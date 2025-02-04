@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["packages/snops", "packages/tui"]
+
+[workspace.package]
+name = "snops"
+version = "0.1.0"
+authors = ["paulo <paulo@turboflakes.io>"]
+license = "MIT or Apache-2.0"
+repository = "https://github.com/turboflakes/snops"
+description = "Just another way of managing substrate node operations in the Polkadot ecoystem."
+edition = "2021"
+
+[workspace.dependencies]
+snops = { path = "packages/snops" }
+snops-tui = { path = "packages/tui" }
