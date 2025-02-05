@@ -1,18 +1,111 @@
+use crate::app::App;
 use ratatui::{
-    layout::Alignment,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
 
-use crate::app::App;
-
 /// Renders the user interface widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {
-    // This is where you add new widgets.
-    // See the following resources:
-    // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
-    // - https://github.com/ratatui/ratatui/tree/master/examples
+    // Define layouts.
+    let container = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Fill(1), Constraint::Length(1)])
+        .split(frame.area());
+
+    let outer_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+        .split(container[0]);
+
+    // TODO: Set constraints based on the enabled features.
+    let left_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![
+            Constraint::Max(4),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Fill(1),
+        ])
+        .split(outer_layout[0]);
+
+    // Render widgets.
+
+    render_networks_widget(app, frame, left_layout[0]);
+
+    render_validators_widget(app, frame, left_layout[1]);
+
+    render_collators_widget(app, frame, left_layout[2]);
+
+    render_rpcs_widget(app, frame, left_layout[3]);
+
+    render_body_widget(app, frame, outer_layout[1]);
+
+    render_legend_widget(app, frame, container[1]);
+}
+
+fn render_networks_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(
+        Paragraph::new(" >> Network List")
+            .block(
+                Block::new()
+                    .title(" Network ")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .style(Style::default().fg(Color::Blue).bg(Color::Black))
+            .left_aligned(),
+        rect,
+    );
+}
+
+fn render_validators_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(
+        Paragraph::new(" >> Validators List")
+            .block(
+                Block::new()
+                    .title(" Validators ")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .style(Style::default().fg(Color::Blue).bg(Color::Black))
+            .left_aligned(),
+        rect,
+    );
+}
+
+fn render_collators_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(
+        Paragraph::new(" >> Collators List")
+            .block(
+                Block::new()
+                    .title(" Collators ")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .style(Style::default().fg(Color::Blue).bg(Color::Black))
+            .left_aligned(),
+        rect,
+    );
+}
+
+fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(
+        Paragraph::new(" >> RPCs List")
+            .block(
+                Block::new()
+                    .title(" RPCs ")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .style(Style::default().fg(Color::Blue).bg(Color::Black))
+            .left_aligned(),
+        rect,
+    );
+}
+
+fn render_body_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
     frame.render_widget(
         Paragraph::new(format!(
             "This is a tui template.\n\
@@ -23,12 +116,23 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         ))
         .block(
             Block::bordered()
-                .title("Template")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Rounded),
+                .title(" Body Dynamic Content ")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),
         )
-        .style(Style::default().fg(Color::Cyan).bg(Color::Black))
+        .style(Style::default().fg(Color::Blue).bg(Color::Black))
         .centered(),
-        frame.area(),
-    )
+        rect,
+    );
+}
+
+fn render_legend_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(
+        Paragraph::new(format!(
+            "← → ↑ ↓: navigate | x: menu | q: quit | +/-: increment/decrement"
+        ))
+        .style(Style::default().fg(Color::Blue).bg(Color::Black))
+        .centered(),
+        rect,
+    );
 }
