@@ -1,30 +1,36 @@
-use std::error;
+use crate::config::{SupportedRuntime, CONFIG};
+use crate::widgets::chains::ChainsListWidget;
+use log::{error, info, warn};
+use std::{collections::HashMap, time::Duration};
+use subxt::{
+    backend::rpc::reconnecting_rpc_client::{ExponentialBackoff, RpcClient},
+    utils::validate_url_is_secure,
+    OnlineClient, SubstrateConfig,
+};
 
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
+pub type AppResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Application.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct App {
     /// Is the application running?
     pub running: bool,
-    /// counter
-    pub counter: u8,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self {
-            running: true,
-            counter: 0,
-        }
-    }
+    /// Holds the API clients for each supported runtime.
+    pub chains: ChainsListWidget,
 }
 
 impl App {
     /// Constructs a new instance of [`App`].
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            running: true,
+            chains: ChainsListWidget::default(),
+        }
+    }
+
+    pub async fn init(&mut self) {
+        self.chains.run().await;
     }
 
     /// Handles the tick event of the terminal.
@@ -35,15 +41,15 @@ impl App {
         self.running = false;
     }
 
-    pub fn increment_counter(&mut self) {
-        if let Some(res) = self.counter.checked_add(1) {
-            self.counter = res;
-        }
-    }
+    // pub fn increment_counter(&mut self) {
+    //     if let Some(res) = self.counter.checked_add(1) {
+    //         self.counter = res;
+    //     }
+    // }
 
-    pub fn decrement_counter(&mut self) {
-        if let Some(res) = self.counter.checked_sub(1) {
-            self.counter = res;
-        }
-    }
+    // pub fn decrement_counter(&mut self) {
+    //     if let Some(res) = self.counter.checked_sub(1) {
+    //         self.counter = res;
+    //     }
+    // }
 }

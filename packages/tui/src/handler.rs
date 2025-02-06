@@ -14,14 +14,18 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 app.quit();
             }
         }
-        // Counter handlers
-        KeyCode::Right => {
-            app.increment_counter();
+        // Scroll Up on `Option-Up`
+        KeyCode::Up => {
+            if key_event.modifiers == KeyModifiers::ALT {
+                app.chains.scroll_up();
+            }
         }
-        KeyCode::Left => {
-            app.decrement_counter();
+        // Scroll Down on `Option-Down`
+        KeyCode::Down => {
+            if key_event.modifiers == KeyModifiers::ALT {
+                app.chains.scroll_down();
+            }
         }
-        // Other handlers you could add here.
         _ => {}
     }
     Ok(())

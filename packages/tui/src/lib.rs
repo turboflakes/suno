@@ -1,6 +1,7 @@
-use std::io;
-
+use log::LevelFilter;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io;
+use tui_logger::{init_logger, set_default_level};
 
 use crate::{
     app::{App, AppResult},
@@ -10,19 +11,29 @@ use crate::{
 };
 
 pub mod app;
-pub mod event;
-pub mod handler;
-pub mod tui;
-pub mod ui;
+mod config;
+mod event;
+mod handler;
+mod tui;
+mod ui;
+mod utils;
+mod widgets;
 
 pub async fn run() -> AppResult<()> {
+    // Initialize logs
+    init_logger(LevelFilter::Info)?;
+    set_default_level(LevelFilter::Info);
+
     // Create an application.
     let mut app = App::new();
+
+    // Initialize the application.
+    app.init().await;
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
-    let events = EventHandler::new(250);
+    let events = EventHandler::new(1000);
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
