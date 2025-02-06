@@ -1,32 +1,35 @@
-use crate::app::{App, AppResult};
+use crate::app::Action;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// Handles the key events and updates the state of [`App`].
-pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+/// Handles the key events and triggers respective action.
+pub fn handle_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
         // Exit application on `ESC` or `q`
-        KeyCode::Esc | KeyCode::Char('q') => {
-            app.quit();
-        }
+        KeyCode::Esc | KeyCode::Char('q') => Action::Quit,
         // Exit application on `Ctrl-C`
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
-                app.quit();
+                Action::Quit
+            } else {
+                Action::Noop
             }
         }
         // Scroll Up on `Option-Up`
         KeyCode::Up => {
             if key_event.modifiers == KeyModifiers::ALT {
-                app.chains.scroll_up();
+                Action::ScrollUp
+            } else {
+                Action::Noop
             }
         }
         // Scroll Down on `Option-Down`
         KeyCode::Down => {
             if key_event.modifiers == KeyModifiers::ALT {
-                app.chains.scroll_down();
+                Action::ScrollDown
+            } else {
+                Action::Noop
             }
         }
-        _ => {}
+        _ => Action::Noop,
     }
-    Ok(())
 }

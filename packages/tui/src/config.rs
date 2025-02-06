@@ -21,6 +21,7 @@ lazy_static! {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {
+    Local,
     Polkadot,
     Kusama,
     Paseo,
@@ -31,6 +32,7 @@ pub enum SupportedRuntime {
 impl std::fmt::Display for SupportedRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Local => write!(f, "Local"),
             Self::Polkadot => write!(f, "Polkadot"),
             Self::Kusama => write!(f, "Kusama"),
             Self::Paseo => write!(f, "Paseo"),

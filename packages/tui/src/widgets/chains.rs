@@ -1,7 +1,8 @@
+use crate::app::Action;
 use crate::config::{SupportedRuntime, CONFIG};
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
-use log::error;
+use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
@@ -13,6 +14,9 @@ use ratatui::{
 };
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
+use tokio::sync::mpsc::UnboundedSender;
+
+pub type BlockNumber = u32;
 
 #[derive(Debug, Clone, Default)]
 pub struct ChainsListWidget {
@@ -33,17 +37,28 @@ struct ChainClient {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-enum ConnectionState {
+pub enum ConnectionState {
     #[default]
     Idle,
     Connecting,
-    Connected,
+    Connected(BlockNumber),
     Error(String),
+}
+
+impl std::fmt::Display for ConnectionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "-"),
+            Self::Connecting => write!(f, "↺"),
+            Self::Connected(block_number) => write!(f, "#{}", block_number),
+            Self::Error(_) => write!(f, "✗"),
+        }
+    }
 }
 
 impl ChainsListWidget {
     /// Initialize OnlineClients for each configured chain.
-    pub async fn run(&self) {
+    pub async fn run(&self, tx: UnboundedSender<Action>) {
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             let url = config.get_default_rpc_url(chain).unwrap_or_default();
@@ -54,9 +69,9 @@ impl ChainsListWidget {
                             let chain_client = ChainClient {
                                 runtime: chain.clone(),
                                 client,
-                                state: ConnectionState::Connected,
+                                state: ConnectionState::Connecting,
                             };
-                            self.on_connected(chain_client)
+                            self.on_connecting(chain_client, tx.clone())
                         }
                         Err(err) => self.on_err(Box::new(err)),
                     }
@@ -66,16 +81,18 @@ impl ChainsListWidget {
         }
     }
 
-    fn on_connected(&self, chain_client: ChainClient) {
+    fn on_connecting(&self, chain_client: ChainClient, tx: UnboundedSender<Action>) {
         let mut state = self.state.write().unwrap();
-        state.chains.push(chain_client);
+        state.chains.push(chain_client.clone());
         if !state.chains.is_empty() {
             state.table_state.select(Some(0));
         }
+        // Launch a task to subscribe the head of the chain.
+        subscribe_best_block(chain_client, tx.clone());
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
-        error!("Failed with error: {}", err);
+        warn!("Failed with error: {}", err);
         // TODO: Set chain state to error
     }
 
@@ -85,6 +102,15 @@ impl ChainsListWidget {
 
     pub fn scroll_up(&self) {
         self.state.write().unwrap().table_state.scroll_up_by(1);
+    }
+
+    pub fn set_connection_state(&self, runtime: SupportedRuntime, connection: ConnectionState) {
+        let mut state = self.state.write().unwrap();
+        for chain in state.chains.iter_mut() {
+            if chain.runtime == runtime {
+                chain.state = connection.clone()
+            }
+        }
     }
 }
 
@@ -98,7 +124,7 @@ impl Widget for &ChainsListWidget {
             .border_type(BorderType::Plain);
 
         let rows = state.chains.iter();
-        let widths = [Constraint::Fill(1), Constraint::Length(5)];
+        let widths = [Constraint::Fill(1), Constraint::Length(10)];
         let table = Table::new(rows, widths)
             .block(block)
             .highlight_spacing(HighlightSpacing::Always)
@@ -120,6 +146,43 @@ impl Widget for &ChainsListWidget {
 impl From<&ChainClient> for Row<'_> {
     fn from(cc: &ChainClient) -> Self {
         let cc = cc.clone();
-        Row::new(vec![cc.runtime.to_string(), "✓".to_string()])
+        Row::new(vec![cc.runtime.to_string(), cc.state.to_string()])
     }
+}
+
+/// Background task that subscribes head block and sends response over channel.
+fn subscribe_best_block(cc: ChainClient, tx: UnboundedSender<Action>) {
+    let api = cc.client.clone();
+    let runtime = cc.runtime.clone();
+    tokio::spawn(async move {
+        match api.blocks().subscribe_best().await {
+            Ok(mut blocks_sub) => {
+                while let Some(result) = blocks_sub.next().await {
+                    match result {
+                        Ok(block) => {
+                            let _ = tx.send(Action::ChainConnection(
+                                runtime.clone(),
+                                ConnectionState::Connected(block.number().into()),
+                            ));
+                        }
+                        Err(e) => {
+                            // Handle disconnection errors.
+                            if e.is_disconnected_will_reconnect() {
+                                warn!("The RPC connection was lost, reconnecting...");
+                                let _ = tx.send(Action::ChainConnection(
+                                    runtime.clone(),
+                                    ConnectionState::Connecting,
+                                ));
+                                continue;
+                            }
+                            error!("{}", e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("error: {:?}", e);
+            }
+        }
+    });
 }

@@ -1,5 +1,4 @@
 use crate::app::App;
-use log::info;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -24,7 +23,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
         .split(container[0]);
 
-    let mut constraints = vec![Constraint::Max(4)];
+    let mut constraints = vec![Constraint::Max(5)];
     if config.features.enable_validators {
         constraints.push(Constraint::Fill(1));
     } else {
@@ -153,7 +152,7 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
 fn render_legend_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
     frame.render_widget(
         Paragraph::new(format!(
-            "← → ↑ ↓: navigate | opt+up/opt+down: scroll | x: menu | q: quit"
+            "← → ↑ ↓: navigate | ⌥ ↑ ↓: scroll | x: menu | q: quit"
         ))
         .style(Style::default().fg(Color::Blue).bg(Color::Black))
         .centered(),
