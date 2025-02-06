@@ -11,7 +11,7 @@ pub async fn create_substrate_rpc_client_from_url(
     if let Err(_) = validate_url_is_secure(url) {
         warn!("Insecure URL provided: {}", url);
     };
-    info!("Connecting to Rpc endpoint {}", url);
+    info!("Connecting to RPC endpoint: {}", url);
     let rpc = RpcClient::builder()
         .retry_policy(ExponentialBackoff::from_millis(100).max_delay(Duration::from_secs(10)))
         .build(url.to_string())

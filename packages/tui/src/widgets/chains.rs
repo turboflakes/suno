@@ -97,11 +97,25 @@ impl ChainsListWidget {
     }
 
     pub fn scroll_down(&self) {
-        self.state.write().unwrap().table_state.scroll_down_by(1);
+        let mut state = self.state.write().unwrap();
+        if let Some(selected) = state.table_state.selected() {
+            if selected == state.chains.len() - 1 {
+                state.table_state.select_first();
+            } else {
+                state.table_state.scroll_down_by(1);
+            }
+        }
     }
 
     pub fn scroll_up(&self) {
-        self.state.write().unwrap().table_state.scroll_up_by(1);
+        let mut state = self.state.write().unwrap();
+        if let Some(selected) = state.table_state.selected() {
+            if selected == 0 {
+                state.table_state.select_last();
+            } else {
+                state.table_state.scroll_up_by(1);
+            }
+        }
     }
 
     pub fn set_connection_state(&self, runtime: SupportedRuntime, connection: ConnectionState) {
@@ -136,6 +150,7 @@ impl Widget for &ChainsListWidget {
             height: area.height - 2,
             ..area
         };
+
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
         let row_index = state.table_state.selected().unwrap();
@@ -168,7 +183,7 @@ fn subscribe_best_block(cc: ChainClient, tx: UnboundedSender<Action>) {
                         Err(e) => {
                             // Handle disconnection errors.
                             if e.is_disconnected_will_reconnect() {
-                                warn!("The RPC connection was lost, reconnecting...");
+                                warn!("Lost connection to the {} RPC. Reconnecting...", cc.runtime);
                                 let _ = tx.send(Action::ChainConnection(
                                     runtime.clone(),
                                     ConnectionState::Connecting,
