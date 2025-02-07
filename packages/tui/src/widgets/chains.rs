@@ -6,7 +6,7 @@ use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::{Style, Stylize},
+    style::{Color, Style, Stylize},
     widgets::{
         Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
         Widget,
@@ -24,13 +24,14 @@ pub struct ChainsListWidget {
 }
 
 #[derive(Debug, Default)]
-struct ChainsListState {
+pub struct ChainsListState {
     chains: Vec<ChainClient>,
     table_state: TableState,
+    is_active: bool,
 }
 
 #[derive(Debug, Clone)]
-struct ChainClient {
+pub struct ChainClient {
     runtime: SupportedRuntime,
     client: OnlineClient<SubstrateConfig>,
     state: ConnectionState,
@@ -126,11 +127,34 @@ impl ChainsListWidget {
             }
         }
     }
+
+    pub fn set_active(&self, active: bool) {
+        let mut state = self.state.write().unwrap();
+        state.is_active = active;
+    }
+
+    pub fn get_selected_chain(&self) -> Option<ChainClient> {
+        let state = self.state.read().unwrap();
+        state
+            .table_state
+            .selected()
+            .map(|i| state.chains[i].clone())
+    }
 }
 
 impl Widget for &ChainsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
+
+        let styles = if state.is_active {
+            let highlight_style = Style::new().fg(Color::Black).bg(Color::White);
+            let table_style = Style::new().fg(Color::White).bg(Color::Black);
+            (table_style, highlight_style)
+        } else {
+            let table_style = Style::new().fg(Color::Blue).bg(Color::Black);
+            let highlight_style = Style::new().fg(Color::White).bg(Color::Black);
+            (table_style, highlight_style)
+        };
 
         let block = Block::new()
             .title(" Chains ")
@@ -141,20 +165,23 @@ impl Widget for &ChainsListWidget {
         let widths = [Constraint::Fill(1), Constraint::Length(10)];
         let table = Table::new(rows, widths)
             .block(block)
+            .style(styles.0)
             .highlight_spacing(HighlightSpacing::Always)
             .highlight_symbol(" > ")
-            .row_highlight_style(Style::new().on_blue());
-
-        let scrollbar_area = Rect {
-            y: area.y + 1,
-            height: area.height - 2,
-            ..area
-        };
+            .row_highlight_style(styles.1);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
-        let row_index = state.table_state.selected().unwrap();
-        render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+        if state.is_active {
+            // Render scrollbar.
+            let scrollbar_area = Rect {
+                y: area.y + 1,
+                height: area.height - 2,
+                ..area
+            };
+            let row_index = state.table_state.selected().unwrap();
+            render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+        }
     }
 }
 

@@ -5,6 +5,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
+use log::info;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -17,10 +18,21 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 pub enum Action {
     Quit,
     Tick,
+    WindowUp,
+    WindowDown,
     ScrollUp,
     ScrollDown,
     ChainConnection(SupportedRuntime, ConnectionState),
     Noop,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum Window {
+    #[default]
+    Chains,
+    Validators,
+    Collators,
+    Rpcs,
 }
 
 /// Application.
@@ -28,6 +40,8 @@ pub enum Action {
 pub struct App {
     /// Is the application running?
     pub running: bool,
+    /// The current window.
+    pub window: Window,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsListWidget,
     /// The sender to send actions to update the state to the app.
@@ -44,6 +58,7 @@ impl App {
 
         Self {
             running: true,
+            window: Window::Chains,
             chains: ChainsListWidget::default(),
             tx,
             rx,
@@ -53,6 +68,7 @@ impl App {
     async fn init(&mut self) {
         let tx = self.tx.clone();
         self.chains.run(tx).await;
+        self.chains.set_active(true);
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
@@ -67,6 +83,7 @@ impl App {
 
         // Start the main loop.
         while self.running {
+            info!("__{:?}", self.window);
             // Render the user interface.
             tui.draw(self)?;
             // Handle events.
@@ -99,8 +116,10 @@ impl App {
             match action {
                 Action::Quit => self.quit(),
                 Action::Tick => self.tick(),
-                Action::ScrollUp => self.chains.scroll_up(),
-                Action::ScrollDown => self.chains.scroll_down(),
+                Action::WindowUp => self.window_up(),
+                Action::WindowDown => self.window_down(),
+                Action::ScrollUp => self.scroll_up(),
+                Action::ScrollDown => self.scroll_down(),
                 Action::ChainConnection(runtime, connection) => {
                     self.chains.set_connection_state(runtime, connection)
                 }
@@ -118,5 +137,43 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    /// Moves row selection up.
+    pub fn scroll_up(&mut self) {
+        match self.window {
+            Window::Chains => self.chains.scroll_up(),
+            _ => {}
+        };
+    }
+
+    /// Moves row selection down.
+    pub fn scroll_down(&mut self) {
+        match self.window {
+            Window::Chains => self.chains.scroll_down(),
+            _ => {}
+        };
+    }
+
+    /// Moves the active window up.
+    pub fn window_up(&mut self) {
+        self.window = match self.window {
+            Window::Chains => Window::Rpcs,
+            Window::Validators => Window::Chains,
+            Window::Collators => Window::Validators,
+            Window::Rpcs => Window::Collators,
+        };
+        self.chains.set_active(self.window == Window::Chains);
+    }
+
+    /// Moves the active window down.
+    pub fn window_down(&mut self) {
+        self.window = match self.window {
+            Window::Chains => Window::Validators,
+            Window::Validators => Window::Collators,
+            Window::Collators => Window::Rpcs,
+            Window::Rpcs => Window::Chains,
+        };
+        self.chains.set_active(self.window == Window::Chains);
     }
 }
