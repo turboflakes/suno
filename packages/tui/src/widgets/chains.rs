@@ -2,11 +2,11 @@ use crate::app::Action;
 use crate::config::{SupportedRuntime, CONFIG};
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
-use log::{error, info, warn};
+use log::{error, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     widgets::{
         Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
         Widget,
@@ -32,8 +32,8 @@ pub struct ChainsListState {
 
 #[derive(Debug, Clone)]
 pub struct ChainClient {
-    runtime: SupportedRuntime,
-    client: OnlineClient<SubstrateConfig>,
+    pub runtime: SupportedRuntime,
+    pub client: OnlineClient<SubstrateConfig>,
     state: ConnectionState,
 }
 
@@ -80,11 +80,15 @@ impl ChainsListWidget {
                 Err(err) => self.on_err(err),
             }
         }
+
+        // Set the window active.
+        self.set_active(true);
     }
 
     fn on_connecting(&self, chain_client: ChainClient, tx: UnboundedSender<Action>) {
         let mut state = self.state.write().unwrap();
         state.chains.push(chain_client.clone());
+        // Select the first chain.
         if !state.chains.is_empty() {
             state.table_state.select(Some(0));
         }
@@ -133,7 +137,7 @@ impl ChainsListWidget {
         state.is_active = active;
     }
 
-    pub fn get_selected_chain(&self) -> Option<ChainClient> {
+    pub fn get_selected(&self) -> Option<ChainClient> {
         let state = self.state.read().unwrap();
         state
             .table_state

@@ -74,19 +74,8 @@ fn render_chains_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
     frame.render_widget(&app.chains, rect);
 }
 
-fn render_validators_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
-    frame.render_widget(
-        Paragraph::new(" >> Validators List")
-            .block(
-                Block::new()
-                    .title(" Validators ")
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .style(Style::default().fg(Color::Blue).bg(Color::Black))
-            .left_aligned(),
-        rect,
-    );
+fn render_validators_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(&app.validators, rect);
 }
 
 fn render_collators_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {

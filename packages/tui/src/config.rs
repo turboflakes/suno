@@ -69,7 +69,7 @@ type Stashes = Vec<Stash>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StashChain {
     #[serde(flatten)]
-    chain: HashMap<SupportedRuntime, Stashes>,
+    pub chain: HashMap<SupportedRuntime, Stashes>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

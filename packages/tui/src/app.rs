@@ -1,5 +1,8 @@
 use crate::config::SupportedRuntime;
-use crate::widgets::chains::{ChainsListWidget, ConnectionState};
+use crate::widgets::{
+    chains::{ChainsListWidget, ConnectionState},
+    validators::ValidatorsListWidget,
+};
 use crate::{
     event::{Event, EventHandler},
     handler::handle_key_events,
@@ -44,6 +47,8 @@ pub struct App {
     pub window: Window,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsListWidget,
+    /// Holds the validators list for the selected chain.
+    pub validators: ValidatorsListWidget,
     /// The sender to send actions to update the state to the app.
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
@@ -60,6 +65,7 @@ impl App {
             running: true,
             window: Window::Chains,
             chains: ChainsListWidget::default(),
+            validators: ValidatorsListWidget::default(),
             tx,
             rx,
         }
@@ -68,7 +74,10 @@ impl App {
     async fn init(&mut self) {
         let tx = self.tx.clone();
         self.chains.run(tx).await;
-        self.chains.set_active(true);
+        if let Some(chain) = self.chains.get_selected() {
+            let tx = self.tx.clone();
+            self.validators.on_chain_selected(chain, tx);
+        }
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
@@ -142,7 +151,13 @@ impl App {
     /// Moves row selection up.
     pub fn scroll_up(&mut self) {
         match self.window {
-            Window::Chains => self.chains.scroll_up(),
+            Window::Chains => {
+                self.chains.scroll_up();
+                if let Some(chain) = self.chains.get_selected() {
+                    let tx = self.tx.clone();
+                    self.validators.on_chain_selected(chain, tx);
+                }
+            }
             _ => {}
         };
     }
@@ -150,7 +165,13 @@ impl App {
     /// Moves row selection down.
     pub fn scroll_down(&mut self) {
         match self.window {
-            Window::Chains => self.chains.scroll_down(),
+            Window::Chains => {
+                self.chains.scroll_down();
+                if let Some(chain) = self.chains.get_selected() {
+                    let tx = self.tx.clone();
+                    self.validators.on_chain_selected(chain, tx);
+                }
+            }
             _ => {}
         };
     }
@@ -164,6 +185,8 @@ impl App {
             Window::Rpcs => Window::Collators,
         };
         self.chains.set_active(self.window == Window::Chains);
+        self.validators
+            .set_active(self.window == Window::Validators);
     }
 
     /// Moves the active window down.
@@ -175,5 +198,7 @@ impl App {
             Window::Rpcs => Window::Chains,
         };
         self.chains.set_active(self.window == Window::Chains);
+        self.validators
+            .set_active(self.window == Window::Validators);
     }
 }
