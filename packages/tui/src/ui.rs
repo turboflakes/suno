@@ -78,19 +78,8 @@ fn render_validators_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
     frame.render_widget(&app.validators, rect);
 }
 
-fn render_collators_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
-    frame.render_widget(
-        Paragraph::new(" >> Collators List")
-            .block(
-                Block::new()
-                    .title(" Collators ")
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .style(Style::default().fg(Color::Blue).bg(Color::Black))
-            .left_aligned(),
-        rect,
-    );
+fn render_collators_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(&app.collators, rect);
 }
 
 fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {

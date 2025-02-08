@@ -2,7 +2,7 @@ use crate::app::Action;
 use crate::config::{SupportedRuntime, CONFIG};
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
-use log::{error, warn};
+use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
@@ -59,28 +59,29 @@ impl std::fmt::Display for ConnectionState {
 
 impl ChainsListWidget {
     /// Initialize OnlineClients for each configured chain.
-    pub async fn run(&self, tx: UnboundedSender<Action>) {
+    pub async fn on_init(&self, tx: &UnboundedSender<Action>) {
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
-            let url = config.get_default_rpc_url(chain).unwrap_or_default();
-            match create_substrate_rpc_client_from_url(url).await {
-                Ok(rpc_client) => {
-                    match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
-                        Ok(client) => {
-                            let chain_client = ChainClient {
-                                runtime: chain.clone(),
-                                client,
-                                state: ConnectionState::Connecting,
-                            };
-                            self.on_connecting(chain_client, tx.clone())
+            for (chain_name, chain_config) in chain {
+                info!("Chain: {}", chain_name);
+                match create_substrate_rpc_client_from_url(&chain_config.rpc_url).await {
+                    Ok(rpc_client) => {
+                        match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
+                            Ok(client) => {
+                                let chain_client = ChainClient {
+                                    runtime: chain_name.clone(),
+                                    client,
+                                    state: ConnectionState::Connecting,
+                                };
+                                self.on_connecting(chain_client, tx.clone())
+                            }
+                            Err(err) => self.on_err(Box::new(err)),
                         }
-                        Err(err) => self.on_err(Box::new(err)),
                     }
+                    Err(err) => self.on_err(err),
                 }
-                Err(err) => self.on_err(err),
             }
         }
-
         // Set the window active.
         self.set_active(true);
     }
@@ -101,7 +102,7 @@ impl ChainsListWidget {
         // TODO: Set chain state to error
     }
 
-    pub fn scroll_down(&self) {
+    pub fn scroll_down(&self) -> Option<ChainClient> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.chains.len() - 1 {
@@ -109,17 +110,30 @@ impl ChainsListWidget {
             } else {
                 state.table_state.scroll_down_by(1);
             }
+            state
+                .table_state
+                .selected()
+                .map(|i| state.chains[i].clone())
+        } else {
+            None
         }
     }
 
-    pub fn scroll_up(&self) {
+    pub fn scroll_up(&self) -> Option<ChainClient> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
-                state.table_state.select_last();
+                let i = state.chains.len() - 1;
+                state.table_state.select(Some(i));
             } else {
                 state.table_state.scroll_up_by(1);
             }
+            state
+                .table_state
+                .selected()
+                .map(|i| state.chains[i].clone())
+        } else {
+            None
         }
     }
 

@@ -1,6 +1,7 @@
-use crate::config::SupportedRuntime;
+use crate::config::{Features, SupportedRuntime, CONFIG};
 use crate::widgets::{
     chains::{ChainsListWidget, ConnectionState},
+    collators::CollatorsListWidget,
     validators::ValidatorsListWidget,
 };
 use crate::{
@@ -30,12 +31,92 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-enum Window {
+pub enum Window {
     #[default]
     Chains,
     Validators,
     Collators,
     Rpcs,
+}
+
+impl Window {
+    fn up(&self, features: &Features) -> Self {
+        use Window::*;
+
+        match self {
+            Chains => Self::up_from_chains(features),
+            Validators => Chains,
+            Collators => Self::up_from_collators(features),
+            Rpcs => Self::up_from_rpcs(features),
+        }
+    }
+
+    fn up_from_chains(features: &Features) -> Self {
+        if features.enable_rpcs {
+            Self::Rpcs
+        } else if features.enable_collators {
+            Self::Collators
+        } else {
+            Self::Validators
+        }
+    }
+
+    fn up_from_collators(features: &Features) -> Self {
+        if features.enable_validators {
+            Self::Validators
+        } else {
+            Self::Chains
+        }
+    }
+
+    fn up_from_rpcs(features: &Features) -> Self {
+        if features.enable_collators {
+            Self::Collators
+        } else if features.enable_validators {
+            Self::Validators
+        } else {
+            Self::Chains
+        }
+    }
+
+    fn down(&self, features: &Features) -> Self {
+        use Window::*;
+
+        match self {
+            Chains => Self::down_from_chains(features),
+            Validators => Self::down_from_validators(features),
+            Collators => Self::down_from_collators(features),
+            Rpcs => Chains,
+        }
+    }
+
+    fn down_from_chains(features: &Features) -> Self {
+        if features.enable_validators {
+            Self::Validators
+        } else if features.enable_collators {
+            Self::Collators
+        } else {
+            Self::Rpcs
+        }
+    }
+
+    fn down_from_validators(features: &Features) -> Self {
+        if features.enable_collators {
+            Self::Collators
+        } else if features.enable_rpcs {
+            Self::Rpcs
+        } else {
+            Self::Chains
+        }
+    }
+
+    fn down_from_collators(features: &Features) -> Self {
+        if features.enable_rpcs {
+            Self::Rpcs
+        } else {
+            Self::Chains
+        }
+    }
 }
 
 /// Application.
@@ -47,8 +128,10 @@ pub struct App {
     pub window: Window,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsListWidget,
-    /// Holds the validators list for the selected chain.
+    /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsListWidget,
+    /// Holds the collators list for the selected relay-chain.
+    pub collators: CollatorsListWidget,
     /// The sender to send actions to update the state to the app.
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
@@ -66,18 +149,22 @@ impl App {
             window: Window::Chains,
             chains: ChainsListWidget::default(),
             validators: ValidatorsListWidget::default(),
+            collators: CollatorsListWidget::default(),
             tx,
             rx,
         }
     }
 
     async fn init(&mut self) {
-        let tx = self.tx.clone();
-        self.chains.run(tx).await;
-        if let Some(chain) = self.chains.get_selected() {
-            let tx = self.tx.clone();
-            self.validators.on_chain_selected(chain, tx);
-        }
+        self.chains.on_init(&self.tx).await;
+        self.validators.on_init(&self.tx);
+        self.collators.on_init(&self.tx);
+        // if let Some(chain) = self.chains.get_selected() {
+        //     let tx = self.tx.clone();
+        //     self.validators.on_chain_selected(chain.clone(), tx);
+        //     let tx = self.tx.clone();
+        //     self.collators.on_chain_selected(chain.clone(), tx);
+        // }
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
@@ -92,7 +179,6 @@ impl App {
 
         // Start the main loop.
         while self.running {
-            info!("__{:?}", self.window);
             // Render the user interface.
             tui.draw(self)?;
             // Handle events.
@@ -153,10 +239,12 @@ impl App {
         match self.window {
             Window::Chains => {
                 self.chains.scroll_up();
-                if let Some(chain) = self.chains.get_selected() {
-                    let tx = self.tx.clone();
-                    self.validators.on_chain_selected(chain, tx);
-                }
+            }
+            Window::Validators => {
+                self.validators.scroll_up();
+            }
+            Window::Collators => {
+                self.collators.scroll_up();
             }
             _ => {}
         };
@@ -167,10 +255,12 @@ impl App {
         match self.window {
             Window::Chains => {
                 self.chains.scroll_down();
-                if let Some(chain) = self.chains.get_selected() {
-                    let tx = self.tx.clone();
-                    self.validators.on_chain_selected(chain, tx);
-                }
+            }
+            Window::Validators => {
+                self.validators.scroll_down();
+            }
+            Window::Collators => {
+                self.collators.scroll_down();
             }
             _ => {}
         };
@@ -178,27 +268,21 @@ impl App {
 
     /// Moves the active window up.
     pub fn window_up(&mut self) {
-        self.window = match self.window {
-            Window::Chains => Window::Rpcs,
-            Window::Validators => Window::Chains,
-            Window::Collators => Window::Validators,
-            Window::Rpcs => Window::Collators,
-        };
+        let config = CONFIG.clone();
+        self.window = self.window.up(&config.features);
         self.chains.set_active(self.window == Window::Chains);
         self.validators
             .set_active(self.window == Window::Validators);
+        self.collators.set_active(self.window == Window::Collators);
     }
 
     /// Moves the active window down.
     pub fn window_down(&mut self) {
-        self.window = match self.window {
-            Window::Chains => Window::Validators,
-            Window::Validators => Window::Collators,
-            Window::Collators => Window::Rpcs,
-            Window::Rpcs => Window::Chains,
-        };
+        let config = CONFIG.clone();
+        self.window = self.window.down(&config.features);
         self.chains.set_active(self.window == Window::Chains);
         self.validators
             .set_active(self.window == Window::Validators);
+        self.collators.set_active(self.window == Window::Collators);
     }
 }

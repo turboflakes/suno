@@ -1,8 +1,8 @@
 use crate::app::Action;
-use crate::config::{NodeConfig, CONFIG};
-use crate::node_account::{AccountDisplay, Validator};
+use crate::config::{NodeConfig, SupportedRuntime, CONFIG};
+use crate::node_account::{AccountDisplay, Collator};
 use crate::widgets::scrollbar::render_scrollbar;
-use log::warn;
+use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
@@ -12,38 +12,40 @@ use ratatui::{
         Widget,
     },
 };
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use subxt::utils::AccountId32;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone, Default)]
-pub struct ValidatorsListWidget {
-    state: Arc<RwLock<ValidatorsListState>>,
+pub struct CollatorsListWidget {
+    state: Arc<RwLock<CollatorsListState>>,
 }
 
 #[derive(Debug, Default)]
-pub struct ValidatorsListState {
-    validators: Vec<Validator>,
+pub struct CollatorsListState {
+    collators: Vec<Collator>,
     table_state: TableState,
     is_active: bool,
 }
 
-impl ValidatorsListWidget {
+impl CollatorsListWidget {
     pub fn on_init(&self, _tx: &UnboundedSender<Action>) {
         let mut state = self.state.write().unwrap();
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
-                for validator in &chain_config.validators {
-                    match validator {
+                for collator in &chain_config.collators {
+                    match collator {
                         NodeConfig::Address(stash) => {
                             state
-                                .validators
-                                .push(Validator::new(chain_name.clone(), stash.clone()));
+                                .collators
+                                .push(Collator::new(chain_name.clone(), stash.clone()));
                         }
                         NodeConfig::Detailed { stash, commands } => {
                             state
-                                .validators
-                                .push(Validator::new(chain_name.clone(), stash.clone()));
+                                .collators
+                                .push(Collator::new(chain_name.clone(), stash.clone()));
                             // if let Some(cmds) = commands {
                             //     for cmd in cmds {
                             //         println!("  Command: {} ({})", cmd.name, cmd.run);
@@ -55,7 +57,7 @@ impl ValidatorsListWidget {
             }
         }
         // Select the first validator.
-        if !state.validators.is_empty() {
+        if !state.collators.is_empty() {
             state.table_state.select(Some(0));
         }
     }
@@ -65,10 +67,10 @@ impl ValidatorsListWidget {
         // TODO: Set chain state to error
     }
 
-    pub fn scroll_down(&self) -> Option<Validator> {
+    pub fn scroll_down(&self) -> Option<Collator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
-            if selected == state.validators.len() - 1 {
+            if selected == state.collators.len() - 1 {
                 state.table_state.select_first();
             } else {
                 state.table_state.scroll_down_by(1);
@@ -76,17 +78,17 @@ impl ValidatorsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.validators[i].clone())
+                .map(|i| state.collators[i].clone())
         } else {
             None
         }
     }
 
-    pub fn scroll_up(&self) -> Option<Validator> {
+    pub fn scroll_up(&self) -> Option<Collator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
-                let i = state.validators.len() - 1;
+                let i = state.collators.len() - 1;
                 state.table_state.select(Some(i));
             } else {
                 state.table_state.scroll_up_by(1);
@@ -94,7 +96,7 @@ impl ValidatorsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.validators[i].clone())
+                .map(|i| state.collators[i].clone())
         } else {
             None
         }
@@ -105,16 +107,16 @@ impl ValidatorsListWidget {
         state.is_active = active;
     }
 
-    pub fn get_selected(&self) -> Option<Validator> {
+    pub fn get_selected(&self) -> Option<Collator> {
         let state = self.state.read().unwrap();
         state
             .table_state
             .selected()
-            .map(|i| state.validators[i].clone())
+            .map(|i| state.collators[i].clone())
     }
 }
 
-impl Widget for &ValidatorsListWidget {
+impl Widget for &CollatorsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
@@ -130,11 +132,11 @@ impl Widget for &ValidatorsListWidget {
         };
 
         let block = Block::new()
-            .title(" Validators ")
+            .title(" Collators ")
             .borders(Borders::ALL)
             .border_type(BorderType::Plain);
 
-        let rows = state.validators.iter();
+        let rows = state.collators.iter();
         let widths = [Constraint::Fill(1), Constraint::Length(14)];
         let table = Table::new(rows, widths)
             .block(block)
@@ -153,14 +155,14 @@ impl Widget for &ValidatorsListWidget {
                 ..area
             };
             let row_index = state.table_state.selected().unwrap();
-            render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
+            render_scrollbar(row_index, state.collators.len(), scrollbar_area, buf);
         }
     }
 }
 
-impl From<&Validator> for Row<'_> {
-    fn from(v: &Validator) -> Self {
-        let v = v.clone();
-        Row::new(vec![v.runtime().to_string(), v.to_compact_string(5)])
+impl From<&Collator> for Row<'_> {
+    fn from(c: &Collator) -> Self {
+        let c = c.clone();
+        Row::new(vec![c.runtime().to_string(), c.to_compact_string(5)])
     }
 }

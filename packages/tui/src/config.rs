@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use subxt::utils::AccountId32;
 
 // Set Config struct into a CONFIG lazy_static to avoid multiple processing
 lazy_static! {
@@ -25,8 +26,14 @@ pub enum SupportedRuntime {
     Polkadot,
     Kusama,
     Paseo,
-    #[serde(rename = "asset-hub-polkadot")]
+    #[serde(rename = "asset_hub_polkadot")]
     AssetHubPolkadot,
+    #[serde(rename = "bridge_hub_polkadot")]
+    BridgeHubPolkadot,
+    #[serde(rename = "asset_hub_kusama")]
+    AssetHubKusama,
+    #[serde(rename = "bridge_hub_kusama")]
+    BridgeHubKusama,
 }
 
 impl std::fmt::Display for SupportedRuntime {
@@ -36,40 +43,63 @@ impl std::fmt::Display for SupportedRuntime {
             Self::Polkadot => write!(f, "Polkadot"),
             Self::Kusama => write!(f, "Kusama"),
             Self::Paseo => write!(f, "Paseo"),
-            Self::AssetHubPolkadot => write!(f, "Asset Hub Polkadot"),
+            Self::AssetHubPolkadot => write!(f, "AssetHub Polkadot"),
+            Self::BridgeHubPolkadot => write!(f, "BridgeHub Polkadot"),
+            Self::AssetHubKusama => write!(f, "AssetHub Kusama"),
+            Self::BridgeHubKusama => write!(f, "BridgeHub Kusama"),
         }
     }
 }
 
-// impl SupportedRuntime {
-//     pub fn default_rpc_url(&self) -> &'static str {
-//         let config = CONFIG.clone();
-//         config
-//             .rpcs
-//             .iter()
-//             .find_map(|rpc_chain| {
-//                 rpc_chain
-//                     .chain
-//                     .get(self)
-//                     .map(|urls| urls.first().unwrap().as_str())
-//             })
-//             .unwrap()
-//         // .unwrap_or_else(|| match &self {
-//         //     Self::Polkadot => "wss://rpc.ibp.network:443/polkadot",
-//         //     Self::Kusama => "wss://rpc.ibp.network:443/kusama",
-//         //     Self::Paseo => "wss://rpc.ibp.network:443/paseo",
-//         //     Self::AssetHubPolkadot => "wss://rpc.ibp.network:443/asset-hub-polkadot",
-//         // })
-//     }
-// }
+impl SupportedRuntime {
+    pub fn to_compact_string(&self) -> String {
+        match self {
+            Self::Local => "loc".to_string(),
+            Self::Polkadot => "dot".to_string(),
+            Self::Kusama => "ksm".to_string(),
+            Self::Paseo => "pas".to_string(),
+            Self::AssetHubPolkadot => "ahp".to_string(),
+            Self::BridgeHubPolkadot => "bhp".to_string(),
+            Self::AssetHubKusama => "ahp".to_string(),
+            Self::BridgeHubKusama => "bhp".to_string(),
+        }
+    }
+}
 
-type Stash = String;
-type Stashes = Vec<Stash>;
+pub type Stash = AccountId32;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StashChain {
-    #[serde(flatten)]
-    pub chain: HashMap<SupportedRuntime, Stashes>,
+pub struct Config {
+    pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
+    // TODO: Add support for RPCs
+    // rpcs: Vec<HashMap<String, Vec<String>>>,
+    pub features: Features,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChainConfig {
+    pub rpc_url: String,
+    pub light_client: bool,
+    #[serde(default)]
+    pub validators: Vec<NodeConfig>,
+    #[serde(default)]
+    pub collators: Vec<NodeConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NodeConfig {
+    Address(Stash),
+    Detailed {
+        stash: Stash,
+        commands: Option<Vec<Command>>,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Command {
+    pub name: String,
+    pub run: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -89,21 +119,6 @@ impl Default for Features {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RpcChain {
-    #[serde(flatten)]
-    chain: HashMap<SupportedRuntime, Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub chains: Vec<SupportedRuntime>,
-    pub validators: Vec<StashChain>,
-    pub collators: Vec<StashChain>,
-    pub rpcs: Vec<RpcChain>,
-    pub features: Features,
-}
-
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let contents = fs::read_to_string(path)?;
@@ -120,15 +135,6 @@ impl Config {
         }
 
         Ok(())
-    }
-
-    pub fn get_default_rpc_url(&self, runtime: &SupportedRuntime) -> Option<&str> {
-        self.rpcs.iter().find_map(|rpc_chain| {
-            rpc_chain
-                .chain
-                .get(runtime)
-                .map(|urls| urls.first().unwrap().as_str())
-        })
     }
 }
 
@@ -148,126 +154,160 @@ fn get_config() -> Result<Config, Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_chain_serialization() {
-        let chain = SupportedRuntime::Polkadot;
-        let serialized = serde_yaml::to_string(&chain).unwrap();
-        assert_eq!(serialized.trim(), "polkadot");
+    fn test_address_only() {
+        let yaml = r#""5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY""#;
+        let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
-        let chain = SupportedRuntime::AssetHubPolkadot;
-        let serialized = serde_yaml::to_string(&chain).unwrap();
-        assert_eq!(serialized.trim(), "asset-hub-polkadot");
+        match config {
+            NodeConfig::Address(account_id) => {
+                assert_eq!(
+                    account_id.to_string(),
+                    "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+                );
+            }
+            _ => panic!("Expected Address variant"),
+        }
     }
 
     #[test]
-    fn test_chain_deserialization() {
-        let chain: SupportedRuntime = serde_yaml::from_str("polkadot").unwrap();
-        assert_eq!(chain, SupportedRuntime::Polkadot);
-
-        let chain: SupportedRuntime = serde_yaml::from_str("asset-hub-polkadot").unwrap();
-        assert_eq!(chain, SupportedRuntime::AssetHubPolkadot);
-    }
-
-    #[test]
-    fn test_valid_config_from_yaml() {
+    fn test_detailed_with_commands() {
         let yaml = r#"
-chains:
-  - polkadot
-  - kusama
-validators:
-  - polkadot: ["stash_1", "stash_2"]
-  - kusama: ["stash_3"]
-collators:
-  - polkadot: ["stash_4"]
-  - kusama: ["stash_5", "stash_6"]
-rpcs:
-    - polkadot: ["endpoint_1"]
-    - kusama: ["endpoint_2", "endpoint_3"]
-features:
-  enable_validators: true
-  enable_collators: true
-  enable_rpcs: false
-"#;
-        let file = create_temp_file(yaml);
-        let config = Config::from_file(file.path()).unwrap();
+            stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            commands:
+              - name: Ping
+                run: "echo 'Ping'"
+        "#;
+        let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
-        assert_eq!(config.chains.len(), 2);
-        assert_eq!(config.validators.len(), 2);
-        assert_eq!(config.validators.len(), 2);
-        assert_eq!(config.collators.len(), 2);
-        assert_eq!(config.rpcs.len(), 2);
-        assert_eq!(
-            config.rpcs[0]
-                .chain
-                .get(&SupportedRuntime::Polkadot)
-                .unwrap(),
-            &vec!["endpoint_1".to_string()]
-        );
-        assert_eq!(
-            config.rpcs[1].chain.get(&SupportedRuntime::Kusama).unwrap(),
-            &vec!["endpoint_2".to_string(), "endpoint_3".to_string()]
-        );
-        assert!(config.features.enable_validators);
-        assert!(config.features.enable_collators);
-        assert!(!config.features.enable_rpcs);
+        match config {
+            NodeConfig::Detailed { stash, commands } => {
+                assert_eq!(
+                    stash.to_string(),
+                    "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+                );
+                let commands = commands.unwrap();
+                assert_eq!(commands[0].name, "Ping");
+                assert_eq!(commands[0].run, "echo 'Ping'");
+            }
+            _ => panic!("Expected Detailed variant"),
+        }
     }
 
     #[test]
-    fn test_config_validation() {
-        // Valid config
-        let config = Config {
-            chains: vec![SupportedRuntime::Polkadot],
-            validators: vec![],
-            collators: vec![],
-            rpcs: vec![],
-            features: Features {
-                enable_validators: true,
-                enable_collators: true,
-                enable_rpcs: true,
-            },
-        };
-        assert!(config.validate().is_ok());
+    fn test_detailed_without_commands() {
+        let yaml = r#"
+                stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            "#;
+        let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
-        // Invalid config (no chains)
+        match config {
+            NodeConfig::Detailed { stash, commands } => {
+                assert_eq!(
+                    stash.to_string(),
+                    "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+                );
+                assert!(commands.is_none());
+            }
+            _ => panic!("Expected Detailed variant"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_account_id() {
+        let yaml = r#""invalid_account_id""#;
+        assert!(serde_yaml::from_str::<NodeConfig>(yaml).is_err());
+    }
+
+    #[test]
+    fn test_supported_runtime_display() {
+        assert_eq!(SupportedRuntime::Local.to_string(), "Local");
+        assert_eq!(SupportedRuntime::Polkadot.to_string(), "Polkadot");
+        assert_eq!(SupportedRuntime::Kusama.to_string(), "Kusama");
+        assert_eq!(SupportedRuntime::Paseo.to_string(), "Paseo");
+        assert_eq!(
+            SupportedRuntime::AssetHubPolkadot.to_string(),
+            "Asset Hub Polkadot"
+        );
+    }
+
+    #[test]
+    fn test_config_validation_empty_chains() {
         let config = Config {
             chains: vec![],
-            validators: vec![],
-            collators: vec![],
-            rpcs: vec![],
-            features: Features {
-                enable_validators: true,
-                enable_collators: true,
-                enable_rpcs: true,
-            },
+            features: Features::default(),
         };
         assert!(config.validate().is_err());
     }
 
     #[test]
-    fn test_invalid_yaml_format() {
-        let invalid_yaml = "invalid: - yaml: content";
-        let file = create_temp_file(invalid_yaml);
-        assert!(Config::from_file(file.path()).is_err());
+    fn test_config_from_file_valid() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+  enable_validators: true
+  enable_collators: false
+  enable_rpcs: false
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 1);
+        assert!(config.features.enable_validators);
     }
 
     #[test]
-    fn test_stash_chain_structure() {
-        let mut map = HashMap::new();
-        map.insert(SupportedRuntime::Polkadot, vec!["stash_1".to_string()]);
+    fn test_supported_runtime_serialization() {
+        let runtime = SupportedRuntime::AssetHubPolkadot;
+        let serialized = serde_yaml::to_string(&runtime).unwrap();
+        assert_eq!(serialized.trim(), "asset_hub_polkadot");
 
-        let stash_chain = StashChain { chain: map };
+        let deserialized: SupportedRuntime = serde_yaml::from_str("asset_hub_polkadot").unwrap();
+        assert!(matches!(deserialized, SupportedRuntime::AssetHubPolkadot));
+    }
 
-        let serialized = serde_yaml::to_string(&stash_chain).unwrap();
-        let deserialized: StashChain = serde_yaml::from_str(&serialized).unwrap();
+    #[test]
+    fn test_config_with_all_chain_types() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+  - kusama:
+      rpc_url: "wss://rpc.kusama.io"
+      light_client: false
+      validators:
+        - stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          commands:
+            - name: "test"
+              run: "echo test"
+  - asset_hub_polkadot:
+      rpc_url: "wss://rpc.asset.hub"
+      light_client: false
+      collators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+  enable_validators: true
+  enable_collators: true
+  enable_rpcs: false
+"#;
 
-        assert_eq!(
-            deserialized.chain.get(&SupportedRuntime::Polkadot).unwrap(),
-            &vec!["stash_1".to_string()]
-        );
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 3);
+        assert!(config.features.enable_validators);
+        assert!(config.features.enable_collators);
     }
 
     // Helper function to create temporary file with content
