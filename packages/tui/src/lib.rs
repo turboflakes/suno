@@ -8,6 +8,7 @@ mod config;
 mod event;
 mod handler;
 mod node_account;
+mod section;
 mod tui;
 mod ui;
 mod utils;

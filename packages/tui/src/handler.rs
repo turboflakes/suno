@@ -19,7 +19,7 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
             if key_event.modifiers == KeyModifiers::ALT {
                 Action::ScrollUp
             } else {
-                Action::WindowUp
+                Action::SectionUp
             }
         }
         // Scroll Down on `Option-Down`
@@ -27,7 +27,7 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
             if key_event.modifiers == KeyModifiers::ALT {
                 Action::ScrollDown
             } else {
-                Action::WindowDown
+                Action::SectionDown
             }
         }
         _ => Action::Noop,

@@ -1,4 +1,5 @@
 use crate::config::{Features, SupportedRuntime, CONFIG};
+use crate::section::Section;
 use crate::widgets::{
     chains::{ChainsListWidget, ConnectionState},
     collators::CollatorsListWidget,
@@ -22,101 +23,12 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 pub enum Action {
     Quit,
     Tick,
-    WindowUp,
-    WindowDown,
+    SectionUp,
+    SectionDown,
     ScrollUp,
     ScrollDown,
     ChainConnection(SupportedRuntime, ConnectionState),
     Noop,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum Section {
-    #[default]
-    Chains,
-    Validators,
-    Collators,
-    Rpcs,
-}
-
-impl Section {
-    fn up(&self, features: &Features) -> Self {
-        use Section::*;
-
-        match self {
-            Chains => Self::up_from_chains(features),
-            Validators => Chains,
-            Collators => Self::up_from_collators(features),
-            Rpcs => Self::up_from_rpcs(features),
-        }
-    }
-
-    fn up_from_chains(features: &Features) -> Self {
-        if features.enable_rpcs {
-            Self::Rpcs
-        } else if features.enable_collators {
-            Self::Collators
-        } else {
-            Self::Validators
-        }
-    }
-
-    fn up_from_collators(features: &Features) -> Self {
-        if features.enable_validators {
-            Self::Validators
-        } else {
-            Self::Chains
-        }
-    }
-
-    fn up_from_rpcs(features: &Features) -> Self {
-        if features.enable_collators {
-            Self::Collators
-        } else if features.enable_validators {
-            Self::Validators
-        } else {
-            Self::Chains
-        }
-    }
-
-    fn down(&self, features: &Features) -> Self {
-        use Section::*;
-
-        match self {
-            Chains => Self::down_from_chains(features),
-            Validators => Self::down_from_validators(features),
-            Collators => Self::down_from_collators(features),
-            Rpcs => Chains,
-        }
-    }
-
-    fn down_from_chains(features: &Features) -> Self {
-        if features.enable_validators {
-            Self::Validators
-        } else if features.enable_collators {
-            Self::Collators
-        } else {
-            Self::Rpcs
-        }
-    }
-
-    fn down_from_validators(features: &Features) -> Self {
-        if features.enable_collators {
-            Self::Collators
-        } else if features.enable_rpcs {
-            Self::Rpcs
-        } else {
-            Self::Chains
-        }
-    }
-
-    fn down_from_collators(features: &Features) -> Self {
-        if features.enable_rpcs {
-            Self::Rpcs
-        } else {
-            Self::Chains
-        }
-    }
 }
 
 /// Application.
@@ -211,8 +123,8 @@ impl App {
             match action {
                 Action::Quit => self.quit(),
                 Action::Tick => self.tick(),
-                Action::WindowUp => self.window_up(),
-                Action::WindowDown => self.window_down(),
+                Action::SectionUp => self.section_up(),
+                Action::SectionDown => self.section_down(),
                 Action::ScrollUp => self.scroll_up(),
                 Action::ScrollDown => self.scroll_down(),
                 Action::ChainConnection(runtime, connection) => {
@@ -266,8 +178,8 @@ impl App {
         };
     }
 
-    /// Moves the active window up.
-    pub fn window_up(&mut self) {
+    /// Moves the active section up.
+    pub fn section_up(&mut self) {
         let config = CONFIG.clone();
         self.section = self.section.up(&config.features);
         self.chains.set_active(self.section == Section::Chains);
@@ -277,8 +189,8 @@ impl App {
             .set_active(self.section == Section::Collators);
     }
 
-    /// Moves the active window down.
-    pub fn window_down(&mut self) {
+    /// Moves the active section down.
+    pub fn section_down(&mut self) {
         let config = CONFIG.clone();
         self.section = self.section.down(&config.features);
         self.chains.set_active(self.section == Section::Chains);
