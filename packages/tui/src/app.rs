@@ -31,7 +31,7 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum Window {
+pub enum Section {
     #[default]
     Chains,
     Validators,
@@ -39,9 +39,9 @@ pub enum Window {
     Rpcs,
 }
 
-impl Window {
+impl Section {
     fn up(&self, features: &Features) -> Self {
-        use Window::*;
+        use Section::*;
 
         match self {
             Chains => Self::up_from_chains(features),
@@ -80,7 +80,7 @@ impl Window {
     }
 
     fn down(&self, features: &Features) -> Self {
-        use Window::*;
+        use Section::*;
 
         match self {
             Chains => Self::down_from_chains(features),
@@ -124,8 +124,8 @@ impl Window {
 pub struct App {
     /// Is the application running?
     pub running: bool,
-    /// The current window.
-    pub window: Window,
+    /// The current selected section.
+    pub section: Section,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsListWidget,
     /// Holds the validators list for the selected relay-chain.
@@ -146,7 +146,7 @@ impl App {
 
         Self {
             running: true,
-            window: Window::Chains,
+            section: Section::Chains,
             chains: ChainsListWidget::default(),
             validators: ValidatorsListWidget::default(),
             collators: CollatorsListWidget::default(),
@@ -236,14 +236,14 @@ impl App {
 
     /// Moves row selection up.
     pub fn scroll_up(&mut self) {
-        match self.window {
-            Window::Chains => {
+        match self.section {
+            Section::Chains => {
                 self.chains.scroll_up();
             }
-            Window::Validators => {
+            Section::Validators => {
                 self.validators.scroll_up();
             }
-            Window::Collators => {
+            Section::Collators => {
                 self.collators.scroll_up();
             }
             _ => {}
@@ -252,14 +252,14 @@ impl App {
 
     /// Moves row selection down.
     pub fn scroll_down(&mut self) {
-        match self.window {
-            Window::Chains => {
+        match self.section {
+            Section::Chains => {
                 self.chains.scroll_down();
             }
-            Window::Validators => {
+            Section::Validators => {
                 self.validators.scroll_down();
             }
-            Window::Collators => {
+            Section::Collators => {
                 self.collators.scroll_down();
             }
             _ => {}
@@ -269,20 +269,22 @@ impl App {
     /// Moves the active window up.
     pub fn window_up(&mut self) {
         let config = CONFIG.clone();
-        self.window = self.window.up(&config.features);
-        self.chains.set_active(self.window == Window::Chains);
+        self.section = self.section.up(&config.features);
+        self.chains.set_active(self.section == Section::Chains);
         self.validators
-            .set_active(self.window == Window::Validators);
-        self.collators.set_active(self.window == Window::Collators);
+            .set_active(self.section == Section::Validators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 
     /// Moves the active window down.
     pub fn window_down(&mut self) {
         let config = CONFIG.clone();
-        self.window = self.window.down(&config.features);
-        self.chains.set_active(self.window == Window::Chains);
+        self.section = self.section.down(&config.features);
+        self.chains.set_active(self.section == Section::Chains);
         self.validators
-            .set_active(self.window == Window::Validators);
-        self.collators.set_active(self.window == Window::Collators);
+            .set_active(self.section == Section::Validators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 }
