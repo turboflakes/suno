@@ -10,6 +10,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use log::info;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
@@ -25,8 +26,9 @@ pub enum Action {
     Tick,
     SectionUp,
     SectionDown,
-    ScrollUp,
-    ScrollDown,
+    MoveUp,
+    MoveDown,
+    TogglePopup,
     ChainConnection(SupportedRuntime, ConnectionState),
     Noop,
 }
@@ -48,6 +50,8 @@ pub struct App {
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
     pub rx: UnboundedReceiver<Action>,
+    /// Is the popup menu open?
+    pub is_popup_visible: bool,
 }
 
 impl App {
@@ -64,6 +68,7 @@ impl App {
             collators: CollatorsListWidget::default(),
             tx,
             rx,
+            is_popup_visible: false,
         }
     }
 
@@ -125,8 +130,9 @@ impl App {
                 Action::Tick => self.tick(),
                 Action::SectionUp => self.section_up(),
                 Action::SectionDown => self.section_down(),
-                Action::ScrollUp => self.scroll_up(),
-                Action::ScrollDown => self.scroll_down(),
+                Action::MoveUp => self.move_up(),
+                Action::MoveDown => self.move_down(),
+                Action::TogglePopup => self.toggle_popup(),
                 Action::ChainConnection(runtime, connection) => {
                     self.chains.set_connection_state(runtime, connection)
                 }
@@ -147,32 +153,40 @@ impl App {
     }
 
     /// Moves row selection up.
-    pub fn scroll_up(&mut self) {
+    pub fn move_up(&mut self) {
         match self.section {
             Section::Chains => {
-                self.chains.scroll_up();
+                self.chains.move_up();
             }
             Section::Validators => {
-                self.validators.scroll_up();
+                if self.is_popup_visible {
+                    self.validators.move_popup_up();
+                } else {
+                    self.validators.move_up();
+                }
             }
             Section::Collators => {
-                self.collators.scroll_up();
+                self.collators.move_up();
             }
             _ => {}
         };
     }
 
     /// Moves row selection down.
-    pub fn scroll_down(&mut self) {
+    pub fn move_down(&mut self) {
         match self.section {
             Section::Chains => {
-                self.chains.scroll_down();
+                self.chains.move_down();
             }
             Section::Validators => {
-                self.validators.scroll_down();
+                if self.is_popup_visible {
+                    self.validators.move_popup_down();
+                } else {
+                    self.validators.move_down();
+                }
             }
             Section::Collators => {
-                self.collators.scroll_down();
+                self.collators.move_down();
             }
             _ => {}
         };
@@ -180,6 +194,9 @@ impl App {
 
     /// Moves the active section up.
     pub fn section_up(&mut self) {
+        if self.is_popup_visible {
+            return;
+        }
         let config = CONFIG.clone();
         self.section = self.section.up(&config.features);
         self.chains.set_active(self.section == Section::Chains);
@@ -191,6 +208,9 @@ impl App {
 
     /// Moves the active section down.
     pub fn section_down(&mut self) {
+        if self.is_popup_visible {
+            return;
+        }
         let config = CONFIG.clone();
         self.section = self.section.down(&config.features);
         self.chains.set_active(self.section == Section::Chains);
@@ -198,5 +218,16 @@ impl App {
             .set_active(self.section == Section::Validators);
         self.collators
             .set_active(self.section == Section::Collators);
+    }
+
+    /// Toggle popup status
+    pub fn toggle_popup(&mut self) {
+        self.is_popup_visible = !self.is_popup_visible;
+        match self.section {
+            Section::Validators => {
+                self.validators.set_popup_visibility(self.is_popup_visible);
+            }
+            _ => {}
+        };
     }
 }

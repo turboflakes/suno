@@ -7,10 +7,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
     style::{Color, Style},
-    widgets::{
-        Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
-        Widget,
-    },
+    widgets::{Block, BorderType, Borders, Clear, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
@@ -102,7 +99,7 @@ impl ChainsListWidget {
         // TODO: Set chain state to error
     }
 
-    pub fn scroll_down(&self) -> Option<ChainClient> {
+    pub fn move_down(&self) -> Option<ChainClient> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.chains.len() - 1 {
@@ -119,7 +116,7 @@ impl ChainsListWidget {
         }
     }
 
-    pub fn scroll_up(&self) -> Option<ChainClient> {
+    pub fn move_up(&self) -> Option<ChainClient> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
@@ -164,14 +161,15 @@ impl Widget for &ChainsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
-        let styles = if state.is_active {
-            let highlight_style = Style::new().fg(Color::Black).bg(Color::White);
-            let table_style = Style::new().fg(Color::White).bg(Color::Black);
-            (table_style, highlight_style)
-        } else {
-            let table_style = Style::new().fg(Color::Blue).bg(Color::Black);
-            let highlight_style = Style::new().fg(Color::White).bg(Color::Black);
-            (table_style, highlight_style)
+        let (table_style, highlight_style) = match state.is_active {
+            true => (
+                Style::default().fg(Color::White),
+                Style::default().fg(Color::Black).bg(Color::White),
+            ),
+            false => (
+                Style::default().fg(Color::Blue),
+                Style::default().fg(Color::Blue),
+            ),
         };
 
         let block = Block::new()
@@ -183,8 +181,8 @@ impl Widget for &ChainsListWidget {
         let widths = [Constraint::Fill(1), Constraint::Length(10)];
         let table = Table::new(rows, widths)
             .block(block)
-            .style(styles.0)
-            .row_highlight_style(styles.1);
+            .style(table_style)
+            .row_highlight_style(highlight_style);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 

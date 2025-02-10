@@ -7,6 +7,7 @@ pub mod app;
 mod config;
 mod event;
 mod handler;
+mod menu;
 mod node_account;
 mod section;
 mod tui;

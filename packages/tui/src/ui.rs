@@ -1,8 +1,10 @@
 use crate::app::App;
+use crate::section::Section;
+use crate::widgets::validators_popup::ValidatorsPopupWidget;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
     Frame,
 };
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
@@ -68,6 +70,30 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     // Display footer.
     render_legend_widget(app, frame, container[1]);
+
+    // Render the frame.
+    if app.is_popup_visible {
+        let area = popup_area(frame.area(), 40, 40);
+        match app.section {
+            Section::Validators => {
+                render_validators_popup(app, frame, area);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn render_validators_popup(app: &mut App, frame: &mut Frame, rect: Rect) {
+    frame.render_widget(Clear, rect); //this clears out the background
+    frame.render_widget(&app.validators.popup, rect);
+}
+
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
 }
 
 fn render_chains_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
@@ -122,18 +148,20 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
             .output_target(false)
             .output_file(false)
             .output_line(false)
-            .style(Style::default().fg(Color::Blue).bg(Color::Black)),
+            .style(Style::default().fg(Color::Blue)),
         rect,
     );
 }
 
-fn render_legend_widget(_app: &mut App, frame: &mut Frame, rect: Rect) {
-    frame.render_widget(
-        Paragraph::new(format!(
-            "← → ↑ ↓: navigate | ⌥ ↑ ↓: scroll | x: menu | q: quit"
-        ))
-        .style(Style::default().fg(Color::Blue).bg(Color::Black))
-        .centered(),
-        rect,
-    );
+fn render_legend_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
+    let footer = if app.is_popup_visible {
+        Paragraph::new(format!("enter: run | ↑ ↓: navigate | x: close"))
+            .style(Style::default().fg(Color::Blue))
+            .centered()
+    } else {
+        Paragraph::new(format!("← ↑ → ↓: navigate | x: menu | q: quit"))
+            .style(Style::default().fg(Color::Blue))
+            .centered()
+    };
+    frame.render_widget(footer, rect);
 }

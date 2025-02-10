@@ -2,6 +2,7 @@ use crate::app::Action;
 use crate::config::{NodeConfig, CONFIG};
 use crate::node_account::{AccountDisplay, Validator};
 use crate::widgets::scrollbar::render_scrollbar;
+use crate::widgets::validators_popup::ValidatorsPopupWidget;
 use log::warn;
 use ratatui::{
     buffer::Buffer,
@@ -18,6 +19,7 @@ use tokio::sync::mpsc::UnboundedSender;
 #[derive(Debug, Clone, Default)]
 pub struct ValidatorsListWidget {
     state: Arc<RwLock<ValidatorsListState>>,
+    pub popup: ValidatorsPopupWidget,
 }
 
 #[derive(Debug, Default)]
@@ -58,6 +60,8 @@ impl ValidatorsListWidget {
         if !state.validators.is_empty() {
             state.table_state.select(Some(0));
         }
+        // Initialize the popup.
+        self.popup.on_init();
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
@@ -65,7 +69,7 @@ impl ValidatorsListWidget {
         // TODO: Set chain state to error
     }
 
-    pub fn scroll_down(&self) -> Option<Validator> {
+    pub fn move_down(&self) -> Option<Validator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.validators.len() - 1 {
@@ -82,7 +86,7 @@ impl ValidatorsListWidget {
         }
     }
 
-    pub fn scroll_up(&self) -> Option<Validator> {
+    pub fn move_up(&self) -> Option<Validator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
@@ -112,6 +116,18 @@ impl ValidatorsListWidget {
             .selected()
             .map(|i| state.validators[i].clone())
     }
+
+    pub fn set_popup_visibility(&mut self, visible: bool) {
+        self.popup.set_active(visible);
+    }
+
+    pub fn move_popup_up(&mut self) {
+        self.popup.move_up();
+    }
+
+    pub fn move_popup_down(&mut self) {
+        self.popup.move_down();
+    }
 }
 
 impl Widget for &ValidatorsListWidget {
@@ -120,12 +136,12 @@ impl Widget for &ValidatorsListWidget {
 
         let (table_style, highlight_style) = match state.is_active {
             true => (
-                Style::default().fg(Color::White).bg(Color::Black),
+                Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
             ),
             false => (
-                Style::default().fg(Color::Blue).bg(Color::Black),
-                Style::default().fg(Color::White).bg(Color::Black),
+                Style::default().fg(Color::Blue),
+                Style::default().fg(Color::Blue),
             ),
         };
 

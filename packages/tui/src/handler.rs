@@ -1,4 +1,5 @@
 use crate::app::Action;
+use crate::section::Section;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handles the key events and triggers respective action.
@@ -14,22 +15,16 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
                 Action::Noop
             }
         }
-        // Scroll Up on `Option-Up`
-        KeyCode::Up => {
-            if key_event.modifiers == KeyModifiers::ALT {
-                Action::ScrollUp
-            } else {
-                Action::SectionUp
-            }
-        }
-        // Scroll Down on `Option-Down`
-        KeyCode::Down => {
-            if key_event.modifiers == KeyModifiers::ALT {
-                Action::ScrollDown
-            } else {
-                Action::SectionDown
-            }
-        }
+        // Open popup menu within the active section
+        KeyCode::Char('x') | KeyCode::Char('X') => Action::TogglePopup,
+        // Section Up on `Left`
+        KeyCode::Left => Action::SectionUp,
+        // Section Down on `Right`
+        KeyCode::Right => Action::SectionDown,
+        // Move Up on `Up`
+        KeyCode::Up => Action::MoveUp,
+        // Move Down on `Down`
+        KeyCode::Down => Action::MoveDown,
         _ => Action::Noop,
     }
 }
