@@ -12,9 +12,7 @@ use ratatui::{
         Widget,
     },
 };
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use subxt::utils::AccountId32;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone, Default)]
@@ -67,7 +65,7 @@ impl CollatorsListWidget {
         // TODO: Set chain state to error
     }
 
-    pub fn scroll_down(&self) -> Option<Collator> {
+    pub fn move_down(&self) -> Option<Collator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.collators.len() - 1 {
@@ -84,7 +82,7 @@ impl CollatorsListWidget {
         }
     }
 
-    pub fn scroll_up(&self) -> Option<Collator> {
+    pub fn move_up(&self) -> Option<Collator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
@@ -122,12 +120,12 @@ impl Widget for &CollatorsListWidget {
 
         let (table_style, highlight_style) = match state.is_active {
             true => (
-                Style::default().fg(Color::White).bg(Color::Black),
+                Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
             ),
             false => (
-                Style::default().fg(Color::Blue).bg(Color::Black),
-                Style::default().fg(Color::White).bg(Color::Black),
+                Style::default().fg(Color::Blue),
+                Style::default().fg(Color::Blue),
             ),
         };
 
