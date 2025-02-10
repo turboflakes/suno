@@ -20,10 +20,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+        .constraints(vec![Constraint::Percentage(25), Constraint::Percentage(75)])
         .split(container[0]);
 
-    let mut constraints = vec![Constraint::Max(5)];
+    let mut constraints = vec![Constraint::Max(8)];
     if config.features.enable_validators {
         constraints.push(Constraint::Fill(1));
     } else {

@@ -184,8 +184,6 @@ impl Widget for &ChainsListWidget {
         let table = Table::new(rows, widths)
             .block(block)
             .style(styles.0)
-            .highlight_spacing(HighlightSpacing::Always)
-            .highlight_symbol(" > ")
             .row_highlight_style(styles.1);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);

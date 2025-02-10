@@ -139,8 +139,6 @@ impl Widget for &ValidatorsListWidget {
         let table = Table::new(rows, widths)
             .block(block)
             .style(table_style)
-            .highlight_spacing(HighlightSpacing::Always)
-            .highlight_symbol(" > ")
             .row_highlight_style(highlight_style);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
