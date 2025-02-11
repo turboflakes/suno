@@ -1,13 +1,32 @@
+/// Popup variations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    Char(char),
+    Instruction(String),
+}
+
+impl std::fmt::Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Char(c) => write!(f, "{c}"),
+            Self::Instruction(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 /// Common struct for shared fields
 #[derive(Debug, Clone)]
 struct Option {
-    key: char,
+    command: Command,
     description: String,
 }
 
 impl Option {
-    fn new(key: char, description: String) -> Self {
-        Self { key, description }
+    fn new(command: Command, description: String) -> Self {
+        Self {
+            command,
+            description,
+        }
     }
 }
 
@@ -18,18 +37,17 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(key: char, description: String) -> Self {
+    pub fn new(command: Command, description: String) -> Self {
         Self {
-            entry: Option::new(key, description),
+            entry: Option::new(command, description),
         }
     }
 
-    // Getter methods if needed
-    pub fn key(&self) -> &char {
-        &self.entry.key
+    pub fn command(&self) -> String {
+        self.entry.command.to_string()
     }
 
-    pub fn description(&self) -> &str {
-        self.entry.description.as_ref()
+    pub fn description(&self) -> String {
+        self.entry.description.to_string()
     }
 }

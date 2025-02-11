@@ -61,7 +61,7 @@ impl ValidatorsListWidget {
             state.table_state.select(Some(0));
         }
         // Initialize the popup.
-        self.popup.on_init();
+        self.popup.menu();
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
@@ -127,6 +127,10 @@ impl ValidatorsListWidget {
 
     pub fn move_popup_down(&mut self) {
         self.popup.move_down();
+    }
+
+    pub fn chill_attempt(&mut self) {
+        self.popup.chill_attempt();
     }
 }
 

@@ -30,6 +30,13 @@ pub enum Action {
     MoveDown,
     TogglePopup,
     ChainConnection(SupportedRuntime, ConnectionState),
+    Chill,
+    Bond,
+    Unbond,
+    ChangeRewardDestination,
+    ChangeCommission,
+    KickNominators,
+    SetSessionKey,
     Noop,
 }
 
@@ -132,10 +139,17 @@ impl App {
                 Action::SectionDown => self.section_down(),
                 Action::MoveUp => self.move_up(),
                 Action::MoveDown => self.move_down(),
-                Action::TogglePopup => self.toggle_popup(),
+                Action::TogglePopup => self.toggle_menu_popup(),
                 Action::ChainConnection(runtime, connection) => {
                     self.chains.set_connection_state(runtime, connection)
                 }
+                Action::Chill => self.chill_attempt(),
+                Action::Bond => {}
+                Action::Unbond => {}
+                Action::ChangeRewardDestination => {}
+                Action::ChangeCommission => {}
+                Action::KickNominators => {}
+                Action::SetSessionKey => {}
                 Action::Noop => self.noop(),
             }
         }
@@ -220,12 +234,25 @@ impl App {
             .set_active(self.section == Section::Collators);
     }
 
-    /// Toggle popup status
-    pub fn toggle_popup(&mut self) {
+    /// Toggle menu popup status
+    pub fn toggle_menu_popup(&mut self) {
         self.is_popup_visible = !self.is_popup_visible;
         match self.section {
             Section::Validators => {
                 self.validators.set_popup_visibility(self.is_popup_visible);
+            }
+            _ => {}
+        };
+    }
+
+    /// Toggle menu popup status
+    pub fn chill_attempt(&mut self) {
+        self.is_popup_visible = !self.is_popup_visible;
+        // info!("__chill_attempt");
+        match self.section {
+            Section::Validators => {
+                info!("__chill_attempt");
+                self.validators.chill_attempt();
             }
             _ => {}
         };

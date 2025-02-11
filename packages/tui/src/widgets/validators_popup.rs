@@ -1,6 +1,6 @@
-use crate::app::Action;
 use crate::config::CONFIG;
 use crate::menu::Entry;
+use crate::{app::Action, menu::Command};
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -9,6 +9,20 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
+
+/// Popup variations.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Variation {
+    #[default]
+    Menu,
+    Chill,
+    Bond,
+    Unbond,
+    ChangeRewardDestination,
+    ChangeCommission,
+    KickNominators,
+    SetSessionKey,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct ValidatorsPopupWidget {
@@ -20,30 +34,29 @@ struct ListState {
     options: Vec<Entry>,
     table_state: TableState,
     is_active: bool,
+    variation: Variation,
 }
 
 impl ValidatorsPopupWidget {
-    pub fn on_init(&self) {
+    pub fn on_init(&self, variation: Variation, active: bool) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
-        state
-            .options
-            .push(Entry::new('c', "chill validator".to_string()));
-        state
-            .options
-            .push(Entry::new('b', "bond more funds".to_string()));
-        state
-            .options
-            .push(Entry::new('r', "change reward destination".to_string()));
-        state
-            .options
-            .push(Entry::new('f', "change commission".to_string()));
-        state
-            .options
-            .push(Entry::new('k', "kick nominators".to_string()));
-        state
-            .options
-            .push(Entry::new('s', "change session keys".to_string()));
+        state.is_active = active;
+        state.variation = variation;
+        match state.variation {
+            Variation::Menu => self.init_menu(&mut state),
+            Variation::Chill => self.init_chill(&mut state),
+            // Variation::Bond => self.init_bond(&mut state),
+            // Variation::Unbond => self.init_unbond(&mut state),
+            // Variation::ChangeRewardDestination => self.init_change_reward_destination(&mut state),
+            // Variation::ChangeCommission => self.init_change_commission(&mut state),
+            // Variation::KickNominators => self.init_kick_nominators(&mut state),
+            // Variation::SetSessionKey => self.init_set_session_key(&mut state),
+            _ => {
+                warn!("Unsupported variation: {:?}", state.variation);
+                return;
+            }
+        }
 
         // Select the first option.
         if !state.options.is_empty() {
@@ -54,6 +67,45 @@ impl ValidatorsPopupWidget {
     fn on_err(&self, err: Box<dyn std::error::Error>) {
         warn!("Failed with error: {}", err);
         // TODO: Set chain state to error
+    }
+
+    fn init_menu(&self, state: &mut ListState) {
+        // Note: match entries with the keys defined in the `handle_key_events` function.
+        state.options.push(Entry::new(
+            Command::Char('c'),
+            "chill validator".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Char('b'),
+            "bond more funds".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Char('r'),
+            "change reward destination".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Char('f'),
+            "change commission".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Char('k'),
+            "kick nominators".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Char('s'),
+            "change session keys".to_string(),
+        ));
+    }
+
+    fn init_chill(&self, state: &mut ListState) {
+        state.options.push(Entry::new(
+            Command::Instruction("staking.chill".to_string()),
+            "chill validator".to_string(),
+        ));
+        state.options.push(Entry::new(
+            Command::Instruction("cancel".to_string()),
+            "bond more funds".to_string(),
+        ));
     }
 
     pub fn move_down(&self) -> Option<Entry> {
@@ -102,6 +154,18 @@ impl ValidatorsPopupWidget {
             .table_state
             .selected()
             .map(|i| state.options[i].clone())
+    }
+
+    pub fn menu(&self) {
+        self.on_init(Variation::Menu, false);
+    }
+
+    pub fn chill_attempt(&self) {
+        info!("Chill attempt");
+        // let mut state = self.state.write().unwrap();
+        // state.variation = Variation::Chill;
+        self.on_init(Variation::Chill, true);
+        // state.is_active = true;
     }
 }
 
@@ -154,6 +218,6 @@ impl Widget for &ValidatorsPopupWidget {
 impl From<&Entry> for Row<'_> {
     fn from(o: &Entry) -> Self {
         let o = o.clone();
-        Row::new(vec![o.key().to_string(), o.description().to_string()])
+        Row::new(vec![o.command().to_string(), o.description().to_string()])
     }
 }
