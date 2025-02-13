@@ -1,44 +1,26 @@
-use crate::config::{Features, SupportedRuntime, CONFIG};
+use crate::actions::{
+    Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction,
+};
+use crate::config::CONFIG;
+use crate::errors::TuiError;
+use crate::menu::Command;
 use crate::section::Section;
 use crate::widgets::{
-    chains::{ChainsListWidget, ConnectionState},
-    collators::CollatorsListWidget,
-    validators::ValidatorsListWidget,
+    chains::ChainsListWidget, collators::CollatorsListWidget, validators::ValidatorsListWidget,
+    validators_popup,
 };
 use crate::{
     event::{Event, EventHandler},
     handler::handle_key_events,
     tui::Tui,
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use log::info;
+use log::{info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-/// Application actions.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Action {
-    Quit,
-    Tick,
-    SectionUp,
-    SectionDown,
-    MoveUp,
-    MoveDown,
-    TogglePopup,
-    ChainConnection(SupportedRuntime, ConnectionState),
-    Chill,
-    Bond,
-    Unbond,
-    ChangeRewardDestination,
-    ChangeCommission,
-    KickNominators,
-    SetSessionKey,
-    Noop,
-}
+pub type AppResult<T> = std::result::Result<T, TuiError>;
 
 /// Application.
 #[derive(Debug)]
@@ -65,12 +47,12 @@ impl App {
     /// Constructs a new instance of [`App`].
     pub fn new() -> Self {
         // Define the channel to send actions to update the app state.
-        let (tx, rx) = unbounded_channel();
+        let (tx, rx) = unbounded_channel::<Action>();
 
         Self {
             running: true,
             section: Section::Chains,
-            chains: ChainsListWidget::default(),
+            chains: ChainsListWidget::new(tx.clone()),
             validators: ValidatorsListWidget::default(),
             collators: CollatorsListWidget::default(),
             tx,
@@ -80,9 +62,9 @@ impl App {
     }
 
     async fn init(&mut self) {
-        self.chains.on_init(&self.tx).await;
-        self.validators.on_init(&self.tx);
-        self.collators.on_init(&self.tx);
+        self.chains.on_init().await;
+        self.validators.on_init();
+        self.collators.on_init();
         // if let Some(chain) = self.chains.get_selected() {
         //     let tx = self.tx.clone();
         //     self.validators.on_chain_selected(chain.clone(), tx);
@@ -108,8 +90,8 @@ impl App {
             // Handle events.
             let event = tui.events.next().await?;
             self.handle_events(event)?;
-            // Update the application.
-            self.update();
+            // Handle actions.
+            self.handle_actions();
         }
 
         // Exit the user interface.
@@ -119,40 +101,83 @@ impl App {
 
     fn handle_events(&mut self, event: Event) -> AppResult<()> {
         let action = match event {
-            Event::Tick => Action::Tick,
+            Event::Tick => Action::System(SystemAction::Tick),
             Event::Key(key_event) => handle_key_events(key_event),
-            Event::Mouse(_) => Action::Noop,
-            Event::Resize(_, _) => Action::Noop,
-            _ => Action::Noop,
+            Event::Mouse(_) => Action::System(SystemAction::Noop),
+            Event::Resize(_, _) => Action::System(SystemAction::Noop),
+            _ => Action::System(SystemAction::Noop),
         };
         self.tx.send(action.clone())?;
+        self.tx
+            .send(action.clone())
+            .map_err(|e| TuiError::Other(format!("sender closed: {e}")))?;
         Ok(())
     }
 
-    fn update(&mut self) {
+    fn handle_actions(&mut self) {
         while let Ok(action) = self.rx.try_recv() {
             // Apply actionable messages to the application.
             match action {
-                Action::Quit => self.quit(),
-                Action::Tick => self.tick(),
-                Action::SectionUp => self.section_up(),
-                Action::SectionDown => self.section_down(),
-                Action::MoveUp => self.move_up(),
-                Action::MoveDown => self.move_down(),
-                Action::TogglePopup => self.toggle_menu_popup(),
-                Action::ChainConnection(runtime, connection) => {
-                    self.chains.set_connection_state(runtime, connection)
-                }
-                Action::Chill => self.chill_attempt(),
-                Action::Bond => {}
-                Action::Unbond => {}
-                Action::ChangeRewardDestination => {}
-                Action::ChangeCommission => {}
-                Action::KickNominators => {}
-                Action::SetSessionKey => {}
-                Action::Noop => self.noop(),
+                Action::System(act) => self.handle_system_actions(act),
+                Action::Navigation(act) => self.handle_navigation_actions(act),
+                Action::Popup(act) => self.handle_popup_actions(act),
+                Action::Chain(act) => self.handle_chain_actions(act),
+                Action::Staking(act) => self.handle_staking_actions(act),
             }
         }
+    }
+
+    fn handle_system_actions(&mut self, action: SystemAction) {
+        match action {
+            SystemAction::Quit => self.quit(),
+            SystemAction::Tick => self.tick(),
+            SystemAction::Noop => self.noop(),
+            SystemAction::Error(_err) => {
+                // self.error(err)
+            }
+        }
+    }
+
+    fn handle_navigation_actions(&mut self, action: NavigationAction) {
+        match action {
+            NavigationAction::SectionUp => self.section_up(),
+            NavigationAction::SectionDown => self.section_down(),
+            NavigationAction::MoveUp => self.move_up(),
+            NavigationAction::MoveDown => self.move_down(),
+        }
+    }
+
+    fn handle_popup_actions(&mut self, action: PopupAction) {
+        match action {
+            PopupAction::Toggle => self.toggle_menu_popup(),
+            PopupAction::Confirm => self.confirm(),
+            PopupAction::Cancel => self.cancel(),
+        }
+    }
+
+    fn handle_chain_actions(&mut self, action: ChainAction) {
+        match action {
+            ChainAction::Connection { runtime, state } => {
+                self.chains.set_connection_state(runtime, state)
+            }
+        }
+    }
+
+    fn handle_staking_actions(&mut self, action: StakingAction) {
+        match action {
+            StakingAction::Chill => self.chill_attempt(),
+            StakingAction::Bond => {}
+            StakingAction::Unbond => {}
+            StakingAction::ChangeRewardDestination => {}
+            StakingAction::ChangeCommission => {}
+            StakingAction::KickNominators => {}
+            StakingAction::SetSessionKey => {}
+        }
+    }
+
+    /// Handles the noop event of the terminal.
+    pub fn error(&self, err: Box<dyn std::error::Error>) {
+        warn!("TODO: HANDLE APPLICTaION ERRORS {}", err);
     }
 
     /// Handles the noop event of the terminal.
@@ -239,20 +264,76 @@ impl App {
         self.is_popup_visible = !self.is_popup_visible;
         match self.section {
             Section::Validators => {
+                self.validators.init_popup_menu();
                 self.validators.set_popup_visibility(self.is_popup_visible);
             }
             _ => {}
         };
     }
 
-    /// Toggle menu popup status
+    /// Confirm and execute instruction.
+    pub fn confirm(&mut self) {
+        if !self.is_popup_visible {
+            return;
+        }
+        match self.section {
+            Section::Validators => match self.validators.popup.get_mode() {
+                validators_popup::Mode::Menu => {
+                    if let Some(entry) = self.validators.popup.get_selected() {
+                        match entry.get_command() {
+                            Command::Text(text) => match text.as_str() {
+                                "cancel" => self.cancel(),
+                                _ => {}
+                            },
+                            Command::Instruction(call) => match call {
+                                validators_popup::Staking::Chill => self.chill_attempt(),
+                                _ => {}
+                            },
+                        }
+                    }
+                }
+                validators_popup::Mode::Confirm => {
+                    if let Some(entry) = self.validators.popup.get_selected() {
+                        match entry.get_command() {
+                            Command::Text(text) => match text.as_str() {
+                                "cancel" => self.cancel(),
+                                _ => {}
+                            },
+                            Command::Instruction(call) => {
+                                if let Some(validator) = self.validators.get_selected() {
+                                    if let Some(chain_client) =
+                                        self.chains.get_chain_client_by_runtime(validator.runtime())
+                                    {
+                                        match call {
+                                            validators_popup::Staking::Chill => {
+                                                info!("TODO: submit extrinsic!!");
+                                                validator.chill();
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            _ => {}
+        };
+    }
+
+    /// Cancel instruction.
+    pub fn cancel(&mut self) {
+        self.is_popup_visible = false;
+    }
+
+    /// Attempt chill instruction
     pub fn chill_attempt(&mut self) {
-        self.is_popup_visible = !self.is_popup_visible;
-        // info!("__chill_attempt");
+        self.is_popup_visible = true;
         match self.section {
             Section::Validators => {
-                info!("__chill_attempt");
-                self.validators.chill_attempt();
+                self.validators.init_popup_chill_attempt();
+                self.validators.set_popup_visibility(self.is_popup_visible);
             }
             _ => {}
         };

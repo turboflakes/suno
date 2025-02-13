@@ -26,6 +26,7 @@ pub enum SupportedRuntime {
     Polkadot,
     Kusama,
     Paseo,
+    Westend,
     #[serde(rename = "asset_hub_polkadot")]
     AssetHubPolkadot,
     #[serde(rename = "bridge_hub_polkadot")]
@@ -43,25 +44,11 @@ impl std::fmt::Display for SupportedRuntime {
             Self::Polkadot => write!(f, "Polkadot"),
             Self::Kusama => write!(f, "Kusama"),
             Self::Paseo => write!(f, "Paseo"),
+            Self::Westend => write!(f, "Westend"),
             Self::AssetHubPolkadot => write!(f, "AssetHub Polkadot"),
             Self::BridgeHubPolkadot => write!(f, "BridgeHub Polkadot"),
             Self::AssetHubKusama => write!(f, "AssetHub Kusama"),
             Self::BridgeHubKusama => write!(f, "BridgeHub Kusama"),
-        }
-    }
-}
-
-impl SupportedRuntime {
-    pub fn to_compact_string(&self) -> String {
-        match self {
-            Self::Local => "loc".to_string(),
-            Self::Polkadot => "dot".to_string(),
-            Self::Kusama => "ksm".to_string(),
-            Self::Paseo => "pas".to_string(),
-            Self::AssetHubPolkadot => "ahp".to_string(),
-            Self::BridgeHubPolkadot => "bhp".to_string(),
-            Self::AssetHubKusama => "ahp".to_string(),
-            Self::BridgeHubKusama => "bhp".to_string(),
         }
     }
 }
@@ -230,7 +217,7 @@ mod tests {
         assert_eq!(SupportedRuntime::Paseo.to_string(), "Paseo");
         assert_eq!(
             SupportedRuntime::AssetHubPolkadot.to_string(),
-            "Asset Hub Polkadot"
+            "AssetHub Polkadot"
         );
     }
 

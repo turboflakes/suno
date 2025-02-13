@@ -1,6 +1,9 @@
 [workspace]
-resolver = "2"
-members = ["packages/snops", "packages/tui"]
+members = [
+    "packages/snops",
+    "packages/tui",
+    # "packages/chains/westend"
+]
 
 [workspace.package]
 name = "snops"
@@ -14,3 +17,5 @@ edition = "2021"
 [workspace.dependencies]
 snops = { path = "packages/snops" }
 snops-tui = { path = "packages/tui" }
+# snops-westend = { path = "packages/chains/westend" }
+resolver = "2"

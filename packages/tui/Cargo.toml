@@ -16,9 +16,12 @@ log = "0.4"
 ratatui = "0.29.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
+# snops-westend = { path = "../chains/westend" }
 subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
+thiserror = "2.0"
 tokio = { version = "1.40.0", features = ["full"] }
 tui-logger = "0.14"
+
 
 [dev-dependencies]
 tempfile = "3.2"

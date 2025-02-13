@@ -17,14 +17,14 @@ pub trait AccountDisplay {
 
 /// Common struct for shared fields
 #[derive(Debug, Clone)]
-struct NodeAccount {
-    runtime: SupportedRuntime,
-    stash: AccountId32,
-    identity: Option<String>,
+pub struct NodeAccount {
+    pub runtime: SupportedRuntime,
+    pub stash: AccountId32,
+    pub identity: Option<String>,
 }
 
 impl NodeAccount {
-    fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
+    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             runtime,
             stash,
@@ -65,34 +65,6 @@ impl Collator {
 
 // Implement the trait for Collator
 impl AccountDisplay for Collator {
-    fn stash(&self) -> &AccountId32 {
-        &self.account.stash
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Validator {
-    pub account: NodeAccount,
-}
-
-impl Validator {
-    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
-        Self {
-            account: NodeAccount::new(runtime, stash),
-        }
-    }
-
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime
-    }
-
-    pub fn identity(&self) -> Option<&String> {
-        self.account.identity.as_ref()
-    }
-}
-
-/// Implement the trait for Validator
-impl AccountDisplay for Validator {
     fn stash(&self) -> &AccountId32 {
         &self.account.stash
     }

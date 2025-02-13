@@ -1,9 +1,9 @@
+use crate::app::AppResult;
+use crate::errors::TuiError;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;
-
-use crate::app::AppResult;
 
 /// Terminal events.
 #[derive(Clone, Debug)]
@@ -19,7 +19,6 @@ pub enum Event {
 }
 
 /// Terminal event handler.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct EventHandler {
     /// Event sender channel.
@@ -88,9 +87,6 @@ impl EventHandler {
         self.receiver
             .recv()
             .await
-            .ok_or(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "This is an IO error",
-            )))
+            .ok_or(TuiError::Other("Event handler error".to_string()))
     }
 }

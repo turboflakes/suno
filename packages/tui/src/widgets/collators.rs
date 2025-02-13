@@ -1,4 +1,3 @@
-use crate::app::Action;
 use crate::config::{NodeConfig, SupportedRuntime, CONFIG};
 use crate::node_account::{AccountDisplay, Collator};
 use crate::widgets::scrollbar::render_scrollbar;
@@ -13,7 +12,6 @@ use ratatui::{
     },
 };
 use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {
@@ -28,7 +26,7 @@ pub struct CollatorsListState {
 }
 
 impl CollatorsListWidget {
-    pub fn on_init(&self, _tx: &UnboundedSender<Action>) {
+    pub fn on_init(&self) {
         let mut state = self.state.write().unwrap();
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
@@ -150,8 +148,9 @@ impl Widget for &CollatorsListWidget {
                 height: area.height - 2,
                 ..area
             };
-            let row_index = state.table_state.selected().unwrap();
-            render_scrollbar(row_index, state.collators.len(), scrollbar_area, buf);
+            if let Some(row_index) = state.table_state.selected() {
+                render_scrollbar(row_index, state.collators.len(), scrollbar_area, buf);
+            }
         }
     }
 }

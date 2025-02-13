@@ -1,6 +1,6 @@
 use crate::app::App;
 use crate::section::Section;
-use crate::widgets::validators_popup::ValidatorsPopupWidget;
+use crate::widgets::validators_popup::Mode;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style},
@@ -73,17 +73,20 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     // Render the frame.
     if app.is_popup_visible {
-        let area = popup_area(frame.area(), 40, 40);
         match app.section {
             Section::Validators => {
-                render_validators_popup(app, frame, area);
+                render_validators_popup(app, frame);
             }
             _ => {}
         }
     }
 }
 
-fn render_validators_popup(app: &mut App, frame: &mut Frame, rect: Rect) {
+fn render_validators_popup(app: &mut App, frame: &mut Frame) {
+    let rect = match &app.validators.popup.get_mode() {
+        Mode::Menu => popup_area(frame.area(), 50, 30),
+        Mode::Confirm => popup_area(frame.area(), 40, 10),
+    };
     frame.render_widget(Clear, rect); //this clears out the background
     frame.render_widget(&app.validators.popup, rect);
 }

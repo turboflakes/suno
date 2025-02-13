@@ -1,19 +1,17 @@
-use crate::app::Action;
-use crate::config::{NodeConfig, CONFIG};
-use crate::node_account::{AccountDisplay, Validator};
+use crate::app::AppResult;
+use crate::config::{NodeConfig, SupportedRuntime, CONFIG};
+use crate::node_account::{AccountDisplay, NodeAccount};
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators_popup::ValidatorsPopupWidget;
-use log::warn;
+use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
     style::{Color, Style},
-    widgets::{
-        Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
-        Widget,
-    },
+    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
+use subxt::utils::AccountId32;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone, Default)]
@@ -29,8 +27,45 @@ pub struct ValidatorsListState {
     is_active: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct Validator {
+    pub account: NodeAccount,
+}
+
+impl Validator {
+    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
+        Self {
+            account: NodeAccount::new(runtime, stash),
+        }
+    }
+
+    pub fn runtime(&self) -> &SupportedRuntime {
+        &self.account.runtime
+    }
+
+    pub fn identity(&self) -> Option<&String> {
+        self.account.identity.as_ref()
+    }
+
+    pub async fn chill(&self) -> AppResult<()> {
+        match self.runtime() {
+            SupportedRuntime::Westend => {
+                warn!("TODO: build and send transaction")
+            }
+            _ => unimplemented!("Chill not implemented for {:?}", self.runtime()),
+        }
+        Ok(())
+    }
+}
+
+impl AccountDisplay for Validator {
+    fn stash(&self) -> &AccountId32 {
+        &self.account.stash
+    }
+}
+
 impl ValidatorsListWidget {
-    pub fn on_init(&self, _tx: &UnboundedSender<Action>) {
+    pub fn on_init(&self) {
         let mut state = self.state.write().unwrap();
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
@@ -129,7 +164,11 @@ impl ValidatorsListWidget {
         self.popup.move_down();
     }
 
-    pub fn chill_attempt(&mut self) {
+    pub fn init_popup_menu(&mut self) {
+        self.popup.menu();
+    }
+
+    pub fn init_popup_chill_attempt(&mut self) {
         self.popup.chill_attempt();
     }
 }
@@ -170,8 +209,9 @@ impl Widget for &ValidatorsListWidget {
                 height: area.height - 2,
                 ..area
             };
-            let row_index = state.table_state.selected().unwrap();
-            render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
+            if let Some(row_index) = state.table_state.selected() {
+                render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
+            }
         }
     }
 }

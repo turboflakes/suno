@@ -1,4 +1,4 @@
-use crate::app::Action;
+use crate::actions::{Action, ChainAction, SystemAction};
 use crate::config::{SupportedRuntime, CONFIG};
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
@@ -15,9 +15,12 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub type BlockNumber = u32;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ChainsListWidget {
+    /// The state is wrapped in an `Arc<RwLock<>>` to allow for shared ownership between the widget and other threads.
     state: Arc<RwLock<ChainsListState>>,
+    /// The sender to send actions to update the state to the app.
+    tx: UnboundedSender<Action>,
 }
 
 #[derive(Debug, Default)]
@@ -55,8 +58,14 @@ impl std::fmt::Display for ConnectionState {
 }
 
 impl ChainsListWidget {
+    pub fn new(tx: UnboundedSender<Action>) -> Self {
+        Self {
+            state: Arc::new(RwLock::new(ChainsListState::default())),
+            tx,
+        }
+    }
     /// Initialize OnlineClients for each configured chain.
-    pub async fn on_init(&self, tx: &UnboundedSender<Action>) {
+    pub async fn on_init(&self) {
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
@@ -70,7 +79,7 @@ impl ChainsListWidget {
                                     client,
                                     state: ConnectionState::Connecting,
                                 };
-                                self.on_connecting(chain_client, tx.clone())
+                                self.on_connecting(chain_client);
                             }
                             Err(err) => self.on_err(Box::new(err)),
                         }
@@ -83,7 +92,7 @@ impl ChainsListWidget {
         self.set_active(true);
     }
 
-    fn on_connecting(&self, chain_client: ChainClient, tx: UnboundedSender<Action>) {
+    fn on_connecting(&self, chain_client: ChainClient) {
         let mut state = self.state.write().unwrap();
         state.chains.push(chain_client.clone());
         // Select the first chain.
@@ -91,11 +100,16 @@ impl ChainsListWidget {
             state.table_state.select(Some(0));
         }
         // Launch a task to subscribe the head of the chain.
-        subscribe_best_block(chain_client, tx.clone());
+        subscribe_best_block(chain_client, self.tx.clone());
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
-        warn!("Failed with error: {}", err);
+        self.tx
+            .send(Action::System(SystemAction::Error(
+                "some error".to_string(),
+            )))
+            .unwrap();
+
         // TODO: Set chain state to error
     }
 
@@ -155,6 +169,15 @@ impl ChainsListWidget {
             .selected()
             .map(|i| state.chains[i].clone())
     }
+
+    pub fn get_chain_client_by_runtime(&self, runtime: &SupportedRuntime) -> Option<ChainClient> {
+        let state = self.state.read().unwrap();
+        state
+            .chains
+            .iter()
+            .find(|chain| &chain.runtime == runtime)
+            .cloned()
+    }
 }
 
 impl Widget for &ChainsListWidget {
@@ -193,8 +216,9 @@ impl Widget for &ChainsListWidget {
                 height: area.height - 2,
                 ..area
             };
-            let row_index = state.table_state.selected().unwrap();
-            render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+            if let Some(row_index) = state.table_state.selected() {
+                render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+            }
         }
     }
 }
@@ -216,19 +240,19 @@ fn subscribe_best_block(cc: ChainClient, tx: UnboundedSender<Action>) {
                 while let Some(result) = blocks_sub.next().await {
                     match result {
                         Ok(block) => {
-                            let _ = tx.send(Action::ChainConnection(
-                                runtime.clone(),
-                                ConnectionState::Connected(block.number().into()),
-                            ));
+                            let _ = tx.send(Action::Chain(ChainAction::Connection {
+                                runtime: runtime.clone(),
+                                state: ConnectionState::Connected(block.number().into()),
+                            }));
                         }
                         Err(e) => {
                             // Handle disconnection errors.
                             if e.is_disconnected_will_reconnect() {
                                 warn!("Lost connection to the {} RPC. Reconnecting...", cc.runtime);
-                                let _ = tx.send(Action::ChainConnection(
-                                    runtime.clone(),
-                                    ConnectionState::Connecting,
-                                ));
+                                let _ = tx.send(Action::Chain(ChainAction::Connection {
+                                    runtime: runtime.clone(),
+                                    state: ConnectionState::Connecting,
+                                }));
                                 continue;
                             }
                             error!("{}", e);
