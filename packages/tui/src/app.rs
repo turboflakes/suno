@@ -108,9 +108,6 @@ impl App {
             _ => Action::System(SystemAction::Noop),
         };
         self.tx.send(action.clone())?;
-        self.tx
-            .send(action.clone())
-            .map_err(|e| TuiError::Other(format!("sender closed: {e}")))?;
         Ok(())
     }
 
