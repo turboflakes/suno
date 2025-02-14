@@ -235,7 +235,7 @@ fn subscribe_best_block(cc: ChainClient, tx: UnboundedSender<Action>) {
                         Err(e) => {
                             // Handle disconnection errors.
                             if e.is_disconnected_will_reconnect() {
-                                warn!("Lost connection to the {} RPC. Reconnecting...", cc.runtime);
+                                warn!("Lost connection to {}. Reconnecting...", cc.runtime);
                                 let _ = tx.send(Action::Chain(ChainAction::Connection {
                                     runtime: runtime.clone(),
                                     state: ConnectionState::Connecting,
