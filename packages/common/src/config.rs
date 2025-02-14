@@ -61,6 +61,7 @@ pub struct Config {
     // TODO: Add support for RPCs
     // rpcs: Vec<HashMap<String, Vec<String>>>,
     pub features: Features,
+    pub signer: Signer,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -106,6 +107,19 @@ impl Default for Features {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Signer {
+    proxy_seed_path: String,
+}
+
+impl Default for Signer {
+    fn default() -> Self {
+        Self {
+            proxy_seed_path: ".proxy_private.seed".into(),
+        }
+    }
+}
+
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let contents = fs::read_to_string(path)?;
@@ -122,6 +136,10 @@ impl Config {
         }
 
         Ok(())
+    }
+
+    pub fn signer_path(&self) -> String {
+        self.signer.proxy_seed_path.clone()
     }
 }
 
@@ -226,6 +244,7 @@ mod tests {
         let config = Config {
             chains: vec![],
             features: Features::default(),
+            signer: Signer::default(),
         };
         assert!(config.validate().is_err());
     }
@@ -243,6 +262,8 @@ features:
   enable_validators: true
   enable_collators: false
   enable_rpcs: false
+signer:
+  proxy_seed_path: ".proxy_private.seed"
 "#;
         let file = create_temp_file(yaml);
         let config = Config::from_file(file.path()).unwrap();
@@ -287,6 +308,8 @@ features:
   enable_validators: true
   enable_collators: true
   enable_rpcs: false
+signer:
+  proxy_seed_path: ".proxy_private.seed"
 "#;
 
         let file = create_temp_file(yaml);

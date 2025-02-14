@@ -1,4 +1,4 @@
-use crate::config::Features;
+use snops_common::config::Features;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Section {

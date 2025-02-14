@@ -1,7 +1,7 @@
 use crate::app::AppResult;
-use crate::errors::TuiError;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
+use snops_common::errors::SnopsError;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
@@ -87,6 +87,6 @@ impl EventHandler {
         self.receiver
             .recv()
             .await
-            .ok_or(TuiError::Other("Event handler error".to_string()))
+            .ok_or(SnopsError::Other("Event handler error".to_string()))
     }
 }

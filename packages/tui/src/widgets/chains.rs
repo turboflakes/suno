@@ -1,5 +1,3 @@
-use crate::actions::{Action, ChainAction, SystemAction};
-use crate::config::{SupportedRuntime, CONFIG};
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
 use log::{error, info, warn};
@@ -9,6 +7,9 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Clear, Row, StatefulWidget, Table, TableState, Widget},
 };
+use snops_common::actions::{Action, ChainAction, SystemAction};
+use snops_common::config::{SupportedRuntime, CONFIG};
+use snops_common::network::ConnectionState;
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
 use tokio::sync::mpsc::UnboundedSender;
@@ -37,23 +38,9 @@ pub struct ChainClient {
     state: ConnectionState,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum ConnectionState {
-    #[default]
-    Idle,
-    Connecting,
-    Connected(BlockNumber),
-    Error(String),
-}
-
-impl std::fmt::Display for ConnectionState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Idle => write!(f, "-"),
-            Self::Connecting => write!(f, "↺"),
-            Self::Connected(block_number) => write!(f, "#{}", block_number),
-            Self::Error(_) => write!(f, "✗"),
-        }
+impl ChainClient {
+    pub fn is_ready(&self) -> bool {
+        matches!(self.state, ConnectionState::Connected(_))
     }
 }
 

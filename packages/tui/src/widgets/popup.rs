@@ -1,4 +1,3 @@
-use crate::config::CONFIG;
 use crate::menu::{AsChar, Command, Entry, ToDescription};
 use crate::theme::THEME;
 use log::{info, warn};
@@ -9,6 +8,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
+use snops_common::config::CONFIG;
 use std::sync::{Arc, RwLock};
 
 /// Popup modes.
@@ -17,6 +17,7 @@ pub enum Mode {
     #[default]
     Menu,
     Confirm,
+    Transaction,
 }
 
 // Popup Call definitions
@@ -74,7 +75,7 @@ impl std::fmt::Display for Staking {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ValidatorsPopupWidget {
+pub struct PopupWidget {
     state: Arc<RwLock<ListState>>,
 }
 
@@ -86,7 +87,7 @@ struct ListState {
     mode: Mode,
 }
 
-impl ValidatorsPopupWidget {
+impl PopupWidget {
     pub fn on_init(&self, mode: Mode, call: Option<Staking>) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
@@ -100,6 +101,7 @@ impl ValidatorsPopupWidget {
                 }
                 self.init_confirmation(&mut state, call.unwrap())
             }
+            Mode::Transaction => self.init_transaction(&mut state),
         }
 
         // Select the first option.
@@ -111,6 +113,10 @@ impl ValidatorsPopupWidget {
     fn on_err(&self, err: Box<dyn std::error::Error>) {
         warn!("Failed with error: {}", err);
         // TODO: Set chain state to error
+    }
+
+    fn init_transaction(&self, state: &mut ListState) {
+        // TODO: Implement transaction menu
     }
 
     fn init_menu(&self, state: &mut ListState) {
@@ -222,7 +228,7 @@ impl ValidatorsPopupWidget {
     }
 }
 
-impl Widget for &ValidatorsPopupWidget {
+impl Widget for &PopupWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
@@ -233,6 +239,7 @@ impl Widget for &ValidatorsPopupWidget {
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
             Mode::Confirm => render_confirmation(area, buf, &mut state),
+            Mode::Transaction => render_transaction(area, buf, &mut state),
         }
     }
 }
@@ -275,6 +282,22 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
+fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+    let block = Block::new()
+        .title(" Transaction progress ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain);
+
+    let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
+    let widths = [Constraint::Length(24), Constraint::Fill(1)];
+    let table = Table::new(rows, widths)
+        .style(THEME.table.base(state.is_active))
+        .block(block)
+        .row_highlight_style(THEME.table.row_highlight(state.is_active));
+
+    StatefulWidget::render(table, area, buf, &mut state.table_state);
+}
+
 impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
     pub fn to_row(&self, mode: Mode) -> Row<'_> {
         let command = self.get_command();
@@ -293,11 +316,18 @@ impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
                         row_data.push(c.to_string());
                         row_data.push(c.description());
                     }
+                    Mode::Transaction => {
+                        row_data.push(c.to_string());
+                        row_data.push(c.description());
+                    }
                 }
 
                 Row::new(row_data)
             }
-            Command::Text(t) => Row::new(vec![t.to_string()]),
+            Command::Text(t) => match mode {
+                Mode::Transaction => Row::new(vec![t.to_string()]),
+                _ => Row::new(vec![t.to_string()]),
+            },
         }
     }
 }

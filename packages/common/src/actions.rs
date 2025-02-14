@@ -1,5 +1,5 @@
-use crate::config::SupportedRuntime;
-use crate::widgets::chains::ConnectionState;
+use super::config::SupportedRuntime;
+use super::network::ConnectionState;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,10 +8,12 @@ pub enum Action {
     Navigation(NavigationAction),
     /// Popup actions
     Popup(PopupAction),
-    /// Chain-related actions
+    /// Network related actions
     Chain(ChainAction),
     /// Staking actions
     Staking(StakingAction),
+    /// Transaction related actions
+    Transaction(TxAction),
     //TODO: Collator actions
     // Collator(CollatorAction),
     /// System actions
@@ -50,6 +52,15 @@ pub enum StakingAction {
     ChangeCommission,
     KickNominators,
     SetSessionKey,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TxAction {
+    Broadcasting,
+    InBestBlock,
+    InFinalizedBlock,
+    Success,
+    Error(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

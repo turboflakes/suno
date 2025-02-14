@@ -1,4 +1,3 @@
-use crate::config::{NodeConfig, SupportedRuntime, CONFIG};
 use crate::node_account::{AccountDisplay, Collator};
 use crate::widgets::scrollbar::render_scrollbar;
 use log::{info, warn};
@@ -11,6 +10,7 @@ use ratatui::{
         Widget,
     },
 };
+use snops_common::config::{NodeConfig, SupportedRuntime, CONFIG};
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Default)]

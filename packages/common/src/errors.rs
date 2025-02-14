@@ -1,12 +1,12 @@
-use crate::actions::Action;
-use subxt::error::{DispatchError, MetadataError, RpcError};
+use super::actions::Action;
+use subxt::error::{DispatchError, MetadataError, RpcError, TransactionError};
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tui_logger::TuiLoggerError;
 
-/// Claimit specific error messages
+/// Snops specific error messages
 #[derive(Error, Debug)]
-pub enum TuiError {
+pub enum SnopsError {
     #[error("Subxt error: {0}")]
     SubxtError(#[from] subxt::Error),
     #[error("Metadata error: {0}")]
@@ -21,13 +21,19 @@ pub enum TuiError {
     SendError(#[from] SendError<Action>),
     #[error("Logger error: {0}")]
     TuiLoggerError(#[from] TuiLoggerError),
+    #[error("Tx error: {0}")]
+    TransactionError(#[from] TransactionError),
+    #[error("SecretError error: {0}")]
+    SecretError(#[from] subxt_signer::SecretUriError),
+    #[error("Keypair error: {0}")]
+    KeypairError(#[from] subxt_signer::sr25519::Error),
     #[error("Other error: {0}")]
     Other(String),
 }
 
-/// Convert &str to TuiError
-impl From<&str> for TuiError {
+/// Convert &str to SnopsError
+impl From<&str> for SnopsError {
     fn from(error: &str) -> Self {
-        TuiError::Other(error.into())
+        Self::Other(error.into())
     }
 }

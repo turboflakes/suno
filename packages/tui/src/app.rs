@@ -1,13 +1,8 @@
-use crate::actions::{
-    Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction,
-};
-use crate::config::CONFIG;
-use crate::errors::TuiError;
 use crate::menu::Command;
 use crate::section::Section;
 use crate::widgets::{
-    chains::ChainsListWidget, collators::CollatorsListWidget, validators::ValidatorsListWidget,
-    validators_popup,
+    chains::ChainsListWidget, collators::CollatorsListWidget, popup, popup::PopupWidget,
+    validators::ValidatorsListWidget,
 };
 use crate::{
     event::{Event, EventHandler},
@@ -16,11 +11,16 @@ use crate::{
 };
 use log::{info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
+use snops_common::actions::{
+    Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,
+};
+use snops_common::config::CONFIG;
+use snops_common::errors::SnopsError;
 use std::io;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, TuiError>;
+pub type AppResult<T> = std::result::Result<T, SnopsError>;
 
 /// Application.
 #[derive(Debug)]
@@ -35,6 +35,8 @@ pub struct App {
     pub validators: ValidatorsListWidget,
     /// Holds the collators list for the selected relay-chain.
     pub collators: CollatorsListWidget,
+    /// The popup widget.
+    pub popup: PopupWidget,
     /// The sender to send actions to update the state to the app.
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
@@ -55,6 +57,7 @@ impl App {
             chains: ChainsListWidget::new(tx.clone()),
             validators: ValidatorsListWidget::default(),
             collators: CollatorsListWidget::default(),
+            popup: PopupWidget::default(),
             tx,
             rx,
             is_popup_visible: false,
@@ -120,6 +123,7 @@ impl App {
                 Action::Popup(act) => self.handle_popup_actions(act),
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Staking(act) => self.handle_staking_actions(act),
+                Action::Transaction(act) => self.handle_transaction_actions(act),
             }
         }
     }
@@ -172,6 +176,16 @@ impl App {
         }
     }
 
+    fn handle_transaction_actions(&mut self, action: TxAction) {
+        match action {
+            TxAction::Broadcasting => {}
+            TxAction::InBestBlock => {}
+            TxAction::InFinalizedBlock => {}
+            TxAction::Success => {}
+            TxAction::Error(err) => {}
+        }
+    }
+
     /// Handles the noop event of the terminal.
     pub fn error(&self, err: Box<dyn std::error::Error>) {
         warn!("TODO: HANDLE APPLICTaION ERRORS {}", err);
@@ -196,7 +210,7 @@ impl App {
             }
             Section::Validators => {
                 if self.is_popup_visible {
-                    self.validators.move_popup_up();
+                    self.popup.move_up();
                 } else {
                     self.validators.move_up();
                 }
@@ -216,7 +230,7 @@ impl App {
             }
             Section::Validators => {
                 if self.is_popup_visible {
-                    self.validators.move_popup_down();
+                    self.popup.move_down();
                 } else {
                     self.validators.move_down();
                 }
@@ -261,8 +275,8 @@ impl App {
         self.is_popup_visible = !self.is_popup_visible;
         match self.section {
             Section::Validators => {
-                self.validators.init_popup_menu();
-                self.validators.set_popup_visibility(self.is_popup_visible);
+                self.popup.menu();
+                self.popup.set_active(self.is_popup_visible);
             }
             _ => {}
         };
@@ -274,23 +288,23 @@ impl App {
             return;
         }
         match self.section {
-            Section::Validators => match self.validators.popup.get_mode() {
-                validators_popup::Mode::Menu => {
-                    if let Some(entry) = self.validators.popup.get_selected() {
+            Section::Validators => match self.popup.get_mode() {
+                popup::Mode::Menu => {
+                    if let Some(entry) = self.popup.get_selected() {
                         match entry.get_command() {
                             Command::Text(text) => match text.as_str() {
                                 "cancel" => self.cancel(),
                                 _ => {}
                             },
                             Command::Instruction(call) => match call {
-                                validators_popup::Staking::Chill => self.chill_attempt(),
+                                popup::Staking::Chill => self.chill_attempt(),
                                 _ => {}
                             },
                         }
                     }
                 }
-                validators_popup::Mode::Confirm => {
-                    if let Some(entry) = self.validators.popup.get_selected() {
+                popup::Mode::Confirm => {
+                    if let Some(entry) = self.popup.get_selected() {
                         match entry.get_command() {
                             Command::Text(text) => match text.as_str() {
                                 "cancel" => self.cancel(),
@@ -302,9 +316,8 @@ impl App {
                                         self.chains.get_chain_client_by_runtime(validator.runtime())
                                     {
                                         match call {
-                                            validators_popup::Staking::Chill => {
-                                                info!("TODO: submit extrinsic!!");
-                                                validator.chill();
+                                            popup::Staking::Chill => {
+                                                validator.chill(&chain_client, self.tx.clone());
                                             }
                                             _ => {}
                                         }
@@ -314,6 +327,7 @@ impl App {
                         }
                     }
                 }
+                _ => {}
             },
             _ => {}
         };
@@ -329,8 +343,10 @@ impl App {
         self.is_popup_visible = true;
         match self.section {
             Section::Validators => {
-                self.validators.init_popup_chill_attempt();
-                self.validators.set_popup_visibility(self.is_popup_visible);
+                // self.validators.init_popup_chill_attempt();
+                self.popup.chill_attempt();
+                // self.validators.set_popup_visibility(self.is_popup_visible);
+                self.popup.set_active(self.is_popup_visible);
             }
             _ => {}
         };

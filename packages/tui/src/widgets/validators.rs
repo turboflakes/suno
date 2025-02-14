@@ -1,8 +1,7 @@
-use crate::app::AppResult;
-use crate::config::{NodeConfig, SupportedRuntime, CONFIG};
 use crate::node_account::{AccountDisplay, NodeAccount};
+use crate::widgets::chains::ChainClient;
+use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
-use crate::widgets::validators_popup::ValidatorsPopupWidget;
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -10,6 +9,9 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
+use snops_common::actions::Action;
+use snops_common::config::{NodeConfig, SupportedRuntime, CONFIG};
+use snops_westend::westend;
 use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
 use tokio::sync::mpsc::UnboundedSender;
@@ -17,7 +19,6 @@ use tokio::sync::mpsc::UnboundedSender;
 #[derive(Debug, Clone, Default)]
 pub struct ValidatorsListWidget {
     state: Arc<RwLock<ValidatorsListState>>,
-    pub popup: ValidatorsPopupWidget,
 }
 
 #[derive(Debug, Default)]
@@ -47,14 +48,27 @@ impl Validator {
         self.account.identity.as_ref()
     }
 
-    pub async fn chill(&self) -> AppResult<()> {
-        match self.runtime() {
-            SupportedRuntime::Westend => {
-                warn!("TODO: build and send transaction")
-            }
-            _ => unimplemented!("Chill not implemented for {:?}", self.runtime()),
+    pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
+        if !chain_client.is_ready() {
+            warn!("TODO:Chain {} not ready", chain_client.runtime);
+            return;
         }
-        Ok(())
+
+        let api = chain_client.client.clone();
+        let runtime = self.runtime().clone();
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            let response = match runtime {
+                SupportedRuntime::Westend => westend::submit_tx_chill(&api, tx).await,
+                _ => unimplemented!("Chill not implemented for {:?}", runtime),
+            };
+            match response {
+                Err(e) => {
+                    warn!("TODO: error: {:?}", e);
+                }
+                _ => (),
+            }
+        });
     }
 }
 
@@ -95,8 +109,6 @@ impl ValidatorsListWidget {
         if !state.validators.is_empty() {
             state.table_state.select(Some(0));
         }
-        // Initialize the popup.
-        self.popup.menu();
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
@@ -150,26 +162,6 @@ impl ValidatorsListWidget {
             .table_state
             .selected()
             .map(|i| state.validators[i].clone())
-    }
-
-    pub fn set_popup_visibility(&mut self, visible: bool) {
-        self.popup.set_active(visible);
-    }
-
-    pub fn move_popup_up(&mut self) {
-        self.popup.move_up();
-    }
-
-    pub fn move_popup_down(&mut self) {
-        self.popup.move_down();
-    }
-
-    pub fn init_popup_menu(&mut self) {
-        self.popup.menu();
-    }
-
-    pub fn init_popup_chill_attempt(&mut self) {
-        self.popup.chill_attempt();
     }
 }
 

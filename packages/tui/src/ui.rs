@@ -1,6 +1,6 @@
 use crate::app::App;
 use crate::section::Section;
-use crate::widgets::validators_popup::Mode;
+use crate::widgets::popup::Mode;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style},
@@ -9,7 +9,7 @@ use ratatui::{
 };
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
 
-use crate::config::CONFIG;
+use snops_common::config::CONFIG;
 
 /// Renders the user interface widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {
@@ -83,12 +83,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
-    let rect = match &app.validators.popup.get_mode() {
+    let rect = match &app.popup.get_mode() {
         Mode::Menu => popup_area(frame.area(), 50, 30),
         Mode::Confirm => popup_area(frame.area(), 40, 10),
+        Mode::Transaction => popup_area(frame.area(), 40, 10),
     };
     frame.render_widget(Clear, rect); //this clears out the background
-    frame.render_widget(&app.validators.popup, rect);
+    frame.render_widget(&app.popup, rect);
 }
 
 fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {

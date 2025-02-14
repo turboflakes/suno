@@ -3,10 +3,7 @@ use tui_logger::{init_logger, set_default_level};
 
 use crate::app::{App, AppResult};
 
-mod actions;
 pub mod app;
-mod config;
-mod errors;
 mod event;
 mod handler;
 mod menu;
