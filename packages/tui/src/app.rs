@@ -80,7 +80,7 @@ impl App {
         // Initialize the terminal user interface.
         let backend = CrosstermBackend::new(io::stdout());
         let terminal = Terminal::new(backend)?;
-        let events = EventHandler::new(1000);
+        let events = EventHandler::new(250);
         let mut tui = Tui::new(terminal, events);
         tui.init()?;
 
@@ -179,8 +179,14 @@ impl App {
             TxAction::Broadcasting => {
                 self.popup.show_transaction();
             }
-            TxAction::InBestBlock => {}
-            TxAction::InFinalizedBlock => {}
+            TxAction::InBestBlock => {
+                self.popup
+                    .update_transaction_status("in best block".to_string());
+            }
+            TxAction::InFinalizedBlock => {
+                self.popup
+                    .update_transaction_status("in finalized block".to_string());
+            }
             TxAction::Success => {
                 self.popup.hide();
             }

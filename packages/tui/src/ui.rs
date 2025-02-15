@@ -86,7 +86,7 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let rect = match &app.popup.get_mode() {
         Mode::Menu => popup_area(frame.area(), 50, 30),
         Mode::Confirm => popup_area(frame.area(), 40, 10),
-        Mode::Transaction => popup_area(frame.area(), 40, 10),
+        Mode::Transaction => popup_area(frame.area(), 20, 7),
     };
     frame.render_widget(Clear, rect); //this clears out the background
     frame.render_widget(&app.popup, rect);

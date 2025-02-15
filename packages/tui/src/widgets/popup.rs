@@ -10,6 +10,7 @@ use ratatui::{
 };
 use snops_common::config::CONFIG;
 use std::sync::{Arc, RwLock};
+use std::time::Instant;
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -79,12 +80,42 @@ pub struct PopupWidget {
     state: Arc<RwLock<ListState>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct ListState {
     options: Vec<Entry<Staking>>,
     table_state: TableState,
     is_visible: bool,
     mode: Mode,
+    spinner_frames: Vec<&'static str>,
+    spinner_start_time: Instant,
+    spinner_counter: usize,
+}
+
+impl Default for ListState {
+    fn default() -> Self {
+        Self {
+            options: Vec::new(),
+            table_state: TableState::default(),
+            is_visible: false,
+            mode: Mode::default(),
+            spinner_frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
+            spinner_start_time: Instant::now(),
+            spinner_counter: 0,
+        }
+    }
+}
+
+impl ListState {
+    fn spinner_frame(&self) -> &str {
+        let elapsed = self.spinner_start_time.elapsed().as_millis() as u64;
+        let frame_index = (elapsed / 250) as usize % self.spinner_frames.len();
+        self.spinner_frames[frame_index]
+    }
+
+    fn spinner_progress(&self) -> String {
+        let full = "⣿".repeat(self.spinner_counter);
+        format!("⣿{}{}", full, self.spinner_frame())
+    }
 }
 
 impl PopupWidget {
@@ -119,7 +150,11 @@ impl PopupWidget {
     }
 
     fn init_transaction(&self, state: &mut ListState) {
-        // TODO: Implement transaction menu
+        state.spinner_start_time = Instant::now();
+        state.spinner_counter = 0;
+        state
+            .options
+            .push(Entry::new(Command::Text("broadcasted".to_string())));
     }
 
     fn init_menu(&self, state: &mut ListState) {
@@ -235,6 +270,13 @@ impl PopupWidget {
         self.on_init(Mode::Transaction, None);
     }
 
+    pub fn update_transaction_status(&self, message: String) {
+        let mut state = self.state.write().unwrap();
+        state.spinner_counter += 1;
+        state.options.clear();
+        state.options.push(Entry::new(Command::Text(message)));
+    }
+
     pub fn confirm_chill_attempt(&self) {
         self.on_init(Mode::Confirm, Some(Staking::Chill));
     }
@@ -262,7 +304,10 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
+    let rows = state
+        .options
+        .iter()
+        .map(|f| f.to_row(state.mode.clone(), None));
     let widths = [
         Constraint::Length(4),
         Constraint::Fill(1),
@@ -284,7 +329,10 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
+    let rows = state
+        .options
+        .iter()
+        .map(|f| f.to_row(state.mode.clone(), None));
     let widths = [Constraint::Length(24), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base(state.is_visible))
@@ -296,22 +344,25 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let block = Block::new()
-        .title(" Transaction progress ")
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
-    let widths = [Constraint::Length(24), Constraint::Fill(1)];
+    let spinner_progress = state.spinner_progress();
+    let rows = state
+        .options
+        .iter()
+        .map(|f| f.to_row(state.mode.clone(), Some(&spinner_progress)));
+    let widths = [Constraint::Length(8), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base(state.is_visible))
-        .block(block)
-        .row_highlight_style(THEME.table.row_highlight(state.is_visible));
+        .block(block);
+    // .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
 impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
-    pub fn to_row(&self, mode: Mode) -> Row<'_> {
+    pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
         let command = self.get_command();
         match command {
             Command::Instruction(c) => {
@@ -328,16 +379,16 @@ impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
                         row_data.push(c.to_string());
                         row_data.push(c.description());
                     }
-                    Mode::Transaction => {
-                        row_data.push(c.to_string());
-                        row_data.push(c.description());
-                    }
+                    _ => {}
                 }
 
                 Row::new(row_data)
             }
             Command::Text(t) => match mode {
-                Mode::Transaction => Row::new(vec![t.to_string()]),
+                Mode::Transaction => Row::new(vec![
+                    msg.unwrap_or("").to_string(),
+                    format!("Transaction {t}"),
+                ]),
                 _ => Row::new(vec![t.to_string()]),
             },
         }
