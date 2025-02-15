@@ -72,7 +72,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_legend_widget(app, frame, container[1]);
 
     // Render the frame.
-    if app.is_popup_visible {
+    if app.popup.is_visible() {
         match app.section {
             Section::Validators => {
                 render_validators_popup(app, frame);
@@ -158,7 +158,7 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
-    let footer = if app.is_popup_visible {
+    let footer = if app.popup.is_visible() {
         Paragraph::new(format!("enter: run | ↑ ↓: navigate | x: close"))
             .style(Style::default().fg(Color::Blue))
             .centered()

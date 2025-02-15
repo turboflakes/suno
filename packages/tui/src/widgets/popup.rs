@@ -83,7 +83,7 @@ pub struct PopupWidget {
 struct ListState {
     options: Vec<Entry<Staking>>,
     table_state: TableState,
-    is_active: bool,
+    is_visible: bool,
     mode: Mode,
 }
 
@@ -108,6 +108,9 @@ impl PopupWidget {
         if !state.options.is_empty() {
             state.table_state.select(Some(0));
         }
+
+        //
+        state.is_visible = true;
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
@@ -201,9 +204,14 @@ impl PopupWidget {
         }
     }
 
-    pub fn set_active(&self, active: bool) {
+    pub fn is_visible(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_visible
+    }
+
+    pub fn hide(&self) {
         let mut state = self.state.write().unwrap();
-        state.is_active = active;
+        state.is_visible = false;
     }
 
     pub fn get_selected(&self) -> Option<Entry<Staking>> {
@@ -219,11 +227,15 @@ impl PopupWidget {
         state.mode.clone()
     }
 
-    pub fn menu(&self) {
+    pub fn show_menu(&self) {
         self.on_init(Mode::Menu, None);
     }
 
-    pub fn chill_attempt(&self) {
+    pub fn show_transaction(&self) {
+        self.on_init(Mode::Transaction, None);
+    }
+
+    pub fn confirm_chill_attempt(&self) {
         self.on_init(Mode::Confirm, Some(Staking::Chill));
     }
 }
@@ -232,7 +244,7 @@ impl Widget for &PopupWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
-        if !state.is_active {
+        if !state.is_visible {
             return; // Do not render if popup is not active.
         }
 
@@ -258,10 +270,10 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     ];
 
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_active))
+        .style(THEME.table.base(state.is_visible))
         .block(block)
         .header(Row::new(vec!["Key", "Extrinsic", "Description"]).set_style(THEME.table.header))
-        .row_highlight_style(THEME.table.row_highlight(state.is_active));
+        .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
@@ -275,9 +287,9 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
     let widths = [Constraint::Length(24), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_active))
+        .style(THEME.table.base(state.is_visible))
         .block(block)
-        .row_highlight_style(THEME.table.row_highlight(state.is_active));
+        .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
@@ -291,9 +303,9 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let rows = state.options.iter().map(|f| f.to_row(state.mode.clone()));
     let widths = [Constraint::Length(24), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_active))
+        .style(THEME.table.base(state.is_visible))
         .block(block)
-        .row_highlight_style(THEME.table.row_highlight(state.is_active));
+        .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
@@ -331,26 +343,3 @@ impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
         }
     }
 }
-
-// /// Background task that fetches child bounties and sends response over channel.
-// pub fn fetch_child_bounties(
-//     api: &OnlineClient<PolkadotConfig>,
-//     runtime: SupportedRelayRuntime,
-//     tx: UnboundedSender<Output>,
-// ) {
-//     let api = api.clone();
-//     let tx = tx.clone();
-//     spawn_local(async move {
-//         let response = match runtime {
-//             SupportedRelayRuntime::Polkadot => polkadot::fetch_child_bounties(&api, tx).await,
-//             SupportedRelayRuntime::Kusama => kusama::fetch_child_bounties(&api, tx).await,
-//             SupportedRelayRuntime::Paseo => paseo::fetch_child_bounties(&api, tx).await,
-//         };
-//         match response {
-//             Err(e) => {
-//                 error!("error: {:?}", e);
-//             }
-//             _ => (),
-//         }
-//     });
-// }

@@ -41,8 +41,6 @@ pub struct App {
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
     pub rx: UnboundedReceiver<Action>,
-    /// Is the popup menu open?
-    pub is_popup_visible: bool,
 }
 
 impl App {
@@ -60,7 +58,7 @@ impl App {
             popup: PopupWidget::default(),
             tx,
             rx,
-            is_popup_visible: false,
+            // is_popup_visible: false,
         }
     }
 
@@ -178,10 +176,14 @@ impl App {
 
     fn handle_transaction_actions(&mut self, action: TxAction) {
         match action {
-            TxAction::Broadcasting => {}
+            TxAction::Broadcasting => {
+                self.popup.show_transaction();
+            }
             TxAction::InBestBlock => {}
             TxAction::InFinalizedBlock => {}
-            TxAction::Success => {}
+            TxAction::Success => {
+                self.popup.hide();
+            }
             TxAction::Error(err) => {}
         }
     }
@@ -209,7 +211,7 @@ impl App {
                 self.chains.move_up();
             }
             Section::Validators => {
-                if self.is_popup_visible {
+                if self.popup.is_visible() {
                     self.popup.move_up();
                 } else {
                     self.validators.move_up();
@@ -229,7 +231,7 @@ impl App {
                 self.chains.move_down();
             }
             Section::Validators => {
-                if self.is_popup_visible {
+                if self.popup.is_visible() {
                     self.popup.move_down();
                 } else {
                     self.validators.move_down();
@@ -244,7 +246,7 @@ impl App {
 
     /// Moves the active section up.
     pub fn section_up(&mut self) {
-        if self.is_popup_visible {
+        if self.popup.is_visible() {
             return;
         }
         let config = CONFIG.clone();
@@ -258,7 +260,7 @@ impl App {
 
     /// Moves the active section down.
     pub fn section_down(&mut self) {
-        if self.is_popup_visible {
+        if self.popup.is_visible() {
             return;
         }
         let config = CONFIG.clone();
@@ -272,11 +274,13 @@ impl App {
 
     /// Toggle menu popup status
     pub fn toggle_menu_popup(&mut self) {
-        self.is_popup_visible = !self.is_popup_visible;
         match self.section {
             Section::Validators => {
-                self.popup.menu();
-                self.popup.set_active(self.is_popup_visible);
+                if self.popup.is_visible() {
+                    self.popup.hide();
+                } else {
+                    self.popup.show_menu();
+                }
             }
             _ => {}
         };
@@ -284,7 +288,7 @@ impl App {
 
     /// Confirm and execute instruction.
     pub fn confirm(&mut self) {
-        if !self.is_popup_visible {
+        if !self.popup.is_visible() {
             return;
         }
         match self.section {
@@ -335,18 +339,14 @@ impl App {
 
     /// Cancel instruction.
     pub fn cancel(&mut self) {
-        self.is_popup_visible = false;
+        self.popup.hide();
     }
 
     /// Attempt chill instruction
     pub fn chill_attempt(&mut self) {
-        self.is_popup_visible = true;
         match self.section {
             Section::Validators => {
-                // self.validators.init_popup_chill_attempt();
-                self.popup.chill_attempt();
-                // self.validators.set_popup_visibility(self.is_popup_visible);
-                self.popup.set_active(self.is_popup_visible);
+                self.popup.confirm_chill_attempt();
             }
             _ => {}
         };
