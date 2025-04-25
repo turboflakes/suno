@@ -18,7 +18,7 @@ pub async fn submit_as_proxy(
     proxied_account: AccountId32,
     tx: UnboundedSender<Action>,
 ) -> Result<(), SnopsError> {
-    let proxy_signer: Keypair = get_keypair_from_seed_file()?;
+    let proxy_signer: Keypair = get_keypair_from_seed_file(None)?;
     let proxy_payload = proxy(proxied_account.clone(), payload);
     submit(api, proxy_payload, proxy_signer, tx).await
 }

@@ -19,9 +19,10 @@ pub async fn submit_as_proxy(
     api: &OnlineClient<SubstrateConfig>,
     call: Call,
     proxied_account: AccountId32,
+    password: Option<String>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), SnopsError> {
-    let proxy_signer: Keypair = get_keypair_from_seed_file()?;
+    let proxy_signer: Keypair = get_keypair_from_seed_file(password)?;
 
     let proxy_call =
         node_runtime::tx()

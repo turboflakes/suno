@@ -63,8 +63,9 @@ impl Validator {
         tokio::spawn(async move {
             let response = match runtime {
                 SupportedRuntime::Westend => {
+                    // TODO: Implement password input for proxy signing
                     let chill_xt = snops_westend::staking::chill();
-                    snops_westend::submit_as_proxy(&api, chill_xt, stash, tx).await
+                    snops_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
                 }
                 _ => unimplemented!("Chill not implemented for {:?}", runtime),
             };
