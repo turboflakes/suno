@@ -1,5 +1,5 @@
 [package]
-name = "snops-common"
+name = "snops-westend"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,18 +7,10 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 
-
 [dependencies]
-lazy_static = "1.5"
-regex = "1.11"
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
-subxt-core = { version = "0.39.0" }
 subxt-signer = { version = "0.39.0", features = ["subxt"] }
-thiserror = "2.0"
+log = "0.4"
+snops-common = { path = "../../common" }
 tokio = { version = "1.40.0", features = ["full"] }
-tui-logger = "0.14"
-
-[dev-dependencies]
-tempfile = "3.2"

@@ -1,5 +1,6 @@
 use super::actions::Action;
 use subxt::error::{DispatchError, MetadataError, RpcError, TransactionError};
+
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tui_logger::TuiLoggerError;
@@ -9,6 +10,8 @@ use tui_logger::TuiLoggerError;
 pub enum SnopsError {
     #[error("Subxt error: {0}")]
     SubxtError(#[from] subxt::Error),
+    #[error("SubxtCore error: {0}")]
+    SubxtCoreError(#[from] subxt::ext::subxt_core::Error),
     #[error("Metadata error: {0}")]
     MetadataError(#[from] MetadataError),
     #[error("Dispatch error: {0}")]
@@ -34,6 +37,13 @@ pub enum SnopsError {
 /// Convert &str to SnopsError
 impl From<&str> for SnopsError {
     fn from(error: &str) -> Self {
+        Self::Other(error.into())
+    }
+}
+
+/// Convert String to SnopsError
+impl From<String> for SnopsError {
+    fn from(error: String) -> Self {
         Self::Other(error.into())
     }
 }

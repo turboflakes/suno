@@ -11,7 +11,9 @@ use ratatui::{
 };
 use snops_common::actions::Action;
 use snops_common::config::{NodeConfig, SupportedRuntime, CONFIG};
-use snops_westend::westend;
+
+use snops_westend;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
 use tokio::sync::mpsc::UnboundedSender;
@@ -50,16 +52,20 @@ impl Validator {
 
     pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
         if !chain_client.is_ready() {
-            warn!("TODO:Chain {} not ready", chain_client.runtime);
+            warn!("TODO: Chain {} not ready", chain_client.runtime);
             return;
         }
 
         let api = chain_client.client.clone();
         let runtime = self.runtime().clone();
         let tx = tx.clone();
+        let stash = self.account.stash.clone();
         tokio::spawn(async move {
             let response = match runtime {
-                SupportedRuntime::Westend => westend::submit_tx_chill(&api, tx).await,
+                SupportedRuntime::Westend => {
+                    let chill_xt = snops_westend::staking::chill();
+                    snops_westend::submit_as_proxy(&api, chill_xt, stash, tx).await
+                }
                 _ => unimplemented!("Chill not implemented for {:?}", runtime),
             };
             match response {

@@ -9,7 +9,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
-use log::{info, warn};
+use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use snops_common::actions::{
     Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,

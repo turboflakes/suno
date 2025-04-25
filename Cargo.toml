@@ -2,6 +2,7 @@
 members = [
     "packages/snops",
     "packages/common",
+    "packages/extrinsics",
     "packages/tui",
     "packages/chains/westend",
 ]
@@ -18,6 +19,7 @@ edition = "2021"
 [workspace.dependencies]
 snops = { path = "packages/snops" }
 snops-common = { path = "packages/common" }
+snops-extrinsics = { path = "packages/extrinsics" }
 snops-tui = { path = "packages/tui" }
 snops-westend = { path = "packages/chains/westend" }
 resolver = "2"
