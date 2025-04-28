@@ -15,7 +15,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
 subxt-core = { version = "0.39.0" }
-subxt-signer = { version = "0.39.0", features = ["subxt"] }
+subxt-signer = { version = "0.41.0", features = ["subxt"] }
 thiserror = "2.0"
 tokio = { version = "1.40.0", features = ["full"] }
 tui-logger = "0.14"

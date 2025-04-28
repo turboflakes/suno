@@ -10,7 +10,7 @@ edition.workspace = true
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
-subxt-signer = { version = "0.39.0", features = ["subxt"] }
+subxt-signer = { version = "0.41.0", features = ["subxt"] }
 log = "0.4"
 snops-common = { path = "../../common" }
 tokio = { version = "1.40.0", features = ["full"] }
