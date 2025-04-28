@@ -19,7 +19,7 @@ serde_yaml = "0.9"
 snops-common = { path = "../common" }
 snops-extrinsics = { path = "../extrinsics" }
 snops-westend = { path = "../chains/westend" }
-subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
+subxt = { version = "0.41.0", features = ["reconnecting-rpc-client"] }
 thiserror = "2.0"
 tokio = { version = "1.40.0", features = ["full"] }
 tui-logger = "0.14"
