@@ -5,10 +5,10 @@ use subxt::{
         reconnecting_rpc_client::{ExponentialBackoff, RpcClient as ReconnectingRpcClient},
         RpcClient,
     },
-    ext::subxt_rpcs::utils::validate_url_is_secure,
+    ext::{jsonrpsee::ws_client::PingConfig, subxt_rpcs::utils::validate_url_is_secure},
 };
 
-pub async fn create_substrate_rpc_client_from_url(
+pub async fn _create_substrate_rpc_client_from_url(
     url: &str,
 ) -> Result<RpcClient, Box<dyn std::error::Error>> {
     if let Err(_) = validate_url_is_secure(url) {
@@ -19,16 +19,22 @@ pub async fn create_substrate_rpc_client_from_url(
     Ok(rpc)
 }
 
-pub async fn _create_substrate_rpc_client_from_url(
+pub async fn create_substrate_rpc_client_from_url(
     url: &str,
 ) -> Result<ReconnectingRpcClient, Box<dyn std::error::Error>> {
     if let Err(_) = validate_url_is_secure(url) {
         warn!("Insecure URL provided: {}", url);
     };
-    info!("Connecting to RPC endpoint: {}", url);
+    let ping_config = PingConfig::new();
+    ping_config.ping_interval(Duration::from_secs(12));
+    ping_config.inactive_limit(Duration::from_secs(18));
     let rpc = ReconnectingRpcClient::builder()
-        .retry_policy(ExponentialBackoff::from_millis(100).max_delay(Duration::from_secs(10)))
+        .retry_policy(ExponentialBackoff::from_millis(10).max_delay(Duration::from_secs(6)))
+        .enable_ws_ping(ping_config)
+        .request_timeout(Duration::from_secs(24))
+        .connection_timeout(Duration::from_secs(6))
         .build(url.to_string())
         .await?;
+    info!("Connected to RPC endpoint {}", url);
     Ok(rpc)
 }
