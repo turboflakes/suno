@@ -5,8 +5,9 @@ use crate::widgets::scrollbar::render_scrollbar;
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::{Color, Style},
+    text::Text,
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use snops_actions::Action;
@@ -218,6 +219,9 @@ impl Widget for &ValidatorsListWidget {
 impl From<&Validator> for Row<'_> {
     fn from(v: &Validator) -> Self {
         let v = v.clone();
-        Row::new(vec![v.runtime().to_string(), v.to_compact_string(5)])
+        Row::new(vec![
+            Text::from(v.runtime().to_string()),
+            Text::from(v.to_compact_string(5)).alignment(Alignment::Right),
+        ])
     }
 }

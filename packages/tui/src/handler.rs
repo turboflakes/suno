@@ -1,5 +1,4 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use log::info;
 use snops_actions::{Action, NavigationAction, PopupAction, StakingAction, SystemAction};
 
 /// Handles the key events and triggers respective action.
@@ -12,6 +11,19 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
                 _ => Action::System(SystemAction::Noop),
             }
         }
+        // TODO: It seems that `command` key on macos is not implemented for SUPER key modifiers
+        KeyModifiers::ALT => match key_event.code {
+            KeyCode::Left => Action::Navigation(NavigationAction::PrevTab),
+            KeyCode::Right => Action::Navigation(NavigationAction::NextTab),
+            _ => Action::System(SystemAction::Noop),
+        },
+        // NOTE: It seems that `command` or `option` keys on macos are not implemented for key modifiers
+        // Use `Shift` key to navigate tabs
+        KeyModifiers::SHIFT => match key_event.code {
+            KeyCode::Left => Action::Navigation(NavigationAction::PrevTab),
+            KeyCode::Right => Action::Navigation(NavigationAction::NextTab),
+            _ => Action::System(SystemAction::Noop),
+        },
         _ => handle_key_events_without_modifiers(key_event),
     }
 }
@@ -24,10 +36,14 @@ pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
         KeyCode::Left | KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
         // Section Down on `Right`
         KeyCode::Right | KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
-        // Move Up on `Up`
+        // Move Up on `Up` inside the active section or list
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
-        // Move Down on `Down`
+        // Move Down on `Down` inside the active section or list
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        // Fallback to PrevTab
+        KeyCode::Char('[') => Action::Navigation(NavigationAction::PrevTab),
+        // Fallback to NextTab
+        KeyCode::Char(']') => Action::Navigation(NavigationAction::NextTab),
         // TODO: Implement KeyBinddings dynamically from config.
         KeyCode::Char('c') => Action::Staking(StakingAction::Chill),
         KeyCode::Char('b') => Action::Staking(StakingAction::Bond),

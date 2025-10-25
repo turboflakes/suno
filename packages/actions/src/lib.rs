@@ -28,6 +28,8 @@ pub enum NavigationAction {
     MoveDown,
     SectionUp,
     SectionDown,
+    NextTab,
+    PrevTab,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

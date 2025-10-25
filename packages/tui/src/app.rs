@@ -1,6 +1,7 @@
 use crate::error::TuiError;
 use crate::menu::Command;
 use crate::section::Section;
+use crate::tab::Tab;
 use crate::widgets::{
     chains::ChainsListWidget, collators::CollatorsListWidget, popup, popup::PopupWidget,
     validators::ValidatorsListWidget,
@@ -27,6 +28,8 @@ pub type AppResult<T> = std::result::Result<T, TuiError>;
 pub struct App {
     /// Is the application running?
     pub running: bool,
+    /// The current selected tab.
+    pub tab: Tab,
     /// The current selected section.
     pub section: Section,
     /// Holds the API clients for each supported runtime.
@@ -51,6 +54,7 @@ impl App {
 
         Self {
             running: true,
+            tab: Tab::Main,
             section: Section::Chains,
             chains: ChainsListWidget::new(tx.clone()),
             validators: ValidatorsListWidget::default(),
@@ -143,6 +147,8 @@ impl App {
             NavigationAction::SectionDown => self.section_down(),
             NavigationAction::MoveUp => self.move_up(),
             NavigationAction::MoveDown => self.move_down(),
+            NavigationAction::NextTab => self.next_tab(),
+            NavigationAction::PrevTab => self.prev_tab(),
         }
     }
 
@@ -276,6 +282,16 @@ impl App {
             .set_active(self.section == Section::Validators);
         self.collators
             .set_active(self.section == Section::Collators);
+    }
+
+    /// Selects the previous tab.
+    fn prev_tab(&mut self) {
+        self.tab = self.tab.prev();
+    }
+
+    /// Selects the next tab.
+    fn next_tab(&mut self) {
+        self.tab = self.tab.next();
     }
 
     /// Toggle menu popup status

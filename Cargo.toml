@@ -28,6 +28,7 @@ ratatui = "0.29.0"
 regex = "1.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
+strum = { version = "0.26.3", features = ["derive"] }
 subxt = { version = "0.43.0", features = ["reconnecting-rpc-client"] }
 subxt-core = { version = "0.43.0" }
 subxt-signer = { version = "0.43.0", features = ["subxt"] }

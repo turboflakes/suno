@@ -1,6 +1,6 @@
-use crate::app::App;
 use crate::section::Section;
 use crate::widgets::popup::Mode;
+use crate::{app::App, tab::Tab};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style},
@@ -64,8 +64,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     }
 
     // TODO: Implement tabs to switch between body widgets.
-    // render_body_widget(app, frame, outer_layout[1]);
-    render_logs_widget(app, frame, outer_layout[1]);
+    match app.tab {
+        Tab::Main => render_body_widget(app, frame, outer_layout[1]),
+        Tab::Logs => render_logs_widget(app, frame, outer_layout[1]),
+    }
 
     // Display footer.
     render_legend_widget(app, frame, container[1]);
@@ -83,7 +85,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let rect = match &app.popup.get_mode() {
-        Mode::Menu => popup_area(frame.area(), 50, 30),
+        Mode::Menu => popup_area(frame.area(), 40, 30),
         Mode::Confirm => popup_area(frame.area(), 40, 10),
         Mode::Transaction => popup_area(frame.area(), 20, 7),
     };
