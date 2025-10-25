@@ -10,7 +10,7 @@ use ratatui::{
         Widget,
     },
 };
-use snops_common::config::{NodeConfig, SupportedRuntime, CONFIG};
+use snops_config::{NodeConfig, SupportedRuntime, CONFIG};
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Default)]

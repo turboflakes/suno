@@ -7,9 +7,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
     Frame,
 };
+use snops_config::CONFIG;
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
-
-use snops_common::config::CONFIG;
 
 /// Renders the user interface widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {

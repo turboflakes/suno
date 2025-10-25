@@ -8,7 +8,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
-use snops_common::config::CONFIG;
+use snops_config::CONFIG;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 

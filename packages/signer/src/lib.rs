@@ -1,12 +1,13 @@
-use super::config::CONFIG;
-use super::errors::SnopsError;
-use regex::Regex;
-use std::str::FromStr;
+mod error;
 
+use crate::error::Error;
+use regex::Regex;
+use snops_config::CONFIG;
+use std::str::FromStr;
 use subxt_signer::{sr25519::Keypair, SecretUri};
 
 /// Helper function to generate a keypair from the content of the seed file
-pub fn get_keypair_from_seed_file(password: Option<String>) -> Result<Keypair, SnopsError> {
+pub fn load_keypair(password: Option<String>) -> Result<Keypair, Error> {
     let config = CONFIG.clone();
 
     // Read data from seed file

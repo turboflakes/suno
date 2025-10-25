@@ -3,13 +3,15 @@ use crate::widgets::scrollbar::render_scrollbar;
 use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Clear, Row, StatefulWidget, Table, TableState, Widget},
+    text::Text,
+    widgets::{
+        Block, BorderType, Borders, Cell, Clear, Row, StatefulWidget, Table, TableState, Widget,
+    },
 };
-use snops_common::actions::{Action, ChainAction, SystemAction};
-use snops_common::config::{SupportedRuntime, CONFIG};
-use snops_common::network::ConnectionState;
+use snops_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
+use snops_config::{SupportedRuntime, CONFIG};
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
 use tokio::sync::mpsc::UnboundedSender;
@@ -56,7 +58,6 @@ impl ChainsListWidget {
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
-                info!("Chain: {}", chain_name);
                 match create_substrate_rpc_client_from_url(&chain_config.rpc_url).await {
                     Ok(rpc_client) => {
                         match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
@@ -196,24 +197,27 @@ impl Widget for &ChainsListWidget {
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
-        if state.is_active {
-            // Render scrollbar.
-            let scrollbar_area = Rect {
-                y: area.y + 1,
-                height: area.height - 2,
-                ..area
-            };
-            if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
-            }
-        }
+        // if state.is_active {
+        //     // Render scrollbar.
+        //     let scrollbar_area = Rect {
+        //         y: area.y + 1,
+        //         height: area.height - 2,
+        //         ..area
+        //     };
+        //     if let Some(row_index) = state.table_state.selected() {
+        //         render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+        //     }
+        // }
     }
 }
 
 impl From<&ChainClient> for Row<'_> {
     fn from(cc: &ChainClient) -> Self {
         let cc = cc.clone();
-        Row::new(vec![cc.runtime.to_string(), cc.state.to_string()])
+        Row::new(vec![
+            Text::from(cc.runtime.to_string()),
+            Text::from(cc.state.to_string()).alignment(Alignment::Right),
+        ])
     }
 }
 

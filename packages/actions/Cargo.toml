@@ -1,5 +1,5 @@
 [package]
-name = "snops"
+name = "snops-actions"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,4 @@ edition.workspace = true
 
 
 [dependencies]
-snops-tui = { path = "../tui" }
-
-color-eyre = { workspace = true }
-tokio = { workspace = true }
+snops-config = { path = "../config" }

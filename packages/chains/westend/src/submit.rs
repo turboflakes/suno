@@ -22,7 +22,7 @@ pub async fn submit_as_proxy(
     password: Option<String>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), SnopsError> {
-    let proxy_signer: Keypair = get_keypair_from_seed_file(password)?;
+    let proxy_signer: Keypair = snops_signer::load_keypair(password)?;
 
     let proxy_call =
         node_runtime::tx()

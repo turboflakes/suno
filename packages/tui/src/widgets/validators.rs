@@ -9,10 +9,10 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
-use snops_common::actions::Action;
-use snops_common::config::{NodeConfig, SupportedRuntime, CONFIG};
+use snops_actions::Action;
+use snops_config::{NodeConfig, SupportedRuntime, CONFIG};
 
-use snops_westend;
+// use snops_westend;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
@@ -61,20 +61,20 @@ impl Validator {
         let tx = tx.clone();
         let stash = self.account.stash.clone();
         tokio::spawn(async move {
-            let response = match runtime {
-                SupportedRuntime::Westend => {
-                    // TODO: Implement password input for proxy signing
-                    let chill_xt = snops_westend::staking::chill();
-                    snops_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
-                }
-                _ => unimplemented!("Chill not implemented for {:?}", runtime),
-            };
-            match response {
-                Err(e) => {
-                    warn!("TODO: error: {:?}", e);
-                }
-                _ => (),
-            }
+            // let response = match runtime {
+            //     SupportedRuntime::Westend => {
+            //         // TODO: Implement password input for proxy signing
+            //         let chill_xt = snops_westend::staking::chill();
+            //         snops_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
+            //     }
+            //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
+            // };
+            // match response {
+            //     Err(e) => {
+            //         warn!("TODO: error: {:?}", e);
+            //     }
+            //     _ => (),
+            // }
         });
     }
 }

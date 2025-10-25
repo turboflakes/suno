@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use log::info;
-use snops_common::actions::{Action, NavigationAction, PopupAction, StakingAction, SystemAction};
+use snops_actions::{Action, NavigationAction, PopupAction, StakingAction, SystemAction};
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent) -> Action {

@@ -1,5 +1,7 @@
-use super::config::SupportedRuntime;
-use super::network::ConnectionState;
+pub mod network;
+
+use crate::network::ConnectionState;
+use snops_config::SupportedRuntime;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,3 +1,4 @@
+use crate::error::TuiError;
 use crate::menu::Command;
 use crate::section::Section;
 use crate::widgets::{
@@ -11,16 +12,15 @@ use crate::{
 };
 use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use snops_common::actions::{
+use snops_actions::{
     Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,
 };
-use snops_common::config::CONFIG;
-use snops_common::errors::SnopsError;
+use snops_config::CONFIG;
 use std::io;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, SnopsError>;
+pub type AppResult<T> = std::result::Result<T, TuiError>;
 
 /// Application.
 #[derive(Debug)]
@@ -106,7 +106,7 @@ impl App {
             Event::Key(key_event) => handle_key_events(key_event),
             Event::Mouse(_) => Action::System(SystemAction::Noop),
             Event::Resize(_, _) => Action::System(SystemAction::Noop),
-            _ => Action::System(SystemAction::Noop),
+            // _ => Action::System(SystemAction::Noop),
         };
         self.tx.send(action.clone())?;
         Ok(())
@@ -348,7 +348,7 @@ impl App {
         self.popup.hide();
     }
 
-    /// Attempt chill instruction
+    /// Try chill instruction
     pub fn chill_attempt(&mut self) {
         match self.section {
             Section::Validators => {

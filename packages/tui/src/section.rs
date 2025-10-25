@@ -1,4 +1,4 @@
-use snops_common::config::Features;
+use snops_config::Features;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Section {

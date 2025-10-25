@@ -1,5 +1,5 @@
 [package]
-name = "snops-tui"
+name = "snops-config"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,20 +9,10 @@ edition.workspace = true
 
 
 [dependencies]
-snops-actions = { path = "../actions" }
-snops-config = { path = "../config" }
-
-crossterm = { workspace = true }
-futures = { workspace = true }
 lazy_static = { workspace = true }
-log = { workspace = true }
-ratatui = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 subxt = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-tui-logger = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -1,4 +1,4 @@
-use snops_common::config::SupportedRuntime;
+use snops_config::SupportedRuntime;
 use subxt::utils::AccountId32;
 
 /// Common trait for account-related functionality

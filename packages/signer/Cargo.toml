@@ -1,5 +1,5 @@
 [package]
-name = "snops"
+name = "snops-signer"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,8 @@ edition.workspace = true
 
 
 [dependencies]
-snops-tui = { path = "../tui" }
+snops-config = { path = "../config" }
 
-color-eyre = { workspace = true }
-tokio = { workspace = true }
+regex = { workspace = true }
+subxt-signer = { workspace = true }
+thiserror = { workspace = true }

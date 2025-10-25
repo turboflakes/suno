@@ -1,14 +1,16 @@
 [workspace]
 members = [
+    "packages/actions",
+    "packages/config",
+    "packages/signer",
     "packages/snops",
-    "packages/common",
-    "packages/extrinsics",
     "packages/tui",
-    "packages/chains/westend",
+    # "packages/chains/westend",
 ]
 
+resolver = "2"
+
 [workspace.package]
-name = "snops"
 version = "0.1.0"
 authors = ["paulo <paulo@turboflakes.io>"]
 license = "MIT or Apache-2.0"
@@ -17,9 +19,19 @@ description = "Just another way of managing substrate node operations in the Pol
 edition = "2021"
 
 [workspace.dependencies]
-snops = { path = "packages/snops" }
-snops-common = { path = "packages/common" }
-snops-extrinsics = { path = "packages/extrinsics" }
-snops-tui = { path = "packages/tui" }
-snops-westend = { path = "packages/chains/westend" }
-resolver = "2"
+color-eyre = "0.6.3"
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+futures = "0.3.31"
+lazy_static = "1.5"
+log = "0.4"
+ratatui = "0.29.0"
+regex = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+subxt = { version = "0.43.0", features = ["reconnecting-rpc-client"] }
+subxt-core = { version = "0.43.0" }
+subxt-signer = { version = "0.43.0", features = ["subxt"] }
+tempfile = "3.2"
+thiserror = "2.0"
+tokio = { version = "1.43.0", features = ["full"] }
+tui-logger = "0.14"
