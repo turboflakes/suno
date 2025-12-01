@@ -160,13 +160,15 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, rect: Rect) {
     let footer = if app.popup.is_visible() {
-        Paragraph::new(format!("enter: run | ↑ ↓: navigate | x: close"))
+        Paragraph::new(format!(": run | ↑ ↓: navigate | x: close"))
             .style(Style::default().fg(Color::Blue))
             .centered()
     } else {
-        Paragraph::new(format!("← ↑ → ↓: navigate | x: menu | q: quit"))
-            .style(Style::default().fg(Color::Blue))
-            .centered()
+        Paragraph::new(format!(
+            "tab or alt+tab or ↑ ↓: navigate | x: menu | q: quit"
+        ))
+        .style(Style::default().fg(Color::Blue))
+        .centered()
     };
     frame.render_widget(footer, rect);
 }

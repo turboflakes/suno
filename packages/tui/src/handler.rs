@@ -13,15 +13,7 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
         }
         // TODO: It seems that `command` key on macos is not implemented for SUPER key modifiers
         KeyModifiers::ALT => match key_event.code {
-            KeyCode::Left => Action::Navigation(NavigationAction::PrevTab),
-            KeyCode::Right => Action::Navigation(NavigationAction::NextTab),
-            _ => Action::System(SystemAction::Noop),
-        },
-        // NOTE: It seems that `command` or `option` keys on macos are not implemented for key modifiers
-        // Use `Shift` key to navigate tabs
-        KeyModifiers::SHIFT => match key_event.code {
-            KeyCode::Left => Action::Navigation(NavigationAction::PrevTab),
-            KeyCode::Right => Action::Navigation(NavigationAction::NextTab),
+            KeyCode::Tab => Action::Navigation(NavigationAction::NextTab),
             _ => Action::System(SystemAction::Noop),
         },
         _ => handle_key_events_without_modifiers(key_event),
@@ -32,10 +24,10 @@ pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
     match key_event.code {
         // Open popup menu within the active section
         KeyCode::Char('x') | KeyCode::Char('X') => Action::Popup(PopupAction::Toggle),
-        // Section Up on `Left`
-        KeyCode::Left | KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
         // Section Down on `Right`
         KeyCode::Right | KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
+        // Section Up on `Left`
+        KeyCode::Left | KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
         // Move Up on `Up` inside the active section or list
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
