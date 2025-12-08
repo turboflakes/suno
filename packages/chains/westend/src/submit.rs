@@ -3,9 +3,9 @@ use log::info;
 use node_runtime::proxy::events::ProxyExecuted;
 use node_runtime::runtime_types::sp_runtime::DispatchError;
 use node_runtime::runtime_types::westend_runtime::ProxyType;
-use snops_common::actions::{Action, TxAction};
-use snops_common::errors::SnopsError;
-use snops_common::file::get_keypair_from_seed_file;
+use suno_common::actions::{Action, TxAction};
+use suno_common::errors::SunoError;
+use suno_common::file::get_keypair_from_seed_file;
 use subxt::{
     error::TransactionError, tx::TxProgress, tx::TxStatus, utils::AccountId32, OnlineClient,
     SubstrateConfig,
@@ -21,8 +21,8 @@ pub async fn submit_as_proxy(
     proxied_account: AccountId32,
     password: Option<String>,
     tx: UnboundedSender<Action>,
-) -> Result<(), SnopsError> {
-    let proxy_signer: Keypair = snops_signer::load_keypair(password)?;
+) -> Result<(), SunoError> {
+    let proxy_signer: Keypair = suno_signer::load_keypair(password)?;
 
     let proxy_call =
         node_runtime::tx()
@@ -41,7 +41,7 @@ async fn handle_response(
     api: &OnlineClient<SubstrateConfig>,
     response: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     outbound: UnboundedSender<Action>,
-) -> Result<(), SnopsError> {
+) -> Result<(), SunoError> {
     while let Some(status) = response.next().await {
         match status? {
             TxStatus::Broadcasted => {

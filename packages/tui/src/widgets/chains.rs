@@ -4,16 +4,16 @@ use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::Text,
     widgets::{
         Block, BorderType, Borders, Cell, Clear, Row, StatefulWidget, Table, TableState, Widget,
     },
 };
-use snops_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
-use snops_config::{SupportedRuntime, CONFIG};
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
+use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
+use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub type BlockNumber = u32;
@@ -184,8 +184,9 @@ impl Widget for &ChainsListWidget {
         };
 
         let block = Block::new()
-            .title(" Chains ")
-            .borders(Borders::ALL)
+            // .title("Chains")
+            // .title_style(Style::default().add_modifier(Modifier::BOLD))
+            .borders(Borders::TOP | Borders::LEFT | Borders::BOTTOM)
             .border_type(BorderType::Plain);
 
         let rows = state.chains.iter();

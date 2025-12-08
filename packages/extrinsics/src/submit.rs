@@ -1,8 +1,8 @@
 use super::proxy::proxy;
 use log::info;
-use snops_common::actions::{Action, TxAction};
-use snops_common::errors::SnopsError;
-use snops_common::file::get_keypair_from_seed_file;
+use suno_common::actions::{Action, TxAction};
+use suno_common::errors::SunoError;
+use suno_common::file::get_keypair_from_seed_file;
 use subxt::ext::scale_value::Composite;
 use subxt::ext::scale_value::ValueDef;
 use subxt::{
@@ -17,7 +17,7 @@ pub async fn submit_as_proxy(
     payload: DynamicPayload,
     proxied_account: AccountId32,
     tx: UnboundedSender<Action>,
-) -> Result<(), SnopsError> {
+) -> Result<(), SunoError> {
     let proxy_signer: Keypair = get_keypair_from_seed_file(None)?;
     let proxy_payload = proxy(proxied_account.clone(), payload);
     submit(api, proxy_payload, proxy_signer, tx).await
@@ -28,7 +28,7 @@ async fn submit(
     payload: DynamicPayload,
     signer: Keypair,
     tx: UnboundedSender<Action>,
-) -> Result<(), SnopsError> {
+) -> Result<(), SunoError> {
     let mut response = api
         .tx()
         .sign_and_submit_then_watch_default(&payload, &signer)
@@ -90,7 +90,7 @@ async fn submit(
 }
 
 // Helper function to extract module index and error data from a Value
-fn extract_module_error(value: &Value<u32>) -> Result<Option<(u8, Vec<u8>)>, SnopsError> {
+fn extract_module_error(value: &Value<u32>) -> Result<Option<(u8, Vec<u8>)>, SunoError> {
     match value {
         Value::<_> { value, context: _ } => {
             info!("Value: {}", value);

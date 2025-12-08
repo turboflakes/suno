@@ -1,5 +1,5 @@
 [package]
-name = "snops"
+name = "suno"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
-snops-tui = { path = "../tui" }
+suno-tui = { path = "../tui" }
 
 color-eyre = { workspace = true }
 tokio = { workspace = true }

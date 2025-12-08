@@ -3,7 +3,7 @@ members = [
     "packages/actions",
     "packages/config",
     "packages/signer",
-    "packages/snops",
+    "packages/suno",
     "packages/tui",
     # "packages/chains/westend",
 ]
@@ -14,14 +14,15 @@ resolver = "2"
 version = "0.1.0"
 authors = ["paulo <paulo@turboflakes.io>"]
 license = "MIT or Apache-2.0"
-repository = "https://github.com/turboflakes/snops"
-description = "Just another way of managing substrate node operations in the Polkadot ecoystem."
+repository = "https://github.com/turboflakes/suno"
+description = "Just another way of managing Substrate node operations in the Polkadot ecosystem."
 edition = "2021"
 
 [workspace.dependencies]
 color-eyre = "0.6.3"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.31"
+indoc = "2"
 lazy_static = "1.5"
 log = "0.4"
 ratatui = "0.29.0"

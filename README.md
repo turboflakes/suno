@@ -1,6 +1,6 @@
-# snops &middot; ![latest release](https://github.com/turboflakes/snops/actions/workflows/create_release.yml/badge.svg)
+# suno &middot; ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
 
-`snops` is just another way of managing substrate node operations.
+`suno` -- Just another way of managing **Su**bstrate **n**ode **o**perations in the Polkadot ecosystem.
 
 ## Development / Build from Source
 
@@ -28,14 +28,14 @@ Once done, finish installing the support software
 sudo apt install build-essential git clang libclang-dev pkg-config libssl-dev
 ```
 
-Build `snops` by cloning this repository
+Build `suno` by cloning this repository
 
 ```bash
 #!/bin/bash
-git clone http://github.com/turboflakes/snops
+git clone http://github.com/turboflakes/suno
 ```
 
-Compile `snops` package with Cargo
+Compile `suno` package with Cargo
 
 ```bash
 #!/bin/bash
@@ -46,12 +46,12 @@ And then run it
 
 ```bash
 #!/bin/bash
-./target/debug/snops
+./target/debug/suno
 ```
 
 Otherwise, recompile the code on changes and run the binary
 
 ```bash
 #!/bin/bash
-cargo watch -x 'run --bin snops'
+cargo watch -x 'run --bin suno'
 ```

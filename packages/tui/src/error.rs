@@ -1,6 +1,6 @@
-use snops_actions::Action;
+use suno_actions::Action;
 
-/// Snops specific error messages
+/// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
 pub enum TuiError {
     #[error("IO error: {0}")]

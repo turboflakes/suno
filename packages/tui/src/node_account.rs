@@ -1,5 +1,5 @@
-use snops_config::SupportedRuntime;
 use subxt::utils::AccountId32;
+use suno_config::SupportedRuntime;
 
 /// Common trait for account-related functionality
 pub trait AccountDisplay {

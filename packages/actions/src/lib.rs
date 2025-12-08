@@ -1,7 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
-use snops_config::SupportedRuntime;
+use suno_config::SupportedRuntime;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -4,14 +4,14 @@ use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     widgets::{
         Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
         Widget,
     },
 };
-use snops_config::{NodeConfig, SupportedRuntime, CONFIG};
 use std::sync::{Arc, RwLock};
+use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {
@@ -128,8 +128,9 @@ impl Widget for &CollatorsListWidget {
         };
 
         let block = Block::new()
-            .title(" Collators ")
-            .borders(Borders::ALL)
+            .title("Collators")
+            .title_style(Style::default().add_modifier(Modifier::BOLD))
+            .borders(Borders::LEFT | Borders::BOTTOM)
             .border_type(BorderType::Plain);
 
         let rows = state.collators.iter();

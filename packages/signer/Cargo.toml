@@ -1,5 +1,5 @@
 [package]
-name = "snops-signer"
+name = "suno-signer"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
-snops-config = { path = "../config" }
+suno-config = { path = "../config" }
 
 regex = { workspace = true }
 subxt-signer = { workspace = true }

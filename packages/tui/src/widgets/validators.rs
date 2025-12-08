@@ -6,14 +6,14 @@ use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::Text,
-    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
-use snops_actions::Action;
-use snops_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_actions::Action;
+use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 
-// use snops_westend;
+// use suno_westend;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
@@ -65,8 +65,8 @@ impl Validator {
             // let response = match runtime {
             //     SupportedRuntime::Westend => {
             //         // TODO: Implement password input for proxy signing
-            //         let chill_xt = snops_westend::staking::chill();
-            //         snops_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
+            //         let chill_xt = suno_westend::staking::chill();
+            //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
             //     }
             //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
             // };
@@ -177,42 +177,54 @@ impl Widget for &ValidatorsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
-        let (table_style, highlight_style) = match state.is_active {
+        let (table_style, highlight_style, highlight_symbol) = match state.is_active {
             true => (
                 Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
+                "❯ ",
             ),
             false => (
                 Style::default().fg(Color::Blue),
                 Style::default().fg(Color::Blue),
+                "",
             ),
         };
 
         let block = Block::new()
-            .title(" Validators ")
-            .borders(Borders::ALL)
+            .title("Validators")
+            .title_style(Style::default().add_modifier(Modifier::BOLD))
+            .borders(Borders::LEFT | Borders::BOTTOM)
             .border_type(BorderType::Plain);
 
         let rows = state.validators.iter();
-        let widths = [Constraint::Fill(1), Constraint::Length(14)];
+
+        let widths = [
+            Constraint::Fill(1),    // Network column
+            Constraint::Length(14), // Stash column
+        ];
+
         let table = Table::new(rows, widths)
             .block(block)
             .style(table_style)
-            .row_highlight_style(highlight_style);
+            .row_highlight_style(highlight_style)
+            .highlight_symbol(highlight_symbol);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
-        if state.is_active {
-            // Render scrollbar.
-            let scrollbar_area = Rect {
-                y: area.y + 1,
-                height: area.height - 2,
-                ..area
-            };
-            if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
-            }
-        }
+        // // Render scrollbar when active
+        // if state.is_active {
+
+        //     let scrollbar_area = Rect {
+        //         x: area.x,
+        //         y: area.y + 1,
+        //         width: 1,
+        //         height: area.height - 2,
+        //         ..area
+        //     };
+        //     if let Some(row_index) = state.table_state.selected() {
+        //         render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
+        //     }
+        // }
     }
 }
 

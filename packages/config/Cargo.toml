@@ -1,5 +1,5 @@
 [package]
-name = "snops-config"
+name = "suno-config"
 version.workspace = true
 license.workspace = true
 repository.workspace = true

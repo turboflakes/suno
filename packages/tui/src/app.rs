@@ -13,11 +13,11 @@ use crate::{
 };
 use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use snops_actions::{
+use std::io;
+use suno_actions::{
     Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,
 };
-use snops_config::CONFIG;
-use std::io;
+use suno_config::CONFIG;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.

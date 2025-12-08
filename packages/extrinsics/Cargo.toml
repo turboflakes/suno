@@ -1,5 +1,5 @@
 [package]
-name = "snops-extrinsics"
+name = "suno-extrinsics"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,5 +15,5 @@ serde = { version = "1.0", features = ["derive"] }
 scale-value = { version = "0.18.0", default-features = false }
 subxt = { version = "0.39.0", features = ["reconnecting-rpc-client"] }
 subxt-signer = { version = "0.39.0", features = ["subxt"] }
-snops-common = { path = "../common" }
+suno-common = { path = "../common" }
 tokio = { version = "1.40.0", features = ["full"] }
