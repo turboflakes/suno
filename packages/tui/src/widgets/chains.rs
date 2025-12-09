@@ -1,22 +1,17 @@
 use crate::utils::create_substrate_rpc_client_from_url;
-use crate::widgets::scrollbar::render_scrollbar;
-use log::{error, info, warn};
+use log::{error, info};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::Text,
-    widgets::{
-        Block, BorderType, Borders, Cell, Clear, Row, StatefulWidget, Table, TableState, Widget,
-    },
+    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
 use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::UnboundedSender;
-
-pub type BlockNumber = u32;
 
 #[derive(Debug, Clone)]
 pub struct ChainsListWidget {
@@ -38,6 +33,8 @@ pub struct ChainClient {
     pub runtime: SupportedRuntime,
     pub client: OnlineClient<SubstrateConfig>,
     state: ConnectionState,
+    // last_update value is given in milliseconds
+    last_update: u64,
 }
 
 impl ChainClient {
@@ -66,6 +63,7 @@ impl ChainsListWidget {
                                     runtime: chain_name.clone(),
                                     client,
                                     state: ConnectionState::Connecting,
+                                    last_update: 0,
                                 };
                                 self.on_connecting(chain_client);
                             }
@@ -140,8 +138,16 @@ impl ChainsListWidget {
         let mut state = self.state.write().unwrap();
         for chain in state.chains.iter_mut() {
             if chain.runtime == runtime {
-                chain.state = connection.clone()
+                chain.state = connection.clone();
+                chain.last_update = 0;
             }
+        }
+    }
+
+    pub fn tick(&self, value: u64) {
+        let mut state = self.state.write().unwrap();
+        for chain in state.chains.iter_mut() {
+            chain.last_update += value;
         }
     }
 
@@ -190,34 +196,38 @@ impl Widget for &ChainsListWidget {
             .border_type(BorderType::Plain);
 
         let rows = state.chains.iter();
-        let widths = [Constraint::Fill(1), Constraint::Length(10)];
+        let widths = [
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Length(12),
+        ];
+
         let table = Table::new(rows, widths)
-            .block(block)
+            .block(block.clone())
             .style(table_style)
             .row_highlight_style(highlight_style);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
-
-        // if state.is_active {
-        //     // Render scrollbar.
-        //     let scrollbar_area = Rect {
-        //         y: area.y + 1,
-        //         height: area.height - 2,
-        //         ..area
-        //     };
-        //     if let Some(row_index) = state.table_state.selected() {
-        //         render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
-        //     }
-        // }
     }
 }
 
 impl From<&ChainClient> for Row<'_> {
     fn from(cc: &ChainClient) -> Self {
         let cc = cc.clone();
+        let ratio = cc.last_update.clamp(0, 6000) as f64 / 6000.0;
+        let total_chars = 12;
+        let filled_chars = (ratio * total_chars as f64) as usize;
+
+        let progress = format!(
+            "{}{}",
+            "░".repeat(total_chars - filled_chars),
+            "▓".repeat(filled_chars),
+        );
+
         Row::new(vec![
             Text::from(cc.runtime.to_string()),
             Text::from(cc.state.to_string()).alignment(Alignment::Right),
+            Text::from(progress.to_string()).alignment(Alignment::Right),
         ])
     }
 }

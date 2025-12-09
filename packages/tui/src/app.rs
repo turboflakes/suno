@@ -11,7 +11,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
-use log::{error, info, warn};
+use log::warn;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::{
@@ -22,6 +22,9 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, TuiError>;
+
+// Constants
+const TICK_RATE: u64 = 250;
 
 /// Application.
 #[derive(Debug)]
@@ -84,7 +87,7 @@ impl App {
         // Initialize the terminal user interface.
         let backend = CrosstermBackend::new(io::stdout());
         let terminal = Terminal::new(backend)?;
-        let events = EventHandler::new(250);
+        let events = EventHandler::new(TICK_RATE);
         let mut tui = Tui::new(terminal, events);
         tui.init()?;
 
@@ -209,7 +212,9 @@ impl App {
     pub fn noop(&self) {}
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
+    pub fn tick(&self) {
+        self.chains.tick(TICK_RATE)
+    }
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
