@@ -1,4 +1,3 @@
-use crate::node_account::{AccountDisplay, NodeAccount};
 use crate::widgets::chains::ChainClient;
 use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
@@ -10,15 +9,172 @@ use ratatui::{
     text::Text,
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
+use std::collections::HashMap;
 use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction};
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_config::{NodeConfig, CONFIG};
+use suno_primitives::{AccountDisplay, NodeAccount, SupportedRuntime, ValidatorKey};
 // use suno_westend;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use subxt::utils::{AccountId32, H256};
 use suno_asset_hub_paseo;
 use tokio::sync::mpsc::UnboundedSender;
+
+type Commission = u32;
+type Points = u32;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum ValidatorState {
+    /// Validator is an authority in the active set
+    Authority,
+    /// Validator is an authority and also a parachain authority
+    ParaAuthority,
+    /// Validator is in the waiting queue
+    Waiting,
+    /// Validator status is unknown or not yet determined
+    #[default]
+    Unknown,
+}
+#[derive(Debug, Clone, Default)]
+pub struct Stake {
+    pub own: u128,
+    pub nominators: u128,
+    pub active: u128,
+}
+
+#[derive(Debug, Clone)]
+pub struct Nominators {
+    pub stash: AccountId32,
+    pub stake: u128,
+    pub is_backer: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Validator {
+    pub account: NodeAccount,
+    pub commission: Commission,
+    pub stake: Stake,
+    pub nominators: Vec<Nominators>,
+    pub points: Points,
+    pub is_next_authority: bool,
+    pub is_chilled: bool,
+    pub state: ValidatorState,
+}
+
+impl Validator {
+    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
+        Self {
+            account: NodeAccount::new(runtime, stash),
+            commission: 0,
+            stake: Stake::default(),
+            nominators: Vec::new(),
+            points: 0,
+            is_next_authority: false,
+            is_chilled: false,
+            state: ValidatorState::default(),
+        }
+    }
+
+    pub fn key(&self) -> &ValidatorKey {
+        &self.account.account_key()
+    }
+
+    pub fn runtime(&self) -> &SupportedRuntime {
+        &self.account.runtime()
+    }
+
+    pub fn identity(&self) -> &Option<String> {
+        self.account.identity()
+    }
+
+    pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
+        let percentage = self.commission as f64 / 10_000_000.0;
+        let formatted = format!("{:.prec$}", percentage, prec = decimal_places);
+        let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+        format!("{}%", trimmed)
+    }
+
+    pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
+        if !chain_client.is_ready() {
+            warn!("TODO: Chain {} not ready", chain_client.runtime());
+            return;
+        }
+
+        let api = chain_client.client().clone();
+        let runtime = self.runtime().clone();
+        let tx = tx.clone();
+        let stash = self.account.stash().clone();
+        tokio::spawn(async move {
+            // let response = match runtime {
+            //     SupportedRuntime::Westend => {
+            //         // TODO: Implement password input for proxy signing
+            //         let chill_xt = suno_westend::staking::chill();
+            //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
+            //     }
+            //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
+            // };
+            // match response {
+            //     Err(e) => {
+            //         warn!("TODO: error: {:?}", e);
+            //     }
+            //     _ => (),
+            // }
+        });
+    }
+}
+
+impl AccountDisplay for Validator {
+    fn stash(&self) -> AccountId32 {
+        self.account.stash()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ValidatorsListState {
+    validators: HashMap<ValidatorKey, Validator>,
+    validators_order: Vec<ValidatorKey>,
+    table_state: TableState,
+    is_active: bool,
+}
+
+impl ValidatorsListState {
+    pub fn add_validator(&mut self, validator: Validator) {
+        let key = validator.key();
+        if !self.validators.contains_key(&key) {
+            self.validators_order.push(key.clone());
+        }
+        self.validators.insert(key.clone(), validator);
+    }
+
+    pub fn update_validator_commission(
+        &mut self,
+        validator_key: &ValidatorKey,
+        commission: Commission,
+    ) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.commission = commission;
+        }
+    }
+
+    // Helper method to get validator by table index
+    pub fn get_validator_by_index(&self, index: usize) -> Option<&Validator> {
+        self.validators_order
+            .get(index)
+            .and_then(|key| self.validators.get(key))
+    }
+
+    pub fn get_validator_by_index_cloned(&self, index: usize) -> Option<Validator> {
+        self.get_validator_by_index(index).cloned()
+    }
+
+    /// Returns an iterator of validators in display order
+    pub fn validators_iter(&self) -> impl Iterator<Item = &Validator> {
+        self.validators_order
+            .iter()
+            .filter_map(move |key| self.validators.get(key))
+    }
+}
 
 #[derive(Debug)]
 pub struct ValidatorsListWidget {
@@ -52,108 +208,6 @@ impl ValidatorsListWidget {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ValidatorsListState {
-    validators: Vec<Validator>,
-    table_state: TableState,
-    is_active: bool,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum ValidatorState {
-    /// Validator is an authority in the active set
-    Authority,
-    /// Validator is an authority and also a parachain authority
-    ParaAuthority,
-    /// Validator is in the waiting queue
-    Waiting,
-    /// Validator status is unknown or not yet determined
-    #[default]
-    Unknown,
-}
-#[derive(Debug, Clone, Default)]
-pub struct Stake {
-    pub own: u128,
-    pub nominators: u128,
-    pub active: u128,
-}
-
-#[derive(Debug, Clone)]
-pub struct Nominators {
-    pub stash: AccountId32,
-    pub stake: u128,
-    pub is_backer: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct Validator {
-    pub account: NodeAccount,
-    pub commission: u128,
-    pub stake: Stake,
-    pub nominators: Vec<Nominators>,
-    pub points: u32,
-    pub is_next_authority: bool,
-    pub is_chilled: bool,
-    pub state: ValidatorState,
-}
-
-impl Validator {
-    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
-        Self {
-            account: NodeAccount::new(runtime, stash),
-            commission: 0,
-            stake: Stake::default(),
-            nominators: Vec::new(),
-            points: 0,
-            is_next_authority: false,
-            is_chilled: false,
-            state: ValidatorState::default(),
-        }
-    }
-
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime()
-    }
-
-    pub fn identity(&self) -> &Option<String> {
-        self.account.identity()
-    }
-
-    pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
-        if !chain_client.is_ready() {
-            warn!("TODO: Chain {} not ready", chain_client.runtime());
-            return;
-        }
-
-        let api = chain_client.client().clone();
-        let runtime = self.runtime().clone();
-        let tx = tx.clone();
-        let stash = self.account.stash().clone();
-        tokio::spawn(async move {
-            // let response = match runtime {
-            //     SupportedRuntime::Westend => {
-            //         // TODO: Implement password input for proxy signing
-            //         let chill_xt = suno_westend::staking::chill();
-            //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
-            //     }
-            //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
-            // };
-            // match response {
-            //     Err(e) => {
-            //         warn!("TODO: error: {:?}", e);
-            //     }
-            //     _ => (),
-            // }
-        });
-    }
-}
-
-impl AccountDisplay for Validator {
-    fn stash(&self) -> &AccountId32 {
-        &self.account.stash()
-    }
-}
-
 impl ValidatorsListWidget {
     pub fn new(tx: UnboundedSender<Action>) -> Self {
         Self {
@@ -170,28 +224,22 @@ impl ValidatorsListWidget {
                 for validator in &chain_config.validators {
                     match validator {
                         NodeConfig::Address(stash) => {
-                            state
-                                .validators
-                                .push(Validator::new(chain_name.clone(), stash.clone()));
+                            let validator = Validator::new(chain_name.clone(), stash.clone());
+                            state.add_validator(validator.clone());
 
-                            // Send a message to fetch initial validator chain data.
                             self.tx
                                 .send(Action::Chain(ChainAction::FetchInitialValidatorData(
-                                    chain_name.clone(),
-                                    stash.clone(),
+                                    validator.key().clone(),
                                 )))
                                 .unwrap_or_else(|err| self.on_err(err.into()));
                         }
                         NodeConfig::Detailed { stash, .. } => {
-                            state
-                                .validators
-                                .push(Validator::new(chain_name.clone(), stash.clone()));
+                            let validator = Validator::new(chain_name.clone(), stash.clone());
+                            state.add_validator(validator.clone());
 
-                            // Send a message to fetch initial validator chain data.
                             self.tx
                                 .send(Action::Chain(ChainAction::FetchInitialValidatorData(
-                                    chain_name.clone(),
-                                    stash.clone(),
+                                    validator.key().clone(),
                                 )))
                                 .unwrap_or_else(|err| self.on_err(err.into()));
 
@@ -220,7 +268,7 @@ impl ValidatorsListWidget {
     pub fn move_down(&self) -> Option<Validator> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
-            if selected == state.validators.len() - 1 {
+            if selected == state.validators_order.len() - 1 {
                 state.table_state.select_first();
             } else {
                 state.table_state.scroll_down_by(1);
@@ -228,7 +276,7 @@ impl ValidatorsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.validators[i].clone())
+                .and_then(|i| state.get_validator_by_index_cloned(i))
         } else {
             None
         }
@@ -238,7 +286,7 @@ impl ValidatorsListWidget {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
-                let i = state.validators.len() - 1;
+                let i = state.validators_order.len() - 1;
                 state.table_state.select(Some(i));
             } else {
                 state.table_state.scroll_up_by(1);
@@ -246,7 +294,7 @@ impl ValidatorsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.validators[i].clone())
+                .and_then(|i| state.get_validator_by_index_cloned(i))
         } else {
             None
         }
@@ -262,33 +310,35 @@ impl ValidatorsListWidget {
         state
             .table_state
             .selected()
-            .map(|i| state.validators[i].clone())
+            .and_then(|i| state.get_validator_by_index_cloned(i))
     }
 
     pub fn fetch_initial_validator_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
-        runtime: SupportedRuntime,
+        validator_key: &ValidatorKey,
         block_hash: H256,
-        stash: AccountId32,
     ) {
         let api = api.clone();
-        let runtime = runtime.clone();
+        let validator_key = validator_key.clone();
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            let result = match runtime.asset_hub_runtime() {
+            let result = match validator_key.runtime().asset_hub_runtime() {
                 SupportedRuntime::AssetHubPaseo => {
                     suno_asset_hub_paseo::fetch_initial_validator_data(
-                        api,
+                        &api,
                         block_hash,
-                        stash,
+                        validator_key,
                         tx.clone(),
                     )
                     .await
                 }
                 _ => {
-                    unimplemented!("fetch_initial_validator_data for runtime {:?}", runtime)
+                    unimplemented!(
+                        "fetch_initial_validator_data for runtime {:?}",
+                        validator_key.runtime()
+                    )
                 }
             };
 
@@ -296,6 +346,15 @@ impl ValidatorsListWidget {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
         });
+    }
+
+    pub fn update_validator_commission(
+        &self,
+        validator_key: &ValidatorKey,
+        commission: Commission,
+    ) {
+        let mut state = self.state.write().unwrap();
+        state.update_validator_commission(validator_key, commission);
     }
 }
 
@@ -323,7 +382,7 @@ impl Widget for &ValidatorsCompactWidget {
             .borders(Borders::LEFT | Borders::BOTTOM)
             .border_type(BorderType::Plain);
 
-        let rows = state.validators.iter();
+        let rows = state.validators_iter();
 
         let widths = [
             Constraint::Fill(1),    // Network column
@@ -375,11 +434,10 @@ impl Widget for &ValidatorsDetailWidget {
             .borders(Borders::NONE)
             .border_type(BorderType::Plain);
 
-        let validators = state.validators.clone();
-        let rows = validators.iter().map(|v| {
+        let rows = state.validators_iter().map(|v| {
             Row::new(vec![
                 Text::from(v.to_compact_string(5)).alignment(Alignment::Left),
-                Text::from(">TODO<"),
+                Text::from(v.commission_as_percentage(2)),
             ])
         });
 

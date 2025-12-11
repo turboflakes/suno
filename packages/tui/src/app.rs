@@ -15,9 +15,9 @@ use log::warn;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::{
-    Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,
+    Action, ChainAction, NavigationAction, PopupAction, SystemAction, TxAction, ValidatorAction,
 };
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_config::CONFIG;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
@@ -127,7 +127,7 @@ impl App {
                 Action::Navigation(act) => self.handle_navigation_actions(act),
                 Action::Popup(act) => self.handle_popup_actions(act),
                 Action::Chain(act) => self.handle_chain_actions(act),
-                Action::Staking(act) => self.handle_staking_actions(act),
+                Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
             }
         }
@@ -168,30 +168,37 @@ impl App {
             ChainAction::Connection { runtime, state } => {
                 self.chains.set_connection_state(runtime, state)
             }
-            ChainAction::FetchInitialValidatorData(runtime, stash) => {
+            ChainAction::FetchInitialValidatorData(validator_key) => {
                 if let Some(chain_client) = self
                     .chains
-                    .get_chain_client_by_runtime(&runtime.asset_hub_runtime())
+                    .get_chain_client_by_runtime(&validator_key.runtime().asset_hub_runtime())
                 {
                     if let Some(block_hash) = chain_client.block_hash() {
                         let api = chain_client.client();
-                        self.validators
-                            .fetch_initial_validator_data(api, runtime, block_hash, stash)
+                        self.validators.fetch_initial_validator_data(
+                            api,
+                            &validator_key,
+                            block_hash,
+                        )
                     }
                 }
             }
         }
     }
 
-    fn handle_staking_actions(&mut self, action: StakingAction) {
+    fn handle_validator_actions(&mut self, action: ValidatorAction) {
         match action {
-            StakingAction::Chill => self.chill_attempt(),
-            StakingAction::Bond => {}
-            StakingAction::Unbond => {}
-            StakingAction::ChangeRewardDestination => {}
-            StakingAction::ChangeCommission => {}
-            StakingAction::KickNominators => {}
-            StakingAction::SetSessionKey => {}
+            ValidatorAction::SubmitChill => self.chill_attempt(),
+            ValidatorAction::SubmitBond => {}
+            ValidatorAction::SubmitUnbond => {}
+            ValidatorAction::SubmitChangeRewardDestination => {}
+            ValidatorAction::SubmitChangeCommission => {}
+            ValidatorAction::SubmitKickNominators => {}
+            ValidatorAction::SubmitSetSessionKey => {}
+            ValidatorAction::UpdateChangeCommission(validator_key, commission) => {
+                self.validators
+                    .update_validator_commission(&validator_key, commission);
+            }
         }
     }
 

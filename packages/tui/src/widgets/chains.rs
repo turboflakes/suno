@@ -10,7 +10,8 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_config::CONFIG;
+use suno_primitives::SupportedRuntime;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]

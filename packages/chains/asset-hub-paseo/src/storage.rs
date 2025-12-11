@@ -1,20 +1,52 @@
 use super::node_runtime;
 use crate::error::Error;
-pub use node_runtime::staking::storage::types::nominators::Nominators;
+use log::info;
+pub use node_runtime::{
+    runtime_types::{pallet_staking_async::ValidatorPrefs, sp_arithmetic::per_things::Perbill},
+    staking::storage::types::nominators::Nominators,
+};
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
-use suno_actions::{Action, TxAction};
+use suno_actions::{Action, ValidatorAction};
+use suno_primitives::ValidatorKey;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn fetch_initial_validator_data(
-    api: OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    stash: AccountId32,
+    validator_key: ValidatorKey,
     tx: UnboundedSender<Action>,
 ) -> Result<(), Error> {
+    let validator_prefs = fetch_validator_prefs(api, block_hash, validator_key.stash()).await?;
+    let Perbill(commission) = validator_prefs.commission;
+
+    tx.send(Action::Validator(ValidatorAction::UpdateChangeCommission(
+        validator_key,
+        commission,
+    )))?;
+
     Ok(())
+}
+
+/// Fetch validator prefs at the specified block hash
+pub async fn fetch_validator_prefs(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: AccountId32,
+) -> Result<ValidatorPrefs, Error> {
+    let addr = node_runtime::storage().staking().validators(stash.clone());
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "ValidatorPrefs not defined at block hash {block_hash:?} for stash {stash:?}"
+            ))
+        })
 }
 
 /// Fetch nominators at the specified block hash
@@ -23,7 +55,7 @@ pub async fn fetch_nominators(
     block_hash: H256,
     stash: AccountId32,
 ) -> Result<Nominators, Error> {
-    let addr = node_runtime::storage().staking().nominators(stash);
+    let addr = node_runtime::storage().staking().nominators(stash.clone());
 
     api.storage()
         .at(block_hash)
@@ -31,7 +63,7 @@ pub async fn fetch_nominators(
         .await?
         .ok_or_else(|| {
             Error::from(format!(
-                "Nominators not defined at block hash {block_hash:?}"
+                "Nominators not defined at block hash {block_hash:?} for stash {stash:?}"
             ))
         })
 }

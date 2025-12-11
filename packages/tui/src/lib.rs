@@ -8,7 +8,6 @@ mod error;
 mod event;
 mod handler;
 mod menu;
-mod node_account;
 mod section;
 mod tab;
 mod theme;

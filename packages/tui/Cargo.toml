@@ -11,6 +11,7 @@ edition.workspace = true
 [dependencies]
 suno-actions = { path = "../actions" }
 suno-config = { path = "../config" }
+suno-primitives = { path = "../primitives" }
 suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
 
 crossterm = { workspace = true }

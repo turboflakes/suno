@@ -1,4 +1,3 @@
-use crate::node_account::{AccountDisplay, Collator};
 use crate::widgets::scrollbar::render_scrollbar;
 use log::{info, warn};
 use ratatui::{
@@ -11,7 +10,8 @@ use ratatui::{
     },
 };
 use std::sync::{Arc, RwLock};
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_config::{NodeConfig, CONFIG};
+use suno_primitives::{AccountDisplay, Collator, SupportedRuntime};
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {
@@ -153,12 +153,5 @@ impl Widget for &CollatorsListWidget {
                 render_scrollbar(row_index, state.collators.len(), scrollbar_area, buf);
             }
         }
-    }
-}
-
-impl From<&Collator> for Row<'_> {
-    fn from(c: &Collator) -> Self {
-        let c = c.clone();
-        Row::new(vec![c.runtime().to_string(), c.to_compact_string(5)])
     }
 }

@@ -1,3 +1,4 @@
+use suno_actions::Action;
 use suno_signer::error::Error as SignerError;
 
 /// Suno specific error messages
@@ -19,6 +20,8 @@ pub enum Error {
     RpcError(#[from] subxt::error::RpcError),
     #[error("Tx error: {0}")]
     TransactionError(#[from] subxt::error::TransactionError),
+    #[error("SendError error: {0}")]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<Action>),
     #[error("Other error: {0}")]
     Other(String),
 }

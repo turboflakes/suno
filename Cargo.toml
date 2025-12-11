@@ -2,6 +2,7 @@
 members = [
     "packages/actions",
     "packages/config",
+    "packages/primitives",
     "packages/signer",
     "packages/suno",
     "packages/tui",

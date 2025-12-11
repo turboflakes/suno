@@ -13,6 +13,7 @@ lazy_static = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 subxt = { workspace = true }
+suno-primitives = { path = "../primitives" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

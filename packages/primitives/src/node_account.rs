@@ -1,9 +1,11 @@
+use crate::key::AccountKey;
+use crate::SupportedRuntime;
+use ratatui::widgets::Row;
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
 
 /// Common trait for account-related functionality
 pub trait AccountDisplay {
-    fn stash(&self) -> &AccountId32;
+    fn stash(&self) -> AccountId32;
 
     fn to_compact_string(&self, size: usize) -> String {
         let account_id = self.stash().to_string();
@@ -18,22 +20,28 @@ pub trait AccountDisplay {
 /// Common struct for shared fields
 #[derive(Debug, Clone)]
 pub struct NodeAccount {
-    runtime: SupportedRuntime,
-    stash: AccountId32,
+    account_key: AccountKey,
     identity: Option<String>,
 }
 
 impl NodeAccount {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
-            runtime,
-            stash,
+            account_key: AccountKey::new(runtime, stash),
             identity: None,
         }
     }
 
+    pub fn account_key(&self) -> &AccountKey {
+        &self.account_key
+    }
+
     pub fn runtime(&self) -> &SupportedRuntime {
-        &self.runtime
+        &self.account_key.runtime()
+    }
+
+    pub fn stash(&self) -> AccountId32 {
+        self.account_key.stash()
     }
 
     pub fn identity(&self) -> &Option<String> {
@@ -41,10 +49,9 @@ impl NodeAccount {
     }
 }
 
-/// Implement common functionality
 impl AccountDisplay for NodeAccount {
-    fn stash(&self) -> &AccountId32 {
-        &self.stash
+    fn stash(&self) -> AccountId32 {
+        self.stash()
     }
 }
 
@@ -63,7 +70,7 @@ impl Collator {
 
     // Getter methods if needed
     pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime
+        &self.account.runtime()
     }
 
     pub fn identity(&self) -> Option<&String> {
@@ -71,9 +78,15 @@ impl Collator {
     }
 }
 
-// Implement the trait for Collator
 impl AccountDisplay for Collator {
-    fn stash(&self) -> &AccountId32 {
-        &self.account.stash
+    fn stash(&self) -> AccountId32 {
+        self.account.stash()
+    }
+}
+
+impl From<&Collator> for Row<'_> {
+    fn from(c: &Collator) -> Self {
+        let c = c.clone();
+        Row::new(vec![c.runtime().to_string(), c.to_compact_string(5)])
     }
 }

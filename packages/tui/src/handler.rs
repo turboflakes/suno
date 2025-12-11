@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use suno_actions::{Action, NavigationAction, PopupAction, StakingAction, SystemAction};
+use suno_actions::{Action, NavigationAction, PopupAction, SystemAction, ValidatorAction};
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent) -> Action {
@@ -37,13 +37,13 @@ pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
         // Fallback to NextTab
         KeyCode::Char(']') => Action::Navigation(NavigationAction::NextTab),
         // TODO: Implement KeyBinddings dynamically from config.
-        KeyCode::Char('c') => Action::Staking(StakingAction::Chill),
-        KeyCode::Char('b') => Action::Staking(StakingAction::Bond),
-        KeyCode::Char('u') => Action::Staking(StakingAction::Unbond),
-        KeyCode::Char('r') => Action::Staking(StakingAction::ChangeRewardDestination),
-        KeyCode::Char('f') => Action::Staking(StakingAction::ChangeCommission),
-        KeyCode::Char('k') => Action::Staking(StakingAction::KickNominators),
-        KeyCode::Char('s') => Action::Staking(StakingAction::SetSessionKey),
+        KeyCode::Char('c') => Action::Validator(ValidatorAction::SubmitChill),
+        KeyCode::Char('b') => Action::Validator(ValidatorAction::SubmitBond),
+        KeyCode::Char('u') => Action::Validator(ValidatorAction::SubmitUnbond),
+        KeyCode::Char('r') => Action::Validator(ValidatorAction::SubmitChangeRewardDestination),
+        KeyCode::Char('f') => Action::Validator(ValidatorAction::SubmitChangeCommission),
+        KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
+        KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
         KeyCode::Char('y') | KeyCode::Enter => Action::Popup(PopupAction::Confirm),
         KeyCode::Char('n') | KeyCode::Esc => Action::Popup(PopupAction::Cancel),
         _ => Action::System(SystemAction::Noop),

@@ -13,6 +13,7 @@ serde = { workspace = true }
 subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../../actions" }
+suno-primitives = { path = "../../primitives" }
 suno-signer = { path = "../../signer" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

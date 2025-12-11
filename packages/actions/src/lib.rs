@@ -2,7 +2,10 @@ pub mod network;
 
 use crate::network::ConnectionState;
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
+use suno_primitives::{SupportedRuntime, ValidatorKey};
+
+type Commission = u32;
+type Stash = AccountId32;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,8 +16,8 @@ pub enum Action {
     Popup(PopupAction),
     /// Network related actions
     Chain(ChainAction),
-    /// Staking actions
-    Staking(StakingAction),
+    /// Validator actions
+    Validator(ValidatorAction),
     /// Transaction related actions
     Transaction(TxAction),
     //TODO: Collator actions
@@ -46,18 +49,19 @@ pub enum ChainAction {
         runtime: SupportedRuntime,
         state: ConnectionState,
     },
-    FetchInitialValidatorData(SupportedRuntime, AccountId32),
+    FetchInitialValidatorData(ValidatorKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StakingAction {
-    Chill,
-    Bond,
-    Unbond,
-    ChangeRewardDestination,
-    ChangeCommission,
-    KickNominators,
-    SetSessionKey,
+pub enum ValidatorAction {
+    SubmitChill,
+    SubmitBond,
+    SubmitUnbond,
+    SubmitChangeRewardDestination,
+    SubmitChangeCommission,
+    SubmitKickNominators,
+    SubmitSetSessionKey,
+    UpdateChangeCommission(ValidatorKey, Commission),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
