@@ -1,5 +1,5 @@
-use crate::runtime::SupportedRuntime;
 use subxt::utils::AccountId32;
+use suno_config::SupportedRuntime;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct AccountKey {

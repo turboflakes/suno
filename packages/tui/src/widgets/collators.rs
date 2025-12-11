@@ -10,8 +10,8 @@ use ratatui::{
     },
 };
 use std::sync::{Arc, RwLock};
-use suno_config::{NodeConfig, CONFIG};
-use suno_primitives::{AccountDisplay, Collator, SupportedRuntime};
+use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_primitives::{AccountDisplay, Collator};
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {

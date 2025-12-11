@@ -11,3 +11,4 @@ edition.workspace = true
 ratatui = { workspace = true }
 serde = { workspace = true }
 subxt = { workspace = true }
+suno-config = { path = "../config" }

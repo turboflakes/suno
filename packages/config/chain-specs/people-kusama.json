@@ -1,0 +1,24 @@
+{
+    "name": "Kusama People",
+    "id": "people-kusama",
+    "chainType": "Live",
+    "bootNodes": [
+        "/dns/kusama-people-connect-0.polkadot.io/tcp/443/wss/p2p/12D3KooWQaqG5TNmDfRWrtH7tMsN7YeqwVkSfoZT4GkemSzezNi1",
+        "/dns/kusama-people-connect-1.polkadot.io/tcp/443/wss/p2p/12D3KooWKhYoQH9LdSyvY3SVZY9gFf6ZV1bFh6317TRehUP3r5fm",
+        "/dns/people-kusama.bootnode.amforc.com/tcp/29999/wss/p2p/12D3KooWPjzgKZe5jdG6TY4gwcFq8QxyyhqsYbQo6N29pwGePWLA",
+        "/dns/people-kusama-bootnode.turboflakes.io/tcp/30745/wss/p2p/12D3KooWCR2Q8J2NFFfuofDak4zSgWkuBq7orP96HFaxLgAoDUBV"
+    ],
+    "telemetryEndpoints": null,
+    "protocolId": null,
+    "properties": {
+        "ss58Format": 2,
+        "tokenDecimals": 12,
+        "tokenSymbol": "KSM"
+    },
+    "relay_chain": "ksmcc3",
+    "para_id": 1004,
+    "codeSubstitutes": {},
+    "genesis": {
+        "stateRootHash": "0xd83cfbf48e85ab66eb53b647aff8cd75954af93b127467b31d07a21dd06cea38"
+    }
+}

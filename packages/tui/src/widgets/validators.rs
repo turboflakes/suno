@@ -12,8 +12,8 @@ use ratatui::{
 use std::collections::HashMap;
 use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction};
-use suno_config::{NodeConfig, CONFIG};
-use suno_primitives::{AccountDisplay, NodeAccount, SupportedRuntime, ValidatorKey};
+use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_primitives::{AccountDisplay, NodeAccount, ValidatorKey};
 // use suno_westend;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};

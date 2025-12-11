@@ -2,7 +2,8 @@ pub mod network;
 
 use crate::network::ConnectionState;
 use subxt::utils::AccountId32;
-use suno_primitives::{SupportedRuntime, ValidatorKey};
+use suno_config::SupportedRuntime;
+use suno_primitives::ValidatorKey;
 
 type Commission = u32;
 type Stash = AccountId32;

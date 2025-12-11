@@ -1,7 +1,7 @@
 use crate::key::AccountKey;
-use crate::SupportedRuntime;
 use ratatui::widgets::Row;
 use subxt::utils::AccountId32;
+use suno_config::SupportedRuntime;
 
 /// Common trait for account-related functionality
 pub trait AccountDisplay {

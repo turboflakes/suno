@@ -9,11 +9,6 @@ edition.workspace = true
 
 
 [dependencies]
-suno-actions = { path = "../actions" }
-suno-config = { path = "../config" }
-suno-primitives = { path = "../primitives" }
-suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
-
 crossterm = { workspace = true }
 futures = { workspace = true }
 indoc = { workspace = true }
@@ -24,6 +19,10 @@ serde = { workspace = true }
 serde_yaml = { workspace = true }
 strum = { workspace = true }
 subxt = { workspace = true }
+suno-actions = { path = "../actions" }
+suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
+suno-config = { path = "../config" }
+suno-primitives = { path = "../primitives" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tui-logger = { workspace = true }
