@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
-use subxt::{OnlineClient, SubstrateConfig};
+use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::UnboundedSender;
@@ -30,16 +30,35 @@ pub struct ChainsListState {
 
 #[derive(Debug, Clone)]
 pub struct ChainClient {
-    pub runtime: SupportedRuntime,
-    pub client: OnlineClient<SubstrateConfig>,
+    runtime: SupportedRuntime,
+    client: OnlineClient<SubstrateConfig>,
     state: ConnectionState,
     // last_update value is given in milliseconds
     last_update: u64,
 }
 
 impl ChainClient {
+    pub fn runtime(&self) -> &SupportedRuntime {
+        &self.runtime
+    }
+
+    pub fn client(&self) -> &OnlineClient<SubstrateConfig> {
+        &self.client
+    }
+
+    pub fn state(&self) -> &ConnectionState {
+        &self.state
+    }
+
+    pub fn block_hash(&self) -> Option<H256> {
+        match self.state {
+            ConnectionState::Connected(_, hash) => Some(hash),
+            _ => None,
+        }
+    }
+
     pub fn is_ready(&self) -> bool {
-        matches!(self.state, ConnectionState::Connected(_))
+        matches!(self.state, ConnectionState::Connected(_, _))
     }
 }
 
@@ -86,7 +105,7 @@ impl ChainsListWidget {
             state.table_state.select(Some(0));
         }
         // Launch a task to subscribe the head of the chain.
-        subscribe_best_block(chain_client, self.tx.clone());
+        subscribe_finalized_block(chain_client, self.tx.clone());
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
@@ -233,18 +252,21 @@ impl From<&ChainClient> for Row<'_> {
 }
 
 /// Background task that subscribes head block and sends response over channel.
-fn subscribe_best_block(cc: ChainClient, tx: UnboundedSender<Action>) {
+fn subscribe_finalized_block(cc: ChainClient, tx: UnboundedSender<Action>) {
     let api = cc.client.clone();
     let runtime = cc.runtime.clone();
     tokio::spawn(async move {
-        match api.blocks().subscribe_best().await {
+        match api.blocks().subscribe_finalized().await {
             Ok(mut blocks_sub) => {
                 while let Some(result) = blocks_sub.next().await {
                     match result {
                         Ok(block) => {
                             let _ = tx.send(Action::Chain(ChainAction::Connection {
                                 runtime: runtime.clone(),
-                                state: ConnectionState::Connected(block.number().into()),
+                                state: ConnectionState::Connected(
+                                    block.number().into(),
+                                    block.hash(),
+                                ),
                             }));
                         }
                         Err(e) => {

@@ -5,7 +5,7 @@ members = [
     "packages/signer",
     "packages/suno",
     "packages/tui",
-    # "packages/chains/westend",
+    "packages/chains/asset-hub-paseo",
 ]
 
 resolver = "2"

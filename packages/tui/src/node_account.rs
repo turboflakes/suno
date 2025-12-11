@@ -18,9 +18,9 @@ pub trait AccountDisplay {
 /// Common struct for shared fields
 #[derive(Debug, Clone)]
 pub struct NodeAccount {
-    pub runtime: SupportedRuntime,
-    pub stash: AccountId32,
-    pub identity: Option<String>,
+    runtime: SupportedRuntime,
+    stash: AccountId32,
+    identity: Option<String>,
 }
 
 impl NodeAccount {
@@ -30,6 +30,14 @@ impl NodeAccount {
             stash,
             identity: None,
         }
+    }
+
+    pub fn runtime(&self) -> &SupportedRuntime {
+        &self.runtime
+    }
+
+    pub fn identity(&self) -> &Option<String> {
+        &self.identity
     }
 }
 

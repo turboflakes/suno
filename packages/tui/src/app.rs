@@ -17,7 +17,7 @@ use std::io;
 use suno_actions::{
     Action, ChainAction, NavigationAction, PopupAction, StakingAction, SystemAction, TxAction,
 };
-use suno_config::CONFIG;
+use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
@@ -60,7 +60,7 @@ impl App {
             tab: Tab::Main,
             section: Section::Chains,
             chains: ChainsListWidget::new(tx.clone()),
-            validators: ValidatorsListWidget::default(),
+            validators: ValidatorsListWidget::new(tx.clone()),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
             tx,
@@ -167,6 +167,18 @@ impl App {
         match action {
             ChainAction::Connection { runtime, state } => {
                 self.chains.set_connection_state(runtime, state)
+            }
+            ChainAction::FetchInitialValidatorData(runtime, stash) => {
+                if let Some(chain_client) = self
+                    .chains
+                    .get_chain_client_by_runtime(&runtime.asset_hub_runtime())
+                {
+                    if let Some(block_hash) = chain_client.block_hash() {
+                        let api = chain_client.client();
+                        self.validators
+                            .fetch_initial_validator_data(api, runtime, block_hash, stash)
+                    }
+                }
             }
         }
     }

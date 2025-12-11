@@ -1,11 +1,14 @@
-type BlockNumber = u32;
+use subxt::utils::H256;
+
+pub type BlockNumber = u32;
+pub type BlockHash = H256;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum ConnectionState {
     #[default]
     Idle,
     Connecting,
-    Connected(BlockNumber),
+    Connected(BlockNumber, BlockHash),
     Error(String),
 }
 
@@ -14,7 +17,7 @@ impl std::fmt::Display for ConnectionState {
         match self {
             Self::Idle => write!(f, "-"),
             Self::Connecting => write!(f, "↺"),
-            Self::Connected(block_number) => write!(f, "#{}", block_number),
+            Self::Connected(block_number, _) => write!(f, "#{}", block_number),
             Self::Error(_) => write!(f, "✗"),
         }
     }

@@ -1,6 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
+use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
 /// Application actions.
@@ -45,6 +46,7 @@ pub enum ChainAction {
         runtime: SupportedRuntime,
         state: ConnectionState,
     },
+    FetchInitialValidatorData(SupportedRuntime, AccountId32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

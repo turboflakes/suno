@@ -117,7 +117,7 @@ fn render_chains_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.validators, area);
+    frame.render_widget(&app.validators.as_compact(), area);
 }
 
 fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -139,14 +139,14 @@ fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-fn render_body_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(
-        Paragraph::new(format!(" >> Press `Esc`, `Ctrl-C` or `q` to stop running."))
-            .block(Block::bordered().title(" App Content "))
-            .style(Style::default().fg(Color::Blue))
-            .centered(),
-        area,
-    );
+fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain);
+
+    let block_area = block.inner(area);
+    frame.render_widget(block, area);
+    frame.render_widget(&app.validators.as_detail(), block_area);
 }
 
 fn render_logs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
