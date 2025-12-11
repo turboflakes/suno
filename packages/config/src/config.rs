@@ -1,11 +1,21 @@
+use crate::error::Error;
 use crate::runtime::SupportedRuntime;
 use lazy_static::lazy_static;
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use subxt::backend::{legacy::LegacyRpcMethods, rpc::RpcClient};
 use subxt::utils::AccountId32;
+use subxt::{
+    utils::H256,
+    // codec::{Decode, Encode},
+    Metadata,
+    OnlineClient,
+    SubstrateConfig,
+};
 
 // Set Config struct into a CONFIG lazy_static to avoid multiple processing
 lazy_static! {
@@ -88,29 +98,58 @@ impl Default for Signer {
 }
 
 impl Config {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let contents = fs::read_to_string(path)?;
         let config: Config = serde_yaml::from_str(&contents)?;
         Ok(config)
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        // Validate a chain is enabled
+    pub fn validate(&self) -> Result<(), Error> {
+        // Validate that at least one chain is configured
         if self.chains.is_empty() {
-            return Err(
-                "At least one chain has to be enabled [Polkadot, Kusama, Paseo]".to_string(),
-            );
+            return Err(Error::ChainNotAvailableError);
         }
 
         Ok(())
     }
+
+    // async fn validate_chains_genesis(&self) -> Result<(), Error> {
+    //     for chain in self.chains.iter() {
+    //         for (chain_name, chain_config) in chain {
+    //             // First, create a raw RPC client:
+    //             let mut rpc_client = RpcClient::from_url(&chain_config.rpc_url).await?;
+
+    //             // Use this to construct our RPC methods:
+    //             let mut rpc = LegacyRpcMethods::<SubstrateConfig>::new(rpc_client.clone().into());
+
+    //             // We can use the same client to drive our full Subxt interface too:
+    //             let mut api =
+    //                 OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
+
+    //             match create_substrate_rpc_client_from_url(&chain_config.rpc_url).await {
+    //                 Ok(rpc_client) => {}
+    //             }
+    //         }
+    //     }
+    //     //         chain.
+    //     //     }
+
+    //     //     // Validate a chain is enabled
+    //     //     if self.chains.is_empty() {
+    //     //         return Err(
+    //     //             "At least one chain has to be enabled [Polkadot, Kusama, Paseo]".to_string(),
+    //     //         );
+
+    //     Ok(())
+    // }
 
     pub fn signer_path(&self) -> String {
         self.signer.proxy_seed_path.clone()
     }
 }
 
-fn get_config() -> Result<Config, Box<dyn std::error::Error>> {
+fn get_config() -> Result<Config, Error> {
+    info!("Loading configuration");
     // Check for custom config file path in environment variable
     let config_path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| ".config.yaml".to_string());
 

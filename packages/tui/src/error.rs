@@ -21,6 +21,8 @@ pub enum TuiError {
     TuiLoggerError(#[from] tui_logger::TuiLoggerError),
     #[error("Tx error: {0}")]
     TransactionError(#[from] subxt::error::TransactionError),
+    #[error("Genesis hash does not match the expected hash from the configured chain.")]
+    GenesisError,
     #[error("Other error: {0}")]
     Other(String),
 }

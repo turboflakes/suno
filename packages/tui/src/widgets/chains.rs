@@ -1,3 +1,4 @@
+use crate::error::TuiError;
 use crate::utils::create_substrate_rpc_client_from_url;
 use log::{error, info};
 use ratatui::{
@@ -38,6 +39,15 @@ pub struct ChainClient {
 }
 
 impl ChainClient {
+    pub fn new(runtime: SupportedRuntime, client: OnlineClient<SubstrateConfig>) -> Self {
+        Self {
+            runtime,
+            client,
+            state: ConnectionState::default(),
+            last_update: 0,
+        }
+    }
+
     pub fn runtime(&self) -> &SupportedRuntime {
         &self.runtime
     }
@@ -50,6 +60,10 @@ impl ChainClient {
         &self.state
     }
 
+    pub fn update_state(&mut self, state: ConnectionState) {
+        self.state = state;
+    }
+
     pub fn block_hash(&self) -> Option<H256> {
         match self.state {
             ConnectionState::Connected(_, hash) => Some(hash),
@@ -57,8 +71,32 @@ impl ChainClient {
         }
     }
 
+    pub async fn validate_genesis(&self) -> Result<(), TuiError> {
+        let api = self.client();
+        let state_root = self.runtime.chain_state_root_hash();
+        let hash = api.genesis_hash();
+
+        if let Some(header) = api.backend().block_header(hash).await? {
+            if header.state_root != state_root {
+                return Err(TuiError::GenesisError);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn is_ready(&self) -> bool {
-        matches!(self.state, ConnectionState::Connected(_, _))
+        matches!(
+            self.state,
+            ConnectionState::Idle | ConnectionState::Connected(_, _)
+        )
+    }
+
+    pub fn is_offline(&self) -> bool {
+        matches!(
+            self.state,
+            ConnectionState::Reconnecting | ConnectionState::Error(_)
+        )
     }
 }
 
@@ -78,15 +116,15 @@ impl ChainsListWidget {
                     Ok(rpc_client) => {
                         match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
                             Ok(client) => {
-                                let chain_client = ChainClient {
-                                    runtime: chain_name.clone(),
-                                    client,
-                                    state: ConnectionState::Connecting,
-                                    last_update: 0,
-                                };
-                                self.on_connecting(chain_client);
+                                let mut chain_client = ChainClient::new(chain_name.clone(), client);
+                                if let Err(err) = chain_client.validate_genesis().await {
+                                    chain_client
+                                        .update_state(ConnectionState::Error(err.to_string()));
+                                    self.on_err(err.into());
+                                }
+                                self.on_subscribe(chain_client);
                             }
-                            Err(err) => self.on_err(Box::new(err)),
+                            Err(err) => self.on_err(err.into()),
                         }
                     }
                     Err(err) => self.on_err(err),
@@ -97,25 +135,23 @@ impl ChainsListWidget {
         self.set_active(true);
     }
 
-    fn on_connecting(&self, chain_client: ChainClient) {
+    fn on_subscribe(&self, chain_client: ChainClient) {
         let mut state = self.state.write().unwrap();
         state.chains.push(chain_client.clone());
         // Select the first chain.
         if !state.chains.is_empty() {
             state.table_state.select(Some(0));
         }
-        // Launch a task to subscribe the head of the chain.
-        subscribe_finalized_block(chain_client, self.tx.clone());
+        if chain_client.is_ready() {
+            // Launch a task to subscribe the head of the chain.
+            subscribe_finalized_block(chain_client, self.tx.clone());
+        }
     }
 
     fn on_err(&self, err: Box<dyn std::error::Error>) {
         self.tx
-            .send(Action::System(SystemAction::Error(
-                "some error".to_string(),
-            )))
-            .unwrap();
-
-        // TODO: Set chain state to error
+            .send(Action::System(SystemAction::Error(err.to_string())))
+            .expect("Failed to send error message");
     }
 
     pub fn move_down(&self) -> Option<ChainClient> {
@@ -275,7 +311,7 @@ fn subscribe_finalized_block(cc: ChainClient, tx: UnboundedSender<Action>) {
                                 info!("Lost connection to {} reconnecting...", cc.runtime);
                                 let _ = tx.send(Action::Chain(ChainAction::Connection {
                                     runtime: runtime.clone(),
-                                    state: ConnectionState::Connecting,
+                                    state: ConnectionState::Reconnecting,
                                 }));
                                 continue;
                             }

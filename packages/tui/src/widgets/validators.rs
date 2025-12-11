@@ -96,7 +96,7 @@ impl Validator {
     }
 
     pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
-        if !chain_client.is_ready() {
+        if chain_client.is_offline() {
             warn!("TODO: Chain {} not ready", chain_client.runtime());
             return;
         }

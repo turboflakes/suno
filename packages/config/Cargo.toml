@@ -14,6 +14,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 subxt = { workspace = true }
+subxt-rpcs = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
 
 
 [dev-dependencies]

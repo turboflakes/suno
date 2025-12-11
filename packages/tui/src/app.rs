@@ -11,7 +11,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
-use log::warn;
+use log::{error, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::{
@@ -138,9 +138,7 @@ impl App {
             SystemAction::Quit => self.quit(),
             SystemAction::Tick => self.tick(),
             SystemAction::Noop => self.noop(),
-            SystemAction::Error(_err) => {
-                // self.error(err)
-            }
+            SystemAction::Error(err) => error!("{err}"),
         }
     }
 
