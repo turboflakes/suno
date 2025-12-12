@@ -355,7 +355,7 @@ fn create_progress_bar(elapsed: u64, bar_width: usize) -> String {
     } else {
         (
             (elapsed.min(PHASE_1_TIMEOUT)) as f64 / PHASE_1_TIMEOUT as f64,
-            "•",
+            "·",
             "░",
         )
     };
