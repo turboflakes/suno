@@ -1,4 +1,4 @@
-use crate::widgets::chains::ChainClient;
+use crate::widgets::chains::Chain;
 use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
 use log::{info, warn};
@@ -97,13 +97,13 @@ impl Validator {
         self.points
     }
 
-    pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
-        if chain_client.is_offline() {
-            warn!("TODO: Chain {} not ready", chain_client.runtime());
+    pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
+        if chain.is_offline() {
+            warn!("TODO: Chain {} not ready", chain.runtime());
             return;
         }
 
-        let api = chain_client.client().clone();
+        let api = chain.client().clone();
         let runtime = self.runtime().clone();
         let tx = tx.clone();
         let stash = self.account.stash().clone();
@@ -132,10 +132,12 @@ impl AccountDisplay for Validator {
     }
 }
 
+type ValidatorKey = AccountKey;
+
 #[derive(Debug, Default)]
 pub struct ValidatorsListState {
-    validators: HashMap<AccountKey, Validator>,
-    validators_order: Vec<AccountKey>,
+    validators: HashMap<ValidatorKey, Validator>,
+    validators_order: Vec<ValidatorKey>,
     table_state: TableState,
     is_active: bool,
 }
@@ -149,7 +151,7 @@ impl ValidatorsListState {
         self.validators.insert(key.clone(), validator);
     }
 
-    pub fn update_validator_commission(
+    pub fn set_commission(
         &mut self,
         validator_key: &AccountKey,
         commission: Commission,
@@ -162,17 +164,21 @@ impl ValidatorsListState {
         None
     }
 
-    pub fn update_validator_points(
-        &mut self,
-        validator_key: &AccountKey,
-        points: Points,
-    ) -> Option<Points> {
+    pub fn set_points(&mut self, validator_key: &AccountKey, points: Points) -> Option<Points> {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             let old_points = validator.points;
             validator.points = points;
             return Some(old_points);
         }
         None
+    }
+
+    pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
+        self.validators.get(validator_key)
+    }
+
+    pub fn get_validator_by_key_cloned(&self, validator_key: &ValidatorKey) -> Option<Validator> {
+        self.validators.get(validator_key).cloned()
     }
 
     // Helper method to get validator by table index
@@ -244,7 +250,6 @@ impl ValidatorsListWidget {
     }
 
     pub fn on_init(&self) {
-        let mut state = self.state.write().unwrap();
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
@@ -252,23 +257,11 @@ impl ValidatorsListWidget {
                     match validator {
                         NodeConfig::Address(stash) => {
                             let validator = Validator::new(chain_name.clone(), stash.clone());
-                            state.add_validator(validator.clone());
-
-                            self.tx
-                                .send(Action::Chain(ChainAction::FetchInitialValidatorData(
-                                    validator.key().clone(),
-                                )))
-                                .unwrap_or_else(|err| self.on_err(err.into()));
+                            self.add_validator(&validator);
                         }
                         NodeConfig::Detailed { stash, .. } => {
                             let validator = Validator::new(chain_name.clone(), stash.clone());
-                            state.add_validator(validator.clone());
-
-                            self.tx
-                                .send(Action::Chain(ChainAction::FetchInitialValidatorData(
-                                    validator.key().clone(),
-                                )))
-                                .unwrap_or_else(|err| self.on_err(err.into()));
+                            self.add_validator(&validator);
 
                             // TODO: Implement command handling
                             // if let Some(cmds) = commands {
@@ -281,15 +274,24 @@ impl ValidatorsListWidget {
                 }
             }
         }
-        // Select the first validator.
-        if !state.validators.is_empty() {
-            state.table_state.select(Some(0));
-        }
+        self.init_table();
     }
 
-    fn on_err(&self, err: Box<dyn std::error::Error>) {
-        warn!("Failed with error: {}", err);
-        // TODO: Set chain state to error
+    fn add_validator(&self, validator: &Validator) {
+        let mut state = self.state.write().unwrap();
+        state.add_validator(validator.clone());
+
+        self.tx
+            .send(Action::Chain(ChainAction::FetchInitialValidatorData(
+                validator.key().clone(),
+            )))
+            .unwrap_or_else(|err| self.error(err.into()));
+    }
+
+    fn error(&self, err: Box<dyn std::error::Error>) {
+        self.tx
+            .send(Action::System(SystemAction::Error(err.to_string())))
+            .expect("Failed to send error message");
     }
 
     pub fn move_down(&self) -> Option<Validator> {
@@ -327,6 +329,13 @@ impl ValidatorsListWidget {
         }
     }
 
+    pub fn init_table(&self) {
+        let mut state = self.state.write().unwrap();
+        if !state.validators.is_empty() {
+            state.table_state.select(Some(0));
+        }
+    }
+
     pub fn set_active(&self, active: bool) {
         let mut state = self.state.write().unwrap();
         state.is_active = active;
@@ -358,7 +367,7 @@ impl ValidatorsListWidget {
         try_fetch_validator_data_from_asset_hub(api, validator_key, block_hash, self.tx.clone());
     }
 
-    pub fn fetch_all_validators_points(
+    pub fn fetch_validators_points(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         runtime: &SupportedRuntime,
@@ -371,22 +380,18 @@ impl ValidatorsListWidget {
         });
     }
 
-    pub fn update_validator_commission(
+    pub fn update_commission(
         &self,
         validator_key: &AccountKey,
         commission: Commission,
     ) -> Option<Commission> {
         let mut state = self.state.write().unwrap();
-        state.update_validator_commission(validator_key, commission)
+        state.set_commission(validator_key, commission)
     }
 
-    pub fn update_validator_points(
-        &self,
-        validator_key: &AccountKey,
-        points: Points,
-    ) -> Option<Points> {
+    pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> Option<Points> {
         let mut state = self.state.write().unwrap();
-        state.update_validator_points(validator_key, points)
+        state.set_points(validator_key, points)
     }
 }
 

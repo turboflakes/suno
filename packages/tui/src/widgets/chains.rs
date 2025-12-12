@@ -1,7 +1,7 @@
 use crate::error::TuiError;
 use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
-use log::{error, info};
+use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
@@ -9,6 +9,7 @@ use ratatui::{
     text::Text,
     widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
@@ -16,38 +17,36 @@ use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::UnboundedSender;
 
-#[derive(Debug, Clone)]
-pub struct ChainsListWidget {
-    /// The state is wrapped in an `Arc<RwLock<>>` to allow for shared ownership between the widget and other threads.
-    state: Arc<RwLock<ChainsListState>>,
-    /// The sender to send actions to update the state to the app.
-    tx: UnboundedSender<Action>,
-}
-
-#[derive(Debug, Default)]
-pub struct ChainsListState {
-    chains: Vec<ChainClient>,
-    table_state: TableState,
-    is_active: bool,
-}
+type BlockNumber = u64;
+type BlockHash = H256;
 
 #[derive(Debug, Clone)]
-pub struct ChainClient {
+pub struct Chain {
     runtime: SupportedRuntime,
     client: OnlineClient<SubstrateConfig>,
+    best_block: BlockNumber,
+    finalized_block: BlockNumber,
+    finalized_block_hash: Option<BlockHash>,
+    // finalized_block_ts value is the timestamp in milliseconds the finalized block was updated
+    finalized_block_ts: u128,
     state: ConnectionState,
-    // last_updated value is the timestamp in milliseconds
-    last_updated: u128,
 }
 
-impl ChainClient {
+impl Chain {
     pub fn new(runtime: SupportedRuntime, client: OnlineClient<SubstrateConfig>) -> Self {
         Self {
             runtime,
             client,
+            best_block: 0,
+            finalized_block: 0,
+            finalized_block_ts: 0,
+            finalized_block_hash: None,
             state: ConnectionState::default(),
-            last_updated: 0,
         }
+    }
+
+    pub fn key(&self) -> &SupportedRuntime {
+        &self.runtime
     }
 
     pub fn runtime(&self) -> &SupportedRuntime {
@@ -62,49 +61,124 @@ impl ChainClient {
         &self.state
     }
 
-    pub fn update_state(&mut self, state: ConnectionState) {
+    pub fn set_state(&mut self, state: ConnectionState) {
         self.state = state;
-        let last_updated = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        self.last_updated = last_updated;
     }
 
-    pub fn block_hash(&self) -> Option<H256> {
-        match self.state {
-            ConnectionState::Connected(_, hash) => Some(hash),
-            _ => None,
-        }
+    pub fn block_hash(&self) -> Option<BlockHash> {
+        self.finalized_block_hash
     }
 
-    pub async fn validate_genesis(&self) -> Result<(), TuiError> {
+    pub async fn validate_genesis(&mut self) -> Result<(), TuiError> {
         let api = self.client();
         let state_root = self.runtime.chain_state_root_hash();
         let hash = api.genesis_hash();
 
         if let Some(header) = api.backend().block_header(hash).await? {
             if header.state_root != state_root {
-                return Err(TuiError::GenesisError);
+                let err = TuiError::GenesisError;
+                self.set_state(ConnectionState::Error(err.to_string()));
+                return Err(err);
             }
         }
+
+        self.set_state(ConnectionState::Connected);
 
         Ok(())
     }
 
     pub fn is_ready(&self) -> bool {
-        matches!(
-            self.state,
-            ConnectionState::Idle | ConnectionState::Connected(_, _)
-        )
+        matches!(self.state, ConnectionState::Connected)
     }
 
     pub fn is_offline(&self) -> bool {
         matches!(
             self.state,
-            ConnectionState::Reconnecting | ConnectionState::Error(_)
+            ConnectionState::Idle | ConnectionState::Reconnecting | ConnectionState::Error(_)
         )
     }
+}
+
+type ChainKey = SupportedRuntime;
+
+#[derive(Debug, Default)]
+pub struct ChainsListState {
+    chains: HashMap<ChainKey, Chain>,
+    chains_order: Vec<ChainKey>,
+    table_state: TableState,
+    is_active: bool,
+}
+
+impl ChainsListState {
+    pub fn add_chain(&mut self, chain: Chain) {
+        let key = chain.key();
+        if !self.chains.contains_key(&key) {
+            self.chains_order.push(key.clone());
+        }
+        self.chains.insert(key.clone(), chain);
+    }
+
+    pub fn set_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.best_block = block_number;
+        }
+    }
+
+    pub fn set_finalized_block(
+        &mut self,
+        chain_key: &ChainKey,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+    ) {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.finalized_block = block_number;
+            chain.finalized_block_hash = Some(block_hash);
+            chain.finalized_block_ts = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+        }
+    }
+
+    pub fn set_connection_state(&mut self, chain_key: &ChainKey, state: ConnectionState) {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.state = state;
+        }
+    }
+
+    pub fn _get_chain_by_key(&self, chain_key: &ChainKey) -> Option<&Chain> {
+        self.chains.get(chain_key)
+    }
+
+    pub fn get_chain_by_key_cloned(&self, chain_key: &ChainKey) -> Option<Chain> {
+        self.chains.get(chain_key).cloned()
+    }
+
+    // Helper method to get chain by table index
+    pub fn get_chain_by_index(&self, index: usize) -> Option<&Chain> {
+        self.chains_order
+            .get(index)
+            .and_then(|key| self.chains.get(key))
+    }
+
+    pub fn get_chain_by_index_cloned(&self, index: usize) -> Option<Chain> {
+        self.get_chain_by_index(index).cloned()
+    }
+
+    /// Returns an iterator of chains in display order
+    pub fn chains_iter(&self) -> impl Iterator<Item = &Chain> {
+        self.chains_order
+            .iter()
+            .filter_map(move |key| self.chains.get(key))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ChainsListWidget {
+    /// The state is wrapped in an `Arc<RwLock<>>` to allow for shared ownership between the widget and other threads.
+    state: Arc<RwLock<ChainsListState>>,
+    /// The sender to send actions to update the state to the app.
+    tx: UnboundedSender<Action>,
 }
 
 impl ChainsListWidget {
@@ -123,45 +197,42 @@ impl ChainsListWidget {
                     Ok(rpc_client) => {
                         match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
                             Ok(client) => {
-                                let mut chain_client = ChainClient::new(chain_name.clone(), client);
-                                if let Err(err) = chain_client.validate_genesis().await {
-                                    chain_client
-                                        .update_state(ConnectionState::Error(err.to_string()));
-                                    self.on_err(err.into());
+                                let mut chain = Chain::new(chain_name.clone(), client);
+                                if let Err(err) = chain.validate_genesis().await {
+                                    self.error(err.into());
                                 }
-                                self.on_subscribe(chain_client);
+                                self.add_chain(&chain);
+                                self.subscribe(&chain);
                             }
-                            Err(err) => self.on_err(err.into()),
+                            Err(err) => self.error(err.into()),
                         }
                     }
-                    Err(err) => self.on_err(err),
+                    Err(err) => self.error(err),
                 }
             }
         }
-        // Set the window active.
-        self.set_active(false);
+        self.init_table();
     }
 
-    fn on_subscribe(&self, chain_client: ChainClient) {
+    fn add_chain(&self, chain: &Chain) {
         let mut state = self.state.write().unwrap();
-        state.chains.push(chain_client.clone());
-        // Select the first chain.
-        if !state.chains.is_empty() {
-            state.table_state.select(Some(0));
-        }
-        if chain_client.is_ready() {
-            // Launch a task to subscribe the head of the chain.
-            subscribe_finalized_block(chain_client, self.tx.clone());
+        state.add_chain(chain.clone());
+    }
+
+    fn subscribe(&self, chain: &Chain) {
+        if chain.is_ready() {
+            subscribe_best_block(chain, self.tx.clone());
+            subscribe_finalized_block(chain, self.tx.clone());
         }
     }
 
-    fn on_err(&self, err: Box<dyn std::error::Error>) {
+    fn error(&self, err: Box<dyn std::error::Error>) {
         self.tx
             .send(Action::System(SystemAction::Error(err.to_string())))
             .expect("Failed to send error message");
     }
 
-    pub fn move_down(&self) -> Option<ChainClient> {
+    pub fn move_down(&self) -> Option<Chain> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.chains.len() - 1 {
@@ -172,13 +243,13 @@ impl ChainsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.chains[i].clone())
+                .and_then(|i| state.get_chain_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn move_up(&self) -> Option<ChainClient> {
+    pub fn move_up(&self) -> Option<Chain> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
@@ -190,18 +261,16 @@ impl ChainsListWidget {
             state
                 .table_state
                 .selected()
-                .map(|i| state.chains[i].clone())
+                .and_then(|i| state.get_chain_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn set_connection_state(&self, runtime: SupportedRuntime, connection: ConnectionState) {
+    pub fn init_table(&self) {
         let mut state = self.state.write().unwrap();
-        for chain in state.chains.iter_mut() {
-            if chain.runtime == runtime {
-                chain.update_state(connection.clone());
-            }
+        if !state.chains.is_empty() {
+            state.table_state.select(Some(0));
         }
     }
 
@@ -210,21 +279,37 @@ impl ChainsListWidget {
         state.is_active = active;
     }
 
-    pub fn get_selected(&self) -> Option<ChainClient> {
+    pub fn get_selected(&self) -> Option<Chain> {
         let state = self.state.read().unwrap();
         state
             .table_state
             .selected()
-            .map(|i| state.chains[i].clone())
+            .and_then(|i| state.get_chain_by_index_cloned(i))
     }
 
-    pub fn get_chain_client_by_runtime(&self, runtime: &SupportedRuntime) -> Option<ChainClient> {
+    pub fn get_chain_by_runtime(&self, runtime: &SupportedRuntime) -> Option<Chain> {
         let state = self.state.read().unwrap();
-        state
-            .chains
-            .iter()
-            .find(|chain| &chain.runtime == runtime)
-            .cloned()
+        state.get_chain_by_key_cloned(runtime)
+    }
+
+    pub fn update_connection_state(&self, chain_key: &ChainKey, connection_state: ConnectionState) {
+        let mut state = self.state.write().unwrap();
+        state.set_connection_state(chain_key, connection_state);
+    }
+
+    pub fn update_best_block(&self, chain_key: &ChainKey, block_number: BlockNumber) {
+        let mut state = self.state.write().unwrap();
+        state.set_best_block(chain_key, block_number);
+    }
+
+    pub fn update_finalized_block(
+        &self,
+        chain_key: &ChainKey,
+        block_number: BlockNumber,
+        block_hash: BlockHash,
+    ) {
+        let mut state = self.state.write().unwrap();
+        state.set_finalized_block(chain_key, block_number, block_hash);
     }
 }
 
@@ -249,12 +334,13 @@ impl Widget for &ChainsListWidget {
             .borders(Borders::TOP | Borders::LEFT | Borders::BOTTOM)
             .border_type(BorderType::Plain);
 
-        let rows = state.chains.iter();
+        let rows = state.chains_iter();
         let widths = [
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Length(12),
-            Constraint::Length(4),
+            Constraint::Min(16),
+            Constraint::Min(8),
+            Constraint::Min(8),
+            Constraint::Min(12),
+            Constraint::Max(4),
         ];
 
         let table = Table::new(rows, widths)
@@ -262,7 +348,8 @@ impl Widget for &ChainsListWidget {
             .header(
                 Row::new(vec![
                     Cell::from(""),
-                    Cell::from(Text::from("finalized").alignment(Alignment::Right)),
+                    Cell::from(Text::from("best").alignment(Alignment::Left)),
+                    Cell::from(Text::from("finalized").alignment(Alignment::Left)),
                     Cell::from(""),
                     Cell::from(""),
                 ])
@@ -275,61 +362,100 @@ impl Widget for &ChainsListWidget {
     }
 }
 
-impl From<&ChainClient> for Row<'_> {
-    fn from(cc: &ChainClient) -> Self {
-        let elapsed = get_elapsed_millis(cc.last_updated);
+impl From<&Chain> for Row<'_> {
+    fn from(chain: &Chain) -> Self {
+        let elapsed = get_elapsed_millis(chain.finalized_block_ts);
         let progress = create_progress_bar(elapsed, 12);
 
         Row::new(vec![
-            Text::from(cc.runtime.to_string()),
-            Text::from(cc.state.to_string()).alignment(Alignment::Right),
+            Text::from(format!(
+                "{}{}",
+                chain.state.to_string(),
+                chain.runtime.to_string()
+            )),
+            Text::from(format!("#{}", chain.best_block.to_string())).alignment(Alignment::Left),
+            Text::from(format!("#{}", chain.finalized_block.to_string()))
+                .alignment(Alignment::Left),
             Text::from(progress.to_string()).alignment(Alignment::Right),
             Text::from(format_millis(elapsed)).alignment(Alignment::Right),
         ])
     }
 }
 
+// Helper functions
+//
 /// Background task that subscribes head block and sends response over channel.
-fn subscribe_finalized_block(cc: ChainClient, tx: UnboundedSender<Action>) {
-    let api = cc.client.clone();
-    let runtime = cc.runtime.clone();
+fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
+    let api = chain.client.clone();
+    let runtime = chain.runtime.clone();
+    tokio::spawn(async move {
+        match api.blocks().subscribe_best().await {
+            Ok(mut blocks_sub) => {
+                while let Some(result) = blocks_sub.next().await {
+                    match result {
+                        Ok(block) => {
+                            let _ = tx.send(Action::Chain(ChainAction::UpdateBestBlock(
+                                runtime.clone(),
+                                block.number().into(),
+                            )));
+                        }
+                        Err(e) => {
+                            if e.is_disconnected_will_reconnect() {
+                                warn!("Lost connection to {} reconnecting...", runtime.clone());
+                                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                                    runtime.clone(),
+                                    ConnectionState::Reconnecting,
+                                )));
+                                continue;
+                            }
+                            error!("subscribe_best result error: {}", e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("subscribe_best error: {:?}", e);
+            }
+        }
+    });
+}
+
+/// Background task that subscribes finalized block and sends response over channel.
+fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
+    let api = chain.client.clone();
+    let runtime = chain.runtime.clone();
     tokio::spawn(async move {
         match api.blocks().subscribe_finalized().await {
             Ok(mut blocks_sub) => {
                 while let Some(result) = blocks_sub.next().await {
                     match result {
                         Ok(block) => {
-                            let _ = tx.send(Action::Chain(ChainAction::Connection {
-                                runtime: runtime.clone(),
-                                state: ConnectionState::Connected(
-                                    block.number().into(),
-                                    block.hash(),
-                                ),
-                            }));
+                            let _ = tx.send(Action::Chain(ChainAction::UpdateFinalizedBlock(
+                                runtime.clone(),
+                                block.number().into(),
+                                block.hash(),
+                            )));
                         }
                         Err(e) => {
-                            // Handle disconnection errors.
                             if e.is_disconnected_will_reconnect() {
-                                info!("Lost connection to {} reconnecting...", cc.runtime);
-                                let _ = tx.send(Action::Chain(ChainAction::Connection {
-                                    runtime: runtime.clone(),
-                                    state: ConnectionState::Reconnecting,
-                                }));
+                                info!("Lost connection to {} reconnecting...", runtime.clone());
+                                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                                    runtime.clone(),
+                                    ConnectionState::Reconnecting,
+                                )));
                                 continue;
                             }
-                            error!("{}", e);
+                            error!("subscribe_finalized result error: {}", e);
                         }
                     }
                 }
             }
             Err(e) => {
-                error!("error: {:?}", e);
+                error!("subscribe_finalized error: {:?}", e);
             }
         }
     });
 }
-
-// Helper functions
 
 /// Get elapsed time in milliseconds since the given timestamp
 fn get_elapsed_millis(last_updated: u128) -> u64 {

@@ -28,7 +28,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(vec![Constraint::Percentage(25), Constraint::Percentage(75)])
+        .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
     let mut constraints = vec![Constraint::Max(8)];

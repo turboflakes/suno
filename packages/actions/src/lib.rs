@@ -1,6 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
+use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::AccountKey;
 
@@ -43,13 +44,17 @@ pub enum PopupAction {
     Cancel,
 }
 
+type ValidatorKey = AccountKey;
+type ChainKey = SupportedRuntime;
+type BlockNumber = u64;
+type BlockHash = H256;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChainAction {
-    Connection {
-        runtime: SupportedRuntime,
-        state: ConnectionState,
-    },
-    FetchInitialValidatorData(AccountKey),
+    UpdateConnectionState(ChainKey, ConnectionState),
+    UpdateBestBlock(ChainKey, BlockNumber),
+    UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
+    FetchInitialValidatorData(ValidatorKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,8 +66,8 @@ pub enum ValidatorAction {
     SubmitChangeCommission,
     SubmitKickNominators,
     SubmitSetSessionKey,
-    UpdateChangeCommission(AccountKey, Commission),
-    UpdatePoints(AccountKey, Points),
+    UpdateChangeCommission(ValidatorKey, Commission),
+    UpdatePoints(ValidatorKey, Points),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

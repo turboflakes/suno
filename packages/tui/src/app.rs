@@ -164,32 +164,34 @@ impl App {
 
     fn handle_chain_actions(&mut self, action: ChainAction) {
         match action {
-            ChainAction::Connection { runtime, state } => {
+            ChainAction::UpdateConnectionState(chain_key, connection_state) => {
                 self.chains
-                    .set_connection_state(runtime.clone(), state.clone());
-                match state {
-                    ConnectionState::Connected(_, block_hash) => match runtime {
-                        SupportedRuntime::Paseo => {
-                            if let Some(chain_client) =
-                                self.chains.get_chain_client_by_runtime(&runtime)
-                            {
-                                let api = chain_client.client();
-                                self.validators
-                                    .fetch_all_validators_points(api, &runtime, block_hash)
-                            }
+                    .update_connection_state(&chain_key, connection_state);
+            }
+            ChainAction::UpdateBestBlock(chain_key, block_number) => {
+                self.chains.update_best_block(&chain_key, block_number);
+            }
+            ChainAction::UpdateFinalizedBlock(chain_key, block_number, block_hash) => {
+                self.chains
+                    .update_finalized_block(&chain_key, block_number, block_hash);
+
+                // Fetch validators data
+                let runtime = chain_key;
+                match runtime {
+                    SupportedRuntime::Paseo => {
+                        if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
+                            let api = chain.client();
+                            self.validators
+                                .fetch_validators_points(api, &runtime, block_hash)
                         }
-                        _ => {}
-                    },
+                    }
                     _ => {}
                 }
             }
             ChainAction::FetchInitialValidatorData(validator_key) => {
-                if let Some(chain_client) = self
-                    .chains
-                    .get_chain_client_by_runtime(&validator_key.runtime())
-                {
-                    if let Some(block_hash) = chain_client.block_hash() {
-                        let api = chain_client.client();
+                if let Some(chain) = self.chains.get_chain_by_runtime(&validator_key.runtime()) {
+                    if let Some(block_hash) = chain.block_hash() {
+                        let api = chain.client();
                         self.validators.fetch_initial_validator_data_from_relay(
                             api,
                             &validator_key,
@@ -198,12 +200,12 @@ impl App {
                     }
                 }
 
-                if let Some(chain_client) = self
+                if let Some(chain) = self
                     .chains
-                    .get_chain_client_by_runtime(&validator_key.runtime().asset_hub_runtime())
+                    .get_chain_by_runtime(&validator_key.runtime().asset_hub_runtime())
                 {
-                    if let Some(block_hash) = chain_client.block_hash() {
-                        let api = chain_client.client();
+                    if let Some(block_hash) = chain.block_hash() {
+                        let api = chain.client();
                         self.validators.fetch_initial_validator_data_from_asset_hub(
                             api,
                             &validator_key,
@@ -226,11 +228,10 @@ impl App {
             ValidatorAction::SubmitSetSessionKey => {}
             ValidatorAction::UpdateChangeCommission(validator_key, commission) => {
                 self.validators
-                    .update_validator_commission(&validator_key, commission);
+                    .update_commission(&validator_key, commission);
             }
             ValidatorAction::UpdatePoints(validator_key, points) => {
-                self.validators
-                    .update_validator_points(&validator_key, points);
+                self.validators.update_points(&validator_key, points);
             }
         }
     }
@@ -394,7 +395,7 @@ impl App {
                             Command::Instruction(call) => {
                                 if let Some(validator) = self.validators.get_selected() {
                                     if let Some(chain_client) =
-                                        self.chains.get_chain_client_by_runtime(validator.runtime())
+                                        self.chains.get_chain_by_runtime(validator.runtime())
                                     {
                                         match call {
                                             popup::Staking::Chill => {
