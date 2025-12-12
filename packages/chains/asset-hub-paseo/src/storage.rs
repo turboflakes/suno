@@ -1,7 +1,6 @@
 use super::node_runtime;
 use crate::error::Error;
-use log::info;
-pub use node_runtime::{
+use node_runtime::{
     runtime_types::{pallet_staking_async::ValidatorPrefs, sp_arithmetic::per_things::Perbill},
     staking::storage::types::nominators::Nominators,
 };
@@ -10,13 +9,14 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_actions::{Action, ValidatorAction};
-use suno_primitives::ValidatorKey;
+use suno_primitives::AccountKey;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub async fn fetch_initial_validator_data(
+/// Fetch and send initial validator data
+pub async fn fas_validator_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    validator_key: ValidatorKey,
+    validator_key: AccountKey,
     tx: UnboundedSender<Action>,
 ) -> Result<(), Error> {
     let validator_prefs = fetch_validator_prefs(api, block_hash, validator_key.stash()).await?;
@@ -31,7 +31,7 @@ pub async fn fetch_initial_validator_data(
 }
 
 /// Fetch validator prefs at the specified block hash
-pub async fn fetch_validator_prefs(
+async fn fetch_validator_prefs(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: AccountId32,
@@ -50,7 +50,7 @@ pub async fn fetch_validator_prefs(
 }
 
 /// Fetch nominators at the specified block hash
-pub async fn fetch_nominators(
+async fn fetch_nominators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: AccountId32,

@@ -10,15 +10,13 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::collections::HashMap;
-use subxt::{OnlineClient, SubstrateConfig};
-use suno_actions::{Action, ChainAction, SystemAction};
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
-use suno_primitives::{AccountDisplay, NodeAccount, ValidatorKey};
-// use suno_westend;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use subxt::utils::{AccountId32, H256};
+use subxt::{OnlineClient, SubstrateConfig};
+use suno_actions::{Action, ChainAction, SystemAction};
 use suno_asset_hub_paseo;
+use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_primitives::{AccountDisplay, AccountKey, NodeAccount};
 use tokio::sync::mpsc::UnboundedSender;
 
 type Commission = u32;
@@ -76,7 +74,7 @@ impl Validator {
         }
     }
 
-    pub fn key(&self) -> &ValidatorKey {
+    pub fn key(&self) -> &AccountKey {
         &self.account.account_key()
     }
 
@@ -93,6 +91,10 @@ impl Validator {
         let formatted = format!("{:.prec$}", percentage, prec = decimal_places);
         let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
         format!("{}%", trimmed)
+    }
+
+    pub fn points(&self) -> Points {
+        self.points
     }
 
     pub fn chill(&self, chain_client: &ChainClient, tx: UnboundedSender<Action>) {
@@ -132,8 +134,8 @@ impl AccountDisplay for Validator {
 
 #[derive(Debug, Default)]
 pub struct ValidatorsListState {
-    validators: HashMap<ValidatorKey, Validator>,
-    validators_order: Vec<ValidatorKey>,
+    validators: HashMap<AccountKey, Validator>,
+    validators_order: Vec<AccountKey>,
     table_state: TableState,
     is_active: bool,
 }
@@ -149,12 +151,28 @@ impl ValidatorsListState {
 
     pub fn update_validator_commission(
         &mut self,
-        validator_key: &ValidatorKey,
+        validator_key: &AccountKey,
         commission: Commission,
-    ) {
+    ) -> Option<Commission> {
         if let Some(validator) = self.validators.get_mut(validator_key) {
+            let old_commission = validator.points;
             validator.commission = commission;
+            return Some(old_commission);
         }
+        None
+    }
+
+    pub fn update_validator_points(
+        &mut self,
+        validator_key: &AccountKey,
+        points: Points,
+    ) -> Option<Points> {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            let old_points = validator.points;
+            validator.points = points;
+            return Some(old_points);
+        }
+        None
     }
 
     // Helper method to get validator by table index
@@ -173,6 +191,15 @@ impl ValidatorsListState {
         self.validators_order
             .iter()
             .filter_map(move |key| self.validators.get(key))
+    }
+
+    /// Get all AccountKeys for a specific runtime
+    pub fn get_keys_by_runtime(&self, runtime: &SupportedRuntime) -> Vec<AccountKey> {
+        self.validators_order
+            .iter()
+            .filter(|key| &key.runtime == runtime)
+            .cloned()
+            .collect()
     }
 }
 
@@ -313,48 +340,53 @@ impl ValidatorsListWidget {
             .and_then(|i| state.get_validator_by_index_cloned(i))
     }
 
-    pub fn fetch_initial_validator_data(
+    pub fn fetch_initial_validator_data_from_relay(
         &self,
         api: &OnlineClient<SubstrateConfig>,
-        validator_key: &ValidatorKey,
+        validator_key: &AccountKey,
         block_hash: H256,
     ) {
-        let api = api.clone();
-        let validator_key = validator_key.clone();
-        let tx = self.tx.clone();
+        try_fetch_validator_points_from_relay(api, validator_key, block_hash, self.tx.clone());
+    }
 
-        tokio::spawn(async move {
-            let result = match validator_key.runtime().asset_hub_runtime() {
-                SupportedRuntime::AssetHubPaseo => {
-                    suno_asset_hub_paseo::fetch_initial_validator_data(
-                        &api,
-                        block_hash,
-                        validator_key,
-                        tx.clone(),
-                    )
-                    .await
-                }
-                _ => {
-                    unimplemented!(
-                        "fetch_initial_validator_data for runtime {:?}",
-                        validator_key.runtime()
-                    )
-                }
-            };
+    pub fn fetch_initial_validator_data_from_asset_hub(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        validator_key: &AccountKey,
+        block_hash: H256,
+    ) {
+        try_fetch_validator_data_from_asset_hub(api, validator_key, block_hash, self.tx.clone());
+    }
 
-            if let Err(e) = result {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
+    pub fn fetch_all_validators_points(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        runtime: &SupportedRuntime,
+        block_hash: H256,
+    ) {
+        let state = self.state.read().unwrap();
+        let keys = state.get_keys_by_runtime(runtime);
+        keys.iter().for_each(|key| {
+            try_fetch_validator_points_from_relay(api, key, block_hash, self.tx.clone())
         });
     }
 
     pub fn update_validator_commission(
         &self,
-        validator_key: &ValidatorKey,
+        validator_key: &AccountKey,
         commission: Commission,
-    ) {
+    ) -> Option<Commission> {
         let mut state = self.state.write().unwrap();
-        state.update_validator_commission(validator_key, commission);
+        state.update_validator_commission(validator_key, commission)
+    }
+
+    pub fn update_validator_points(
+        &self,
+        validator_key: &AccountKey,
+        points: Points,
+    ) -> Option<Points> {
+        let mut state = self.state.write().unwrap();
+        state.update_validator_points(validator_key, points)
     }
 }
 
@@ -438,12 +470,14 @@ impl Widget for &ValidatorsDetailWidget {
             Row::new(vec![
                 Text::from(v.to_compact_string(5)).alignment(Alignment::Left),
                 Text::from(v.commission_as_percentage(2)),
+                Text::from(v.points().to_string()),
             ])
         });
 
         let widths = [
             Constraint::Length(20), // Stash Column
-            Constraint::Fill(1),    // TODO Column
+            Constraint::Fill(1),
+            Constraint::Fill(1), // TODO Column
         ];
 
         let table = Table::new(rows, widths)
@@ -463,4 +497,68 @@ impl From<&Validator> for Row<'_> {
             Text::from(v.to_compact_string(5)).alignment(Alignment::Right),
         ])
     }
+}
+
+// Helper functions
+
+pub fn try_fetch_validator_data_from_asset_hub(
+    api: &OnlineClient<SubstrateConfig>,
+    validator_key: &AccountKey,
+    block_hash: H256,
+    tx: UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let validator_key = validator_key.clone();
+
+    tokio::spawn(async move {
+        let result = match validator_key.runtime().asset_hub_runtime() {
+            SupportedRuntime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fas_validator_data(
+                    &api,
+                    block_hash,
+                    validator_key,
+                    tx.clone(),
+                )
+                .await
+            }
+            _ => {
+                unimplemented!(
+                    "fas_validator_data for runtime {:?}",
+                    validator_key.runtime().asset_hub_runtime()
+                )
+            }
+        };
+
+        if let Err(e) = result {
+            let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+        }
+    });
+}
+
+pub fn try_fetch_validator_points_from_relay(
+    api: &OnlineClient<SubstrateConfig>,
+    validator_key: &AccountKey,
+    block_hash: H256,
+    tx: UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let validator_key = validator_key.clone();
+
+    tokio::spawn(async move {
+        let result = match validator_key.runtime() {
+            SupportedRuntime::Paseo => {
+                suno_paseo::fas_validator_points(&api, block_hash, validator_key, tx.clone()).await
+            }
+            _ => {
+                unimplemented!(
+                    "fas_validator_points for runtime {:?}",
+                    validator_key.runtime()
+                )
+            }
+        };
+
+        if let Err(e) = result {
+            let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+        }
+    });
 }

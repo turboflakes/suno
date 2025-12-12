@@ -1,12 +1,11 @@
 pub mod network;
 
 use crate::network::ConnectionState;
-use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
-use suno_primitives::ValidatorKey;
+use suno_primitives::AccountKey;
 
 type Commission = u32;
-type Stash = AccountId32;
+type Points = u32;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,7 +49,7 @@ pub enum ChainAction {
         runtime: SupportedRuntime,
         state: ConnectionState,
     },
-    FetchInitialValidatorData(ValidatorKey),
+    FetchInitialValidatorData(AccountKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,7 +61,8 @@ pub enum ValidatorAction {
     SubmitChangeCommission,
     SubmitKickNominators,
     SubmitSetSessionKey,
-    UpdateChangeCommission(ValidatorKey, Commission),
+    UpdateChangeCommission(AccountKey, Commission),
+    UpdatePoints(AccountKey, Points),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -7,6 +7,7 @@ members = [
     "packages/suno",
     "packages/tui",
     "packages/chains/asset-hub-paseo",
+    "packages/chains/paseo",
 ]
 
 resolver = "2"

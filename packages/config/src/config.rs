@@ -7,15 +7,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use subxt::backend::{legacy::LegacyRpcMethods, rpc::RpcClient};
 use subxt::utils::AccountId32;
-use subxt::{
-    utils::H256,
-    // codec::{Decode, Encode},
-    Metadata,
-    OnlineClient,
-    SubstrateConfig,
-};
 
 // Set Config struct into a CONFIG lazy_static to avoid multiple processing
 lazy_static! {

@@ -1,8 +1,8 @@
 pub mod error;
-pub mod staking;
+pub mod extrinsics;
 pub mod storage;
 pub mod submit;
-pub use storage::fetch_initial_validator_data;
+pub use storage::fas_validator_data;
 pub use submit::submit_as_proxy;
 
 #[subxt::subxt(

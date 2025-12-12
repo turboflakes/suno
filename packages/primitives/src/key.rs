@@ -3,15 +3,15 @@ use suno_config::SupportedRuntime;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct AccountKey {
-    runtime: SupportedRuntime,
-    stash: [u8; 32],
+    pub runtime: SupportedRuntime,
+    pub bytes: [u8; 32],
 }
 
 impl AccountKey {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             runtime,
-            stash: *stash.as_ref(),
+            bytes: *stash.as_ref(),
         }
     }
 
@@ -20,6 +20,6 @@ impl AccountKey {
     }
 
     pub fn stash(&self) -> AccountId32 {
-        AccountId32::from(self.stash)
+        AccountId32::from(self.bytes)
     }
 }

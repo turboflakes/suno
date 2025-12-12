@@ -14,10 +14,11 @@ use crate::{
 use log::{error, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use suno_actions::network::ConnectionState;
 use suno_actions::{
     Action, ChainAction, NavigationAction, PopupAction, SystemAction, TxAction, ValidatorAction,
 };
-use suno_config::CONFIG;
+use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
@@ -164,16 +165,46 @@ impl App {
     fn handle_chain_actions(&mut self, action: ChainAction) {
         match action {
             ChainAction::Connection { runtime, state } => {
-                self.chains.set_connection_state(runtime, state)
+                self.chains
+                    .set_connection_state(runtime.clone(), state.clone());
+                match state {
+                    ConnectionState::Connected(_, block_hash) => match runtime {
+                        SupportedRuntime::Paseo => {
+                            if let Some(chain_client) =
+                                self.chains.get_chain_client_by_runtime(&runtime)
+                            {
+                                let api = chain_client.client();
+                                self.validators
+                                    .fetch_all_validators_points(api, &runtime, block_hash)
+                            }
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
             }
             ChainAction::FetchInitialValidatorData(validator_key) => {
+                if let Some(chain_client) = self
+                    .chains
+                    .get_chain_client_by_runtime(&validator_key.runtime())
+                {
+                    if let Some(block_hash) = chain_client.block_hash() {
+                        let api = chain_client.client();
+                        self.validators.fetch_initial_validator_data_from_relay(
+                            api,
+                            &validator_key,
+                            block_hash,
+                        )
+                    }
+                }
+
                 if let Some(chain_client) = self
                     .chains
                     .get_chain_client_by_runtime(&validator_key.runtime().asset_hub_runtime())
                 {
                     if let Some(block_hash) = chain_client.block_hash() {
                         let api = chain_client.client();
-                        self.validators.fetch_initial_validator_data(
+                        self.validators.fetch_initial_validator_data_from_asset_hub(
                             api,
                             &validator_key,
                             block_hash,
@@ -196,6 +227,10 @@ impl App {
             ValidatorAction::UpdateChangeCommission(validator_key, commission) => {
                 self.validators
                     .update_validator_commission(&validator_key, commission);
+            }
+            ValidatorAction::UpdatePoints(validator_key, points) => {
+                self.validators
+                    .update_validator_points(&validator_key, points);
             }
         }
     }
