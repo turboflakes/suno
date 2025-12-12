@@ -24,7 +24,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 pub type AppResult<T> = std::result::Result<T, TuiError>;
 
 // Constants
-const TICK_RATE: u64 = 250;
+const TICK_RATE: u64 = 200;
 
 /// Application.
 #[derive(Debug)]
@@ -229,9 +229,7 @@ impl App {
     pub fn noop(&self) {}
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {
-        self.chains.tick(TICK_RATE)
-    }
+    pub fn tick(&self) {}
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {

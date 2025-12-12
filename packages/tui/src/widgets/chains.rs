@@ -1,14 +1,16 @@
 use crate::error::TuiError;
+use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
 use log::{error, info};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Style},
+    style::{Color, Style, Styled},
     text::Text,
-    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
@@ -34,8 +36,8 @@ pub struct ChainClient {
     runtime: SupportedRuntime,
     client: OnlineClient<SubstrateConfig>,
     state: ConnectionState,
-    // last_update value is given in milliseconds
-    last_update: u64,
+    // last_updated value is the timestamp in milliseconds
+    last_updated: u128,
 }
 
 impl ChainClient {
@@ -44,7 +46,7 @@ impl ChainClient {
             runtime,
             client,
             state: ConnectionState::default(),
-            last_update: 0,
+            last_updated: 0,
         }
     }
 
@@ -62,6 +64,11 @@ impl ChainClient {
 
     pub fn update_state(&mut self, state: ConnectionState) {
         self.state = state;
+        let last_updated = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        self.last_updated = last_updated;
     }
 
     pub fn block_hash(&self) -> Option<H256> {
@@ -132,7 +139,7 @@ impl ChainsListWidget {
             }
         }
         // Set the window active.
-        self.set_active(true);
+        self.set_active(false);
     }
 
     fn on_subscribe(&self, chain_client: ChainClient) {
@@ -193,16 +200,8 @@ impl ChainsListWidget {
         let mut state = self.state.write().unwrap();
         for chain in state.chains.iter_mut() {
             if chain.runtime == runtime {
-                chain.state = connection.clone();
-                chain.last_update = 0;
+                chain.update_state(connection.clone());
             }
-        }
-    }
-
-    pub fn tick(&self, value: u64) {
-        let mut state = self.state.write().unwrap();
-        for chain in state.chains.iter_mut() {
-            chain.last_update += value;
         }
     }
 
@@ -255,10 +254,20 @@ impl Widget for &ChainsListWidget {
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Length(12),
+            Constraint::Length(4),
         ];
 
         let table = Table::new(rows, widths)
-            .block(block.clone())
+            .block(block)
+            .header(
+                Row::new(vec![
+                    Cell::from(""),
+                    Cell::from(Text::from("finalized").alignment(Alignment::Right)),
+                    Cell::from(""),
+                    Cell::from(""),
+                ])
+                .set_style(THEME.table.header),
+            )
             .style(table_style)
             .row_highlight_style(highlight_style);
 
@@ -268,21 +277,14 @@ impl Widget for &ChainsListWidget {
 
 impl From<&ChainClient> for Row<'_> {
     fn from(cc: &ChainClient) -> Self {
-        let cc = cc.clone();
-        let ratio = cc.last_update.clamp(0, 6000) as f64 / 6000.0;
-        let total_chars = 12;
-        let filled_chars = (ratio * total_chars as f64) as usize;
-
-        let progress = format!(
-            "{}{}",
-            "░".repeat(total_chars - filled_chars),
-            "▓".repeat(filled_chars),
-        );
+        let elapsed = get_elapsed_millis(cc.last_updated);
+        let progress = create_progress_bar(elapsed, 12);
 
         Row::new(vec![
             Text::from(cc.runtime.to_string()),
             Text::from(cc.state.to_string()).alignment(Alignment::Right),
             Text::from(progress.to_string()).alignment(Alignment::Right),
+            Text::from(format_millis(elapsed)).alignment(Alignment::Right),
         ])
     }
 }
@@ -325,4 +327,58 @@ fn subscribe_finalized_block(cc: ChainClient, tx: UnboundedSender<Action>) {
             }
         }
     });
+}
+
+// Helper functions
+
+/// Get elapsed time in milliseconds since the given timestamp
+fn get_elapsed_millis(last_updated: u128) -> u64 {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    (now - last_updated) as u64
+}
+
+/// Create a progress bar based on elapsed time
+fn create_progress_bar(elapsed: u64, bar_width: usize) -> String {
+    const PHASE_1_TIMEOUT: u64 = 6_000; // 6 seconds
+    const PHASE_2_TIMEOUT: u64 = 60_000; // 60 seconds
+
+    let (ratio, empty_char, filled_char) = if elapsed > PHASE_1_TIMEOUT {
+        (
+            (elapsed.min(PHASE_2_TIMEOUT)) as f64 / PHASE_2_TIMEOUT as f64,
+            "░",
+            "█",
+        )
+    } else {
+        (
+            (elapsed.min(PHASE_1_TIMEOUT)) as f64 / PHASE_1_TIMEOUT as f64,
+            "•",
+            "░",
+        )
+    };
+
+    let filled_chars = (ratio * bar_width as f64) as usize;
+
+    format!(
+        "{}{}",
+        filled_char.repeat(filled_chars),
+        empty_char.repeat(bar_width - filled_chars),
+    )
+}
+
+/// Format milliseconds to human-readable string (e.g., "6.5s")
+fn format_millis(millis: u64) -> String {
+    let seconds = millis as f64 / 1000.0;
+
+    match seconds {
+        s if s < 10.0 => format!("{:.1}s", s),
+        s if s < 60.0 => format!("{:.0}s", s),
+        s if s < 600.0 => format!("{:.1}m", s / 60.0),
+        s if s < 3600.0 => format!("{:.0}m", s / 60.0),
+        s if s < 36000.0 => format!("{:.1}h", s / 3600.0),
+        _ => format!("{:.0}h", seconds / 3600.0),
+    }
 }

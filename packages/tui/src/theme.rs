@@ -34,7 +34,7 @@ pub const THEME: Theme = Theme {
     table: Table {
         base: Style::new().fg(Color::Blue),
         base_active: Style::new().fg(Color::White),
-        header: Style::new().add_modifier(Modifier::UNDERLINED),
+        header: Style::new().add_modifier(Modifier::BOLD),
         row_highlight: Style::new().fg(Color::White),
         row_highlight_active: Style::new().fg(Color::Black).bg(Color::White),
     },

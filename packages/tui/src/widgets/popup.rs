@@ -1,11 +1,10 @@
 use crate::menu::{AsChar, Command, Entry, ToDescription};
 use crate::theme::THEME;
-use log::{info, warn};
-use ratatui::style::Styled;
+use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::{Color, Style},
+    style::Styled,
     widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
