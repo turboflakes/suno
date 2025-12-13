@@ -1,4 +1,5 @@
 use crate::error::TuiError;
+use crate::theme::THEME;
 use crate::widgets::chains::Chain;
 use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
@@ -7,9 +8,9 @@ use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Styled},
     text::Text,
-    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -88,6 +89,14 @@ impl Validator {
 
     pub fn identity(&self) -> &Option<String> {
         self.account.identity()
+    }
+
+    pub fn display_name(&self) -> String {
+        if let Some(display_name) = self.identity() {
+            display_name.clone()
+        } else {
+            self.to_compact_string(6)
+        }
     }
 
     pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
@@ -188,6 +197,12 @@ impl ValidatorsListState {
             return Some(old_points);
         }
         None
+    }
+
+    pub fn set_identity(&mut self, validator_key: &AccountKey, identity: String) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.account.set_identity(identity);
+        }
     }
 
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
@@ -417,6 +432,11 @@ impl ValidatorsListWidget {
         state.set_era_points(validator_key, points)
     }
 
+    pub fn update_identity(&self, validator_key: &AccountKey, identity: String) {
+        let mut state = self.state.write().unwrap();
+        state.set_identity(validator_key, identity);
+    }
+
     pub fn spawn_fetch_validator_data_from_asset_hub(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -455,6 +475,33 @@ impl ValidatorsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) = fetch_and_send_validators_data_from_asset_hub(
+                &api,
+                block_hash,
+                &runtime,
+                &validator_keys,
+                tx.clone(),
+            )
+            .await
+            {
+                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+            }
+        });
+    }
+
+    pub fn spawn_fetch_validators_identities(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: &SupportedRuntime,
+        validator_keys: &Vec<ValidatorKey>,
+    ) {
+        let api = api.clone();
+        let runtime = runtime.clone();
+        let validator_keys = validator_keys.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) = fetch_and_send_validators_identities(
                 &api,
                 block_hash,
                 &runtime,
@@ -598,7 +645,7 @@ impl Widget for &ValidatorsDetailWidget {
 
         let rows = state.validators_iter().map(|v| {
             Row::new(vec![
-                Text::from(v.to_compact_string(5)).alignment(Alignment::Left),
+                Text::from(v.display_name()).alignment(Alignment::Left),
                 Text::from(v.commission_as_percentage(2)),
                 Text::from(v.total_points().to_string()),
             ])
@@ -611,7 +658,15 @@ impl Widget for &ValidatorsDetailWidget {
         ];
 
         let table = Table::new(rows, widths)
-            // .block(block)
+            .block(block)
+            .header(
+                Row::new(vec![
+                    Cell::from(""),
+                    Cell::from(Text::from("commission").alignment(Alignment::Left)),
+                    Cell::from(Text::from("points").alignment(Alignment::Left)),
+                ])
+                .set_style(THEME.table.header),
+            )
             .style(table_style)
             .row_highlight_style(highlight_style);
 
@@ -691,6 +746,48 @@ async fn fetch_and_send_validators_data_from_asset_hub(
                     }
                 }
                 Err(e) => warn!("Failed to fetch validators era points: {}", e),
+            }
+        }
+        _ => error!("Unsupported runtime: {:?}", runtime),
+    }
+
+    Ok(())
+}
+
+async fn fetch_and_send_validators_identities(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    validator_keys: &Vec<AccountKey>,
+    tx: UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    match runtime {
+        SupportedRuntime::PeoplePaseo => {
+            // Create futures for all validators
+            let fetch_futures = validator_keys.iter().map(|validator_key| {
+                let api = api.clone();
+                let stash = validator_key.stash();
+                async move {
+                    let result =
+                        suno_people_paseo::fetch_display_name(&api, block_hash, &stash).await;
+                    (validator_key.clone(), result)
+                }
+            });
+
+            // Execute all fetches in parallel
+            let results = join_all(fetch_futures).await;
+
+            // Process results
+            for (validator_key, result) in results {
+                match result {
+                    Ok(identity) => {
+                        tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
+                            validator_key,
+                            identity,
+                        )))?;
+                    }
+                    Err(e) => warn!("Failed to fetch identity for {:?}: {}", validator_key, e),
+                }
             }
         }
         _ => error!("Unsupported runtime: {:?}", runtime),

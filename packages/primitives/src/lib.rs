@@ -1,3 +1,4 @@
+pub mod identity;
 pub mod key;
 pub mod node_account;
 

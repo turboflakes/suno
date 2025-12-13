@@ -23,6 +23,7 @@ suno-actions = { path = "../actions" }
 suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
 suno-config = { path = "../config" }
 suno-paseo = { path = "../chains/paseo" }
+suno-people-paseo = { path = "../chains/people-paseo" }
 suno-primitives = { path = "../primitives" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

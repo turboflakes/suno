@@ -47,6 +47,10 @@ impl NodeAccount {
     pub fn identity(&self) -> &Option<String> {
         &self.identity
     }
+
+    pub fn set_identity(&mut self, identity: String) {
+        self.identity = Some(identity);
+    }
 }
 
 impl AccountDisplay for NodeAccount {

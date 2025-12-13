@@ -70,6 +70,7 @@ pub enum ValidatorAction {
     UpdateCommission(ValidatorKey, Commission),
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),
+    UpdateIdentity(ValidatorKey, String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

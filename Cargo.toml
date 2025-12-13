@@ -8,6 +8,7 @@ members = [
     "packages/tui",
     "packages/chains/asset-hub-paseo",
     "packages/chains/paseo",
+    "packages/chains/people-paseo",
 ]
 
 resolver = "2"
@@ -21,6 +22,7 @@ description = "Just another way of managing Substrate node operations in the Pol
 edition = "2021"
 
 [workspace.dependencies]
+async-recursion = "1.0"
 color-eyre = "0.6.3"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.31"

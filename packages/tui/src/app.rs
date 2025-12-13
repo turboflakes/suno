@@ -13,6 +13,7 @@ use crate::{
 };
 use log::{error, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::f64::INFINITY;
 use std::io;
 use suno_actions::network::ConnectionState;
 use suno_actions::{
@@ -231,6 +232,18 @@ impl App {
                         )
                     }
                 }
+
+                if let Some(chain) = self.chains.get_chain_by_runtime(&runtime.people_runtime()) {
+                    if let Some(block_hash) = chain.block_hash() {
+                        let api = chain.client();
+                        self.validators.spawn_fetch_validators_identities(
+                            api,
+                            block_hash,
+                            &runtime.people_runtime(),
+                            &validator_keys,
+                        )
+                    }
+                }
             }
         }
     }
@@ -253,6 +266,9 @@ impl App {
             }
             ValidatorAction::UpdateEraPoints(validator_key, points) => {
                 self.validators.update_era_points(&validator_key, points);
+            }
+            ValidatorAction::UpdateIdentity(validator_key, identity) => {
+                self.validators.update_identity(&validator_key, identity);
             }
         }
     }
