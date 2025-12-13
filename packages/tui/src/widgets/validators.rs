@@ -669,10 +669,13 @@ impl Widget for &ValidatorsDetailWidget {
 
 impl From<&Validator> for Row<'_> {
     fn from(v: &Validator) -> Self {
+        // TODO: Verify if proxy is available and correctly setup for each stash
+        let has_proxy = false;
+        let status = if has_proxy { "[P]" } else { "[R]" };
         let v = v.clone();
         Row::new(vec![
-            Text::from(v.runtime().to_string()),
-            Text::from(v.to_compact_string(5)).alignment(Alignment::Right),
+            Text::from(format!("{}/{}", v.runtime(), v.display_name(),)),
+            Text::from(status).alignment(Alignment::Right),
         ])
     }
 }
