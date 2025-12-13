@@ -802,7 +802,7 @@ async fn fetch_and_send_validator_data_from_relay(
     validator_key: &ValidatorKey,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    let runtime = validator_key.runtime().asset_hub_runtime();
+    let runtime = validator_key.runtime();
     let stash = validator_key.stash();
 
     match runtime {
@@ -859,7 +859,11 @@ async fn fetch_and_send_all_validators_points_from_relay(
                             points,
                         )))?;
                     }
-                    Err(e) => warn!("Failed to fetch points for {:?}: {}", validator_key, e),
+                    Err(e) => warn!(
+                        "Failed to fetch points for {:?}: {}",
+                        validator_key.to_string(),
+                        e
+                    ),
                 }
             }
         }

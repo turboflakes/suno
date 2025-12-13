@@ -69,7 +69,7 @@ async fn fetch_validator_prefs(
         .await?
         .ok_or_else(|| {
             Error::from(format!(
-                "ValidatorPrefs not defined at block hash {block_hash:?} for stash {stash:?}"
+                "ValidatorPrefs not defined at block hash {block_hash:?} for stash {stash}"
             ))
         })
 }
@@ -121,7 +121,7 @@ async fn _fetch_nominators(
         .await?
         .ok_or_else(|| {
             Error::from(format!(
-                "Nominators not defined at block hash {block_hash:?} for stash {stash:?}"
+                "Nominators not defined at block hash {block_hash:?} for stash {stash}"
             ))
         })
 }

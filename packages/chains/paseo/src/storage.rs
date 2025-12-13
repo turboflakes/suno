@@ -23,7 +23,7 @@ pub async fn fetch_validator_points(
         .await?
         .ok_or_else(|| {
             Error::from(format!(
-                "Validator points not defined at block hash {block_hash:?} for stash {stash:?}"
+                "Validator points not defined at block hash {block_hash:?} for stash {stash}"
             ))
         })
 }
