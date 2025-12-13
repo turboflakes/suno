@@ -9,11 +9,10 @@ edition.workspace = true
 
 [dependencies]
 log = { workspace = true }
-serde = { workspace = true }
 subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../../actions" }
-suno-primitives = { path = "../../primitives" }
 suno-signer = { path = "../../signer" }
+suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

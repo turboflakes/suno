@@ -175,27 +175,29 @@ impl App {
                 self.chains
                     .update_finalized_block(&chain_key, block_number, block_hash);
 
-                // Fetch validators data
+                // Fetch data relevant to be synced at every finalized block, eg. all validators points
                 let runtime = chain_key;
                 match runtime {
                     SupportedRuntime::Paseo => {
                         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
                             let api = chain.client();
                             self.validators
-                                .fetch_validators_points(api, &runtime, block_hash)
+                                .spawn_fetch_all_validators_points_from_relay(
+                                    api, block_hash, &runtime,
+                                )
                         }
                     }
                     _ => {}
                 }
             }
-            ChainAction::FetchInitialValidatorData(validator_key) => {
+            ChainAction::FetchValidatorData(validator_key) => {
                 if let Some(chain) = self.chains.get_chain_by_runtime(&validator_key.runtime()) {
                     if let Some(block_hash) = chain.block_hash() {
                         let api = chain.client();
-                        self.validators.fetch_initial_validator_data_from_relay(
+                        self.validators.spawn_fetch_validator_data_from_relay(
                             api,
-                            &validator_key,
                             block_hash,
+                            &validator_key,
                         )
                     }
                 }
@@ -206,10 +208,26 @@ impl App {
                 {
                     if let Some(block_hash) = chain.block_hash() {
                         let api = chain.client();
-                        self.validators.fetch_initial_validator_data_from_asset_hub(
+                        self.validators.spawn_fetch_validator_data_from_asset_hub(
                             api,
-                            &validator_key,
                             block_hash,
+                            &validator_key,
+                        )
+                    }
+                }
+            }
+            ChainAction::FetchValidatorsData(runtime, validator_keys) => {
+                if let Some(chain) = self
+                    .chains
+                    .get_chain_by_runtime(&runtime.asset_hub_runtime())
+                {
+                    if let Some(block_hash) = chain.block_hash() {
+                        let api = chain.client();
+                        self.validators.spawn_fetch_validators_data_from_asset_hub(
+                            api,
+                            block_hash,
+                            &runtime.asset_hub_runtime(),
+                            &validator_keys,
                         )
                     }
                 }
@@ -226,12 +244,15 @@ impl App {
             ValidatorAction::SubmitChangeCommission => {}
             ValidatorAction::SubmitKickNominators => {}
             ValidatorAction::SubmitSetSessionKey => {}
-            ValidatorAction::UpdateChangeCommission(validator_key, commission) => {
+            ValidatorAction::UpdateCommission(validator_key, commission) => {
                 self.validators
                     .update_commission(&validator_key, commission);
             }
             ValidatorAction::UpdatePoints(validator_key, points) => {
                 self.validators.update_points(&validator_key, points);
+            }
+            ValidatorAction::UpdateEraPoints(validator_key, points) => {
+                self.validators.update_era_points(&validator_key, points);
             }
         }
     }

@@ -19,6 +19,10 @@ impl AccountKey {
         &self.runtime
     }
 
+    pub fn bytes(&self) -> [u8; 32] {
+        self.bytes
+    }
+
     pub fn stash(&self) -> AccountId32 {
         AccountId32::from(self.bytes)
     }

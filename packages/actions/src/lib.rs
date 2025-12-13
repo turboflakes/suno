@@ -54,7 +54,8 @@ pub enum ChainAction {
     UpdateConnectionState(ChainKey, ConnectionState),
     UpdateBestBlock(ChainKey, BlockNumber),
     UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
-    FetchInitialValidatorData(ValidatorKey),
+    FetchValidatorData(ValidatorKey),
+    FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,8 +67,9 @@ pub enum ValidatorAction {
     SubmitChangeCommission,
     SubmitKickNominators,
     SubmitSetSessionKey,
-    UpdateChangeCommission(ValidatorKey, Commission),
+    UpdateCommission(ValidatorKey, Commission),
     UpdatePoints(ValidatorKey, Points),
+    UpdateEraPoints(ValidatorKey, Points),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2,7 +2,7 @@ pub mod error;
 pub mod extrinsics;
 pub mod storage;
 pub mod submit;
-pub use storage::fas_validator_data;
+pub use storage::{fetch_validator_commission, fetch_validators_era_points};
 pub use submit::submit_as_proxy;
 
 #[subxt::subxt(
