@@ -9,6 +9,7 @@ pub enum ConnectionState {
     Idle,
     Reconnecting,
     Connected,
+    Validated,
     Error(String),
 }
 
@@ -17,6 +18,7 @@ impl std::fmt::Display for ConnectionState {
         match self {
             Self::Idle => write!(f, "◯ "),
             // Self::Connected => write!(f, "●"),
+            Self::Validated => write!(f, "✓ "),
             Self::Connected => write!(f, ""),
             Self::Reconnecting => write!(f, "↺ "),
             Self::Error(_) => write!(f, "❗ "),

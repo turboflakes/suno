@@ -75,6 +75,26 @@ impl SupportedRuntime {
         }
     }
 
+    pub fn relay_chain(&self) -> Self {
+        match &self {
+            Self::Local => Self::Local,
+            Self::Polkadot
+            | Self::AssetHubPolkadot
+            | Self::BridgeHubPolkadot
+            | Self::PeoplePolkadot => Self::Polkadot,
+            Self::Kusama | Self::AssetHubKusama | Self::BridgeHubKusama | Self::PeopleKusama => {
+                Self::Kusama
+            }
+            Self::Paseo | Self::AssetHubPaseo | Self::BridgeHubPaseo | Self::PeoplePaseo => {
+                Self::Paseo
+            }
+            Self::Westend
+            | Self::AssetHubWestend
+            | Self::BridgeHubWestend
+            | Self::PeopleWestend => Self::Westend,
+        }
+    }
+
     pub fn asset_hub_runtime(&self) -> Self {
         match &self {
             Self::Polkadot => Self::AssetHubPolkadot,
@@ -140,29 +160,40 @@ impl SupportedRuntime {
             _ => panic!("Unsupported chain"),
         }
     }
+
+    pub fn is_relay_chain(&self) -> bool {
+        match &self {
+            Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Local => "Local",
+            Self::Polkadot => "Polkadot",
+            Self::Kusama => "Kusama",
+            Self::Westend => "Westend",
+            Self::Paseo => "Paseo",
+            Self::AssetHubPolkadot => "Asset Hub Polkadot",
+            Self::BridgeHubPolkadot => "Bridge Hub Polkadot",
+            Self::PeoplePolkadot => "People Polkadot",
+            Self::AssetHubKusama => "Asset Hub Kusama",
+            Self::BridgeHubKusama => "Bridge Hub Kusama",
+            Self::PeopleKusama => "People Kusama",
+            Self::AssetHubPaseo => "Asset Hub Paseo",
+            Self::BridgeHubPaseo => "Bridge Hub Paseo",
+            Self::PeoplePaseo => "People Paseo",
+            Self::AssetHubWestend => "Asset Hub Westend",
+            Self::BridgeHubWestend => "Bridge Hub Westend",
+            Self::PeopleWestend => "People Westend",
+        }
+    }
 }
 
 impl std::fmt::Display for SupportedRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Local => write!(f, "Local"),
-            Self::Polkadot => write!(f, "Polkadot"),
-            Self::Kusama => write!(f, "Kusama"),
-            Self::Paseo => write!(f, "Paseo"),
-            Self::Westend => write!(f, "Westend"),
-            Self::AssetHubPolkadot => write!(f, "AssetHub Polkadot"),
-            Self::BridgeHubPolkadot => write!(f, "BridgeHub Polkadot"),
-            Self::PeoplePolkadot => write!(f, "People Polkadot"),
-            Self::AssetHubKusama => write!(f, "AssetHub Kusama"),
-            Self::BridgeHubKusama => write!(f, "BridgeHub Kusama"),
-            Self::PeopleKusama => write!(f, "People Kusama"),
-            Self::AssetHubPaseo => write!(f, "AssetHub Paseo"),
-            Self::BridgeHubPaseo => write!(f, "BridgeHub Paseo"),
-            Self::PeoplePaseo => write!(f, "People Paseo"),
-            Self::AssetHubWestend => write!(f, "AssetHub Westend"),
-            Self::BridgeHubWestend => write!(f, "BridgeHub Westend"),
-            Self::PeopleWestend => write!(f, "People Westend"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 

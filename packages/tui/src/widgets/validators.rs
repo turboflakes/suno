@@ -320,8 +320,6 @@ impl ValidatorsListWidget {
             }
         }
         self.init_table();
-        // Fetch initial data for all validators
-        self.fetch_all_validators_data();
     }
 
     fn on_error(&self, err: Box<dyn std::error::Error>) {
@@ -466,11 +464,11 @@ impl ValidatorsListWidget {
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         runtime: &SupportedRuntime,
-        validator_keys: &Vec<ValidatorKey>,
     ) {
+        let state = self.state.read().unwrap();
+        let keys = state.get_keys_by_runtime(&runtime.relay_chain());
         let api = api.clone();
         let runtime = runtime.clone();
-        let validator_keys = validator_keys.clone();
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
@@ -478,7 +476,7 @@ impl ValidatorsListWidget {
                 &api,
                 block_hash,
                 &runtime,
-                &validator_keys,
+                &keys,
                 tx.clone(),
             )
             .await
@@ -493,22 +491,17 @@ impl ValidatorsListWidget {
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         runtime: &SupportedRuntime,
-        validator_keys: &Vec<ValidatorKey>,
     ) {
+        let state = self.state.read().unwrap();
+        let keys = state.get_keys_by_runtime(&runtime.relay_chain());
         let api = api.clone();
         let runtime = runtime.clone();
-        let validator_keys = validator_keys.clone();
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_identities(
-                &api,
-                block_hash,
-                &runtime,
-                &validator_keys,
-                tx.clone(),
-            )
-            .await
+            if let Err(e) =
+                fetch_and_send_validators_identities(&api, block_hash, &runtime, &keys, tx.clone())
+                    .await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }

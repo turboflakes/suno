@@ -1,7 +1,7 @@
 use crate::error::TuiError;
 use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
@@ -49,6 +49,10 @@ impl Chain {
         &self.runtime
     }
 
+    pub fn name(&self) -> &str {
+        &self.runtime.as_str()
+    }
+
     pub fn runtime(&self) -> &SupportedRuntime {
         &self.runtime
     }
@@ -82,12 +86,16 @@ impl Chain {
             }
         }
 
-        self.set_state(ConnectionState::Connected);
+        self.set_state(ConnectionState::Validated);
 
         Ok(())
     }
 
-    pub fn is_ready(&self) -> bool {
+    pub fn is_validated(&self) -> bool {
+        matches!(self.state, ConnectionState::Validated)
+    }
+
+    pub fn is_connected(&self) -> bool {
         matches!(self.state, ConnectionState::Connected)
     }
 
@@ -118,10 +126,14 @@ impl ChainsListState {
         self.chains.insert(key.clone(), chain);
     }
 
-    pub fn set_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) {
+    pub fn set_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.best_block = block_number;
+            if chain.best_block != block_number {
+                chain.best_block = block_number;
+                return true;
+            }
         }
+        false
     }
 
     pub fn set_finalized_block(
@@ -129,21 +141,29 @@ impl ChainsListState {
         chain_key: &ChainKey,
         block_number: BlockNumber,
         block_hash: BlockHash,
-    ) {
+    ) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.finalized_block = block_number;
-            chain.finalized_block_hash = Some(block_hash);
-            chain.finalized_block_ts = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis();
+            if chain.finalized_block != block_number {
+                chain.finalized_block = block_number;
+                chain.finalized_block_hash = Some(block_hash);
+                chain.finalized_block_ts = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis();
+                return true;
+            }
         }
+        false
     }
 
-    pub fn set_connection_state(&mut self, chain_key: &ChainKey, state: ConnectionState) {
+    pub fn set_connection_state(&mut self, chain_key: &ChainKey, state: ConnectionState) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.state = state;
+            if chain.state != state {
+                chain.state = state;
+                return true;
+            }
         }
+        false
     }
 
     pub fn _get_chain_by_key(&self, chain_key: &ChainKey) -> Option<&Chain> {
@@ -220,7 +240,7 @@ impl ChainsListWidget {
     }
 
     fn subscribe(&self, chain: &Chain) {
-        if chain.is_ready() {
+        if chain.is_validated() {
             subscribe_best_block(chain, self.tx.clone());
             subscribe_finalized_block(chain, self.tx.clone());
         }
@@ -292,14 +312,33 @@ impl ChainsListWidget {
         state.get_chain_by_key_cloned(runtime)
     }
 
-    pub fn update_connection_state(&self, chain_key: &ChainKey, connection_state: ConnectionState) {
-        let mut state = self.state.write().unwrap();
-        state.set_connection_state(chain_key, connection_state);
+    pub fn get_api_and_block_hash(
+        &self,
+        runtime: &SupportedRuntime,
+    ) -> Option<(OnlineClient<SubstrateConfig>, H256)> {
+        let chain = self.get_chain_by_runtime(runtime)?;
+
+        if !chain.is_connected() {
+            debug!("Chain {} not connected", runtime);
+            return None;
+        }
+
+        let block_hash = chain.block_hash()?;
+        Some((chain.client().clone(), block_hash))
     }
 
-    pub fn update_best_block(&self, chain_key: &ChainKey, block_number: BlockNumber) {
+    pub fn update_connection_state(
+        &self,
+        chain_key: &ChainKey,
+        connection_state: ConnectionState,
+    ) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_best_block(chain_key, block_number);
+        state.set_connection_state(chain_key, connection_state)
+    }
+
+    pub fn update_best_block(&self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_best_block(chain_key, block_number)
     }
 
     pub fn update_finalized_block(
@@ -307,9 +346,9 @@ impl ChainsListWidget {
         chain_key: &ChainKey,
         block_number: BlockNumber,
         block_hash: BlockHash,
-    ) {
+    ) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_finalized_block(chain_key, block_number, block_hash);
+        state.set_finalized_block(chain_key, block_number, block_hash)
     }
 }
 
@@ -434,6 +473,13 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 runtime.clone(),
                                 block.number().into(),
                                 block.hash(),
+                            )));
+
+                            // Everytime a new block is received, update the connection state to connected.
+                            // Used as KEEPALIVE in case of reconnections and initialization
+                            let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                                runtime.clone(),
+                                ConnectionState::Connected,
                             )));
                         }
                         Err(e) => {

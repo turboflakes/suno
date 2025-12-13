@@ -13,7 +13,6 @@ use crate::{
 };
 use log::{error, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::f64::INFINITY;
 use std::io;
 use suno_actions::network::ConnectionState;
 use suno_actions::{
@@ -166,8 +165,33 @@ impl App {
     fn handle_chain_actions(&mut self, action: ChainAction) {
         match action {
             ChainAction::UpdateConnectionState(chain_key, connection_state) => {
-                self.chains
-                    .update_connection_state(&chain_key, connection_state);
+                let is_updated = self
+                    .chains
+                    .update_connection_state(&chain_key, connection_state.clone());
+
+                if is_updated && connection_state == ConnectionState::Connected {
+                    let runtime = chain_key;
+                    match runtime {
+                        SupportedRuntime::AssetHubPaseo => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(&runtime)
+                            {
+                                self.validators.spawn_fetch_validators_data_from_asset_hub(
+                                    &api, block_hash, &runtime,
+                                )
+                            }
+                        }
+                        SupportedRuntime::PeoplePaseo => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(&runtime)
+                            {
+                                self.validators
+                                    .spawn_fetch_validators_identities(&api, block_hash, &runtime)
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
             ChainAction::UpdateBestBlock(chain_key, block_number) => {
                 self.chains.update_best_block(&chain_key, block_number);
@@ -192,59 +216,28 @@ impl App {
                 }
             }
             ChainAction::FetchValidatorData(validator_key) => {
-                if let Some(chain) = self.chains.get_chain_by_runtime(&validator_key.runtime()) {
-                    if let Some(block_hash) = chain.block_hash() {
-                        let api = chain.client();
-                        self.validators.spawn_fetch_validator_data_from_relay(
-                            api,
-                            block_hash,
-                            &validator_key,
-                        )
-                    }
+                if let Some((api, block_hash)) =
+                    self.chains.get_api_and_block_hash(&validator_key.runtime())
+                {
+                    self.validators.spawn_fetch_validator_data_from_relay(
+                        &api,
+                        block_hash,
+                        &validator_key,
+                    )
                 }
 
-                if let Some(chain) = self
+                if let Some((api, block_hash)) = self
                     .chains
-                    .get_chain_by_runtime(&validator_key.runtime().asset_hub_runtime())
+                    .get_api_and_block_hash(&validator_key.runtime().asset_hub_runtime())
                 {
-                    if let Some(block_hash) = chain.block_hash() {
-                        let api = chain.client();
-                        self.validators.spawn_fetch_validator_data_from_asset_hub(
-                            api,
-                            block_hash,
-                            &validator_key,
-                        )
-                    }
+                    self.validators.spawn_fetch_validator_data_from_asset_hub(
+                        &api,
+                        block_hash,
+                        &validator_key,
+                    )
                 }
             }
-            ChainAction::FetchValidatorsData(runtime, validator_keys) => {
-                if let Some(chain) = self
-                    .chains
-                    .get_chain_by_runtime(&runtime.asset_hub_runtime())
-                {
-                    if let Some(block_hash) = chain.block_hash() {
-                        let api = chain.client();
-                        self.validators.spawn_fetch_validators_data_from_asset_hub(
-                            api,
-                            block_hash,
-                            &runtime.asset_hub_runtime(),
-                            &validator_keys,
-                        )
-                    }
-                }
-
-                if let Some(chain) = self.chains.get_chain_by_runtime(&runtime.people_runtime()) {
-                    if let Some(block_hash) = chain.block_hash() {
-                        let api = chain.client();
-                        self.validators.spawn_fetch_validators_identities(
-                            api,
-                            block_hash,
-                            &runtime.people_runtime(),
-                            &validator_keys,
-                        )
-                    }
-                }
-            }
+            _ => {}
         }
     }
 
@@ -293,9 +286,9 @@ impl App {
         }
     }
 
-    /// Handles the noop event of the terminal.
+    /// Handles application errors.
     pub fn error(&self, err: Box<dyn std::error::Error>) {
-        warn!("TODO: HANDLE APPLICTaION ERRORS {}", err);
+        error!("{}", err);
     }
 
     /// Handles the noop event of the terminal.
