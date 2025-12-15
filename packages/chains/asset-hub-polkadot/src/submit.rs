@@ -1,5 +1,4 @@
 use super::node_runtime;
-use crate::error::Error;
 use log::info;
 use node_runtime::proxy::events::ProxyExecuted;
 use node_runtime::runtime_types::asset_hub_polkadot_runtime::ProxyType;
@@ -10,6 +9,7 @@ use subxt::{
 };
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, TxAction};
+use suno_error::Error;
 use tokio::sync::mpsc::UnboundedSender;
 
 type Call = node_runtime::runtime_types::asset_hub_polkadot_runtime::RuntimeCall;

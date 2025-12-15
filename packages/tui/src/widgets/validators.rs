@@ -3,7 +3,7 @@ use crate::theme::THEME;
 use crate::widgets::chains::Chain;
 use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
-use futures::future::join_all;
+use futures::{future::join_all, stream, StreamExt};
 use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -122,6 +122,9 @@ impl Validator {
     }
 
     pub fn delta_points(&self) -> Option<Points> {
+        if self.points <= self.old_points {
+            return None;
+        }
         let elapsed = get_elapsed_millis(self.old_points_ts);
         if elapsed >= 4_000 {
             return None;
@@ -528,7 +531,7 @@ impl ValidatorsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) =
-                fetch_and_send_validators_identities(&api, block_hash, &runtime, &keys, tx.clone())
+                fetch_and_send_validators_identities(&api, block_hash, &runtime, keys, tx.clone())
                     .await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
@@ -734,25 +737,50 @@ async fn fetch_and_send_validator_data_from_asset_hub(
     let runtime = validator_key.runtime().asset_hub_runtime();
     let stash = validator_key.stash();
 
-    match runtime {
+    let (commission_result,) = match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            // TODO: Add more fetches here to run them in parallel/
+            tokio::join!(suno_asset_hub_polkadot::fetch_validator_commission(
+                api, block_hash, &stash
+            ),)
+        }
+        SupportedRuntime::AssetHubKusama => {
+            // TODO: Add more fetches here to run them in parallel/
+            tokio::join!(suno_asset_hub_kusama::fetch_validator_commission(
+                api, block_hash, &stash
+            ),)
+        }
         SupportedRuntime::AssetHubPaseo => {
             // TODO: Add more fetches here to run them in parallel/
-            let (commission_result,) = tokio::join!(
-                suno_asset_hub_paseo::fetch_validator_commission(api, block_hash, &stash)
-            );
-
-            // Handle commission
-            match commission_result {
-                Ok(commission) => {
-                    tx.send(Action::Validator(ValidatorAction::UpdateCommission(
-                        validator_key.clone(),
-                        commission,
-                    )))?;
-                }
-                Err(e) => warn!("Failed to fetch commission: {}", e),
-            }
+            tokio::join!(suno_asset_hub_paseo::fetch_validator_commission(
+                api, block_hash, &stash
+            ),)
         }
-        _ => error!("Unsupported runtime: {:?}", runtime),
+        SupportedRuntime::AssetHubWestend => {
+            // TODO: Add more fetches here to run them in parallel/
+            tokio::join!(suno_asset_hub_westend::fetch_validator_commission(
+                api, block_hash, &stash
+            ),)
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
+
+    // Handle commission result
+    match commission_result {
+        Ok(commission) => {
+            tx.send(Action::Validator(ValidatorAction::UpdateCommission(
+                validator_key.clone(),
+                commission,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch points for {:?}: {}",
+            validator_key.to_string(),
+            e
+        ),
     }
 
     Ok(())
@@ -765,49 +793,90 @@ async fn fetch_and_send_validators_data_from_asset_hub(
     validator_keys: &Vec<AccountKey>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    match runtime {
+    // Execute the appropriate fetches based on runtime
+    let (era_points_result, staker_overview_result) = match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            tokio::join!(
+                suno_asset_hub_polkadot::fetch_validators_era_points(
+                    api,
+                    block_hash,
+                    validator_keys
+                ),
+                suno_asset_hub_polkadot::fetch_validators_stake_overview(
+                    api,
+                    block_hash,
+                    validator_keys
+                )
+            )
+        }
+        SupportedRuntime::AssetHubKusama => {
+            tokio::join!(
+                suno_asset_hub_kusama::fetch_validators_era_points(api, block_hash, validator_keys),
+                suno_asset_hub_kusama::fetch_validators_stake_overview(
+                    api,
+                    block_hash,
+                    validator_keys
+                )
+            )
+        }
         SupportedRuntime::AssetHubPaseo => {
-            // TODO: Add more fetches here to run them in parallel/
-            let (era_points_result, staker_overview_result) = tokio::join!(
+            tokio::join!(
                 suno_asset_hub_paseo::fetch_validators_era_points(api, block_hash, validator_keys),
                 suno_asset_hub_paseo::fetch_validators_stake_overview(
                     api,
                     block_hash,
                     validator_keys
                 )
-            );
+            )
+        }
+        SupportedRuntime::AssetHubWestend => {
+            tokio::join!(
+                suno_asset_hub_westend::fetch_validators_era_points(
+                    api,
+                    block_hash,
+                    validator_keys
+                ),
+                suno_asset_hub_westend::fetch_validators_stake_overview(
+                    api,
+                    block_hash,
+                    validator_keys
+                )
+            )
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
 
-            // Handle era_points
-            match era_points_result {
-                Ok(result) => {
-                    for key in validator_keys {
-                        if let Some(points) = result.get(&key.bytes()).copied() {
-                            tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
-                                key.clone(),
-                                points,
-                            )))?;
-                        }
-                    }
+    // Handle era_points - same for all runtimes
+    match era_points_result {
+        Ok(result) => {
+            for key in validator_keys {
+                if let Some(points) = result.get(&key.bytes()).copied() {
+                    tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
+                        key.clone(),
+                        points,
+                    )))?;
                 }
-                Err(e) => warn!("Failed to fetch validators era points: {}", e),
-            }
-
-            // Handle staker_overview
-            match staker_overview_result {
-                Ok(result) => {
-                    for key in validator_keys {
-                        if let Some(data) = result.get(&key.bytes()).copied() {
-                            tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
-                                key.clone(),
-                                data,
-                            )))?;
-                        }
-                    }
-                }
-                Err(e) => warn!("Failed to fetch validators era points: {}", e),
             }
         }
-        _ => error!("Unsupported runtime: {:?}", runtime),
+        Err(e) => warn!("Failed to fetch validators era points: {}", e),
+    }
+
+    // Handle staker_overview - same for all runtimes
+    match staker_overview_result {
+        Ok(result) => {
+            for key in validator_keys {
+                if let Some(data) = result.get(&key.bytes()).copied() {
+                    tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
+                        key.clone(),
+                        data,
+                    )))?;
+                }
+            }
+        }
+        Err(e) => warn!("Failed to fetch validators stake overview: {}", e),
     }
 
     Ok(())
@@ -817,39 +886,51 @@ async fn fetch_and_send_validators_identities(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: Vec<AccountKey>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    match runtime {
-        SupportedRuntime::PeoplePaseo => {
-            // Create futures for all validators
-            let fetch_futures = validator_keys.iter().map(|validator_key| {
-                let api = api.clone();
-                let stash = validator_key.stash();
-                async move {
-                    let result =
-                        suno_people_paseo::fetch_display_name(&api, block_hash, &stash).await;
-                    (validator_key.clone(), result)
-                }
-            });
+    const CONCURRENT_REQUESTS: usize = 6;
 
-            // Execute all fetches in parallel
-            let results = join_all(fetch_futures).await;
-
-            // Process results
-            for (validator_key, result) in results {
-                match result {
-                    Ok(identity) => {
-                        tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
-                            validator_key,
-                            identity,
-                        )))?;
+    let mut stream = stream::iter(validator_keys)
+        .map(|validator_key| {
+            let api = api.clone();
+            let stash = validator_key.stash();
+            let runtime = runtime.clone();
+            async move {
+                let result = match runtime {
+                    SupportedRuntime::PeoplePolkadot => {
+                        suno_people_polkadot::fetch_display_name(&api, block_hash, &stash).await
                     }
-                    Err(e) => warn!("Failed to fetch identity for {:?}: {}", validator_key, e),
-                }
+                    SupportedRuntime::PeopleKusama => {
+                        suno_people_kusama::fetch_display_name(&api, block_hash, &stash).await
+                    }
+                    SupportedRuntime::PeoplePaseo => {
+                        suno_people_paseo::fetch_display_name(&api, block_hash, &stash).await
+                    }
+                    SupportedRuntime::PeopleWestend => {
+                        suno_people_westend::fetch_display_name(&api, block_hash, &stash).await
+                    }
+                    _ => Err(suno_error::Error::from("Unsupported runtime")),
+                };
+                (validator_key, result)
             }
+        })
+        .buffer_unordered(CONCURRENT_REQUESTS);
+
+    while let Some((validator_key, result)) = stream.next().await {
+        match result {
+            Ok(identity) => {
+                tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
+                    validator_key.clone(),
+                    identity,
+                )))?;
+            }
+            Err(e) => warn!(
+                "Failed to fetch points for {}: {}",
+                validator_key.to_string(),
+                e
+            ),
         }
-        _ => error!("Unsupported runtime: {:?}", runtime),
     }
 
     Ok(())
@@ -864,24 +945,44 @@ async fn fetch_and_send_validator_data_from_relay(
     let runtime = validator_key.runtime();
     let stash = validator_key.stash();
 
-    match runtime {
-        SupportedRuntime::Paseo => {
+    // When you add more fetches, they'll go in the tokio::join!
+    let (points_result,) = match runtime {
+        SupportedRuntime::Polkadot => {
             // TODO: Add more fetches here to run them in parallel/
-            let (points_result,) =
-                tokio::join!(suno_paseo::fetch_validator_points(&api, block_hash, &stash));
-
-            // Handle points
-            match points_result {
-                Ok(points) => {
-                    tx.send(Action::Validator(ValidatorAction::UpdatePoints(
-                        validator_key.clone(),
-                        points,
-                    )))?;
-                }
-                Err(e) => warn!("Failed to fetch points: {}", e),
-            }
+            tokio::join!(suno_polkadot::fetch_validator_points(
+                api, block_hash, &stash
+            ),)
         }
-        _ => error!("Unsupported runtime: {:?}", runtime),
+        SupportedRuntime::Kusama => {
+            tokio::join!(suno_kusama::fetch_validator_points(api, block_hash, &stash),)
+        }
+        SupportedRuntime::Paseo => {
+            tokio::join!(suno_paseo::fetch_validator_points(api, block_hash, &stash),)
+        }
+        SupportedRuntime::Westend => {
+            tokio::join!(suno_westend::fetch_validator_points(
+                api, block_hash, &stash
+            ),)
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
+
+    // Handle points result
+    match points_result {
+        Ok(points) => {
+            tx.send(Action::Validator(ValidatorAction::UpdatePoints(
+                validator_key.clone(),
+                points,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch points for {:?}: {}",
+            validator_key.to_string(),
+            e
+        ),
     }
 
     Ok(())
@@ -894,39 +995,48 @@ async fn fetch_and_send_all_validators_points_from_relay(
     validator_keys: Vec<ValidatorKey>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    match runtime {
-        SupportedRuntime::Paseo => {
-            // Create futures for all validators
-            let fetch_futures = validator_keys.iter().map(|validator_key| {
-                let api = api.clone();
-                let stash = validator_key.stash();
-                async move {
-                    let result = suno_paseo::fetch_validator_points(&api, block_hash, &stash).await;
-                    (validator_key.clone(), result)
-                }
-            });
+    const CONCURRENT_REQUESTS: usize = 6;
 
-            // Execute all fetches in parallel
-            let results = join_all(fetch_futures).await;
-
-            // Process results
-            for (validator_key, result) in results {
-                match result {
-                    Ok(points) => {
-                        tx.send(Action::Validator(ValidatorAction::UpdatePoints(
-                            validator_key,
-                            points,
-                        )))?;
+    let mut stream = stream::iter(validator_keys)
+        .map(|validator_key| {
+            let api = api.clone();
+            let stash = validator_key.stash();
+            let runtime = runtime.clone();
+            async move {
+                let result = match runtime {
+                    SupportedRuntime::Polkadot => {
+                        suno_polkadot::fetch_validator_points(&api, block_hash, &stash).await
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch points for {:?}: {}",
-                        validator_key.to_string(),
-                        e
-                    ),
-                }
+                    SupportedRuntime::Kusama => {
+                        suno_kusama::fetch_validator_points(&api, block_hash, &stash).await
+                    }
+                    SupportedRuntime::Paseo => {
+                        suno_paseo::fetch_validator_points(&api, block_hash, &stash).await
+                    }
+                    SupportedRuntime::Westend => {
+                        suno_westend::fetch_validator_points(&api, block_hash, &stash).await
+                    }
+                    _ => Err(suno_error::Error::from("Unsupported runtime")),
+                };
+                (validator_key, result)
             }
+        })
+        .buffer_unordered(CONCURRENT_REQUESTS);
+
+    while let Some((validator_key, result)) = stream.next().await {
+        match result {
+            Ok(points) => {
+                tx.send(Action::Validator(ValidatorAction::UpdatePoints(
+                    validator_key,
+                    points,
+                )))?;
+            }
+            Err(e) => warn!(
+                "Failed to fetch points for {}: {}",
+                validator_key.to_string(),
+                e
+            ),
         }
-        _ => error!("Unsupported runtime: {:?}", runtime),
     }
 
     Ok(())

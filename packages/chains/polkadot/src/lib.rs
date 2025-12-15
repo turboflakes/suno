@@ -1,4 +1,3 @@
-pub mod error;
 pub mod storage;
 pub use storage::fetch_validator_points;
 

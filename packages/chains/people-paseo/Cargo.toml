@@ -11,5 +11,6 @@ edition.workspace = true
 async-recursion = { workspace = true }
 log = { workspace = true }
 subxt = { workspace = true }
+suno-error = { path = "../../error" }
 suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }

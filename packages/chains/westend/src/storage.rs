@@ -1,9 +1,9 @@
 use super::node_runtime;
-use crate::error::Error;
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
+use suno_error::Error;
 
 type Points = u32;
 

@@ -172,7 +172,10 @@ impl App {
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
                     match runtime {
-                        SupportedRuntime::AssetHubPaseo => {
+                        SupportedRuntime::AssetHubPolkadot
+                        | SupportedRuntime::AssetHubKusama
+                        | SupportedRuntime::AssetHubPaseo
+                        | SupportedRuntime::AssetHubWestend => {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
@@ -181,7 +184,10 @@ impl App {
                                 )
                             }
                         }
-                        SupportedRuntime::PeoplePaseo => {
+                        SupportedRuntime::PeoplePolkadot
+                        | SupportedRuntime::PeopleKusama
+                        | SupportedRuntime::PeoplePaseo
+                        | SupportedRuntime::PeopleWestend => {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
@@ -203,7 +209,10 @@ impl App {
                 // Fetch data relevant to be synced at every finalized block, eg. all validators points
                 let runtime = chain_key;
                 match runtime {
-                    SupportedRuntime::Paseo => {
+                    SupportedRuntime::Polkadot
+                    | SupportedRuntime::Kusama
+                    | SupportedRuntime::Paseo
+                    | SupportedRuntime::Westend => {
                         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
                             let api = chain.client();
                             self.validators

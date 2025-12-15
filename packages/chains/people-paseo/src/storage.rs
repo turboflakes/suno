@@ -1,5 +1,4 @@
 use super::node_runtime;
-use crate::error::Error;
 use async_recursion::async_recursion;
 use node_runtime::runtime_types::pallet_identity::types::Data;
 use node_runtime::runtime_types::{
@@ -10,6 +9,7 @@ use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
+use suno_error::Error;
 use suno_primitives::identity::Identity;
 
 pub async fn fetch_display_name(

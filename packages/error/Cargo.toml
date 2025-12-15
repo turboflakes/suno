@@ -1,5 +1,5 @@
 [package]
-name = "suno-kusama"
+name = "suno-error"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,6 +9,5 @@ edition.workspace = true
 
 [dependencies]
 subxt = { workspace = true }
-suno-error = { path = "../../error" }
-suno-signer = { path = "../../signer" }
+suno-signer = { path = "../signer" }
 thiserror = { workspace = true }

@@ -1,5 +1,4 @@
 use super::node_runtime;
-use crate::error::Error;
 use node_runtime::{
     runtime_types::pallet_staking_async::{ActiveEraInfo, EraRewardPoints, ValidatorPrefs},
     staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
@@ -9,6 +8,7 @@ use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
+use suno_error::Error;
 use suno_primitives::{staking::StakeOverview, AccountKey};
 
 /// Fetch validator commission

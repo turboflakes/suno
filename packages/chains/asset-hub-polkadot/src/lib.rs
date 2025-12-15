@@ -1,4 +1,3 @@
-pub mod error;
 pub mod extrinsics;
 pub mod storage;
 pub mod submit;
