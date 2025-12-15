@@ -1,5 +1,5 @@
 [package]
-name = "suno-westend"
+name = "suno-polkadot"
 version.workspace = true
 license.workspace = true
 repository.workspace = true

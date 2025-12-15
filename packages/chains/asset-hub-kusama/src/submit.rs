@@ -1,19 +1,18 @@
 use super::node_runtime;
+use crate::error::Error;
 use log::info;
 use node_runtime::proxy::events::ProxyExecuted;
+use node_runtime::runtime_types::asset_hub_kusama_runtime::ProxyType;
 use node_runtime::runtime_types::sp_runtime::DispatchError;
-use node_runtime::runtime_types::westend_runtime::ProxyType;
-use suno_common::actions::{Action, TxAction};
-use suno_common::errors::SunoError;
-use suno_common::file::get_keypair_from_seed_file;
 use subxt::{
     error::TransactionError, tx::TxProgress, tx::TxStatus, utils::AccountId32, OnlineClient,
     SubstrateConfig,
 };
 use subxt_signer::sr25519::Keypair;
+use suno_actions::{Action, TxAction};
 use tokio::sync::mpsc::UnboundedSender;
 
-type Call = node_runtime::runtime_types::westend_runtime::RuntimeCall;
+type Call = node_runtime::runtime_types::asset_hub_kusama_runtime::RuntimeCall;
 
 pub async fn submit_as_proxy(
     api: &OnlineClient<SubstrateConfig>,
@@ -21,7 +20,7 @@ pub async fn submit_as_proxy(
     proxied_account: AccountId32,
     password: Option<String>,
     tx: UnboundedSender<Action>,
-) -> Result<(), SunoError> {
+) -> Result<(), Error> {
     let proxy_signer: Keypair = suno_signer::load_keypair(password)?;
 
     let proxy_call =
@@ -40,18 +39,18 @@ pub async fn submit_as_proxy(
 async fn handle_response(
     api: &OnlineClient<SubstrateConfig>,
     response: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
-    outbound: UnboundedSender<Action>,
-) -> Result<(), SunoError> {
+    tx: UnboundedSender<Action>,
+) -> Result<(), Error> {
     while let Some(status) = response.next().await {
         match status? {
             TxStatus::Broadcasted => {
-                let _ = outbound.send(Action::Transaction(TxAction::Broadcasting));
+                let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
             }
             TxStatus::InBestBlock(_) => {
-                let _ = outbound.send(Action::Transaction(TxAction::InBestBlock));
+                let _ = tx.send(Action::Transaction(TxAction::InBestBlock));
             }
             TxStatus::InFinalizedBlock(in_block) => {
-                let _ = outbound.send(Action::Transaction(TxAction::InFinalizedBlock));
+                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock));
                 info!(
                     "Transaction {:?} is finalized in block {:?}",
                     in_block.extrinsic_hash(),
@@ -68,7 +67,7 @@ async fn handle_response(
                         match ev.result {
                             Ok(_) => {
                                 info!("ProxyExecuted successufuly");
-                                let _ = outbound.send(Action::Transaction(TxAction::Success));
+                                let _ = tx.send(Action::Transaction(TxAction::Success));
                             }
                             Err(err) => match err {
                                 DispatchError::Module(data) => {

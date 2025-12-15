@@ -8,25 +8,25 @@
 #
 # Relay Chains
 # subxt metadata --url wss://westend.rpc.turboflakes.io:443 -f bytes > packages/chains/westend/artifacts/metadata/westend_metadata.scale
-# subxt metadata --url wss://westend.rpc.turboflakes.io:443 --pallets Session -f bytes > packages/chains/westend/artifacts/metadata/westend_metadata_small.scale
-subxt metadata --url wss://paseo.rpc.turboflakes.io:443 -f bytes > packages/chains/paseo/artifacts/metadata/paseo_metadata.scale
-subxt metadata --url wss://paseo.rpc.turboflakes.io:443 --pallets Session,StakingAhClient -f bytes > packages/chains/paseo/artifacts/metadata/paseo_metadata_small.scale
+subxt metadata --url wss://westend.rpc.turboflakes.io:443 --pallets Session,StakingAhClient,Proxy -f bytes > packages/chains/westend/artifacts/metadata/westend_metadata_small.scale
+# subxt metadata --url wss://paseo.rpc.turboflakes.io:443 -f bytes > packages/chains/paseo/artifacts/metadata/paseo_metadata.scale
+subxt metadata --url wss://paseo.rpc.turboflakes.io:443 --pallets Session,StakingAhClient,Proxy -f bytes > packages/chains/paseo/artifacts/metadata/paseo_metadata_small.scale
 # subxt metadata --url wss://kusama.rpc.turboflakes.io:443 -f bytes > packages/chains/kusama/artifacts/metadata/kusama_metadata.scale
-# subxt metadata --url wss://kusama.rpc.turboflakes.io:443 --pallets Session -f bytes > packages/chains/kusama/artifacts/metadata/kusama_metadata_small.scale
-#subxt metadata --url wss://polkadot.rpc.turboflakes.io:443 -f bytes > packages/chains/polkadot/artifacts/metadata/polkadot_metadata.scale
-# subxt metadata --url wss://polkadot.rpc.turboflakes.io:443 --pallets Session -f bytes > packages/chains/polkadot/artifacts/metadata/polkadot_metadata_small.scale
+subxt metadata --url wss://kusama.rpc.turboflakes.io:443 --pallets Session,StakingAhClient,Proxy -f bytes > packages/chains/kusama/artifacts/metadata/kusama_metadata_small.scale
+# subxt metadata --url wss://polkadot.rpc.turboflakes.io:443 -f bytes > packages/chains/polkadot/artifacts/metadata/polkadot_metadata.scale
+subxt metadata --url wss://polkadot.rpc.turboflakes.io:443 --pallets Session,StakingAhClient,Proxy -f bytes > packages/chains/polkadot/artifacts/metadata/polkadot_metadata_small.scale
 
 # AssetHub Chains
-# subxt metadata --url wss://asset-hub-westend.rpc.turboflakes.io:443 --pallets System,Balances,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-westend/artifacts/metadata/asset_hub_westend_metadata_small.scale
-subxt metadata --url wss://asset-hub-paseo.rpc.turboflakes.io:443 --pallets System,Balances,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-paseo/artifacts/metadata/asset_hub_paseo_metadata_small.scale
-# subxt metadata --url wss://asset-hub-kusama.rpc.turboflakes.io:443 --pallets System,Balances,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-kusama/artifacts/metadata/asset_hub_kusama_metadata_small.scale
-# subxt metadata --url wss://asset-hub-polkadot.rpc.turboflakes.io:443 --pallets System,Balances,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-polkadot/artifacts/metadata/asset_hub_polkadot_metadata_small.scale
+subxt metadata --url wss://asset-hub-westend.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-westend/artifacts/metadata/asset_hub_westend_metadata_small.scale
+subxt metadata --url wss://asset-hub-paseo.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-paseo/artifacts/metadata/asset_hub_paseo_metadata_small.scale
+subxt metadata --url wss://asset-hub-kusama.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-kusama/artifacts/metadata/asset_hub_kusama_metadata_small.scale
+subxt metadata --url wss://asset-hub-polkadot.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-polkadot/artifacts/metadata/asset_hub_polkadot_metadata_small.scale
 
 # People Chains
-# subxt metadata --url wss://people-westend.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-westend/artifacts/metadata/people_westend_metadata_small.scale
-# subxt metadata --url wss://people-paseo.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-paseo/artifacts/metadata/people_paseo_metadata_small.scale
-# subxt metadata --url wss://people-kusama.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-kusama/artifacts/metadata/people_kusama_metadata_small.scale
-# subxt metadata --url wss://people-polkadot.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-polkadot/artifacts/metadata/people_polkadot_metadata_small.scale
+subxt metadata --url wss://people-westend.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-westend/artifacts/metadata/people_westend_metadata_small.scale
+subxt metadata --url wss://people-paseo.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-paseo/artifacts/metadata/people_paseo_metadata_small.scale
+subxt metadata --url wss://people-kusama.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-kusama/artifacts/metadata/people_kusama_metadata_small.scale
+subxt metadata --url wss://people-polkadot.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-polkadot/artifacts/metadata/people_polkadot_metadata_small.scale
 
 # Generate runtime API client code from metadata.
 

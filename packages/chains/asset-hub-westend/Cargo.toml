@@ -1,5 +1,5 @@
 [package]
-name = "suno-westend"
+name = "suno-asset-hub-westend"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -8,6 +8,11 @@ description.workspace = true
 edition.workspace = true
 
 [dependencies]
+log = { workspace = true }
 subxt = { workspace = true }
+subxt-signer = { workspace = true }
+suno-actions = { path = "../../actions" }
 suno-signer = { path = "../../signer" }
+suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }
+tokio = { workspace = true }

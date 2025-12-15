@@ -1,9 +1,9 @@
-pub mod staking;
-pub mod submit;
-pub use submit::submit_as_proxy;
+pub mod error;
+pub mod storage;
+pub use storage::fetch_validator_points;
 
 #[subxt::subxt(
-    runtime_metadata_path = "artifacts/metadata/westend_metadata.scale",
+    runtime_metadata_path = "artifacts/metadata/westend_metadata_small.scale",
     derive_for_all_types = "PartialEq, Clone"
 )]
 mod node_runtime {}

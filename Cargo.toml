@@ -7,8 +7,17 @@ members = [
     "packages/suno",
     "packages/tui",
     "packages/chains/asset-hub-paseo",
+    "packages/chains/asset-hub-polkadot",
+    "packages/chains/asset-hub-kusama",
+    "packages/chains/asset-hub-westend",
     "packages/chains/paseo",
+    "packages/chains/polkadot",
+    "packages/chains/kusama",
+    "packages/chains/westend",
     "packages/chains/people-paseo",
+    "packages/chains/people-polkadot",
+    "packages/chains/people-kusama",
+    "packages/chains/people-westend",
 ]
 
 resolver = "2"
