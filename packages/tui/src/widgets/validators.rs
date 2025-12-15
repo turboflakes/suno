@@ -123,8 +123,7 @@ impl Validator {
 
     pub fn delta_points(&self) -> Option<Points> {
         let elapsed = get_elapsed_millis(self.old_points_ts);
-        info!("Elapsed: {}", elapsed);
-        if elapsed >= 3_000 {
+        if elapsed >= 4_000 {
             return None;
         }
         return Some(self.points - self.old_points);
