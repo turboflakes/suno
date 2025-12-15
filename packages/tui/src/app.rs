@@ -263,6 +263,9 @@ impl App {
             ValidatorAction::UpdateIdentity(validator_key, identity) => {
                 self.validators.update_identity(&validator_key, identity);
             }
+            ValidatorAction::UpdateStakeOverview(validator_key, data) => {
+                self.validators.update_stake_overview(&validator_key, data);
+            }
         }
     }
 

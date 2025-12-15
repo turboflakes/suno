@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
+use suno_primitives::{display::format_millis, Staking};
 use tokio::sync::mpsc::UnboundedSender;
 
 type BlockNumber = u64;
@@ -29,6 +30,7 @@ pub struct Chain {
     finalized_block_hash: Option<BlockHash>,
     // finalized_block_ts value is the timestamp in milliseconds the finalized block was updated
     finalized_block_ts: u128,
+    staking: Option<Staking>,
     state: ConnectionState,
 }
 
@@ -41,6 +43,7 @@ impl Chain {
             finalized_block: 0,
             finalized_block_ts: 0,
             finalized_block_hash: None,
+            staking: None,
             state: ConnectionState::default(),
         }
     }
@@ -539,18 +542,4 @@ fn create_progress_bar(elapsed: u64, bar_width: usize) -> String {
         filled_char.repeat(filled_chars),
         empty_char.repeat(bar_width - filled_chars),
     )
-}
-
-/// Format milliseconds to human-readable string (e.g., "6.5s")
-fn format_millis(millis: u64) -> String {
-    let seconds = millis as f64 / 1000.0;
-
-    match seconds {
-        s if s < 10.0 => format!("{:.1}s", s),
-        s if s < 60.0 => format!("{:.0}s", s),
-        s if s < 600.0 => format!("{:.1}m", s / 60.0),
-        s if s < 3600.0 => format!("{:.0}m", s / 60.0),
-        s if s < 36000.0 => format!("{:.1}h", s / 3600.0),
-        _ => format!("{:.0}h", seconds / 3600.0),
-    }
 }

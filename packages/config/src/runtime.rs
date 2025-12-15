@@ -19,8 +19,6 @@ pub const WESTEND_SPEC: &str = include_str!("../chain-specs/westend.json");
 pub const ASSET_HUB_WESTEND_SPEC: &str = include_str!("../chain-specs/asset-hub-westend.json");
 pub const PEOPLE_WESTEND_SPEC: &str = include_str!("../chain-specs/people-westend.json");
 
-pub type ChainPrefix = u16;
-
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {
@@ -56,25 +54,6 @@ pub enum SupportedRuntime {
 }
 
 impl SupportedRuntime {
-    pub fn chain_prefix(&self) -> ChainPrefix {
-        match &self {
-            Self::Polkadot
-            | Self::AssetHubPolkadot
-            | Self::BridgeHubPolkadot
-            | Self::PeoplePolkadot => 0,
-            Self::Kusama | Self::AssetHubKusama | Self::BridgeHubKusama | Self::PeopleKusama => 2,
-            Self::Local
-            | Self::Paseo
-            | Self::AssetHubPaseo
-            | Self::BridgeHubPaseo
-            | Self::PeoplePaseo
-            | Self::Westend
-            | Self::AssetHubWestend
-            | Self::BridgeHubWestend
-            | Self::PeopleWestend => 42,
-        }
-    }
-
     pub fn relay_chain(&self) -> Self {
         match &self {
             Self::Local => Self::Local,
@@ -161,6 +140,60 @@ impl SupportedRuntime {
         }
     }
 
+    pub fn account_format(&self) -> u32 {
+        match &self {
+            Self::Polkadot => get_ss58_format(POLKADOT_SPEC),
+            Self::Kusama => get_ss58_format(KUSAMA_SPEC),
+            Self::Westend => get_ss58_format(WESTEND_SPEC),
+            Self::Paseo => get_ss58_format(PASEO_SPEC),
+            Self::PeoplePolkadot => get_ss58_format(PEOPLE_POLKADOT_SPEC),
+            Self::PeopleKusama => get_ss58_format(PEOPLE_KUSAMA_SPEC),
+            Self::PeopleWestend => get_ss58_format(PEOPLE_WESTEND_SPEC),
+            Self::PeoplePaseo => get_ss58_format(PEOPLE_PASEO_SPEC),
+            Self::AssetHubPolkadot => get_ss58_format(ASSET_HUB_POLKADOT_SPEC),
+            Self::AssetHubKusama => get_ss58_format(ASSET_HUB_KUSAMA_SPEC),
+            Self::AssetHubWestend => get_ss58_format(ASSET_HUB_WESTEND_SPEC),
+            Self::AssetHubPaseo => get_ss58_format(ASSET_HUB_PASEO_SPEC),
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    pub fn token_symbol(&self) -> String {
+        match &self {
+            Self::Polkadot => get_symbol(POLKADOT_SPEC),
+            Self::Kusama => get_symbol(KUSAMA_SPEC),
+            Self::Westend => get_symbol(WESTEND_SPEC),
+            Self::Paseo => get_symbol(PASEO_SPEC),
+            Self::PeoplePolkadot => get_symbol(PEOPLE_POLKADOT_SPEC),
+            Self::PeopleKusama => get_symbol(PEOPLE_KUSAMA_SPEC),
+            Self::PeopleWestend => get_symbol(PEOPLE_WESTEND_SPEC),
+            Self::PeoplePaseo => get_symbol(PEOPLE_PASEO_SPEC),
+            Self::AssetHubPolkadot => get_symbol(ASSET_HUB_POLKADOT_SPEC),
+            Self::AssetHubKusama => get_symbol(ASSET_HUB_KUSAMA_SPEC),
+            Self::AssetHubWestend => get_symbol(ASSET_HUB_WESTEND_SPEC),
+            Self::AssetHubPaseo => get_symbol(ASSET_HUB_PASEO_SPEC),
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    pub fn token_decimals(&self) -> u32 {
+        match &self {
+            Self::Polkadot => get_decimals(POLKADOT_SPEC),
+            Self::Kusama => get_decimals(KUSAMA_SPEC),
+            Self::Westend => get_decimals(WESTEND_SPEC),
+            Self::Paseo => get_decimals(PASEO_SPEC),
+            Self::PeoplePolkadot => get_decimals(PEOPLE_POLKADOT_SPEC),
+            Self::PeopleKusama => get_decimals(PEOPLE_KUSAMA_SPEC),
+            Self::PeopleWestend => get_decimals(PEOPLE_WESTEND_SPEC),
+            Self::PeoplePaseo => get_decimals(PEOPLE_PASEO_SPEC),
+            Self::AssetHubPolkadot => get_decimals(ASSET_HUB_POLKADOT_SPEC),
+            Self::AssetHubKusama => get_decimals(ASSET_HUB_KUSAMA_SPEC),
+            Self::AssetHubWestend => get_decimals(ASSET_HUB_WESTEND_SPEC),
+            Self::AssetHubPaseo => get_decimals(ASSET_HUB_PASEO_SPEC),
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
     pub fn is_relay_chain(&self) -> bool {
         match &self {
             Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend => true,
@@ -205,6 +238,45 @@ fn get_state_root_hash(chain_specs: &str) -> H256 {
                 .as_str()
                 .expect("chain spec does not contain state root hash");
             H256::from_str(state_root).expect("invalid state root hash")
+        }
+        Err(err) => panic!("Failed to parse JSON: {}", err),
+    }
+}
+
+fn get_ss58_format(chain_specs: &str) -> u32 {
+    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    match spec {
+        Ok(json) => {
+            let value = json["properties"]["ss58Format"]
+                .as_u64()
+                .expect("chain spec does not contain ss58Format");
+            value as u32
+        }
+        Err(err) => panic!("Failed to parse JSON: {}", err),
+    }
+}
+
+fn get_symbol(chain_specs: &str) -> String {
+    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    match spec {
+        Ok(json) => {
+            let value = json["properties"]["tokenSymbol"]
+                .as_str()
+                .expect("chain spec does not contain tokenSymbol");
+            value.to_string()
+        }
+        Err(err) => panic!("Failed to parse JSON: {}", err),
+    }
+}
+
+fn get_decimals(chain_specs: &str) -> u32 {
+    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    match spec {
+        Ok(json) => {
+            let value = json["properties"]["tokenDecimals"]
+                .as_u64()
+                .expect("chain spec does not contain tokenDecimals");
+            value as u32
         }
         Err(err) => panic!("Failed to parse JSON: {}", err),
     }

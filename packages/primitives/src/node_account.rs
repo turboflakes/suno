@@ -51,6 +51,18 @@ impl NodeAccount {
     pub fn set_identity(&mut self, identity: String) {
         self.identity = Some(identity);
     }
+
+    pub fn account_format(&self) -> u32 {
+        self.runtime().account_format()
+    }
+
+    pub fn token_decimals(&self) -> u32 {
+        self.runtime().token_decimals()
+    }
+
+    pub fn token_symbol(&self) -> String {
+        self.runtime().token_symbol()
+    }
 }
 
 impl AccountDisplay for NodeAccount {

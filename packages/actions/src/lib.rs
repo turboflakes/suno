@@ -3,7 +3,7 @@ pub mod network;
 use crate::network::ConnectionState;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
-use suno_primitives::AccountKey;
+use suno_primitives::{staking::StakeOverview, AccountKey};
 
 type Commission = u32;
 type Points = u32;
@@ -71,6 +71,7 @@ pub enum ValidatorAction {
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),
     UpdateIdentity(ValidatorKey, String),
+    UpdateStakeOverview(ValidatorKey, StakeOverview),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

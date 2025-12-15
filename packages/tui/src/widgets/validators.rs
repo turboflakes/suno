@@ -19,7 +19,9 @@ use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
-use suno_primitives::{AccountDisplay, AccountKey, NodeAccount};
+use suno_primitives::{
+    display::format_planks, staking::StakeOverview, AccountDisplay, AccountKey, NodeAccount,
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 type Commission = u32;
@@ -37,12 +39,6 @@ pub enum ValidatorState {
     #[default]
     Unknown,
 }
-#[derive(Debug, Clone, Default)]
-pub struct Stake {
-    pub own: u128,
-    pub nominators: u128,
-    pub active: u128,
-}
 
 #[derive(Debug, Clone)]
 pub struct Nominators {
@@ -55,7 +51,7 @@ pub struct Nominators {
 pub struct Validator {
     pub account: NodeAccount,
     pub commission: Commission,
-    pub stake: Stake,
+    pub stake: StakeOverview,
     pub nominators: Vec<Nominators>,
     pub points: Points,
     pub era_points: Points,
@@ -69,7 +65,7 @@ impl Validator {
         Self {
             account: NodeAccount::new(runtime, stash),
             commission: 0,
-            stake: Stake::default(),
+            stake: StakeOverview::default(),
             nominators: Vec::new(),
             points: 0,
             era_points: 0,
@@ -202,6 +198,12 @@ impl ValidatorsListState {
     pub fn set_identity(&mut self, validator_key: &AccountKey, identity: String) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.account.set_identity(identity);
+        }
+    }
+
+    pub fn set_stake_overview(&mut self, validator_key: &AccountKey, data: StakeOverview) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.stake = data;
         }
     }
 
@@ -435,6 +437,11 @@ impl ValidatorsListWidget {
         state.set_identity(validator_key, identity);
     }
 
+    pub fn update_stake_overview(&self, validator_key: &AccountKey, data: StakeOverview) {
+        let mut state = self.state.write().unwrap();
+        state.set_stake_overview(validator_key, data);
+    }
+
     pub fn spawn_fetch_validator_data_from_asset_hub(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -637,17 +644,24 @@ impl Widget for &ValidatorsDetailWidget {
             .border_type(BorderType::Plain);
 
         let rows = state.validators_iter().map(|v| {
+            let decimals = v.account.token_decimals();
             Row::new(vec![
                 Text::from(v.display_name()).alignment(Alignment::Left),
-                Text::from(v.commission_as_percentage(2)),
-                Text::from(v.total_points().to_string()),
+                Text::from(v.total_points().to_string()).alignment(Alignment::Right),
+                Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
+                Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
+                Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
+                Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
             ])
         });
 
         let widths = [
             Constraint::Length(20), // Stash Column
             Constraint::Fill(1),
-            Constraint::Fill(1), // TODO Column
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
         ];
 
         let table = Table::new(rows, widths)
@@ -655,8 +669,11 @@ impl Widget for &ValidatorsDetailWidget {
             .header(
                 Row::new(vec![
                     Cell::from(""),
-                    Cell::from(Text::from("commission").alignment(Alignment::Left)),
-                    Cell::from(Text::from("points").alignment(Alignment::Left)),
+                    Cell::from(Text::from("points").alignment(Alignment::Right)),
+                    Cell::from(Text::from("total").alignment(Alignment::Right)),
+                    Cell::from(Text::from("own").alignment(Alignment::Right)),
+                    Cell::from(Text::from("nominators").alignment(Alignment::Right)),
+                    Cell::from(Text::from("commission").alignment(Alignment::Right)),
                 ])
                 .set_style(THEME.table.header),
             )
@@ -725,18 +742,38 @@ async fn fetch_and_send_validators_data_from_asset_hub(
     match runtime {
         SupportedRuntime::AssetHubPaseo => {
             // TODO: Add more fetches here to run them in parallel/
-            let (era_points_result,) = tokio::join!(
-                suno_asset_hub_paseo::fetch_validators_era_points(api, block_hash, validator_keys)
+            let (era_points_result, staker_overview_result) = tokio::join!(
+                suno_asset_hub_paseo::fetch_validators_era_points(api, block_hash, validator_keys),
+                suno_asset_hub_paseo::fetch_validators_stake_overview(
+                    api,
+                    block_hash,
+                    validator_keys
+                )
             );
 
             // Handle era_points
             match era_points_result {
-                Ok(era_points) => {
+                Ok(result) => {
                     for key in validator_keys {
-                        if let Some(points) = era_points.get(&key.bytes()).copied() {
+                        if let Some(points) = result.get(&key.bytes()).copied() {
                             tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
                                 key.clone(),
                                 points,
+                            )))?;
+                        }
+                    }
+                }
+                Err(e) => warn!("Failed to fetch validators era points: {}", e),
+            }
+
+            // Handle staker_overview
+            match staker_overview_result {
+                Ok(result) => {
+                    for key in validator_keys {
+                        if let Some(data) = result.get(&key.bytes()).copied() {
+                            tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
+                                key.clone(),
+                                data,
                             )))?;
                         }
                     }
