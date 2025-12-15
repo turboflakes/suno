@@ -15,7 +15,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
-use suno_primitives::{display::format_millis, Staking};
+use suno_primitives::{
+    display::{format_millis, get_elapsed_millis},
+    Staking,
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 type BlockNumber = u64;
@@ -504,16 +507,6 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
             }
         }
     });
-}
-
-/// Get elapsed time in milliseconds since the given timestamp
-fn get_elapsed_millis(last_updated: u128) -> u64 {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-
-    (now - last_updated) as u64
 }
 
 /// Create a progress bar based on elapsed time

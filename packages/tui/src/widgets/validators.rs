@@ -14,13 +14,16 @@ use ratatui::{
 };
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use subxt::utils::{AccountId32, H256};
 use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
-    display::format_planks, staking::StakeOverview, AccountDisplay, AccountKey, NodeAccount,
+    display::{format_planks, get_elapsed_millis},
+    staking::StakeOverview,
+    AccountDisplay, AccountKey, NodeAccount,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -53,7 +56,13 @@ pub struct Validator {
     pub commission: Commission,
     pub stake: StakeOverview,
     pub nominators: Vec<Nominators>,
+    // Track session points from staking_ah_client.validator_points
     pub points: Points,
+    // Track old points so it can be better rendered the delta points
+    pub old_points: Points,
+    pub old_points_ts: u128,
+    // Track era points accumulated at every new session from staking.era_reward_points
+    // the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
     pub is_next_authority: bool,
     pub is_chilled: bool,
@@ -68,6 +77,8 @@ impl Validator {
             stake: StakeOverview::default(),
             nominators: Vec::new(),
             points: 0,
+            old_points: 0,
+            old_points_ts: 0,
             era_points: 0,
             is_next_authority: false,
             is_chilled: false,
@@ -108,6 +119,15 @@ impl Validator {
 
     pub fn total_points(&self) -> Points {
         self.points + self.era_points
+    }
+
+    pub fn delta_points(&self) -> Option<Points> {
+        let elapsed = get_elapsed_millis(self.old_points_ts);
+        info!("Elapsed: {}", elapsed);
+        if elapsed >= 3_000 {
+            return None;
+        }
+        return Some(self.points - self.old_points);
     }
 
     pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
@@ -164,35 +184,41 @@ impl ValidatorsListState {
         self.validators.insert(key.clone(), validator);
     }
 
-    pub fn set_commission(
-        &mut self,
-        validator_key: &AccountKey,
-        commission: Commission,
-    ) -> Option<Commission> {
+    pub fn set_commission(&mut self, validator_key: &AccountKey, commission: Commission) -> bool {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let old_commission = validator.points;
-            validator.commission = commission;
-            return Some(old_commission);
+            if validator.commission != commission {
+                validator.commission = commission;
+                return true;
+            }
         }
-        None
+        false
     }
 
-    pub fn set_points(&mut self, validator_key: &AccountKey, points: Points) -> Option<Points> {
+    pub fn set_points(&mut self, validator_key: &AccountKey, points: Points) -> bool {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let old_points = validator.points;
-            validator.points = points;
-            return Some(old_points);
+            if validator.points != points {
+                let old_points = validator.points;
+                validator.points = points;
+                validator.old_points = old_points;
+                let ts = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis();
+                validator.old_points_ts = ts;
+                return true;
+            }
         }
-        None
+        false
     }
 
-    pub fn set_era_points(&mut self, validator_key: &AccountKey, points: Points) -> Option<Points> {
+    pub fn set_era_points(&mut self, validator_key: &AccountKey, points: Points) -> bool {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let old_points = validator.era_points;
-            validator.era_points = points;
-            return Some(old_points);
+            if validator.era_points != points {
+                validator.era_points = points;
+                return true;
+            }
         }
-        None
+        false
     }
 
     pub fn set_identity(&mut self, validator_key: &AccountKey, identity: String) {
@@ -413,21 +439,17 @@ impl ValidatorsListWidget {
             .and_then(|i| state.get_validator_by_index_cloned(i))
     }
 
-    pub fn update_commission(
-        &self,
-        validator_key: &AccountKey,
-        commission: Commission,
-    ) -> Option<Commission> {
+    pub fn update_commission(&self, validator_key: &AccountKey, commission: Commission) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_commission(validator_key, commission)
     }
 
-    pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> Option<Points> {
+    pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_points(validator_key, points)
     }
 
-    pub fn update_era_points(&self, validator_key: &AccountKey, points: Points) -> Option<Points> {
+    pub fn update_era_points(&self, validator_key: &AccountKey, points: Points) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_era_points(validator_key, points)
     }
@@ -644,10 +666,15 @@ impl Widget for &ValidatorsDetailWidget {
             .border_type(BorderType::Plain);
 
         let rows = state.validators_iter().map(|v| {
+            let points = match v.delta_points() {
+                Some(d) => format!("+{} {}", d, v.total_points()),
+                None => v.total_points().to_string(),
+            };
+
             let decimals = v.account.token_decimals();
             Row::new(vec![
                 Text::from(v.display_name()).alignment(Alignment::Left),
-                Text::from(v.total_points().to_string()).alignment(Alignment::Right),
+                Text::from(points).alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
@@ -656,7 +683,7 @@ impl Widget for &ValidatorsDetailWidget {
         });
 
         let widths = [
-            Constraint::Length(20), // Stash Column
+            Constraint::Length(20),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),

@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 /// Format milliseconds to human-readable string (e.g., "6.5s")
 pub fn format_millis(millis: u64) -> String {
     let seconds = millis as f64 / 1000.0;
@@ -22,4 +24,14 @@ pub fn format_planks(plancks: u128, decimals: u32, display_decimals: usize) -> S
         v if v >= 1_000.0 => format!("{:.prec$}K", v / 1e3, prec = display_decimals),
         v => format!("{:.prec$}", v, prec = display_decimals),
     }
+}
+
+/// Get elapsed time in milliseconds since the given timestamp
+pub fn get_elapsed_millis(last_updated: u128) -> u64 {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    (now - last_updated) as u64
 }
