@@ -1,6 +1,8 @@
 use super::node_runtime;
 use node_runtime::{
-    runtime_types::pallet_staking_async::{ActiveEraInfo, EraRewardPoints, ValidatorPrefs},
+    runtime_types::pallet_staking_async::{
+        ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, ValidatorPrefs,
+    },
     staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
 };
 use std::collections::{HashMap, HashSet};
@@ -9,7 +11,10 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_primitives::{staking::StakeOverview, AccountKey};
+use suno_primitives::{
+    staking::{StakeLedger, StakeOverview},
+    AccountKey,
+};
 
 /// Fetch validator commission
 pub async fn fetch_validator_commission(
@@ -53,6 +58,18 @@ pub async fn fetch_validator_stake_overview(
     if let Some(data) = fetch_eras_stakers_overview(api, block_hash, era, stash).await? {
         let stake_overview = StakeOverview::new(data.own, data.total, data.nominator_count);
         return Ok(Some(stake_overview));
+    }
+    Ok(None)
+}
+
+pub async fn fetch_validator_staking_ledger(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Option<StakeLedger>, Error> {
+    if let Some(data) = fetch_staking_ledger(api, block_hash, stash).await? {
+        let stake_ledger = StakeLedger::new(data.active, data.total);
+        return Ok(Some(stake_ledger));
     }
     Ok(None)
 }
@@ -108,6 +125,21 @@ async fn fetch_validator_prefs(
                 "ValidatorPrefs not defined at block hash {block_hash:?} for stash {stash}"
             ))
         })
+}
+
+/// Fetch staking ledger at the specified block hash
+async fn fetch_staking_ledger(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Option<StakingLedger>, Error> {
+    let addr = node_runtime::storage().staking().ledger(stash.clone());
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await
+        .map_err(|e| e.into())
 }
 
 /// Fetch active era at the specified block hash

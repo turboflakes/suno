@@ -61,3 +61,35 @@ impl StakeOverview {
         self.nominators_count
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct Unlocking {
+    pub era: u32,
+    pub value: u128,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct StakeLedger {
+    pub active: u128,
+    pub total: u128,
+    pub unlocking: Vec<Unlocking>,
+}
+
+impl StakeLedger {
+    // TODO: add unlocking: Vec<Unlocking>
+    pub fn new(active: u128, total: u128) -> Self {
+        Self {
+            active,
+            total,
+            unlocking: Vec::new(),
+        }
+    }
+
+    pub fn active(&self) -> u128 {
+        self.active
+    }
+
+    pub fn total(&self) -> u128 {
+        self.total
+    }
+}
