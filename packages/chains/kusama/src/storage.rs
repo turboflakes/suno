@@ -17,13 +17,10 @@ pub async fn fetch_validator_points(
         .staking_ah_client()
         .validator_points(stash.clone());
 
-    api.storage()
+    Ok(api
+        .storage()
         .at(block_hash)
         .fetch(&addr)
         .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "Validator points not defined at block hash {block_hash:?} for stash {stash}"
-            ))
-        })
+        .unwrap_or(0))
 }
