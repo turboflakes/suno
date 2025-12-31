@@ -1,5 +1,6 @@
+pub mod constants;
 pub mod storage;
-pub use storage::fetch_validator_points;
+pub use storage::{fetch_epoch_data, fetch_validator_points};
 
 #[subxt::subxt(
     runtime_metadata_path = "artifacts/metadata/kusama_metadata_small.scale",

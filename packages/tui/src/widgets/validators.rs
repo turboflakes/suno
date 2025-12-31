@@ -435,26 +435,6 @@ impl ValidatorsListWidget {
         }
     }
 
-    fn fetch_validator_data(&self, validator: &Validator) {
-        self.tx
-            .send(Action::Chain(ChainAction::FetchValidatorData(
-                validator.key().clone(),
-            )))
-            .unwrap_or_else(|err| self.on_error(err.into()));
-    }
-
-    fn fetch_all_validators_data(&self) {
-        let state = self.state.read().unwrap();
-        let keys_grouped = state.get_keys_grouped_by_runtime_cloned();
-        keys_grouped.into_iter().for_each(|(runtime, keys)| {
-            self.tx
-                .send(Action::Chain(ChainAction::FetchValidatorsData(
-                    runtime, keys,
-                )))
-                .unwrap_or_else(|err| self.on_error(err.into()));
-        });
-    }
-
     pub fn set_active(&self, active: bool) {
         let mut state = self.state.write().unwrap();
         state.is_active = active;
@@ -496,6 +476,26 @@ impl ValidatorsListWidget {
     pub fn update_stake_ledger(&self, validator_key: &AccountKey, data: StakeLedger) {
         let mut state = self.state.write().unwrap();
         state.set_stake_ledger(validator_key, data);
+    }
+
+    fn fetch_validator_data(&self, validator: &Validator) {
+        self.tx
+            .send(Action::Chain(ChainAction::FetchValidatorData(
+                validator.key().clone(),
+            )))
+            .unwrap_or_else(|err| self.on_error(err.into()));
+    }
+
+    fn fetch_all_validators_data(&self) {
+        let state = self.state.read().unwrap();
+        let keys_grouped = state.get_keys_grouped_by_runtime_cloned();
+        keys_grouped.into_iter().for_each(|(runtime, keys)| {
+            self.tx
+                .send(Action::Chain(ChainAction::FetchValidatorsData(
+                    runtime, keys,
+                )))
+                .unwrap_or_else(|err| self.on_error(err.into()));
+        });
     }
 
     pub fn spawn_fetch_validator_data_from_asset_hub(
@@ -753,8 +753,8 @@ impl ValidatorsDetailWidget {
             ))
             .alignment(Alignment::Right),
             Line::from(format!(
-                "session 53378 (40% / 22min) [▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱]"
-            ))
+                "session {} (40% / 22min) [▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱]"
+                ,))
             .alignment(Alignment::Right),
         ])
         .style(Style::default().fg(Color::Blue));

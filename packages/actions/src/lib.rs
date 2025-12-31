@@ -4,6 +4,7 @@ use crate::network::ConnectionState;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
+    babe::Epoch,
     staking::{StakeLedger, StakeOverview},
     AccountKey,
 };
@@ -57,6 +58,7 @@ pub enum ChainAction {
     UpdateConnectionState(ChainKey, ConnectionState),
     UpdateBestBlock(ChainKey, BlockNumber),
     UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
+    UpdateEpoch(ChainKey, Epoch),
     FetchValidatorData(ValidatorKey),
     FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
 }

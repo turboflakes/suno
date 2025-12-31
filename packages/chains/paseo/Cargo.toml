@@ -10,5 +10,6 @@ edition.workspace = true
 [dependencies]
 subxt = { workspace = true }
 suno-error = { path = "../../error" }
+suno-primitives = { path = "../../primitives" }
 suno-signer = { path = "../../signer" }
 thiserror = { workspace = true }

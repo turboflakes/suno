@@ -17,7 +17,7 @@ use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{format_millis, get_elapsed_millis},
-    Staking,
+    Epoch, Staking,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -34,6 +34,7 @@ pub struct Chain {
     // finalized_block_ts value is the timestamp in milliseconds the finalized block was updated
     finalized_block_ts: u128,
     staking: Option<Staking>,
+    epoch: Option<Epoch>,
     state: ConnectionState,
 }
 
@@ -47,6 +48,7 @@ impl Chain {
             finalized_block_ts: 0,
             finalized_block_hash: None,
             staking: None,
+            epoch: None,
             state: ConnectionState::default(),
         }
     }
@@ -168,6 +170,14 @@ impl ChainsListState {
                 chain.state = state;
                 return true;
             }
+        }
+        false
+    }
+
+    pub fn set_epoch(&mut self, chain_key: &ChainKey, data: Epoch) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.epoch = Some(data);
+            return true;
         }
         false
     }
@@ -356,6 +366,30 @@ impl ChainsListWidget {
         let mut state = self.state.write().unwrap();
         state.set_finalized_block(chain_key, block_number, block_hash)
     }
+
+    pub fn update_epoch(&self, chain_key: &ChainKey, epoch: Epoch) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_epoch(chain_key, epoch)
+    }
+
+    pub fn spawn_fetch_epoch_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        chain_key: &ChainKey,
+    ) {
+        let api = api.clone();
+        let chain_key = chain_key.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) =
+                fetch_and_send_chain_data(&api, block_hash, &chain_key, tx.clone()).await
+            {
+                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+            }
+        });
+    }
 }
 
 impl Widget for &ChainsListWidget {
@@ -535,4 +569,48 @@ fn create_progress_bar(elapsed: u64, bar_width: usize) -> String {
         filled_char.repeat(filled_chars),
         empty_char.repeat(bar_width - filled_chars),
     )
+}
+
+async fn fetch_and_send_chain_data(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    tx: UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    let (epoch_result,) = match runtime {
+        SupportedRuntime::Polkadot => {
+            // TODO: Add more fetches here to run them in parallel/
+            tokio::join!(suno_polkadot::fetch_epoch_data(api, block_hash),)
+        }
+        SupportedRuntime::Kusama => {
+            tokio::join!(suno_kusama::fetch_epoch_data(api, block_hash),)
+        }
+        SupportedRuntime::Paseo => {
+            tokio::join!(suno_paseo::fetch_epoch_data(api, block_hash),)
+        }
+        SupportedRuntime::Westend => {
+            tokio::join!(suno_westend::fetch_epoch_data(api, block_hash),)
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
+
+    // Handle epoch result
+    match epoch_result {
+        Ok(epoch) => {
+            tx.send(Action::Chain(ChainAction::UpdateEpoch(
+                runtime.clone(),
+                epoch,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch epoch data for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
+    }
+
+    Ok(())
 }

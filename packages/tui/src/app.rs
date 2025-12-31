@@ -172,6 +172,17 @@ impl App {
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
                     match runtime {
+                        SupportedRuntime::Polkadot
+                        | SupportedRuntime::Kusama
+                        | SupportedRuntime::Paseo
+                        | SupportedRuntime::Westend => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(&runtime)
+                            {
+                                self.chains
+                                    .spawn_fetch_epoch_data(&api, block_hash, &runtime)
+                            }
+                        }
                         SupportedRuntime::AssetHubPolkadot
                         | SupportedRuntime::AssetHubKusama
                         | SupportedRuntime::AssetHubPaseo
@@ -223,6 +234,9 @@ impl App {
                     }
                     _ => {}
                 }
+            }
+            ChainAction::UpdateEpoch(chain_key, epoch) => {
+                self.chains.update_epoch(&chain_key, epoch);
             }
             ChainAction::FetchValidatorData(validator_key) => {
                 if let Some((api, block_hash)) =
