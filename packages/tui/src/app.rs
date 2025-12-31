@@ -275,6 +275,9 @@ impl App {
             ValidatorAction::UpdateStakeOverview(validator_key, data) => {
                 self.validators.update_stake_overview(&validator_key, data);
             }
+            ValidatorAction::UpdateStakeLedger(validator_key, data) => {
+                self.validators.update_stake_ledger(&validator_key, data);
+            }
         }
     }
 

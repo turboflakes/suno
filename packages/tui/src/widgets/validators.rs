@@ -7,12 +7,15 @@ use futures::{future::join_all, stream, StreamExt};
 use log::{error, info, warn};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    prelude::Stylize,
     style::{Color, Modifier, Style, Styled},
-    text::Text,
-    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
+    text::{Line, Text},
+    widgets::{
+        Block, BorderType, Borders, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget,
+    },
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use subxt::utils::{AccountId32, H256};
@@ -22,7 +25,7 @@ use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{format_planks, get_elapsed_millis},
-    staking::StakeOverview,
+    staking::{StakeLedger, StakeOverview},
     AccountDisplay, AccountKey, NodeAccount,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -55,6 +58,7 @@ pub struct Validator {
     pub account: NodeAccount,
     pub commission: Commission,
     pub stake: StakeOverview,
+    pub ledger: StakeLedger,
     pub nominators: Vec<Nominators>,
     // Track session points from staking_ah_client.validator_points
     pub points: Points,
@@ -75,6 +79,7 @@ impl Validator {
             account: NodeAccount::new(runtime, stash),
             commission: 0,
             stake: StakeOverview::default(),
+            ledger: StakeLedger::default(),
             nominators: Vec::new(),
             points: 0,
             old_points: 0,
@@ -126,7 +131,7 @@ impl Validator {
             return None;
         }
         let elapsed = get_elapsed_millis(self.old_points_ts);
-        if elapsed >= 4_000 {
+        if elapsed >= 2_000 {
             return None;
         }
         return Some(self.points - self.old_points);
@@ -174,6 +179,7 @@ pub struct ValidatorsListState {
     validators: HashMap<ValidatorKey, Validator>,
     validators_order: Vec<ValidatorKey>,
     table_state: TableState,
+    table_unselected_rows_indices: Vec<usize>,
     is_active: bool,
 }
 
@@ -235,6 +241,12 @@ impl ValidatorsListState {
         }
     }
 
+    pub fn set_stake_ledger(&mut self, validator_key: &AccountKey, data: StakeLedger) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.ledger = data;
+        }
+    }
+
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
         self.validators.get(validator_key)
     }
@@ -278,6 +290,21 @@ impl ValidatorsListState {
                 .entry(key.runtime.clone())
                 .or_insert_with(Vec::new)
                 .push(key.clone());
+        }
+
+        grouped
+    }
+
+    pub fn get_validators_grouped_by_runtime(&self) -> BTreeMap<SupportedRuntime, Vec<&Validator>> {
+        let mut grouped: BTreeMap<SupportedRuntime, Vec<&Validator>> = BTreeMap::new();
+
+        for key in &self.validators_order {
+            if let Some(validator) = self.get_validator_by_key(key) {
+                grouped
+                    .entry(key.runtime.clone())
+                    .or_insert_with(Vec::new)
+                    .push(validator);
+            }
         }
 
         grouped
@@ -466,6 +493,11 @@ impl ValidatorsListWidget {
         state.set_stake_overview(validator_key, data);
     }
 
+    pub fn update_stake_ledger(&self, validator_key: &AccountKey, data: StakeLedger) {
+        let mut state = self.state.write().unwrap();
+        state.set_stake_ledger(validator_key, data);
+    }
+
     pub fn spawn_fetch_validator_data_from_asset_hub(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -650,42 +682,115 @@ impl Widget for &ValidatorsCompactWidget {
 // Detailed widget implementation, with all relevant information
 impl Widget for &ValidatorsDetailWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
+        let state = self.state.write().unwrap();
 
-        let (table_style, highlight_style) = match state.is_active {
-            true => (
-                Style::default().fg(Color::White),
-                Style::default().fg(Color::Black).bg(Color::White),
-            ),
-            false => (
-                Style::default().fg(Color::Blue),
-                Style::default().fg(Color::Blue),
-            ),
-        };
+        // Split area into sections for each runtime group
+        let grouped = state.get_validators_grouped_by_runtime();
 
-        let block = Block::new()
-            .borders(Borders::NONE)
-            .border_type(BorderType::Plain);
+        // Calculate heights for each section
+        let mut constraints = Vec::new();
+        for (_, validators) in &grouped {
+            let group_height = 6 + validators.len() as u16;
+            constraints.push(Constraint::Length(group_height));
+        }
 
-        let rows = state.validators_iter().map(|v| {
-            let points = match v.delta_points() {
-                Some(d) => format!("+{} {}", d, v.total_points()),
-                None => v.total_points().to_string(),
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(constraints)
+            .split(area);
+
+        for (i, (runtime, validators)) in grouped.into_iter().enumerate() {
+            let group_area = chunks[i];
+
+            // Split group area into header and body
+            let group_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(4), // Header height
+                    Constraint::Min(0),    // Body takes remaining
+                ])
+                .split(group_area);
+
+            // Render header with custom layout
+            self.render_table_header(runtime, group_chunks[0], buf);
+
+            // Render validators table
+            self.render_table_body(
+                validators,
+                group_chunks[1],
+                buf,
+                &mut state.table_state.clone(),
+            );
+        }
+    }
+}
+
+impl ValidatorsDetailWidget {
+    fn render_table_header(&self, runtime: SupportedRuntime, area: Rect, buf: &mut Buffer) {
+        let header_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(28), // Network info
+                Constraint::Fill(1),    // Era / Session progress bar
+            ])
+            .split(area);
+
+        // TODO: Get onchain data
+        let network_info = Paragraph::new(vec![
+            Line::from(format!("# {}", runtime)).style(Style::default().fg(Color::Blue).bold()),
+            Line::from(format!("validators: {}/{}", 1000, 2500)),
+            Line::from(format!("nominators: {}/{}", 23000, 31500)),
+            Line::from(format!("staked: {:.2}%", 55.0)),
+        ])
+        .style(Style::default().fg(Color::Blue));
+
+        network_info.render(header_layout[0], buf);
+
+        let progress_info = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(format!(
+                "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
+            ))
+            .alignment(Alignment::Right),
+            Line::from(format!(
+                "session 53378 (40% / 22min) [▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱]"
+            ))
+            .alignment(Alignment::Right),
+        ])
+        .style(Style::default().fg(Color::Blue));
+
+        progress_info.render(header_layout[1], buf);
+    }
+
+    fn render_table_body(
+        &self,
+        validators: Vec<&Validator>,
+        area: Rect,
+        buf: &mut Buffer,
+        table_state: &mut TableState,
+    ) {
+        let mut rows = Vec::new();
+
+        for v in validators {
+            let text_points = match v.delta_points() {
+                Some(d) => Text::from(format!("+{}", d)).style(Style::default().fg(Color::White)),
+                None => Text::from(v.total_points().to_string()),
             };
 
-            let decimals = v.account.token_decimals();
-            Row::new(vec![
-                Text::from(v.display_name()).alignment(Alignment::Left),
-                Text::from(points).alignment(Alignment::Right),
+            let decimals = v.runtime().token_decimals();
+            let validator_row = Row::new(vec![
+                Text::from(format!("{}", v.display_name())).alignment(Alignment::Left),
+                text_points.alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
-            ])
-        });
+            ]);
+            rows.push(validator_row);
+        }
 
         let widths = [
-            Constraint::Length(20),
+            Constraint::Length(28),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
@@ -693,8 +798,12 @@ impl Widget for &ValidatorsDetailWidget {
             Constraint::Fill(1),
         ];
 
+        let (table_style, highlight_style) = (
+            Style::default().fg(Color::Blue),
+            Style::default().fg(Color::Blue),
+        );
+
         let table = Table::new(rows, widths)
-            .block(block)
             .header(
                 Row::new(vec![
                     Cell::from(""),
@@ -709,9 +818,74 @@ impl Widget for &ValidatorsDetailWidget {
             .style(table_style)
             .row_highlight_style(highlight_style);
 
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
+        StatefulWidget::render(table, area, buf, table_state);
     }
 }
+
+// impl Widget for &ValidatorsDetailWidget {
+//     fn render(self, area: Rect, buf: &mut Buffer) {
+//         let mut state = self.state.write().unwrap();
+
+//         let (table_style, highlight_style) = match state.is_active {
+//             true => (
+//                 Style::default().fg(Color::White),
+//                 Style::default().fg(Color::Black).bg(Color::White),
+//             ),
+//             false => (
+//                 Style::default().fg(Color::Blue),
+//                 Style::default().fg(Color::Blue),
+//             ),
+//         };
+
+//         let block = Block::new()
+//             .borders(Borders::NONE)
+//             .border_type(BorderType::Plain);
+
+//         let rows = state.validators_iter().map(|v| {
+//             let points = match v.delta_points() {
+//                 Some(d) => format!("+{} {}", d, v.total_points()),
+//                 None => v.total_points().to_string(),
+//             };
+
+//             let decimals = v.account.token_decimals();
+//             Row::new(vec![
+//                 Text::from(v.display_name()).alignment(Alignment::Left),
+//                 Text::from(points).alignment(Alignment::Right),
+//                 Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
+//                 Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
+//                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
+//                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
+//             ])
+//         });
+
+//         let widths = [
+//             Constraint::Length(20),
+//             Constraint::Fill(1),
+//             Constraint::Fill(1),
+//             Constraint::Fill(1),
+//             Constraint::Fill(1),
+//             Constraint::Fill(1),
+//         ];
+
+//         let table = Table::new(rows, widths)
+//             .block(block)
+//             .header(
+//                 Row::new(vec![
+//                     Cell::from(""),
+//                     Cell::from(Text::from("points").alignment(Alignment::Right)),
+//                     Cell::from(Text::from("total").alignment(Alignment::Right)),
+//                     Cell::from(Text::from("own").alignment(Alignment::Right)),
+//                     Cell::from(Text::from("nominators").alignment(Alignment::Right)),
+//                     Cell::from(Text::from("commission").alignment(Alignment::Right)),
+//                 ])
+//                 .set_style(THEME.table.header),
+//             )
+//             .style(table_style)
+//             .row_highlight_style(highlight_style);
+
+//         StatefulWidget::render(table, area, buf, &mut state.table_state);
+//     }
+// }
 
 impl From<&Validator> for Row<'_> {
     fn from(v: &Validator) -> Self {
@@ -737,30 +911,30 @@ async fn fetch_and_send_validator_data_from_asset_hub(
     let runtime = validator_key.runtime().asset_hub_runtime();
     let stash = validator_key.stash();
 
-    let (commission_result,) = match runtime {
+    let (commission_result, staking_ledger_result) = match runtime {
         SupportedRuntime::AssetHubPolkadot => {
-            // TODO: Add more fetches here to run them in parallel/
-            tokio::join!(suno_asset_hub_polkadot::fetch_validator_commission(
-                api, block_hash, &stash
-            ),)
+            tokio::join!(
+                suno_asset_hub_polkadot::fetch_validator_commission(api, block_hash, &stash),
+                suno_asset_hub_polkadot::fetch_validator_staking_ledger(api, block_hash, &stash),
+            )
         }
         SupportedRuntime::AssetHubKusama => {
-            // TODO: Add more fetches here to run them in parallel/
-            tokio::join!(suno_asset_hub_kusama::fetch_validator_commission(
-                api, block_hash, &stash
-            ),)
+            tokio::join!(
+                suno_asset_hub_kusama::fetch_validator_commission(api, block_hash, &stash),
+                suno_asset_hub_kusama::fetch_validator_staking_ledger(api, block_hash, &stash),
+            )
         }
         SupportedRuntime::AssetHubPaseo => {
-            // TODO: Add more fetches here to run them in parallel/
-            tokio::join!(suno_asset_hub_paseo::fetch_validator_commission(
-                api, block_hash, &stash
-            ),)
+            tokio::join!(
+                suno_asset_hub_paseo::fetch_validator_commission(api, block_hash, &stash),
+                suno_asset_hub_paseo::fetch_validator_staking_ledger(api, block_hash, &stash),
+            )
         }
         SupportedRuntime::AssetHubWestend => {
-            // TODO: Add more fetches here to run them in parallel/
-            tokio::join!(suno_asset_hub_westend::fetch_validator_commission(
-                api, block_hash, &stash
-            ),)
+            tokio::join!(
+                suno_asset_hub_westend::fetch_validator_commission(api, block_hash, &stash),
+                suno_asset_hub_westend::fetch_validator_staking_ledger(api, block_hash, &stash),
+            )
         }
         _ => {
             error!("Unsupported runtime: {:?}", runtime);
@@ -777,7 +951,25 @@ async fn fetch_and_send_validator_data_from_asset_hub(
             )))?;
         }
         Err(e) => warn!(
-            "Failed to fetch points for {:?}: {}",
+            "Failed to fetch commission for {:?}: {}",
+            validator_key.to_string(),
+            e
+        ),
+    }
+
+    match staking_ledger_result {
+        Ok(Some(data)) => {
+            tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
+                validator_key.clone(),
+                data,
+            )))?;
+        }
+        Ok(None) => warn!(
+            "Staking ledger not found for {:?}",
+            validator_key.to_string()
+        ),
+        Err(e) => warn!(
+            "Failed to fetch staking ledger for {:?}: {}",
             validator_key.to_string(),
             e
         ),
@@ -926,7 +1118,7 @@ async fn fetch_and_send_validators_identities(
                 )))?;
             }
             Err(e) => warn!(
-                "Failed to fetch points for {}: {}",
+                "Failed to fetch identity for {}: {}",
                 validator_key.to_string(),
                 e
             ),
