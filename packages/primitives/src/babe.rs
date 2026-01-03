@@ -42,7 +42,7 @@ impl Epoch {
         diff as f64 / self.duration() as f64
     }
 
-    pub fn progress_time(&self, current_block_number: u64) -> String {
+    pub fn countdown_time(&self, current_block_number: u64) -> String {
         if current_block_number < self.start()
             || current_block_number >= self.start() + self.duration()
         {

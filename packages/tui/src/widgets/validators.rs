@@ -735,6 +735,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
                 .constraints([
                     Constraint::Length(28), // Network info
                     Constraint::Fill(1),    // Era / Session progress bar
+                    Constraint::Length(16), // Countdown
                 ])
                 .split(area);
 
@@ -755,27 +756,35 @@ impl<'a> ValidatorsDetailWidget<'a> {
             };
 
             let epoch_progress = epoch.progress(chain.finalized_block());
-            let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 40);
-            let epoch_progress_time = epoch.progress_time(chain.finalized_block());
+            let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
 
             let progress_info = Paragraph::new(vec![
                 Line::from(""),
+                // Line::from(format!(
+                //     "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
+                // ))
+                // .alignment(Alignment::Right),
                 Line::from(format!(
-                    "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
-                ))
-                .alignment(Alignment::Right),
-                Line::from(format!(
-                    "epoch {} {:.2}% {} [{}]",
+                    "epoch {} {:.2}% {}",
                     epoch.index(),
                     epoch_progress * 100 as f64,
                     epoch_progress_bar,
-                    epoch_progress_time,
                 ))
                 .alignment(Alignment::Right),
             ])
             .style(Style::default().fg(Color::Blue));
 
             progress_info.render(header_layout[1], buf);
+
+            let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
+
+            let countdown_info = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
+            ])
+            .style(Style::default().fg(Color::Blue));
+
+            countdown_info.render(header_layout[2], buf);
         };
     }
 
