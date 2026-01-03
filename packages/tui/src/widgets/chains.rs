@@ -16,7 +16,7 @@ use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
-    display::{format_millis, get_elapsed_millis},
+    display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
     Epoch, Staking,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -73,8 +73,12 @@ impl Chain {
         &self.state
     }
 
-    pub fn set_state(&mut self, state: ConnectionState) {
-        self.state = state;
+    pub fn finalized_block(&self) -> u64 {
+        self.finalized_block
+    }
+
+    pub fn epoch(&self) -> &Option<Epoch> {
+        &self.epoch
     }
 
     pub fn block_hash(&self) -> Option<BlockHash> {
@@ -112,6 +116,10 @@ impl Chain {
             self.state,
             ConnectionState::Idle | ConnectionState::Reconnecting | ConnectionState::Error(_)
         )
+    }
+
+    pub fn set_state(&mut self, state: ConnectionState) {
+        self.state = state;
     }
 }
 
@@ -444,7 +452,7 @@ impl Widget for &ChainsListWidget {
 impl From<&Chain> for Row<'_> {
     fn from(chain: &Chain) -> Self {
         let elapsed = get_elapsed_millis(chain.finalized_block_ts);
-        let progress = create_progress_bar(elapsed, 12);
+        let progress = create_progress_bar_by_millis(elapsed, 12);
 
         Row::new(vec![
             Text::from(format!(
@@ -541,34 +549,6 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
             }
         }
     });
-}
-
-/// Create a progress bar based on elapsed time
-fn create_progress_bar(elapsed: u64, bar_width: usize) -> String {
-    const PHASE_1_TIMEOUT: u64 = 6_000; // 6 seconds
-    const PHASE_2_TIMEOUT: u64 = 60_000; // 60 seconds
-
-    let (ratio, empty_char, filled_char) = if elapsed > PHASE_1_TIMEOUT {
-        (
-            (elapsed.min(PHASE_2_TIMEOUT)) as f64 / PHASE_2_TIMEOUT as f64,
-            "░",
-            "█",
-        )
-    } else {
-        (
-            (elapsed.min(PHASE_1_TIMEOUT)) as f64 / PHASE_1_TIMEOUT as f64,
-            "·",
-            "░",
-        )
-    };
-
-    let filled_chars = (ratio * bar_width as f64) as usize;
-
-    format!(
-        "{}{}",
-        filled_char.repeat(filled_chars),
-        empty_char.repeat(bar_width - filled_chars),
-    )
 }
 
 async fn fetch_and_send_chain_data(

@@ -1,6 +1,6 @@
 use crate::error::TuiError;
 use crate::theme::THEME;
-use crate::widgets::chains::Chain;
+use crate::widgets::chains::{Chain, ChainsListWidget};
 use crate::widgets::popup::PopupWidget;
 use crate::widgets::scrollbar::render_scrollbar;
 use futures::{future::join_all, stream, StreamExt};
@@ -24,7 +24,7 @@ use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
-    display::{format_planks, get_elapsed_millis},
+    display::{create_progress_bar_by_blocks, format_planks, get_elapsed_millis},
     staking::{StakeLedger, StakeOverview},
     AccountDisplay, AccountKey, NodeAccount,
 };
@@ -318,17 +318,18 @@ pub struct ValidatorsListWidget {
     tx: UnboundedSender<Action>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ValidatorsCompactWidget {
     state: Arc<RwLock<ValidatorsListState>>,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct ValidatorsDetailWidget {
+#[derive(Debug, Clone)]
+pub struct ValidatorsDetailWidget<'a> {
     state: Arc<RwLock<ValidatorsListState>>,
+    chains: &'a ChainsListWidget,
 }
 
-impl ValidatorsListWidget {
+impl<'a> ValidatorsListWidget {
     // Add methods to create the alternative widgets
     pub fn as_compact(&self) -> ValidatorsCompactWidget {
         ValidatorsCompactWidget {
@@ -336,9 +337,10 @@ impl ValidatorsListWidget {
         }
     }
 
-    pub fn as_detail(&self) -> ValidatorsDetailWidget {
+    pub fn as_detail(&self, chains: &'a ChainsListWidget) -> ValidatorsDetailWidget<'a> {
         ValidatorsDetailWidget {
             state: self.state.clone(),
+            chains,
         }
     }
 }
@@ -680,7 +682,7 @@ impl Widget for &ValidatorsCompactWidget {
 }
 
 // Detailed widget implementation, with all relevant information
-impl Widget for &ValidatorsDetailWidget {
+impl<'a> Widget for &ValidatorsDetailWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
 
@@ -725,41 +727,56 @@ impl Widget for &ValidatorsDetailWidget {
     }
 }
 
-impl ValidatorsDetailWidget {
+impl<'a> ValidatorsDetailWidget<'a> {
     fn render_table_header(&self, runtime: SupportedRuntime, area: Rect, buf: &mut Buffer) {
-        let header_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(28), // Network info
-                Constraint::Fill(1),    // Era / Session progress bar
+        if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
+            let header_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Length(28), // Network info
+                    Constraint::Fill(1),    // Era / Session progress bar
+                ])
+                .split(area);
+
+            // TODO: Get onchain data
+            let network_info = Paragraph::new(vec![
+                Line::from(format!("# {}", runtime)).style(Style::default().fg(Color::Blue).bold()),
+                Line::from(format!("validators: {}/{}", 1000, 2500)),
+                Line::from(format!("nominators: {}/{}", 23000, 31500)),
+                Line::from(format!("staked: {:.2}%", 55.0)),
             ])
-            .split(area);
+            .style(Style::default().fg(Color::Blue));
 
-        // TODO: Get onchain data
-        let network_info = Paragraph::new(vec![
-            Line::from(format!("# {}", runtime)).style(Style::default().fg(Color::Blue).bold()),
-            Line::from(format!("validators: {}/{}", 1000, 2500)),
-            Line::from(format!("nominators: {}/{}", 23000, 31500)),
-            Line::from(format!("staked: {:.2}%", 55.0)),
-        ])
-        .style(Style::default().fg(Color::Blue));
+            network_info.render(header_layout[0], buf);
 
-        network_info.render(header_layout[0], buf);
+            let Some(epoch) = chain.epoch() else {
+                // TODO: Handle epoch not available, maybe render loading indicator
+                return;
+            };
 
-        let progress_info = Paragraph::new(vec![
-            Line::from(""),
-            Line::from(format!(
-                "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
-            ))
-            .alignment(Alignment::Right),
-            Line::from(format!(
-                "session {} (40% / 22min) [▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱]"
-                ,))
-            .alignment(Alignment::Right),
-        ])
-        .style(Style::default().fg(Color::Blue));
+            let epoch_progress = epoch.progress(chain.finalized_block());
+            let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 40);
+            let epoch_progress_time = epoch.progress_time(chain.finalized_block());
 
-        progress_info.render(header_layout[1], buf);
+            let progress_info = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(format!(
+                    "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
+                ))
+                .alignment(Alignment::Right),
+                Line::from(format!(
+                    "epoch {} {:.2}% {} [{}]",
+                    epoch.index(),
+                    epoch_progress * 100 as f64,
+                    epoch_progress_bar,
+                    epoch_progress_time,
+                ))
+                .alignment(Alignment::Right),
+            ])
+            .style(Style::default().fg(Color::Blue));
+
+            progress_info.render(header_layout[1], buf);
+        };
     }
 
     fn render_table_body(
