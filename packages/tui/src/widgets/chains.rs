@@ -423,11 +423,11 @@ impl Widget for &ChainsListWidget {
 
         let rows = state.chains_iter();
         let widths = [
-            Constraint::Min(16),
-            Constraint::Min(8),
-            Constraint::Min(8),
-            Constraint::Min(12),
-            Constraint::Max(4),
+            Constraint::Fill(1),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(6),
+            Constraint::Length(4),
         ];
 
         let table = Table::new(rows, widths)
@@ -435,8 +435,8 @@ impl Widget for &ChainsListWidget {
             .header(
                 Row::new(vec![
                     Cell::from(""),
-                    Cell::from(Text::from("best").alignment(Alignment::Left)),
-                    Cell::from(Text::from("finalized").alignment(Alignment::Left)),
+                    Cell::from(Text::from("best").alignment(Alignment::Right)),
+                    Cell::from(Text::from("finalized").alignment(Alignment::Right)),
                     Cell::from(""),
                     Cell::from(""),
                 ])
@@ -452,7 +452,7 @@ impl Widget for &ChainsListWidget {
 impl From<&Chain> for Row<'_> {
     fn from(chain: &Chain) -> Self {
         let elapsed = get_elapsed_millis(chain.finalized_block_ts);
-        let progress = create_progress_bar_by_millis(elapsed, 12);
+        let progress = create_progress_bar_by_millis(elapsed, 6);
 
         Row::new(vec![
             Text::from(format!(
@@ -460,9 +460,9 @@ impl From<&Chain> for Row<'_> {
                 chain.state.to_string(),
                 chain.runtime.to_string()
             )),
-            Text::from(format!("#{}", chain.best_block.to_string())).alignment(Alignment::Left),
+            Text::from(format!("#{}", chain.best_block.to_string())).alignment(Alignment::Right),
             Text::from(format!("#{}", chain.finalized_block.to_string()))
-                .alignment(Alignment::Left),
+                .alignment(Alignment::Right),
             Text::from(progress.to_string()).alignment(Alignment::Right),
             Text::from(format_millis(elapsed)).alignment(Alignment::Right),
         ])
