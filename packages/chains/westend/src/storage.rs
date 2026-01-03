@@ -1,5 +1,5 @@
 use super::node_runtime;
-use crate::constants::fetch_epoch_duration;
+use crate::constants::{fetch_epoch_duration, fetch_expected_block_time};
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
@@ -35,10 +35,11 @@ pub async fn fetch_epoch_data(
     block_hash: H256,
 ) -> Result<Epoch, Error> {
     let duration = fetch_epoch_duration(api)?;
+    let block_time = fetch_expected_block_time(api)?;
     let (_, start) = fetch_epoch_start(api, block_hash).await?;
     let index = fetch_epoch_index(api, block_hash).await?;
 
-    Ok(Epoch::new(index, start, duration))
+    Ok(Epoch::new(index, start, duration, block_time))
 }
 
 /// Fetch babe epoch index at the specified block hash

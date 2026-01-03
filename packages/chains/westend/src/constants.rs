@@ -9,3 +9,9 @@ pub fn fetch_epoch_duration(api: &OnlineClient<SubstrateConfig>) -> Result<Value
     let addr = node_runtime::constants().babe().epoch_duration();
     Ok(api.constants().at(&addr)?)
 }
+
+/// Fetch babe expected block time in miliseconds
+pub fn fetch_expected_block_time(api: &OnlineClient<SubstrateConfig>) -> Result<Value, Error> {
+    let addr = node_runtime::constants().babe().expected_block_time();
+    Ok(api.constants().at(&addr)?)
+}
