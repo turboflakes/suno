@@ -1,7 +1,11 @@
 use super::node_runtime;
+use crate::constants::fetch_sessions_per_era;
 use node_runtime::{
-    runtime_types::pallet_staking_async::{
-        ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, ValidatorPrefs,
+    runtime_types::{
+        bounded_collections::bounded_vec::BoundedVec,
+        pallet_staking_async::{
+            ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, ValidatorPrefs,
+        },
     },
     staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
 };
@@ -12,7 +16,7 @@ use subxt::{
 };
 use suno_error::Error;
 use suno_primitives::{
-    staking::{StakeLedger, StakeOverview},
+    staking::{Era, StakeLedger, StakeOverview},
     AccountKey,
 };
 
@@ -106,6 +110,46 @@ pub async fn fetch_validators_era_points(
     }
 
     Ok(HashMap::new())
+}
+
+/// Fetch era data at the specified block hash
+pub async fn fetch_era_data(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<Era, Error> {
+    let sessions_per_era = fetch_sessions_per_era(api)?;
+    let era_info = fetch_active_era_info(api, block_hash).await?;
+    let BoundedVec(bonded_eras) = fetch_bonded_eras(api, block_hash).await?;
+    let start_session: u64 = bonded_eras
+        .iter()
+        .find(|b| b.0 == era_info.index)
+        .map(|c| c.1 as u64)
+        .unwrap_or(0);
+
+    Ok(Era::new(
+        era_info.index,
+        era_info.start.unwrap_or(0),
+        start_session,
+        sessions_per_era,
+    ))
+}
+
+/// Fetch bonded eras at the specified block hash
+async fn fetch_bonded_eras(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<BoundedVec<(u32, u32)>, Error> {
+    let addr = node_runtime::storage().staking().bonded_eras();
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "BondedEras not defined at block hash {block_hash:?}"
+            ))
+        })
 }
 
 /// Fetch validator prefs at the specified block hash

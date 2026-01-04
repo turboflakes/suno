@@ -190,7 +190,7 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.validators.spawn_fetch_validators_data_from_asset_hub(
+                                self.validators.spawn_fetch_initial_data_from_asset_hub(
                                     &api, block_hash, &runtime,
                                 )
                             }
@@ -234,6 +234,9 @@ impl App {
                     }
                     _ => {}
                 }
+            }
+            ChainAction::UpdateEra(chain_key, era) => {
+                self.chains.update_era(&chain_key, era);
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);

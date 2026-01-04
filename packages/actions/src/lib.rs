@@ -5,7 +5,7 @@ use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
-    staking::{StakeLedger, StakeOverview},
+    staking::{Era, StakeLedger, StakeOverview},
     AccountKey,
 };
 
@@ -58,6 +58,7 @@ pub enum ChainAction {
     UpdateConnectionState(ChainKey, ConnectionState),
     UpdateBestBlock(ChainKey, BlockNumber),
     UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
+    UpdateEra(ChainKey, Era),
     UpdateEpoch(ChainKey, Epoch),
     FetchValidatorData(ValidatorKey),
     FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),

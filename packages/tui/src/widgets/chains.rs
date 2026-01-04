@@ -17,7 +17,7 @@ use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
-    Epoch, Staking,
+    Epoch, Era, Staking,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -34,6 +34,7 @@ pub struct Chain {
     // finalized_block_ts value is the timestamp in milliseconds the finalized block was updated
     finalized_block_ts: u128,
     staking: Option<Staking>,
+    era: Option<Era>,
     epoch: Option<Epoch>,
     state: ConnectionState,
 }
@@ -48,6 +49,7 @@ impl Chain {
             finalized_block_ts: 0,
             finalized_block_hash: None,
             staking: None,
+            era: None,
             epoch: None,
             state: ConnectionState::default(),
         }
@@ -75,6 +77,10 @@ impl Chain {
 
     pub fn finalized_block(&self) -> u64 {
         self.finalized_block
+    }
+
+    pub fn era(&self) -> &Option<Era> {
+        &self.era
     }
 
     pub fn epoch(&self) -> &Option<Epoch> {
@@ -178,6 +184,14 @@ impl ChainsListState {
                 chain.state = state;
                 return true;
             }
+        }
+        false
+    }
+
+    pub fn set_era(&mut self, chain_key: &ChainKey, data: Era) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.era = Some(data);
+            return true;
         }
         false
     }
@@ -373,6 +387,11 @@ impl ChainsListWidget {
     ) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_finalized_block(chain_key, block_number, block_hash)
+    }
+
+    pub fn update_era(&self, chain_key: &ChainKey, era: Era) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_era(chain_key, era)
     }
 
     pub fn update_epoch(&self, chain_key: &ChainKey, epoch: Epoch) -> bool {

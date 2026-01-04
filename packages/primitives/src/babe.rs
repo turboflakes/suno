@@ -34,6 +34,10 @@ impl Epoch {
         self.duration_bn
     }
 
+    pub fn block_time_ms(&self) -> u64 {
+        self.block_time_ms
+    }
+
     pub fn progress(&self, current_block_number: u64) -> f64 {
         if current_block_number < self.start() {
             return 0.0;

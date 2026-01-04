@@ -524,7 +524,7 @@ impl ValidatorsListWidget {
         });
     }
 
-    pub fn spawn_fetch_validators_data_from_asset_hub(
+    pub fn spawn_fetch_initial_data_from_asset_hub(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -537,7 +537,7 @@ impl ValidatorsListWidget {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_data_from_asset_hub(
+            if let Err(e) = fetch_and_send_initial_data_from_asset_hub(
                 &api,
                 block_hash,
                 &runtime,
@@ -730,61 +730,81 @@ impl<'a> Widget for &ValidatorsDetailWidget<'a> {
 impl<'a> ValidatorsDetailWidget<'a> {
     fn render_table_header(&self, runtime: SupportedRuntime, area: Rect, buf: &mut Buffer) {
         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
-            let header_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(28), // Network info
-                    Constraint::Fill(1),    // Era / Session progress bar
-                    Constraint::Length(16), // Countdown
+            if let Some(ah_chain) = self
+                .chains
+                .get_chain_by_runtime(&runtime.asset_hub_runtime())
+            {
+                let header_layout = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(28), // Network info
+                        Constraint::Fill(1),    // Era / Session progress bar
+                        Constraint::Length(16), // Countdown
+                    ])
+                    .split(area);
+
+                // TODO: Get onchain data
+                let network_info = Paragraph::new(vec![
+                    Line::from(format!("# {}", runtime))
+                        .style(Style::default().fg(Color::Blue).bold()),
+                    Line::from(format!("validators: {}/{}", 1000, 2500)),
+                    Line::from(format!("nominators: {}/{}", 23000, 31500)),
+                    Line::from(format!("staked: {:.2}%", 55.0)),
                 ])
-                .split(area);
+                .style(Style::default().fg(Color::Blue));
 
-            // TODO: Get onchain data
-            let network_info = Paragraph::new(vec![
-                Line::from(format!("# {}", runtime)).style(Style::default().fg(Color::Blue).bold()),
-                Line::from(format!("validators: {}/{}", 1000, 2500)),
-                Line::from(format!("nominators: {}/{}", 23000, 31500)),
-                Line::from(format!("staked: {:.2}%", 55.0)),
-            ])
-            .style(Style::default().fg(Color::Blue));
+                network_info.render(header_layout[0], buf);
 
-            network_info.render(header_layout[0], buf);
+                let Some(epoch) = chain.epoch() else {
+                    // TODO: Handle epoch not available, maybe render loading indicator
+                    return;
+                };
 
-            let Some(epoch) = chain.epoch() else {
-                // TODO: Handle epoch not available, maybe render loading indicator
-                return;
+                let epoch_progress = epoch.progress(chain.finalized_block());
+                let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
+
+                let Some(era) = ah_chain.era() else {
+                    // TODO: Handle era not available, maybe render loading indicator
+                    return;
+                };
+
+                let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
+                let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
+
+                let progress_info = Paragraph::new(vec![
+                    Line::from(""),
+                    Line::from(format!(
+                        "era {} {:.0}% {}",
+                        era.index(),
+                        era_progress * 100 as f64,
+                        era_progress_bar
+                    ))
+                    .alignment(Alignment::Right),
+                    Line::from(format!(
+                        "epoch {} {:.0}% {}",
+                        epoch.index(),
+                        epoch_progress * 100 as f64,
+                        epoch_progress_bar,
+                    ))
+                    .alignment(Alignment::Right),
+                ])
+                .style(Style::default().fg(Color::Blue));
+
+                progress_info.render(header_layout[1], buf);
+
+                let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
+                let era_countdown_time =
+                    era.countdown_time(epoch.duration(), epoch.block_time_ms());
+
+                let countdown_info = Paragraph::new(vec![
+                    Line::from(""),
+                    Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
+                    Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
+                ])
+                .style(Style::default().fg(Color::Blue));
+
+                countdown_info.render(header_layout[2], buf);
             };
-
-            let epoch_progress = epoch.progress(chain.finalized_block());
-            let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
-
-            let progress_info = Paragraph::new(vec![
-                Line::from(""),
-                // Line::from(format!(
-                //     "era 8999 (35% / 2hrs 2min) [▰▰▰▰▰▰/▰▰▰▰▰▰/▰▰▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱/▱▱▱▱▱▱]"
-                // ))
-                // .alignment(Alignment::Right),
-                Line::from(format!(
-                    "epoch {} {:.2}% {}",
-                    epoch.index(),
-                    epoch_progress * 100 as f64,
-                    epoch_progress_bar,
-                ))
-                .alignment(Alignment::Right),
-            ])
-            .style(Style::default().fg(Color::Blue));
-
-            progress_info.render(header_layout[1], buf);
-
-            let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
-
-            let countdown_info = Paragraph::new(vec![
-                Line::from(""),
-                Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
-            ])
-            .style(Style::default().fg(Color::Blue));
-
-            countdown_info.render(header_layout[2], buf);
         };
     }
 
@@ -1004,7 +1024,7 @@ async fn fetch_and_send_validator_data_from_asset_hub(
     Ok(())
 }
 
-async fn fetch_and_send_validators_data_from_asset_hub(
+async fn fetch_and_send_initial_data_from_asset_hub(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
@@ -1012,9 +1032,10 @@ async fn fetch_and_send_validators_data_from_asset_hub(
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
     // Execute the appropriate fetches based on runtime
-    let (era_points_result, staker_overview_result) = match runtime {
+    let (era_result, era_points_result, staker_overview_result) = match runtime {
         SupportedRuntime::AssetHubPolkadot => {
             tokio::join!(
+                suno_asset_hub_polkadot::fetch_era_data(api, block_hash),
                 suno_asset_hub_polkadot::fetch_validators_era_points(
                     api,
                     block_hash,
@@ -1029,6 +1050,7 @@ async fn fetch_and_send_validators_data_from_asset_hub(
         }
         SupportedRuntime::AssetHubKusama => {
             tokio::join!(
+                suno_asset_hub_kusama::fetch_era_data(api, block_hash),
                 suno_asset_hub_kusama::fetch_validators_era_points(api, block_hash, validator_keys),
                 suno_asset_hub_kusama::fetch_validators_stake_overview(
                     api,
@@ -1039,6 +1061,7 @@ async fn fetch_and_send_validators_data_from_asset_hub(
         }
         SupportedRuntime::AssetHubPaseo => {
             tokio::join!(
+                suno_asset_hub_paseo::fetch_era_data(api, block_hash),
                 suno_asset_hub_paseo::fetch_validators_era_points(api, block_hash, validator_keys),
                 suno_asset_hub_paseo::fetch_validators_stake_overview(
                     api,
@@ -1049,6 +1072,7 @@ async fn fetch_and_send_validators_data_from_asset_hub(
         }
         SupportedRuntime::AssetHubWestend => {
             tokio::join!(
+                suno_asset_hub_westend::fetch_era_data(api, block_hash),
                 suno_asset_hub_westend::fetch_validators_era_points(
                     api,
                     block_hash,
@@ -1066,6 +1090,18 @@ async fn fetch_and_send_validators_data_from_asset_hub(
             return Ok(());
         }
     };
+
+    // Handle era result
+    match era_result {
+        Ok(era) => {
+            tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch era data for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
+    }
 
     // Handle era_points - same for all runtimes
     match era_points_result {
