@@ -51,8 +51,14 @@ impl Era {
             .unwrap()
             .as_millis();
 
-        let diff = self.duration_ms(blocks_per_session, block_time_ms)
-            - (now - self.start_ts as u128) as u64;
+        let duration = self.duration_ms(blocks_per_session, block_time_ms);
+
+        if duration < (now - self.start_ts as u128) as u64 {
+            return format_millis(0);
+        }
+
+        let diff = duration - (now - self.start_ts as u128) as u64;
+
         format_millis(diff)
     }
 }
