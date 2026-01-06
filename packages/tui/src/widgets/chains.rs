@@ -17,7 +17,7 @@ use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
-    Epoch, Era, Staking,
+    Epoch, Era,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -26,16 +26,31 @@ type BlockHash = H256;
 
 #[derive(Debug, Clone)]
 pub struct Chain {
+    // Chain runtime details
     runtime: SupportedRuntime,
+    // Api client details
     client: OnlineClient<SubstrateConfig>,
+    // Best block number
     best_block: BlockNumber,
+    // Finalized block number
     finalized_block: BlockNumber,
+    // Finalized block timestamp
     finalized_block_hash: Option<BlockHash>,
-    // finalized_block_ts value is the timestamp in milliseconds the finalized block was updated
+    // Finalized block timestamp in milliseconds
     finalized_block_ts: u128,
-    staking: Option<Staking>,
+    // Era details
     era: Option<Era>,
+    // Epoch details
     epoch: Option<Epoch>,
+    // Active validators
+    active_vals: u32,
+    // Total validators
+    total_vals: u32,
+    // Active nominators
+    active_noms: u32,
+    // Total nominators
+    total_noms: u32,
+    // RPC Connection status
     state: ConnectionState,
 }
 
@@ -46,11 +61,14 @@ impl Chain {
             client,
             best_block: 0,
             finalized_block: 0,
-            finalized_block_ts: 0,
             finalized_block_hash: None,
-            staking: None,
+            finalized_block_ts: 0,
             era: None,
             epoch: None,
+            active_vals: 0,
+            total_vals: 0,
+            active_noms: 0,
+            total_noms: 0,
             state: ConnectionState::default(),
         }
     }
@@ -85,6 +103,22 @@ impl Chain {
 
     pub fn epoch(&self) -> &Option<Epoch> {
         &self.epoch
+    }
+
+    pub fn active_validators(&self) -> u32 {
+        self.active_vals
+    }
+
+    pub fn total_validators(&self) -> u32 {
+        self.total_vals
+    }
+
+    pub fn active_nominators(&self) -> u32 {
+        self.active_noms
+    }
+
+    pub fn total_nominators(&self) -> u32 {
+        self.total_noms
     }
 
     pub fn block_hash(&self) -> Option<BlockHash> {
@@ -199,6 +233,38 @@ impl ChainsListState {
     pub fn set_epoch(&mut self, chain_key: &ChainKey, data: Epoch) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             chain.epoch = Some(data);
+            return true;
+        }
+        false
+    }
+
+    pub fn set_active_vals(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.active_vals = counter;
+            return true;
+        }
+        false
+    }
+
+    pub fn set_total_vals(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.total_vals = counter;
+            return true;
+        }
+        false
+    }
+
+    pub fn set_active_noms(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.active_noms = counter;
+            return true;
+        }
+        false
+    }
+
+    pub fn set_total_noms(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.total_noms = counter;
             return true;
         }
         false
@@ -399,7 +465,27 @@ impl ChainsListWidget {
         state.set_epoch(chain_key, epoch)
     }
 
-    pub fn spawn_fetch_epoch_data(
+    pub fn update_active_validators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_active_vals(chain_key, counter)
+    }
+
+    pub fn update_total_validators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_total_vals(chain_key, counter)
+    }
+
+    pub fn update_active_nominators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_active_noms(chain_key, counter)
+    }
+
+    pub fn update_total_nominators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_total_noms(chain_key, counter)
+    }
+
+    pub fn spawn_fetch_initial_data_from_relay_chain(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -411,7 +497,7 @@ impl ChainsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) =
-                fetch_and_send_chain_data(&api, block_hash, &chain_key, tx.clone()).await
+                fetch_initial_data_from_relay_chain(&api, block_hash, &chain_key, tx.clone()).await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
@@ -570,7 +656,7 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
     });
 }
 
-async fn fetch_and_send_chain_data(
+async fn fetch_initial_data_from_relay_chain(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
@@ -578,7 +664,6 @@ async fn fetch_and_send_chain_data(
 ) -> Result<(), TuiError> {
     let (epoch_result,) = match runtime {
         SupportedRuntime::Polkadot => {
-            // TODO: Add more fetches here to run them in parallel/
             tokio::join!(suno_polkadot::fetch_epoch_data(api, block_hash),)
         }
         SupportedRuntime::Kusama => {

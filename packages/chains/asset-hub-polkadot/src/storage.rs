@@ -11,6 +11,7 @@ use node_runtime::{
 };
 use std::collections::{HashMap, HashSet};
 use subxt::{
+    ext::futures::StreamExt,
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
@@ -134,6 +135,59 @@ pub async fn fetch_era_data(
     ))
 }
 
+/// Fetch active validators at the specified block hash
+pub async fn fetch_active_validators(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u32, Error> {
+    let active_era_info = fetch_active_era_info(api, block_hash).await?;
+
+    let addr = node_runtime::storage()
+        .staking()
+        .eras_stakers_overview_iter1(active_era_info.index);
+
+    let iter = api.storage().at(block_hash).iter(addr).await?;
+    let count = iter.count().await;
+
+    Ok(count as u32)
+}
+
+/// Fetch total validators at the specified block hash
+pub async fn fetch_total_validators(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u32, Error> {
+    let addr = node_runtime::storage().staking().counter_for_validators();
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "Total validators not defined at block hash {block_hash:?}"
+            ))
+        })
+}
+
+/// Fetch total nominators at the specified block hash
+pub async fn fetch_total_nominators(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u32, Error> {
+    let addr = node_runtime::storage().staking().counter_for_nominators();
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "Total nominators not defined at block hash {block_hash:?}"
+            ))
+        })
+}
+
 /// Fetch bonded eras at the specified block hash
 async fn fetch_bonded_eras(
     api: &OnlineClient<SubstrateConfig>,
@@ -148,6 +202,25 @@ async fn fetch_bonded_eras(
         .ok_or_else(|| {
             Error::from(format!(
                 "BondedEras not defined at block hash {block_hash:?}"
+            ))
+        })
+}
+
+/// Fetch eras total stake for a specific era at the specified block hash
+async fn fetch_eras_total_stake(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    era: u32,
+) -> Result<u128, Error> {
+    let addr = node_runtime::storage().staking().eras_total_stake(era);
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "Counter for nominators not defined at block hash {block_hash:?}"
             ))
         })
 }

@@ -743,12 +743,20 @@ impl<'a> ValidatorsDetailWidget<'a> {
                     ])
                     .split(area);
 
-                // TODO: Get onchain data
                 let network_info = Paragraph::new(vec![
                     Line::from(format!("# {}", runtime))
                         .style(Style::default().fg(Color::Blue).bold()),
-                    Line::from(format!("validators: {}/{}", 1000, 2500)),
-                    Line::from(format!("nominators: {}/{}", 23000, 31500)),
+                    Line::from(format!(
+                        "validators: {}/{}",
+                        ah_chain.active_validators(),
+                        ah_chain.total_validators()
+                    )),
+                    Line::from(format!(
+                        "nominators: {}/{}",
+                        ah_chain.active_nominators(),
+                        ah_chain.total_nominators()
+                    )),
+                    // TODO: Get onchain data
                     Line::from(format!("staked: {:.2}%", 55.0)),
                 ])
                 .style(Style::default().fg(Color::Blue));
@@ -1032,7 +1040,14 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
     // Execute the appropriate fetches based on runtime
-    let (era_result, era_points_result, staker_overview_result) = match runtime {
+    let (
+        era_result,
+        era_points_result,
+        staker_overview_result,
+        active_validators_result,
+        total_validators_result,
+        total_nominators_result,
+    ) = match runtime {
         SupportedRuntime::AssetHubPolkadot => {
             tokio::join!(
                 suno_asset_hub_polkadot::fetch_era_data(api, block_hash),
@@ -1045,7 +1060,10 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     api,
                     block_hash,
                     validator_keys
-                )
+                ),
+                suno_asset_hub_polkadot::fetch_active_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_nominators(api, block_hash),
             )
         }
         SupportedRuntime::AssetHubKusama => {
@@ -1056,7 +1074,10 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     api,
                     block_hash,
                     validator_keys
-                )
+                ),
+                suno_asset_hub_polkadot::fetch_active_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_nominators(api, block_hash),
             )
         }
         SupportedRuntime::AssetHubPaseo => {
@@ -1067,7 +1088,10 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     api,
                     block_hash,
                     validator_keys
-                )
+                ),
+                suno_asset_hub_polkadot::fetch_active_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_nominators(api, block_hash),
             )
         }
         SupportedRuntime::AssetHubWestend => {
@@ -1082,7 +1106,10 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     api,
                     block_hash,
                     validator_keys
-                )
+                ),
+                suno_asset_hub_polkadot::fetch_active_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_validators(api, block_hash),
+                suno_asset_hub_polkadot::fetch_total_nominators(api, block_hash),
             )
         }
         _ => {
@@ -1131,6 +1158,48 @@ async fn fetch_and_send_initial_data_from_asset_hub(
             }
         }
         Err(e) => warn!("Failed to fetch validators stake overview: {}", e),
+    }
+
+    match active_validators_result {
+        Ok(counter) => {
+            tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
+                runtime.clone(),
+                counter,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch active validators counter for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
+    }
+
+    match total_validators_result {
+        Ok(counter) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
+                runtime.clone(),
+                counter,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch total validators counter for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
+    }
+
+    match total_nominators_result {
+        Ok(counter) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
+                runtime.clone(),
+                counter,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch total nominators counter for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
     }
 
     Ok(())

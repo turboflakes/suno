@@ -11,6 +11,7 @@ use suno_primitives::{
 
 type Commission = u32;
 type Points = u32;
+type Counter = u32;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,6 +61,10 @@ pub enum ChainAction {
     UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
     UpdateEra(ChainKey, Era),
     UpdateEpoch(ChainKey, Epoch),
+    UpdateActiveValidators(ChainKey, Counter),
+    UpdateTotalValidators(ChainKey, Counter),
+    UpdateActiveNominators(ChainKey, Counter),
+    UpdateTotalNominators(ChainKey, Counter),
     FetchValidatorData(ValidatorKey),
     FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
 }

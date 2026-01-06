@@ -7,4 +7,4 @@ pub mod staking;
 pub use babe::Epoch;
 pub use key::AccountKey;
 pub use node_account::{AccountDisplay, Collator, NodeAccount};
-pub use staking::{Era, Staking};
+pub use staking::Era;

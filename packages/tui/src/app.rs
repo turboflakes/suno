@@ -11,7 +11,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
-use log::{error, warn};
+use log::error;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::network::ConnectionState;
@@ -179,8 +179,9 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.chains
-                                    .spawn_fetch_epoch_data(&api, block_hash, &runtime)
+                                self.chains.spawn_fetch_initial_data_from_relay_chain(
+                                    &api, block_hash, &runtime,
+                                )
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -240,6 +241,18 @@ impl App {
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
+            }
+            ChainAction::UpdateActiveValidators(chain_key, counter) => {
+                self.chains.update_active_validators(&chain_key, counter);
+            }
+            ChainAction::UpdateTotalValidators(chain_key, counter) => {
+                self.chains.update_total_validators(&chain_key, counter);
+            }
+            ChainAction::UpdateActiveNominators(chain_key, counter) => {
+                self.chains.update_active_validators(&chain_key, counter);
+            }
+            ChainAction::UpdateTotalNominators(chain_key, counter) => {
+                self.chains.update_total_nominators(&chain_key, counter);
             }
             ChainAction::FetchValidatorData(validator_key) => {
                 if let Some((api, block_hash)) =

@@ -63,21 +63,6 @@ impl Era {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Staking {
-    nominators_count: u32,
-    validators_count: u32,
-}
-
-impl Staking {
-    pub fn new() -> Self {
-        Self {
-            nominators_count: 0,
-            validators_count: 0,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct StakeOverview {
     pub own: u128,
