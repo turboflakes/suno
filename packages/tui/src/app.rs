@@ -193,7 +193,14 @@ impl App {
                             {
                                 self.validators.spawn_fetch_initial_data_from_asset_hub(
                                     &api, block_hash, &runtime,
-                                )
+                                );
+
+                                self.validators
+                                    .spawn_fetch_validators_commission(&api, block_hash, &runtime);
+
+                                self.validators.spawn_fetch_validators_staking_ledger(
+                                    &api, block_hash, &runtime,
+                                );
                             }
                         }
                         SupportedRuntime::PeoplePolkadot
@@ -228,16 +235,35 @@ impl App {
                         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
                             let api = chain.client();
                             self.validators
-                                .spawn_fetch_all_validators_points_from_relay(
-                                    api, block_hash, &runtime,
-                                )
+                                .spawn_fetch_validators_points_from_relay(api, block_hash, &runtime)
                         }
                     }
                     _ => {}
                 }
             }
             ChainAction::UpdateEra(chain_key, era) => {
-                self.chains.update_era(&chain_key, era);
+                self.chains.update_era(&chain_key, era.clone());
+
+                // Fetch data relevant to be synced whenever era changes
+                let runtime = chain_key;
+                match runtime {
+                    SupportedRuntime::AssetHubPolkadot
+                    | SupportedRuntime::AssetHubKusama
+                    | SupportedRuntime::AssetHubPaseo
+                    | SupportedRuntime::AssetHubWestend => {
+                        if let Some((api, block_hash)) =
+                            self.chains.get_api_and_block_hash(&runtime)
+                        {
+                            self.validators.spawn_fetch_validators_stake_overview(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                            )
+                        }
+                    }
+                    _ => {}
+                }
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
@@ -249,32 +275,10 @@ impl App {
                 self.chains.update_total_validators(&chain_key, counter);
             }
             ChainAction::UpdateActiveNominators(chain_key, counter) => {
-                self.chains.update_active_validators(&chain_key, counter);
+                self.chains.update_active_nominators(&chain_key, counter);
             }
             ChainAction::UpdateTotalNominators(chain_key, counter) => {
                 self.chains.update_total_nominators(&chain_key, counter);
-            }
-            ChainAction::FetchValidatorData(validator_key) => {
-                if let Some((api, block_hash)) =
-                    self.chains.get_api_and_block_hash(&validator_key.runtime())
-                {
-                    self.validators.spawn_fetch_validator_data_from_relay(
-                        &api,
-                        block_hash,
-                        &validator_key,
-                    )
-                }
-
-                if let Some((api, block_hash)) = self
-                    .chains
-                    .get_api_and_block_hash(&validator_key.runtime().asset_hub_runtime())
-                {
-                    self.validators.spawn_fetch_validator_data_from_asset_hub(
-                        &api,
-                        block_hash,
-                        &validator_key,
-                    )
-                }
             }
             _ => {}
         }

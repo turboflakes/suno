@@ -17,6 +17,7 @@ use subxt::{
 };
 use suno_error::Error;
 use suno_primitives::{
+    node_account::get_account_bytes_from_storage_key,
     staking::{Era, StakeLedger, StakeOverview},
     AccountKey,
 };
@@ -29,28 +30,6 @@ pub async fn fetch_validator_commission(
 ) -> Result<u32, Error> {
     let prefs = fetch_validator_prefs(api, block_hash, stash).await?;
     Ok(prefs.commission.0)
-}
-
-/// Fetch validators stake information
-pub async fn fetch_validators_stake_overview(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    validator_keys: &Vec<AccountKey>,
-) -> Result<HashMap<[u8; 32], StakeOverview>, Error> {
-    let active_era_info = fetch_active_era_info(api, block_hash).await?;
-
-    let mut stakes_map = HashMap::new();
-
-    for key in validator_keys {
-        if let Some(data) =
-            fetch_validator_stake_overview(api, block_hash, active_era_info.index, &key.stash())
-                .await?
-        {
-            stakes_map.insert(key.bytes(), data);
-        }
-    }
-
-    Ok(stakes_map)
 }
 
 /// Fetch validator stake overview
@@ -135,8 +114,45 @@ pub async fn fetch_era_data(
     ))
 }
 
+/// Fetch active validators and nominators at the specified block hash
+pub async fn fetch_active_nominators_count(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u32, Error> {
+    let active_era_info = fetch_active_era_info(api, block_hash).await?;
+
+    let addr = node_runtime::storage()
+        .staking()
+        .eras_stakers_overview_iter1(active_era_info.index);
+
+    let mut validators_set = HashSet::<[u8; 32]>::new();
+    let mut iter = api.storage().at(block_hash).iter(addr).await?;
+    while let Some(Ok(storage_kv)) = iter.next().await {
+        let account_id = get_account_bytes_from_storage_key(storage_kv.key_bytes);
+        validators_set.insert(account_id);
+    }
+
+    let mut nominators_count = 0u32;
+    let addr = node_runtime::storage().staking().nominators_iter();
+    let mut iter = api.storage().at(block_hash).iter(addr).await?;
+    while let Some(Ok(storage_kv)) = iter.next().await {
+        // Check if any of the nominator's targets is in the validators_set
+        if storage_kv
+            .value
+            .targets
+            .0
+            .iter()
+            .any(|target| validators_set.contains(&target.0))
+        {
+            nominators_count += 1;
+        }
+    }
+
+    Ok(nominators_count)
+}
+
 /// Fetch active validators at the specified block hash
-pub async fn fetch_active_validators(
+pub async fn fetch_active_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<u32, Error> {
@@ -153,7 +169,7 @@ pub async fn fetch_active_validators(
 }
 
 /// Fetch total validators at the specified block hash
-pub async fn fetch_total_validators(
+pub async fn fetch_total_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<u32, Error> {
@@ -171,7 +187,7 @@ pub async fn fetch_total_validators(
 }
 
 /// Fetch total nominators at the specified block hash
-pub async fn fetch_total_nominators(
+pub async fn fetch_total_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<u32, Error> {
