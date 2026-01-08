@@ -254,6 +254,20 @@ impl App {
                         if let Some((api, block_hash)) =
                             self.chains.get_api_and_block_hash(&runtime)
                         {
+                            self.validators.spawn_fetch_validators_era_points(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                            );
+
+                            self.validators.spawn_fetch_validators_stake_overview(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                            );
+
                             self.validators.spawn_fetch_validators_stake_overview(
                                 &api,
                                 block_hash,

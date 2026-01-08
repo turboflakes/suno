@@ -63,13 +63,10 @@ pub async fn fetch_validator_staking_ledger(
 pub async fn fetch_validators_era_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
+    era: u32,
     validator_keys: &Vec<AccountKey>,
 ) -> Result<HashMap<[u8; 32], u32>, Error> {
-    let active_era_info = fetch_active_era_info(api, block_hash).await?;
-
-    if let Some(reward_points) =
-        fetch_era_reward_points(api, block_hash, active_era_info.index).await?
-    {
+    if let Some(reward_points) = fetch_era_reward_points(api, block_hash, era).await? {
         let validator_bytes: HashSet<[u8; 32]> =
             validator_keys.iter().map(|key| key.bytes()).collect();
 

@@ -517,6 +517,27 @@ impl ValidatorsListWidget {
         block_hash: H256,
         runtime: &SupportedRuntime,
     ) {
+        let api = api.clone();
+        let runtime = runtime.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) =
+                fetch_and_send_initial_data_from_asset_hub(&api, block_hash, &runtime, tx.clone())
+                    .await
+            {
+                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+            }
+        });
+    }
+
+    pub fn spawn_fetch_validators_era_points(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: &SupportedRuntime,
+        era_index: u32,
+    ) {
         let state = self.state.read().unwrap();
         let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
         let api = api.clone();
@@ -524,10 +545,11 @@ impl ValidatorsListWidget {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_initial_data_from_asset_hub(
+            if let Err(e) = fetch_and_send_validators_era_points(
                 &api,
                 block_hash,
                 &runtime,
+                era_index,
                 &validator_keys,
                 tx.clone(),
             )
@@ -1026,19 +1048,16 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
     let (
         era_data_fut,
-        validators_era_points_fut,
         active_validators_count_fut,
         total_validators_count_fut,
         active_nominators_count_fut,
         total_nominators_count_fut,
     ): (
         BoxFuture<'_, Result<Era, Error>>,
-        BoxFuture<'_, Result<HashMap<[u8; 32], u32>, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
@@ -1046,11 +1065,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     ) = match runtime {
         SupportedRuntime::AssetHubPolkadot => (
             Box::pin(suno_asset_hub_polkadot::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_polkadot::fetch_validators_era_points(
-                api,
-                block_hash,
-                validator_keys,
-            )),
             Box::pin(suno_asset_hub_polkadot::fetch_active_validators_count(
                 api, block_hash,
             )),
@@ -1066,11 +1080,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubKusama => (
             Box::pin(suno_asset_hub_kusama::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_kusama::fetch_validators_era_points(
-                api,
-                block_hash,
-                validator_keys,
-            )),
             Box::pin(suno_asset_hub_kusama::fetch_active_validators_count(
                 api, block_hash,
             )),
@@ -1086,11 +1095,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubPaseo => (
             Box::pin(suno_asset_hub_paseo::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_paseo::fetch_validators_era_points(
-                api,
-                block_hash,
-                validator_keys,
-            )),
             Box::pin(suno_asset_hub_paseo::fetch_active_validators_count(
                 api, block_hash,
             )),
@@ -1106,11 +1110,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubWestend => (
             Box::pin(suno_asset_hub_westend::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_westend::fetch_validators_era_points(
-                api,
-                block_hash,
-                validator_keys,
-            )),
             Box::pin(suno_asset_hub_westend::fetch_active_validators_count(
                 api, block_hash,
             )),
@@ -1131,7 +1130,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     };
 
     let mut era_data_fut = era_data_fut.fuse();
-    let mut validators_era_points_fut = validators_era_points_fut.fuse();
     let mut active_validators_count_fut = active_validators_count_fut.fuse();
     let mut total_validators_count_fut = total_validators_count_fut.fuse();
     let mut active_nominators_count_fut = active_nominators_count_fut.fuse();
@@ -1146,24 +1144,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     }
                     Err(e) => warn!(
                         "Failed to fetch era data: {}",
-                        e
-                    ),
-                }
-            }
-            validators_era_points_result = validators_era_points_fut => {
-                match validators_era_points_result {
-                    Ok(points_map) => {
-                        for key in validator_keys {
-                            if let Some(points) = points_map.get(&key.bytes()).copied() {
-                                tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
-                                    key.clone(),
-                                    points,
-                                )))?;
-                            }
-                        }
-                    }
-                    Err(e) => warn!(
-                        "Failed to fetch validators_era_points {}",
                         e
                     ),
                 }
@@ -1226,6 +1206,74 @@ async fn fetch_and_send_initial_data_from_asset_hub(
             }
             complete => break
         }
+    }
+
+    Ok(())
+}
+
+async fn fetch_and_send_validators_era_points(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    era_index: u32,
+    validator_keys: &Vec<AccountKey>,
+    tx: UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    let validators_era_points_result = match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            suno_asset_hub_polkadot::fetch_validators_era_points(
+                api,
+                block_hash,
+                era_index,
+                validator_keys,
+            )
+            .await
+        }
+        SupportedRuntime::AssetHubKusama => {
+            suno_asset_hub_polkadot::fetch_validators_era_points(
+                api,
+                block_hash,
+                era_index,
+                validator_keys,
+            )
+            .await
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            suno_asset_hub_polkadot::fetch_validators_era_points(
+                api,
+                block_hash,
+                era_index,
+                validator_keys,
+            )
+            .await
+        }
+        SupportedRuntime::AssetHubWestend => {
+            suno_asset_hub_polkadot::fetch_validators_era_points(
+                api,
+                block_hash,
+                era_index,
+                validator_keys,
+            )
+            .await
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
+
+    match validators_era_points_result {
+        Ok(points_map) => {
+            for key in validator_keys {
+                if let Some(points) = points_map.get(&key.bytes()).copied() {
+                    tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
+                        key.clone(),
+                        points,
+                    )))?;
+                }
+            }
+        }
+        Err(e) => warn!("Failed to fetch validators_era_points {}", e),
     }
 
     Ok(())
