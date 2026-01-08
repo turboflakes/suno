@@ -780,7 +780,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
                 let header_layout = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
-                        Constraint::Length(28), // Network info
+                        Constraint::Length(48), // Network info
                         Constraint::Fill(1),    // Era / Session progress bar
                         Constraint::Length(16), // Countdown
                     ])
@@ -790,17 +790,19 @@ impl<'a> ValidatorsDetailWidget<'a> {
                     Line::from(format!("# {}", runtime))
                         .style(Style::default().fg(Color::Blue).bold()),
                     Line::from(format!(
-                        "validators: {}/{}",
-                        ah_chain.active_validators(),
-                        ah_chain.total_validators()
+                        "validators: {} active {} waiting",
+                        ah_chain.active_validators_count(),
+                        ah_chain.waiting_validators_count()
                     )),
                     Line::from(format!(
-                        "nominators: {}/{}",
-                        ah_chain.active_nominators(),
-                        ah_chain.total_nominators()
+                        "nominators: {} active {} waiting",
+                        ah_chain.active_nominators_count(),
+                        ah_chain.waiting_nominators_count()
                     )),
-                    // TODO: Get onchain data
-                    Line::from(format!("staked: {:.2}%", 55.0)),
+                    Line::from(format!(
+                        "total staked: {}",
+                        ah_chain.total_staked_percentage()
+                    )),
                 ])
                 .style(Style::default().fg(Color::Blue));
 

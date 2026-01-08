@@ -1,6 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
+use sp_arithmetic::Permill;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
@@ -12,6 +13,7 @@ use suno_primitives::{
 type Commission = u32;
 type Points = u32;
 type Counter = u32;
+type Rate = u128;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +63,7 @@ pub enum ChainAction {
     UpdateFinalizedBlock(ChainKey, BlockNumber, BlockHash),
     UpdateEra(ChainKey, Era),
     UpdateEpoch(ChainKey, Epoch),
+    UpdateTotalStaked(ChainKey, Permill),
     UpdateActiveValidators(ChainKey, Counter),
     UpdateTotalValidators(ChainKey, Counter),
     UpdateActiveNominators(ChainKey, Counter),

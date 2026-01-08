@@ -259,7 +259,14 @@ impl App {
                                 block_hash,
                                 &runtime,
                                 era.index(),
-                            )
+                            );
+
+                            self.chains.spawn_fetch_total_staked(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                            );
                         }
                     }
                     _ => {}
@@ -268,18 +275,22 @@ impl App {
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
             }
-            ChainAction::UpdateActiveValidators(chain_key, counter) => {
-                self.chains.update_active_validators(&chain_key, counter);
+            ChainAction::UpdateActiveValidators(chain_key, count) => {
+                self.chains.update_active_validators(&chain_key, count);
             }
-            ChainAction::UpdateTotalValidators(chain_key, counter) => {
-                self.chains.update_total_validators(&chain_key, counter);
+            ChainAction::UpdateTotalValidators(chain_key, count) => {
+                self.chains.update_total_validators(&chain_key, count);
             }
-            ChainAction::UpdateActiveNominators(chain_key, counter) => {
-                self.chains.update_active_nominators(&chain_key, counter);
+            ChainAction::UpdateActiveNominators(chain_key, count) => {
+                self.chains.update_active_nominators(&chain_key, count);
             }
-            ChainAction::UpdateTotalNominators(chain_key, counter) => {
-                self.chains.update_total_nominators(&chain_key, counter);
+            ChainAction::UpdateTotalNominators(chain_key, count) => {
+                self.chains.update_total_nominators(&chain_key, count);
             }
+            ChainAction::UpdateTotalStaked(chain_key, value) => {
+                self.chains.update_total_staked(&chain_key, value);
+            }
+
             _ => {}
         }
     }

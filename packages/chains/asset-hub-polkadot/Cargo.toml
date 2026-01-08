@@ -9,6 +9,7 @@ edition.workspace = true
 
 [dependencies]
 log = { workspace = true }
+sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../../actions" }

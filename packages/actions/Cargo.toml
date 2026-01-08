@@ -9,6 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
+sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
 suno-primitives = { path = "../primitives" }

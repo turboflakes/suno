@@ -9,6 +9,7 @@ use ratatui::{
     text::Text,
     widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
+use sp_arithmetic::Permill;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -50,6 +51,8 @@ pub struct Chain {
     active_noms: u32,
     // Total nominators
     total_noms: u32,
+    // Total staked rate
+    total_staked_pm: Permill,
     // RPC Connection status
     state: ConnectionState,
 }
@@ -69,6 +72,7 @@ impl Chain {
             total_vals: 0,
             active_noms: 0,
             total_noms: 0,
+            total_staked_pm: Permill::zero(),
             state: ConnectionState::default(),
         }
     }
@@ -105,20 +109,33 @@ impl Chain {
         &self.epoch
     }
 
-    pub fn active_validators(&self) -> u32 {
+    pub fn active_validators_count(&self) -> u32 {
         self.active_vals
     }
 
-    pub fn total_validators(&self) -> u32 {
+    pub fn total_validators_count(&self) -> u32 {
         self.total_vals
     }
 
-    pub fn active_nominators(&self) -> u32 {
+    pub fn waiting_validators_count(&self) -> u32 {
+        self.total_vals - self.active_vals
+    }
+
+    pub fn active_nominators_count(&self) -> u32 {
         self.active_noms
     }
 
-    pub fn total_nominators(&self) -> u32 {
+    pub fn total_nominators_count(&self) -> u32 {
         self.total_noms
+    }
+
+    pub fn waiting_nominators_count(&self) -> u32 {
+        self.total_noms - self.active_noms
+    }
+
+    pub fn total_staked_percentage(&self) -> String {
+        let percentage = self.total_staked_pm.deconstruct() as f64 / 10_000.0;
+        format!("{:.0}%", percentage)
     }
 
     pub fn block_hash(&self) -> Option<BlockHash> {
@@ -265,6 +282,14 @@ impl ChainsListState {
     pub fn set_total_noms(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             chain.total_noms = counter;
+            return true;
+        }
+        false
+    }
+
+    pub fn set_total_staked(&mut self, chain_key: &ChainKey, value: Permill) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.total_staked_pm = value;
             return true;
         }
         false
@@ -465,24 +490,29 @@ impl ChainsListWidget {
         state.set_epoch(chain_key, epoch)
     }
 
-    pub fn update_active_validators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+    pub fn update_active_validators(&self, chain_key: &ChainKey, count: u32) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_active_vals(chain_key, counter)
+        state.set_active_vals(chain_key, count)
     }
 
-    pub fn update_total_validators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+    pub fn update_total_validators(&self, chain_key: &ChainKey, count: u32) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_total_vals(chain_key, counter)
+        state.set_total_vals(chain_key, count)
     }
 
-    pub fn update_active_nominators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+    pub fn update_active_nominators(&self, chain_key: &ChainKey, count: u32) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_active_noms(chain_key, counter)
+        state.set_active_noms(chain_key, count)
     }
 
-    pub fn update_total_nominators(&self, chain_key: &ChainKey, counter: u32) -> bool {
+    pub fn update_total_nominators(&self, chain_key: &ChainKey, count: u32) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_total_noms(chain_key, counter)
+        state.set_total_noms(chain_key, count)
+    }
+
+    pub fn update_total_staked(&self, chain_key: &ChainKey, value: Permill) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_total_staked(chain_key, value)
     }
 
     pub fn spawn_fetch_initial_data_from_relay_chain(
@@ -498,6 +528,26 @@ impl ChainsListWidget {
         tokio::spawn(async move {
             if let Err(e) =
                 fetch_initial_data_from_relay_chain(&api, block_hash, &chain_key, tx.clone()).await
+            {
+                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+            }
+        });
+    }
+
+    pub fn spawn_fetch_total_staked(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: &SupportedRuntime,
+        era_index: u32,
+    ) {
+        let api = api.clone();
+        let runtime = runtime.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) =
+                fetch_and_send_total_staked(&api, block_hash, &runtime, era_index, tx.clone()).await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
@@ -691,6 +741,49 @@ async fn fetch_initial_data_from_relay_chain(
         }
         Err(e) => warn!(
             "Failed to fetch epoch data for {:?}: {}",
+            runtime.to_string(),
+            e
+        ),
+    }
+
+    Ok(())
+}
+
+async fn fetch_and_send_total_staked(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    era_index: u32,
+    tx: UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    let total_staked_result = match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            suno_asset_hub_polkadot::fetch_total_staked(api, block_hash, era_index).await
+        }
+        SupportedRuntime::AssetHubKusama => {
+            suno_asset_hub_kusama::fetch_total_staked(api, block_hash, era_index).await
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            suno_asset_hub_paseo::fetch_total_staked(api, block_hash, era_index).await
+        }
+        SupportedRuntime::AssetHubWestend => {
+            suno_asset_hub_westend::fetch_total_staked(api, block_hash, era_index).await
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    };
+
+    match total_staked_result {
+        Ok(value) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
+                runtime.clone(),
+                value,
+            )))?;
+        }
+        Err(e) => warn!(
+            "Failed to fetch total staked for {:?}: {}",
             runtime.to_string(),
             e
         ),

@@ -9,6 +9,7 @@ use node_runtime::{
     },
     staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
 };
+use sp_arithmetic::Permill;
 use std::collections::{HashMap, HashSet};
 use subxt::{
     ext::futures::StreamExt,
@@ -204,6 +205,25 @@ pub async fn fetch_total_nominators_count(
         })
 }
 
+/// Fetch total total staked for a specific era at the specified block hash
+pub async fn fetch_total_staked(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    era: u32,
+) -> Result<Permill, Error> {
+    let total_issuance = fetch_total_issuance(api, block_hash).await?;
+    let inactive_issuance = fetch_inactive_issuance(api, block_hash).await?;
+    let total_staked = fetch_eras_total_stake(api, block_hash, era).await?;
+
+    let active_issuance = total_issuance.saturating_sub(inactive_issuance);
+
+    if active_issuance == 0 {
+        return Ok(Permill::zero());
+    }
+
+    Ok(Permill::from_rational(total_staked, active_issuance))
+}
+
 /// Fetch bonded eras at the specified block hash
 async fn fetch_bonded_eras(
     api: &OnlineClient<SubstrateConfig>,
@@ -236,7 +256,43 @@ async fn fetch_eras_total_stake(
         .await?
         .ok_or_else(|| {
             Error::from(format!(
-                "Counter for nominators not defined at block hash {block_hash:?}"
+                "TotalStake not defined at block hash {block_hash:?} for era {era}"
+            ))
+        })
+}
+
+/// Fetch total issuance for at the specified block hash
+async fn fetch_total_issuance(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u128, Error> {
+    let addr = node_runtime::storage().balances().total_issuance();
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "TotalIssuance not defined at block hash {block_hash:?}"
+            ))
+        })
+}
+
+/// Fetch inactive issuance for at the specified block hash
+async fn fetch_inactive_issuance(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<u128, Error> {
+    let addr = node_runtime::storage().balances().inactive_issuance();
+
+    api.storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .ok_or_else(|| {
+            Error::from(format!(
+                "InactiveIssuance not defined at block hash {block_hash:?}"
             ))
         })
 }
