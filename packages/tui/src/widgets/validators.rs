@@ -38,7 +38,7 @@ type Commission = u32;
 type Points = u32;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum ValidatorState {
+pub enum ValidatorStatus {
     /// Validator is an authority in the active set
     Authority,
     /// Validator is an authority and also a parachain authority
@@ -74,7 +74,7 @@ pub struct Validator {
     pub era_points: Points,
     pub is_next_authority: bool,
     pub is_chilled: bool,
-    pub state: ValidatorState,
+    pub status: ValidatorStatus,
 }
 
 impl Validator {
@@ -91,7 +91,7 @@ impl Validator {
             era_points: 0,
             is_next_authority: false,
             is_chilled: false,
-            state: ValidatorState::default(),
+            status: ValidatorStatus::default(),
         }
     }
 
@@ -139,6 +139,14 @@ impl Validator {
             return None;
         }
         return Some(self.points - self.old_points);
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.status == ValidatorStatus::Authority || self.status == ValidatorStatus::ParaAuthority
+    }
+
+    pub fn is_waiting(&self) -> bool {
+        self.status == ValidatorStatus::Waiting
     }
 
     pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
@@ -729,40 +737,42 @@ impl<'a> Widget for &ValidatorsDetailWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
 
-        // Split area into sections for each runtime group
-        let grouped = state.get_validators_grouped_by_runtime();
+        let validators_grouped = state.get_validators_grouped_by_runtime();
 
         // Calculate heights for each section
+        const HEADER_HEIGHT: u16 = 5;
         let mut constraints = Vec::new();
-        for (_, validators) in &grouped {
-            let group_height = 6 + validators.len() as u16;
+        for (_, validators) in &validators_grouped {
+            // height of header + validators + 1 for the validators table header + 1 for bottom padding
+            let group_height = HEADER_HEIGHT + validators.len() as u16 + 1 + 1;
             constraints.push(Constraint::Length(group_height));
         }
 
-        let chunks = Layout::default()
+        // Split area into sections for each runtime group
+        let layout_rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
             .split(area);
 
-        for (i, (runtime, validators)) in grouped.into_iter().enumerate() {
-            let group_area = chunks[i];
+        for (i, (runtime, validators)) in validators_grouped.into_iter().enumerate() {
+            let section_area = layout_rows[i];
 
-            // Split group area into header and body
-            let group_chunks = Layout::default()
+            // Split section area into header and body
+            let section_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(4), // Header height
-                    Constraint::Min(0),    // Body takes remaining
+                    Constraint::Length(HEADER_HEIGHT), // Header height
+                    Constraint::Min(0),                // Body takes remaining
                 ])
-                .split(group_area);
+                .split(section_area);
 
             // Render header with custom layout
-            self.render_table_header(runtime, group_chunks[0], buf);
+            self.render_table_header(runtime, validators.clone(), section_rows[0], buf);
 
             // Render validators table
             self.render_table_body(
                 validators,
-                group_chunks[1],
+                section_rows[1],
                 buf,
                 &mut state.table_state.clone(),
             );
@@ -771,16 +781,22 @@ impl<'a> Widget for &ValidatorsDetailWidget<'a> {
 }
 
 impl<'a> ValidatorsDetailWidget<'a> {
-    fn render_table_header(&self, runtime: SupportedRuntime, area: Rect, buf: &mut Buffer) {
+    fn render_table_header(
+        &self,
+        runtime: SupportedRuntime,
+        validators: Vec<&Validator>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
             if let Some(ah_chain) = self
                 .chains
                 .get_chain_by_runtime(&runtime.asset_hub_runtime())
             {
-                let header_layout = Layout::default()
+                let header_layout_cols = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
-                        Constraint::Length(48), // Network info
+                        Constraint::Length(82), // Network info
                         Constraint::Fill(1),    // Era / Session progress bar
                         Constraint::Length(16), // Countdown
                     ])
@@ -790,23 +806,28 @@ impl<'a> ValidatorsDetailWidget<'a> {
                     Line::from(format!("# {}", runtime))
                         .style(Style::default().fg(Color::Blue).bold()),
                     Line::from(format!(
-                        "validators: {} active {} waiting",
+                        "Total validators: {} active, {} waiting",
                         ah_chain.active_validators_count(),
-                        ah_chain.waiting_validators_count()
+                        ah_chain.waiting_validators_count(),
                     )),
                     Line::from(format!(
-                        "nominators: {} active {} waiting",
+                        "Total nominators: {} active, {} waiting",
                         ah_chain.active_nominators_count(),
                         ah_chain.waiting_nominators_count()
                     )),
                     Line::from(format!(
-                        "total staked: {}",
+                        "Total staked: {}",
                         ah_chain.total_staked_percentage()
+                    )),
+                    Line::from(format!(
+                        "On display: {} active, {} waiting",
+                        validators.iter().filter(|v| v.is_active()).count(),
+                        validators.iter().filter(|v| v.is_waiting()).count(),
                     )),
                 ])
                 .style(Style::default().fg(Color::Blue));
 
-                network_info.render(header_layout[0], buf);
+                network_info.render(header_layout_cols[0], buf);
 
                 let Some(epoch) = chain.epoch() else {
                     // TODO: Handle epoch not available, maybe render loading indicator
@@ -843,7 +864,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
                 ])
                 .style(Style::default().fg(Color::Blue));
 
-                progress_info.render(header_layout[1], buf);
+                progress_info.render(header_layout_cols[1], buf);
 
                 let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
                 let era_countdown_time =
@@ -856,7 +877,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
                 ])
                 .style(Style::default().fg(Color::Blue));
 
-                countdown_info.render(header_layout[2], buf);
+                countdown_info.render(header_layout_cols[2], buf);
             };
         };
     }

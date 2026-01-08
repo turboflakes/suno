@@ -135,7 +135,7 @@ impl Chain {
 
     pub fn total_staked_percentage(&self) -> String {
         let percentage = self.total_staked_pm.deconstruct() as f64 / 10_000.0;
-        format!("{:.0}%", percentage)
+        format!("{:.1}%", percentage)
     }
 
     pub fn block_hash(&self) -> Option<BlockHash> {
