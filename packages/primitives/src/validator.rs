@@ -13,15 +13,26 @@ type Points = u32;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ValidatorStatus {
-    /// Validator is an authority in the active set
+    /// Validator is an authority in the active set, displayed as [A]
     Authority,
-    /// Validator is an authority and also a parachain authority
+    /// Validator is an authority and also a parachain authority, displayed as [P]
     ParaAuthority,
-    /// Validator is in the waiting queue
-    Waiting,
-    /// Validator status is unknown or not yet determined
+    /// Validator is in the waiting queue, displayed as [W]
     #[default]
+    Waiting,
+    /// Validator status is unknown or not yet determined, displayed as [U]
     Unknown,
+}
+
+impl std::fmt::Display for ValidatorStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Authority => write!(f, "[A]"),
+            Self::ParaAuthority => write!(f, "[P]"),
+            Self::Waiting => write!(f, "[W]"),
+            Self::Unknown => write!(f, "[U]"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,12 +126,20 @@ impl Validator {
         return Some(self.points - self.old_points);
     }
 
+    pub fn status(&self) -> &ValidatorStatus {
+        &self.status
+    }
+
     pub fn is_active(&self) -> bool {
         self.status == ValidatorStatus::Authority || self.status == ValidatorStatus::ParaAuthority
     }
 
     pub fn is_waiting(&self) -> bool {
         self.status == ValidatorStatus::Waiting
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        self.status == ValidatorStatus::Unknown
     }
 }
 

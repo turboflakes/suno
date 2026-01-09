@@ -683,7 +683,7 @@ impl<'a> Widget for &ValidatorsDetailWidget<'a> {
         let validators_grouped = state.get_validators_grouped_by_runtime();
 
         // Calculate heights for each section
-        const HEADER_HEIGHT: u16 = 5;
+        const HEADER_HEIGHT: u16 = 6;
         let mut constraints = Vec::new();
         for (_, validators) in &validators_grouped {
             // height of header + validators + 1 for the validators table header + 1 for bottom padding
@@ -841,11 +841,18 @@ impl<'a> ValidatorsDetailWidget<'a> {
             };
 
             let decimals = v.runtime().token_decimals();
+            let staked_total = if v.is_active() { v.stake.total() } else { 0 };
+            let staked_own = if v.is_active() {
+                v.stake.own()
+            } else {
+                v.ledger.active()
+            };
             let validator_row = Row::new(vec![
+                Text::from(format!("{}", v.status())).alignment(Alignment::Left),
                 Text::from(format!("{}", v.display_name())).alignment(Alignment::Left),
                 text_points.alignment(Alignment::Right),
-                Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
-                Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
+                Text::from(format_planks(staked_total, decimals, 4)).alignment(Alignment::Right),
+                Text::from(format_planks(staked_own, decimals, 4)).alignment(Alignment::Right),
                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
             ]);
@@ -853,6 +860,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
         }
 
         let widths = [
+            Constraint::Length(3),
             Constraint::Length(28),
             Constraint::Fill(1),
             Constraint::Fill(1),
@@ -869,7 +877,8 @@ impl<'a> ValidatorsDetailWidget<'a> {
         let table = Table::new(rows, widths)
             .header(
                 Row::new(vec![
-                    Cell::from(""),
+                    Cell::from(Text::from("◈").alignment(Alignment::Center)),
+                    Cell::from(Text::from("identity").alignment(Alignment::Left)),
                     Cell::from(Text::from("points").alignment(Alignment::Right)),
                     Cell::from(Text::from("total").alignment(Alignment::Right)),
                     Cell::from(Text::from("own").alignment(Alignment::Right)),
@@ -1016,10 +1025,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     Ok(era) => {
                         tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch era data: {}",
-                        e
-                    ),
+                    Err(e) => warn!("{e}"),
                 }
             }
             total_validators_count_result = total_validators_count_fut => {
@@ -1030,10 +1036,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                             count,
                         )))?;
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch total_validators_count: {}",
-                        e
-                    ),
+                    Err(e) => warn!("{e}"),
                 }
             }
             total_nominators_count_result = total_nominators_count_fut => {
@@ -1044,10 +1047,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                             count,
                         )))?;
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch total_nominators_count: {}",
-                        e
-                    ),
+                    Err(e) => warn!("{e}"),
                 }
             }
             complete => break
@@ -1150,7 +1150,7 @@ async fn fetch_and_send_data_by_era(
                             }
                         }
                     }
-                    Err(e) => warn!("Failed to fetch validators_era_points {}", e),
+                    Err(e) => warn!("{e}"),
                 }
             }
             active_validators_count_result = active_validators_count_fut => {
@@ -1161,10 +1161,7 @@ async fn fetch_and_send_data_by_era(
                             count,
                         )))?;
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch active_validators_count: {}",
-                        e
-                    ),
+                    Err(e) => warn!("{e}"),
                 }
             }
             active_nominators_count_result = active_nominators_count_fut => {
@@ -1175,10 +1172,7 @@ async fn fetch_and_send_data_by_era(
                             count,
                         )))?;
                     }
-                    Err(e) => warn!(
-                        "Failed to fetch active_nominators_count: {}",
-                        e
-                    ),
+                    Err(e) => warn!("{e}"),
                 }
             }
             complete => break
@@ -1233,11 +1227,7 @@ async fn fetch_and_send_validators_identities(
                     identity,
                 )))?;
             }
-            Err(e) => warn!(
-                "Failed to fetch identity for {}: {}",
-                validator_key.to_string(),
-                e
-            ),
+            Err(e) => warn!("{e}"),
         }
     }
 
@@ -1285,11 +1275,7 @@ async fn fetch_and_send_validators_points_from_relay(
                     points,
                 )))?;
             }
-            Err(e) => warn!(
-                "Failed to fetch points for {}: {}",
-                validator_key.to_string(),
-                e
-            ),
+            Err(e) => warn!("{e}"),
         }
     }
 
@@ -1355,16 +1341,8 @@ async fn fetch_and_send_validators_stake_overview(
                     "No stake overview data found for {}",
                     validator_key.to_string(),
                 );
-                tx.send(Action::Validator(ValidatorAction::UpdateStatus(
-                    validator_key,
-                    ValidatorStatus::Waiting,
-                )))?;
             }
-            Err(e) => warn!(
-                "Failed to fetch stake overview for {}: {}",
-                validator_key.to_string(),
-                e
-            ),
+            Err(e) => warn!("{e}"),
         }
     }
 
@@ -1418,11 +1396,16 @@ async fn fetch_and_send_validators_commission(
                     commission,
                 )))?;
             }
-            Err(e) => warn!(
-                "Failed to fetch commission for {}: {}",
-                validator_key.to_string(),
-                e
-            ),
+            Err(e) => {
+                // Note: When an error is reported here it could be a connectivity issue,
+                // or that the commission was never set for the specific stash, so we set the
+                // validator status to unknown.
+                tx.send(Action::Validator(ValidatorAction::UpdateStatus(
+                    validator_key.clone(),
+                    ValidatorStatus::Unknown,
+                )))?;
+                warn!("{e}")
+            }
         }
     }
 
@@ -1488,11 +1471,7 @@ async fn fetch_and_send_validators_staking_ledger(
                     validator_key.to_string(),
                 )
             }
-            Err(e) => warn!(
-                "Failed to fetch commission for {}: {}",
-                validator_key.to_string(),
-                e
-            ),
+            Err(e) => warn!("{e}"),
         }
     }
 
@@ -1536,7 +1515,7 @@ async fn fetch_and_send_validators_authority_status(
                 }
             }
         }
-        Err(e) => warn!("Failed to fetch validators_era_points {}", e),
+        Err(e) => warn!("{e}"),
     }
 
     Ok(())

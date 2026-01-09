@@ -739,11 +739,7 @@ async fn fetch_initial_data_from_relay(
                 epoch,
             )))?;
         }
-        Err(e) => warn!(
-            "Failed to fetch epoch data for {:?}: {}",
-            runtime.to_string(),
-            e
-        ),
+        Err(e) => warn!("{e}"),
     }
 
     Ok(())
@@ -782,11 +778,7 @@ async fn fetch_and_send_total_staked(
                 value,
             )))?;
         }
-        Err(e) => warn!(
-            "Failed to fetch total staked for {:?}: {}",
-            runtime.to_string(),
-            e
-        ),
+        Err(e) => warn!("{e}"),
     }
 
     Ok(())
