@@ -1,11 +1,15 @@
 use super::node_runtime;
-use crate::constants::{fetch_epoch_duration, fetch_expected_block_time};
+use crate::{
+    constants::{fetch_epoch_duration, fetch_expected_block_time},
+    node_runtime::runtime_types::polkadot_primitives::v8::ValidatorIndex,
+};
+use std::collections::{HashMap, HashSet};
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_primitives::Epoch;
+use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch};
 
 type Points = u32;
 type Index = u64;
@@ -42,6 +46,31 @@ pub async fn fetch_epoch_data(
     Ok(Epoch::new(index, start, duration, block_time))
 }
 
+/// Fetch validators authority status
+pub async fn fetch_validators_authority_status(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    validator_keys: &Vec<AccountKey>,
+) -> Result<HashMap<[u8; 32], ValidatorStatus>, Error> {
+    let validators = fetch_session_validators(api, block_hash).await?;
+    let validator_indices = fetch_active_validator_indices(api, block_hash).await?;
+
+    let validator_bytes: HashSet<[u8; 32]> = validator_keys.iter().map(|key| key.bytes()).collect();
+    let mut status: HashMap<[u8; 32], ValidatorStatus> = HashMap::new();
+
+    for (i, stash) in validators.iter().enumerate() {
+        let bytes = *stash.as_ref();
+        if validator_bytes.contains(&bytes) {
+            status.insert(bytes, ValidatorStatus::Authority);
+            if validator_indices.contains(&ValidatorIndex(i as u32)) {
+                status.insert(bytes, ValidatorStatus::ParaAuthority);
+            }
+        }
+    }
+
+    Ok(status)
+}
+
 /// Fetch babe epoch index at the specified block hash
 async fn fetch_epoch_index(
     api: &OnlineClient<SubstrateConfig>,
@@ -73,11 +102,28 @@ async fn fetch_epoch_start(
 }
 
 /// Fetch session validators at the specified block hash
-async fn _fetch_session_validators(
+async fn fetch_session_validators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<Vec<AccountId32>, Error> {
     let addr = node_runtime::storage().session().validators();
+
+    Ok(api
+        .storage()
+        .at(block_hash)
+        .fetch(&addr)
+        .await?
+        .unwrap_or_default())
+}
+
+/// Fetch active validator indices at the specified block hash
+async fn fetch_active_validator_indices(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<Vec<ValidatorIndex>, Error> {
+    let addr = node_runtime::storage()
+        .paras_shared()
+        .active_validator_indices();
 
     Ok(api
         .storage()

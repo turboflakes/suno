@@ -11,7 +11,7 @@ use suno_config::SupportedRuntime;
 type Commission = u32;
 type Points = u32;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ValidatorStatus {
     /// Validator is an authority in the active set
     Authority,

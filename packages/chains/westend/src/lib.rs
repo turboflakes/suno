@@ -1,6 +1,6 @@
 pub mod constants;
 pub mod storage;
-pub use storage::{fetch_epoch_data, fetch_validator_points};
+pub use storage::{fetch_epoch_data, fetch_validator_points, fetch_validators_authority_status};
 
 #[subxt::subxt(
     runtime_metadata_path = "artifacts/metadata/westend_metadata_small.scale",

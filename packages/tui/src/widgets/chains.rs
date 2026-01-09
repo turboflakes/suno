@@ -515,7 +515,7 @@ impl ChainsListWidget {
         state.set_total_staked(chain_key, value)
     }
 
-    pub fn spawn_fetch_initial_data_from_relay_chain(
+    pub fn spawn_fetch_initial_data_from_relay(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -527,7 +527,7 @@ impl ChainsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) =
-                fetch_initial_data_from_relay_chain(&api, block_hash, &chain_key, tx.clone()).await
+                fetch_initial_data_from_relay(&api, block_hash, &chain_key, tx.clone()).await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
@@ -706,7 +706,7 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
     });
 }
 
-async fn fetch_initial_data_from_relay_chain(
+async fn fetch_initial_data_from_relay(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
