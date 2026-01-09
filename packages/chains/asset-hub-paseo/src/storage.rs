@@ -116,12 +116,11 @@ pub async fn fetch_era_data(
 pub async fn fetch_active_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
+    era: u32,
 ) -> Result<u32, Error> {
-    let active_era_info = fetch_active_era_info(api, block_hash).await?;
-
     let addr = node_runtime::storage()
         .staking()
-        .eras_stakers_overview_iter1(active_era_info.index);
+        .eras_stakers_overview_iter1(era);
 
     let mut validators_set = HashSet::<[u8; 32]>::new();
     let mut iter = api.storage().at(block_hash).iter(addr).await?;
@@ -153,12 +152,11 @@ pub async fn fetch_active_nominators_count(
 pub async fn fetch_active_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
+    era: u32,
 ) -> Result<u32, Error> {
-    let active_era_info = fetch_active_era_info(api, block_hash).await?;
-
     let addr = node_runtime::storage()
         .staking()
-        .eras_stakers_overview_iter1(active_era_info.index);
+        .eras_stakers_overview_iter1(era);
 
     let iter = api.storage().at(block_hash).iter(addr).await?;
     let count = iter.count().await;

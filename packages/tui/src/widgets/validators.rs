@@ -1,13 +1,13 @@
 use crate::error::TuiError;
 use crate::theme::THEME;
-use crate::widgets::chains::{Chain, ChainsListWidget};
-use crate::widgets::popup::PopupWidget;
-use crate::widgets::scrollbar::render_scrollbar;
+use crate::widgets::chains::ChainsListWidget;
+// use crate::widgets::popup::PopupWidget;
+// use crate::widgets::scrollbar::render_scrollbar;
 use futures::{
     future::{BoxFuture, FutureExt},
-    select, stream, Future, StreamExt,
+    select, stream, StreamExt,
 };
-use log::{error, info, warn};
+use log::{error, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -20,169 +20,23 @@ use ratatui::{
 };
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use subxt::utils::{AccountId32, H256};
+use std::time::{SystemTime, UNIX_EPOCH};
+use subxt::utils::H256;
 use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_error::Error;
 use suno_primitives::{
-    display::{create_progress_bar_by_blocks, format_planks, get_elapsed_millis},
+    display::{create_progress_bar_by_blocks, format_planks},
     staking::{Era, StakeLedger, StakeOverview},
-    AccountDisplay, AccountKey, NodeAccount,
+    validator::{Validator, ValidatorStatus},
+    AccountKey,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
 type Commission = u32;
 type Points = u32;
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum ValidatorStatus {
-    /// Validator is an authority in the active set
-    Authority,
-    /// Validator is an authority and also a parachain authority
-    ParaAuthority,
-    /// Validator is in the waiting queue
-    Waiting,
-    /// Validator status is unknown or not yet determined
-    #[default]
-    Unknown,
-}
-
-#[derive(Debug, Clone)]
-pub struct Nominators {
-    pub stash: AccountId32,
-    pub stake: u128,
-    pub is_backer: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct Validator {
-    pub account: NodeAccount,
-    pub commission: Commission,
-    pub stake: StakeOverview,
-    pub ledger: StakeLedger,
-    pub nominators: Vec<Nominators>,
-    // Track session points from staking_ah_client.validator_points
-    pub points: Points,
-    // Track old points so it can be better rendered the delta points
-    pub old_points: Points,
-    pub old_points_ts: u128,
-    // Track era points accumulated at every new session from staking.era_reward_points
-    // the total points earned at any single time will be sum of points + era_points
-    pub era_points: Points,
-    pub is_next_authority: bool,
-    pub is_chilled: bool,
-    pub status: ValidatorStatus,
-}
-
-impl Validator {
-    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
-        Self {
-            account: NodeAccount::new(runtime, stash),
-            commission: 0,
-            stake: StakeOverview::default(),
-            ledger: StakeLedger::default(),
-            nominators: Vec::new(),
-            points: 0,
-            old_points: 0,
-            old_points_ts: 0,
-            era_points: 0,
-            is_next_authority: false,
-            is_chilled: false,
-            status: ValidatorStatus::default(),
-        }
-    }
-
-    pub fn key(&self) -> &AccountKey {
-        &self.account.account_key()
-    }
-
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime()
-    }
-
-    pub fn identity(&self) -> &Option<String> {
-        self.account.identity()
-    }
-
-    pub fn display_name(&self) -> String {
-        if let Some(display_name) = self.identity() {
-            display_name.clone()
-        } else {
-            self.to_compact_string(6)
-        }
-    }
-
-    pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
-        let percentage = self.commission as f64 / 10_000_000.0;
-        let formatted = format!("{:.prec$}", percentage, prec = decimal_places);
-        let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-        format!("{}%", trimmed)
-    }
-
-    pub fn points(&self) -> Points {
-        self.points
-    }
-
-    pub fn total_points(&self) -> Points {
-        self.points + self.era_points
-    }
-
-    pub fn delta_points(&self) -> Option<Points> {
-        if self.points <= self.old_points {
-            return None;
-        }
-        let elapsed = get_elapsed_millis(self.old_points_ts);
-        if elapsed >= 2_000 {
-            return None;
-        }
-        return Some(self.points - self.old_points);
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.status == ValidatorStatus::Authority || self.status == ValidatorStatus::ParaAuthority
-    }
-
-    pub fn is_waiting(&self) -> bool {
-        self.status == ValidatorStatus::Waiting
-    }
-
-    pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
-        if chain.is_offline() {
-            warn!("TODO: Chain {} not ready", chain.runtime());
-            return;
-        }
-
-        let api = chain.client().clone();
-        let runtime = self.runtime().clone();
-        let tx = tx.clone();
-        let stash = self.account.stash().clone();
-        tokio::spawn(async move {
-            // let response = match runtime {
-            //     SupportedRuntime::Westend => {
-            //         // TODO: Implement password input for proxy signing
-            //         let chill_xt = suno_westend::staking::chill();
-            //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
-            //     }
-            //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
-            // };
-            // match response {
-            //     Err(e) => {
-            //         warn!("TODO: error: {:?}", e);
-            //     }
-            //     _ => (),
-            // }
-        });
-    }
-}
-
-impl AccountDisplay for Validator {
-    fn stash(&self) -> AccountId32 {
-        self.account.stash()
-    }
-}
 
 type ValidatorKey = AccountKey;
 
@@ -256,6 +110,12 @@ impl ValidatorsListState {
     pub fn set_stake_ledger(&mut self, validator_key: &AccountKey, data: StakeLedger) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.ledger = data;
+        }
+    }
+
+    pub fn set_status(&mut self, validator_key: &AccountKey, status: ValidatorStatus) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.status = status;
         }
     }
 
@@ -489,6 +349,11 @@ impl ValidatorsListWidget {
         state.set_stake_ledger(validator_key, data);
     }
 
+    pub fn update_status(&self, validator_key: &AccountKey, status: ValidatorStatus) {
+        let mut state = self.state.write().unwrap();
+        state.set_status(validator_key, status);
+    }
+
     // DEPRECATED
     fn fetch_validator_data(&self, validator: &Validator) {
         self.tx
@@ -511,7 +376,36 @@ impl ValidatorsListWidget {
         });
     }
 
-    pub fn spawn_fetch_initial_data_from_asset_hub(
+    // TODO
+    // pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
+    //     if chain.is_offline() {
+    //         warn!("TODO: Chain {} not ready", chain.runtime());
+    //         return;
+    //     }
+
+    //     let api = chain.client().clone();
+    //     let runtime = self.runtime().clone();
+    //     let tx = tx.clone();
+    //     let stash = self.account.stash().clone();
+    //     tokio::spawn(async move {
+    //         // let response = match runtime {
+    //         //     SupportedRuntime::Westend => {
+    //         //         // TODO: Implement password input for proxy signing
+    //         //         let chill_xt = suno_westend::staking::chill();
+    //         //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
+    //         //     }
+    //         //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
+    //         // };
+    //         // match response {
+    //         //     Err(e) => {
+    //         //         warn!("TODO: error: {:?}", e);
+    //         //     }
+    //         //     _ => (),
+    //         // }
+    //     });
+    // }
+
+    pub fn spawn_fetch_initial_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -523,15 +417,14 @@ impl ValidatorsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) =
-                fetch_and_send_initial_data_from_asset_hub(&api, block_hash, &runtime, tx.clone())
-                    .await
+                fetch_and_send_initial_data(&api, block_hash, &runtime, tx.clone()).await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
         });
     }
 
-    pub fn spawn_fetch_validators_era_points(
+    pub fn spawn_fetch_send_data_by_era(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -545,7 +438,7 @@ impl ValidatorsListWidget {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_era_points(
+            if let Err(e) = fetch_and_send_data_by_era(
                 &api,
                 block_hash,
                 &runtime,
@@ -1029,49 +922,22 @@ impl<'a> ValidatorsDetailWidget<'a> {
 //     }
 // }
 
-impl From<&Validator> for Row<'_> {
-    fn from(v: &Validator) -> Self {
-        // TODO: Verify if proxy is available and correctly setup for each stash
-        let has_proxy = false;
-        let status = if has_proxy { "[P]" } else { "[R]" };
-        let v = v.clone();
-        Row::new(vec![
-            Text::from(format!("{}/{}", v.runtime(), v.display_name(),)),
-            Text::from(status).alignment(Alignment::Right),
-        ])
-    }
-}
-
 // Helper functions
 
-async fn fetch_and_send_initial_data_from_asset_hub(
+async fn fetch_and_send_initial_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    let (
-        era_data_fut,
-        active_validators_count_fut,
-        total_validators_count_fut,
-        active_nominators_count_fut,
-        total_nominators_count_fut,
-    ): (
+    let (era_data_fut, total_validators_count_fut, total_nominators_count_fut): (
         BoxFuture<'_, Result<Era, Error>>,
-        BoxFuture<'_, Result<u32, Error>>,
-        BoxFuture<'_, Result<u32, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
     ) = match runtime {
         SupportedRuntime::AssetHubPolkadot => (
             Box::pin(suno_asset_hub_polkadot::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_polkadot::fetch_active_validators_count(
-                api, block_hash,
-            )),
             Box::pin(suno_asset_hub_polkadot::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_polkadot::fetch_active_nominators_count(
                 api, block_hash,
             )),
             Box::pin(suno_asset_hub_polkadot::fetch_total_nominators_count(
@@ -1080,13 +946,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubKusama => (
             Box::pin(suno_asset_hub_kusama::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_kusama::fetch_active_validators_count(
-                api, block_hash,
-            )),
             Box::pin(suno_asset_hub_kusama::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_kusama::fetch_active_nominators_count(
                 api, block_hash,
             )),
             Box::pin(suno_asset_hub_kusama::fetch_total_nominators_count(
@@ -1095,13 +955,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubPaseo => (
             Box::pin(suno_asset_hub_paseo::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_paseo::fetch_active_validators_count(
-                api, block_hash,
-            )),
             Box::pin(suno_asset_hub_paseo::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_paseo::fetch_active_nominators_count(
                 api, block_hash,
             )),
             Box::pin(suno_asset_hub_paseo::fetch_total_nominators_count(
@@ -1110,13 +964,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         ),
         SupportedRuntime::AssetHubWestend => (
             Box::pin(suno_asset_hub_westend::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_westend::fetch_active_validators_count(
-                api, block_hash,
-            )),
             Box::pin(suno_asset_hub_westend::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_westend::fetch_active_nominators_count(
                 api, block_hash,
             )),
             Box::pin(suno_asset_hub_westend::fetch_total_nominators_count(
@@ -1130,9 +978,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     };
 
     let mut era_data_fut = era_data_fut.fuse();
-    let mut active_validators_count_fut = active_validators_count_fut.fuse();
     let mut total_validators_count_fut = total_validators_count_fut.fuse();
-    let mut active_nominators_count_fut = active_nominators_count_fut.fuse();
     let mut total_nominators_count_fut = total_nominators_count_fut.fuse();
 
     loop {
@@ -1148,20 +994,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     ),
                 }
             }
-            active_validators_count_result = active_validators_count_fut => {
-                match active_validators_count_result {
-                    Ok(count) => {
-                        tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
-                            runtime.clone(),
-                            count,
-                        )))?;
-                    }
-                    Err(e) => warn!(
-                        "Failed to fetch active_validators_count: {}",
-                        e
-                    ),
-                }
-            }
             total_validators_count_result = total_validators_count_fut => {
                 match total_validators_count_result {
                     Ok(count) => {
@@ -1172,20 +1004,6 @@ async fn fetch_and_send_initial_data_from_asset_hub(
                     }
                     Err(e) => warn!(
                         "Failed to fetch total_validators_count: {}",
-                        e
-                    ),
-                }
-            }
-            active_nominators_count_result = active_nominators_count_fut => {
-                match active_nominators_count_result {
-                    Ok(count) => {
-                        tx.send(Action::Chain(ChainAction::UpdateActiveNominators(
-                            runtime.clone(),
-                            count,
-                        )))?;
-                    }
-                    Err(e) => warn!(
-                        "Failed to fetch active_nominators_count: {}",
                         e
                     ),
                 }
@@ -1211,7 +1029,7 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     Ok(())
 }
 
-async fn fetch_and_send_validators_era_points(
+async fn fetch_and_send_data_by_era(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
@@ -1219,61 +1037,124 @@ async fn fetch_and_send_validators_era_points(
     validator_keys: &Vec<AccountKey>,
     tx: UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    let validators_era_points_result = match runtime {
-        SupportedRuntime::AssetHubPolkadot => {
-            suno_asset_hub_polkadot::fetch_validators_era_points(
+    let (validators_era_points_fut, active_validators_count_fut, active_nominators_count_fut): (
+        BoxFuture<'_, Result<HashMap<[u8; 32], u32>, Error>>,
+        BoxFuture<'_, Result<u32, Error>>,
+        BoxFuture<'_, Result<u32, Error>>,
+    ) = match runtime {
+        SupportedRuntime::AssetHubPolkadot => (
+            Box::pin(suno_asset_hub_polkadot::fetch_validators_era_points(
                 api,
                 block_hash,
                 era_index,
                 validator_keys,
-            )
-            .await
-        }
-        SupportedRuntime::AssetHubKusama => {
-            suno_asset_hub_polkadot::fetch_validators_era_points(
+            )),
+            Box::pin(suno_asset_hub_polkadot::fetch_active_validators_count(
+                api, block_hash, era_index,
+            )),
+            Box::pin(suno_asset_hub_polkadot::fetch_active_nominators_count(
+                api, block_hash, era_index,
+            )),
+        ),
+        SupportedRuntime::AssetHubKusama => (
+            Box::pin(suno_asset_hub_kusama::fetch_validators_era_points(
                 api,
                 block_hash,
                 era_index,
                 validator_keys,
-            )
-            .await
-        }
-        SupportedRuntime::AssetHubPaseo => {
-            suno_asset_hub_polkadot::fetch_validators_era_points(
+            )),
+            Box::pin(suno_asset_hub_kusama::fetch_active_validators_count(
+                api, block_hash, era_index,
+            )),
+            Box::pin(suno_asset_hub_kusama::fetch_active_nominators_count(
+                api, block_hash, era_index,
+            )),
+        ),
+        SupportedRuntime::AssetHubPaseo => (
+            Box::pin(suno_asset_hub_paseo::fetch_validators_era_points(
                 api,
                 block_hash,
                 era_index,
                 validator_keys,
-            )
-            .await
-        }
-        SupportedRuntime::AssetHubWestend => {
-            suno_asset_hub_polkadot::fetch_validators_era_points(
+            )),
+            Box::pin(suno_asset_hub_paseo::fetch_active_validators_count(
+                api, block_hash, era_index,
+            )),
+            Box::pin(suno_asset_hub_paseo::fetch_active_nominators_count(
+                api, block_hash, era_index,
+            )),
+        ),
+        SupportedRuntime::AssetHubWestend => (
+            Box::pin(suno_asset_hub_westend::fetch_validators_era_points(
                 api,
                 block_hash,
                 era_index,
                 validator_keys,
-            )
-            .await
-        }
+            )),
+            Box::pin(suno_asset_hub_westend::fetch_active_validators_count(
+                api, block_hash, era_index,
+            )),
+            Box::pin(suno_asset_hub_westend::fetch_active_nominators_count(
+                api, block_hash, era_index,
+            )),
+        ),
         _ => {
             error!("Unsupported runtime: {:?}", runtime);
             return Ok(());
         }
     };
 
-    match validators_era_points_result {
-        Ok(points_map) => {
-            for key in validator_keys {
-                if let Some(points) = points_map.get(&key.bytes()).copied() {
-                    tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
-                        key.clone(),
-                        points,
-                    )))?;
+    let mut validators_era_points_fut = validators_era_points_fut.fuse();
+    let mut active_validators_count_fut = active_validators_count_fut.fuse();
+    let mut active_nominators_count_fut = active_nominators_count_fut.fuse();
+
+    loop {
+        select! {
+            validators_era_points_result = validators_era_points_fut => {
+                match validators_era_points_result {
+                    Ok(points_map) => {
+                        for key in validator_keys {
+                            if let Some(points) = points_map.get(&key.bytes()).copied() {
+                                tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
+                                    key.clone(),
+                                    points,
+                                )))?;
+                            }
+                        }
+                    }
+                    Err(e) => warn!("Failed to fetch validators_era_points {}", e),
                 }
             }
+            active_validators_count_result = active_validators_count_fut => {
+                match active_validators_count_result {
+                    Ok(count) => {
+                        tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
+                            runtime.clone(),
+                            count,
+                        )))?;
+                    }
+                    Err(e) => warn!(
+                        "Failed to fetch active_validators_count: {}",
+                        e
+                    ),
+                }
+            }
+            active_nominators_count_result = active_nominators_count_fut => {
+                match active_nominators_count_result {
+                    Ok(count) => {
+                        tx.send(Action::Chain(ChainAction::UpdateActiveNominators(
+                            runtime.clone(),
+                            count,
+                        )))?;
+                    }
+                    Err(e) => warn!(
+                        "Failed to fetch active_nominators_count: {}",
+                        e
+                    ),
+                }
+            }
+            complete => break
         }
-        Err(e) => warn!("Failed to fetch validators_era_points {}", e),
     }
 
     Ok(())
@@ -1437,15 +1318,23 @@ async fn fetch_and_send_validators_stake_overview(
         match result {
             Ok(Some(data)) => {
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
-                    validator_key,
+                    validator_key.clone(),
                     data,
+                )))?;
+                tx.send(Action::Validator(ValidatorAction::UpdateStatus(
+                    validator_key,
+                    ValidatorStatus::Authority,
                 )))?;
             }
             Ok(None) => {
                 warn!(
                     "No stake overview data found for {}",
                     validator_key.to_string(),
-                )
+                );
+                tx.send(Action::Validator(ValidatorAction::UpdateStatus(
+                    validator_key,
+                    ValidatorStatus::Waiting,
+                )))?;
             }
             Err(e) => warn!(
                 "Failed to fetch stake overview for {}: {}",

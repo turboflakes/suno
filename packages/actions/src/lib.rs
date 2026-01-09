@@ -7,13 +7,13 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
     staking::{Era, StakeLedger, StakeOverview},
+    validator::ValidatorStatus,
     AccountKey,
 };
 
 type Commission = u32;
 type Points = u32;
 type Counter = u32;
-type Rate = u128;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +87,7 @@ pub enum ValidatorAction {
     UpdateIdentity(ValidatorKey, String),
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
+    UpdateStatus(ValidatorKey, ValidatorStatus),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

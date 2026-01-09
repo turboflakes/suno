@@ -191,9 +191,8 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.validators.spawn_fetch_initial_data_from_asset_hub(
-                                    &api, block_hash, &runtime,
-                                );
+                                self.validators
+                                    .spawn_fetch_initial_data(&api, block_hash, &runtime);
 
                                 self.validators
                                     .spawn_fetch_validators_commission(&api, block_hash, &runtime);
@@ -254,14 +253,7 @@ impl App {
                         if let Some((api, block_hash)) =
                             self.chains.get_api_and_block_hash(&runtime)
                         {
-                            self.validators.spawn_fetch_validators_era_points(
-                                &api,
-                                block_hash,
-                                &runtime,
-                                era.index(),
-                            );
-
-                            self.validators.spawn_fetch_validators_stake_overview(
+                            self.validators.spawn_fetch_send_data_by_era(
                                 &api,
                                 block_hash,
                                 &runtime,
@@ -336,6 +328,9 @@ impl App {
             }
             ValidatorAction::UpdateStakeLedger(validator_key, data) => {
                 self.validators.update_stake_ledger(&validator_key, data);
+            }
+            ValidatorAction::UpdateStatus(validator_key, status) => {
+                self.validators.update_status(&validator_key, status);
             }
         }
     }
@@ -503,7 +498,8 @@ impl App {
                                     {
                                         match call {
                                             popup::Staking::Chill => {
-                                                validator.chill(&chain_client, self.tx.clone());
+                                                // TODO: Implement chill functionality
+                                                // validator.chill(&chain_client, self.tx.clone());
                                             }
                                             _ => {}
                                         }
