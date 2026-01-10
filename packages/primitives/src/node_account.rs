@@ -18,7 +18,7 @@ pub trait AccountDisplay {
 }
 
 /// Common struct for shared fields
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeAccount {
     account_key: AccountKey,
     identity: Option<String>,

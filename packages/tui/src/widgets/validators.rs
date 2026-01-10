@@ -37,7 +37,6 @@ use tokio::sync::mpsc::UnboundedSender;
 
 type Commission = u32;
 type Points = u32;
-
 type ValidatorKey = AccountKey;
 
 #[derive(Debug, Default)]
@@ -45,7 +44,6 @@ pub struct ValidatorsListState {
     validators: HashMap<ValidatorKey, Validator>,
     validators_order: Vec<ValidatorKey>,
     table_state: TableState,
-    table_unselected_rows_indices: Vec<usize>,
     is_active: bool,
 }
 
@@ -181,6 +179,18 @@ impl ValidatorsListState {
 
         grouped
     }
+
+    pub fn get_selected_ref(&self) -> Option<&Validator> {
+        self.table_state
+            .selected()
+            .and_then(|i| self.get_validator_by_index(i))
+    }
+
+    pub fn get_selected(&self) -> Option<Validator> {
+        self.table_state
+            .selected()
+            .and_then(|i| self.get_validator_by_index_cloned(i))
+    }
 }
 
 #[derive(Debug)]
@@ -313,10 +323,7 @@ impl ValidatorsListWidget {
 
     pub fn get_selected(&self) -> Option<Validator> {
         let state = self.state.read().unwrap();
-        state
-            .table_state
-            .selected()
-            .and_then(|i| state.get_validator_by_index_cloned(i))
+        state.get_selected()
     }
 
     pub fn update_commission(&self, validator_key: &AccountKey, commission: Commission) -> bool {
@@ -712,9 +719,18 @@ impl<'a> Widget for &ValidatorsDetailWidget<'a> {
             // Render header with custom layout
             self.render_table_header(runtime, validators.clone(), section_rows[0], buf);
 
+            // Get selected validator if one of the validators in the current section
+            let selected_validator = match state.get_selected_ref() {
+                Some(selected) if validators.contains(&selected) && state.is_active => {
+                    Some(selected)
+                }
+                _ => None,
+            };
+
             // Render validators table
             self.render_table_body(
                 validators,
+                selected_validator,
                 section_rows[1],
                 buf,
                 &mut state.table_state.clone(),
@@ -828,6 +844,7 @@ impl<'a> ValidatorsDetailWidget<'a> {
     fn render_table_body(
         &self,
         validators: Vec<&Validator>,
+        selected_validator: Option<&Validator>,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
@@ -847,19 +864,43 @@ impl<'a> ValidatorsDetailWidget<'a> {
             } else {
                 v.ledger.active()
             };
-            let validator_row = Row::new(vec![
-                Text::from(format!("{}", v.status())).alignment(Alignment::Left),
-                Text::from(format!("{}", v.display_name())).alignment(Alignment::Left),
-                text_points.alignment(Alignment::Right),
-                Text::from(format_planks(staked_total, decimals, 4)).alignment(Alignment::Right),
-                Text::from(format_planks(staked_own, decimals, 4)).alignment(Alignment::Right),
-                Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
-                Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
-            ]);
-            rows.push(validator_row);
+
+            let (cell_style, highlight_symbol) = match selected_validator {
+                Some(selected) if v == selected => {
+                    (Style::default().fg(Color::Black).bg(Color::White), "❯")
+                }
+                _ => (Style::default(), ""),
+            };
+
+            let mut validator_cells = vec![
+                Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
+                Cell::from(Text::from(format!("{}", v.display_name())).alignment(Alignment::Left)),
+                Cell::from(text_points.alignment(Alignment::Right)),
+                Cell::from(
+                    Text::from(format_planks(staked_total, decimals, 4))
+                        .alignment(Alignment::Right),
+                ),
+                Cell::from(
+                    Text::from(format_planks(staked_own, decimals, 4)).alignment(Alignment::Right),
+                ),
+                Cell::from(
+                    Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
+                ),
+                Cell::from(Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right)),
+            ];
+            if selected_validator.is_some() {
+                validator_cells.insert(
+                    1,
+                    Cell::from(
+                        Text::from(format!("{}", highlight_symbol)).alignment(Alignment::Left),
+                    )
+                    .style(cell_style),
+                );
+            }
+            rows.push(Row::new(validator_cells));
         }
 
-        let widths = [
+        let mut widths = vec![
             Constraint::Length(3),
             Constraint::Length(28),
             Constraint::Fill(1),
@@ -869,26 +910,25 @@ impl<'a> ValidatorsDetailWidget<'a> {
             Constraint::Fill(1),
         ];
 
-        let (table_style, highlight_style) = (
-            Style::default().fg(Color::Blue),
-            Style::default().fg(Color::Blue),
-        );
+        let mut header_cells = vec![
+            Cell::from(Text::from("◈").alignment(Alignment::Center)),
+            Cell::from(Text::from("identity").alignment(Alignment::Left)),
+            Cell::from(Text::from("points").alignment(Alignment::Right)),
+            Cell::from(Text::from("total").alignment(Alignment::Right)),
+            Cell::from(Text::from("own").alignment(Alignment::Right)),
+            Cell::from(Text::from("nominators").alignment(Alignment::Right)),
+            Cell::from(Text::from("commission").alignment(Alignment::Right)),
+        ];
+
+        // If selected validator is in this group, add a column for the highlight symbol
+        if selected_validator.is_some() {
+            widths.insert(1, Constraint::Length(1));
+            header_cells.insert(1, Cell::from(Text::from("")));
+        };
 
         let table = Table::new(rows, widths)
-            .header(
-                Row::new(vec![
-                    Cell::from(Text::from("◈").alignment(Alignment::Center)),
-                    Cell::from(Text::from("identity").alignment(Alignment::Left)),
-                    Cell::from(Text::from("points").alignment(Alignment::Right)),
-                    Cell::from(Text::from("total").alignment(Alignment::Right)),
-                    Cell::from(Text::from("own").alignment(Alignment::Right)),
-                    Cell::from(Text::from("nominators").alignment(Alignment::Right)),
-                    Cell::from(Text::from("commission").alignment(Alignment::Right)),
-                ])
-                .set_style(THEME.table.header),
-            )
-            .style(table_style)
-            .row_highlight_style(highlight_style);
+            .header(Row::new(header_cells).set_style(THEME.table.header))
+            .style(Style::default().fg(Color::Blue));
 
         StatefulWidget::render(table, area, buf, table_state);
     }

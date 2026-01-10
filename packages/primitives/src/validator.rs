@@ -35,14 +35,14 @@ impl std::fmt::Display for ValidatorStatus {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nominators {
     pub stash: AccountId32,
     pub stake: u128,
     pub is_backer: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     pub account: NodeAccount,
     pub commission: Commission,
