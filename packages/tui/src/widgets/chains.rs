@@ -1,6 +1,7 @@
 use crate::error::TuiError;
 use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
+use crate::widgets::scrollbar::render_scrollbar;
 use log::{debug, error, info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -601,6 +602,20 @@ impl Widget for &ChainsListWidget {
             .row_highlight_style(highlight_style);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
+
+        // Render scrollbar when active
+        if state.is_active && state.chains.len() >= area.height.saturating_sub(2) as usize {
+            let scrollbar_area = Rect {
+                x: area.x,
+                y: area.y + 1,
+                width: 1,
+                height: area.height.saturating_sub(2),
+                ..area
+            };
+            if let Some(row_index) = state.table_state.selected() {
+                render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+            }
+        }
     }
 }
 

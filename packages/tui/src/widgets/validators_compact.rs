@@ -53,7 +53,7 @@ impl Widget for &ValidatorsCompactWidget {
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
         // Render scrollbar when active
-        if state.is_active {
+        if state.is_active && state.validators.len() >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x,
                 y: area.y + 1,
