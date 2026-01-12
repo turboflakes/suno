@@ -6,7 +6,7 @@ use log::{debug, error, info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Style, Styled},
+    style::{Color, Modifier, Style, Styled},
     text::Text,
     widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
@@ -560,14 +560,16 @@ impl Widget for &ChainsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
-        let (table_style, highlight_style) = match state.is_active {
+        let (table_style, highlight_style, highlight_symbol) = match state.is_active {
             true => (
                 Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
+                "❯",
             ),
             false => (
                 Style::default().fg(Color::Blue),
                 Style::default().fg(Color::Blue),
+                "",
             ),
         };
 
@@ -599,7 +601,8 @@ impl Widget for &ChainsListWidget {
                 .set_style(THEME.table.header),
             )
             .style(table_style)
-            .row_highlight_style(highlight_style);
+            .row_highlight_style(highlight_style)
+            .highlight_symbol(highlight_symbol);
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 

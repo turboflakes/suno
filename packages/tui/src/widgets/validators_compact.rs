@@ -22,7 +22,7 @@ impl Widget for &ValidatorsCompactWidget {
             true => (
                 Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
-                "❯ ",
+                "❯",
             ),
             false => (
                 Style::default().fg(Color::Blue),
