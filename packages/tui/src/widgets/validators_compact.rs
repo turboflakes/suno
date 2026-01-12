@@ -58,7 +58,7 @@ impl Widget for &ValidatorsCompactWidget {
                 x: area.x,
                 y: area.y + 1,
                 width: 1,
-                height: area.height - 2,
+                height: area.height.saturating_sub(2),
                 ..area
             };
             if let Some(row_index) = state.table_state.selected() {

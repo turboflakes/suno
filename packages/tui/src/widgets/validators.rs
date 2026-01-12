@@ -325,6 +325,7 @@ impl ValidatorsListWidget {
         if let Some(selected) = state.table_state.selected() {
             if selected == state.validators_order.len() - 1 {
                 state.table_state.select_first();
+                state.scroll_offset = 0;
             } else {
                 state.table_state.scroll_down_by(1);
             }
@@ -346,6 +347,7 @@ impl ValidatorsListWidget {
                 state.table_state.select(Some(i));
             } else {
                 state.table_state.scroll_up_by(1);
+                state.scroll_offset = state.scroll_offset.saturating_sub(1);
             }
             state.ensure_selection_in_view();
             state

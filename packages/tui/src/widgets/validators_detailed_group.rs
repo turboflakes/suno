@@ -2,6 +2,7 @@ use crate::theme::THEME;
 use crate::widgets::chains::ChainsListWidget;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsListState;
+use log::info;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -33,9 +34,15 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
         state.set_viewport_height(area.height);
         let validators_grouped = state.get_validators_grouped_by_runtime();
         let total_height = state.total_detailed_group_height();
+        let is_scroll_visible = state.is_active && area.height < total_height;
+        let area_width = if is_scroll_visible {
+            area.width.saturating_sub(1)
+        } else {
+            area.width
+        };
 
         // Create a new area to fit all the content as total_height, but as wide as the screen.
-        let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area.width, total_height));
+        let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
         // Track the current height of group in display
         let mut current_y_group = 0;
@@ -43,7 +50,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
         // Iterate and render each group
         for (runtime, validators) in validators_grouped {
             let group_height = GROUP_HEADER_HEIGHT + validators.len() as u16 + BOTTOM_PADDING;
-            let group_area = Rect::new(0, current_y_group, area.width, group_height);
+            let group_area = Rect::new(0, current_y_group, area_width, group_height);
 
             // Get selected validator if one of the validators in the current section
             let selected_validator = match state.get_selected_ref() {
@@ -72,7 +79,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
                 break;
             }
 
-            for x in 0..area.width {
+            for x in 0..area_width {
                 // Get the cell from the large virtual buffer
                 let source_cell = &full_content_buf[(x, virtual_y)];
 
@@ -91,17 +98,19 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
         }
 
         // Render scrollbar when active
-        if state.is_active {
+        if state.is_active && area.height < total_height {
+            let selected_pos = state.table_state.selected().unwrap_or_default();
+
             let scrollbar_area = Rect {
-                x: area.x,
+                x: area.right().saturating_sub(1),
                 y: area.y + 1,
                 width: 1,
-                height: area.height,
+                height: area.height.saturating_sub(2),
                 ..area
             };
 
             render_scrollbar(
-                state.scroll_offset as usize,
+                state.scroll_offset as usize + selected_pos,
                 total_height as usize,
                 scrollbar_area,
                 buf,
@@ -328,6 +337,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         //     widths.insert(1, Constraint::Length(1));
         //     header_cells.insert(1, Cell::from(Text::from("")));
         // };
+        //
+
+        // Note: Since table_state is being shared with other widgets, it is important to guarantee
+        // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
+        *table_state.offset_mut() = 0;
 
         let table = Table::new(rows, widths)
             .header(Row::new(header_cells).set_style(THEME.table.header))
