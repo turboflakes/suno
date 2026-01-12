@@ -3,6 +3,7 @@ members = [
     "packages/actions",
     "packages/config",
     "packages/error",
+    "packages/events",
     "packages/primitives",
     "packages/signer",
     "packages/suno",

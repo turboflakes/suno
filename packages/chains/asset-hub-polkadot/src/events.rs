@@ -3,7 +3,7 @@ use crate::storage::fetch_era_data;
 use node_runtime::staking::events::{Chilled, EraPaid, ValidatorPrefsSet};
 use subxt::{events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
-use suno_primitives::event::Event;
+use suno_events::Event;
 
 pub async fn handle_events(
     api: &OnlineClient<SubstrateConfig>,

@@ -1,8 +1,8 @@
 use crate::node_runtime::session::events::NewSession;
-use crate::storage::fetch_epoch_data;
+use crate::storage::fetch_epoch_data_event;
 use subxt::{events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
-use suno_primitives::event::Event;
+use suno_events::Event;
 
 pub async fn handle_events(
     api: &OnlineClient<SubstrateConfig>,
@@ -14,8 +14,8 @@ pub async fn handle_events(
         let event = event?;
 
         if let Some(_ev) = event.as_event::<NewSession>()? {
-            let epoch = fetch_epoch_data(api, block_hash).await?;
-            processed_events.push(Event::NewEpoch(epoch));
+            let ev = fetch_epoch_data_event(api, block_hash).await?;
+            processed_events.push(ev);
         }
     }
     Ok(processed_events)

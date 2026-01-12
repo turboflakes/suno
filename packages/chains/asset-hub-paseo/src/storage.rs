@@ -17,6 +17,7 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
+use suno_events::Event;
 use suno_primitives::{
     node_account::get_account_bytes_from_storage_key,
     staking::{Era, StakeLedger, StakeOverview},
@@ -201,11 +202,11 @@ pub async fn fetch_total_nominators_count(
 }
 
 /// Fetch total total staked for a specific era at the specified block hash
-pub async fn fetch_total_staked(
+pub async fn fetch_total_staked_event(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     era: u32,
-) -> Result<Permill, Error> {
+) -> Result<Event, Error> {
     let total_issuance = fetch_total_issuance(api, block_hash).await?;
     let inactive_issuance = fetch_inactive_issuance(api, block_hash).await?;
     let total_staked = fetch_eras_total_stake(api, block_hash, era).await?;
@@ -213,10 +214,13 @@ pub async fn fetch_total_staked(
     let active_issuance = total_issuance.saturating_sub(inactive_issuance);
 
     if active_issuance == 0 {
-        return Ok(Permill::zero());
+        return Ok(Event::TotalStakedFetched(Permill::zero()));
     }
 
-    Ok(Permill::from_rational(total_staked, active_issuance))
+    Ok(Event::TotalStakedFetched(Permill::from_rational(
+        total_staked,
+        active_issuance,
+    )))
 }
 
 /// Fetch bonded eras at the specified block hash

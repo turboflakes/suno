@@ -1,6 +1,5 @@
 pub mod babe;
 pub mod display;
-pub mod event;
 pub mod identity;
 pub mod key;
 pub mod node_account;

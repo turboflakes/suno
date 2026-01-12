@@ -1,3 +1,5 @@
+use suno_actions::Action;
+use suno_config::SupportedRuntime;
 use suno_signer::error::Error as SignerError;
 
 /// Suno specific error messages
@@ -19,6 +21,12 @@ pub enum Error {
     RpcError(#[from] subxt::error::RpcError),
     #[error("Tx error: {0}")]
     TransactionError(#[from] subxt::error::TransactionError),
+    #[error("Send error: {0}")]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<Action>),
+    #[error("Genesis hash does not match the expected hash from the configured chain.")]
+    GenesisError,
+    #[error("Unsupported runtime: {0}")]
+    UnsupportedRuntime(SupportedRuntime),
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -1,4 +1,3 @@
-use crate::error::TuiError;
 use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
@@ -17,9 +16,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
+use suno_error::Error;
+use suno_events::Event;
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
-    event::Event,
     Epoch, Era,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -144,14 +144,14 @@ impl Chain {
         self.finalized_block_hash
     }
 
-    pub async fn validate_genesis(&mut self) -> Result<(), TuiError> {
+    pub async fn validate_genesis(&mut self) -> Result<(), Error> {
         let api = self.client();
         let state_root = self.runtime.chain_state_root_hash();
         let hash = api.genesis_hash();
 
         if let Some(header) = api.backend().block_header(hash).await? {
             if header.state_root != state_root {
-                let err = TuiError::GenesisError;
+                let err = Error::GenesisError;
                 self.set_state(ConnectionState::Error(err.to_string()));
                 return Err(err);
             }
@@ -517,7 +517,7 @@ impl ChainsListWidget {
         state.set_total_staked(chain_key, value)
     }
 
-    pub fn spawn_fetch_initial_data_from_relay(
+    pub fn spawn_fetch_epoch_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
@@ -528,9 +528,7 @@ impl ChainsListWidget {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) =
-                fetch_initial_data_from_relay(&api, block_hash, &chain_key, tx.clone()).await
-            {
+            if let Err(e) = fetch_and_dispatch_epoch_data(&api, block_hash, &chain_key, &tx).await {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
         });
@@ -549,7 +547,7 @@ impl ChainsListWidget {
 
         tokio::spawn(async move {
             if let Err(e) =
-                fetch_and_send_total_staked(&api, block_hash, &runtime, era_index, tx.clone()).await
+                fetch_and_dispatch_total_staked(&api, block_hash, &runtime, era_index, &tx).await
             {
                 let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
             }
@@ -761,7 +759,7 @@ async fn process_runtime_events(
     events: Events<SubstrateConfig>,
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
-) -> Result<(), TuiError> {
+) -> Result<(), Error> {
     let processed_events = handle_runtime_events(api, block_hash, events, runtime).await;
 
     for event in processed_events {
@@ -840,11 +838,64 @@ async fn handle_runtime_events(
     }
 }
 
+async fn fetch_and_dispatch_epoch_data(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    let event = match runtime {
+        SupportedRuntime::Polkadot => {
+            suno_polkadot::fetch_epoch_data_event(api, block_hash).await?
+        }
+        SupportedRuntime::Kusama => suno_kusama::fetch_epoch_data_event(api, block_hash).await?,
+        SupportedRuntime::Paseo => suno_paseo::fetch_epoch_data_event(api, block_hash).await?,
+        SupportedRuntime::Westend => suno_westend::fetch_epoch_data_event(api, block_hash).await?,
+        _ => {
+            return Err(Error::UnsupportedRuntime(runtime.clone()));
+        }
+    };
+
+    dispatch_event_action(event, runtime, tx)?;
+
+    Ok(())
+}
+
+async fn fetch_and_dispatch_total_staked(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    era_index: u32,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    let event = match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            suno_asset_hub_polkadot::fetch_total_staked_event(api, block_hash, era_index).await?
+        }
+        SupportedRuntime::AssetHubKusama => {
+            suno_asset_hub_kusama::fetch_total_staked_event(api, block_hash, era_index).await?
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            suno_asset_hub_paseo::fetch_total_staked_event(api, block_hash, era_index).await?
+        }
+        SupportedRuntime::AssetHubWestend => {
+            suno_asset_hub_westend::fetch_total_staked_event(api, block_hash, era_index).await?
+        }
+        _ => {
+            return Err(Error::UnsupportedRuntime(runtime.clone()));
+        }
+    };
+
+    dispatch_event_action(event, runtime, tx)?;
+
+    Ok(())
+}
+
 fn dispatch_event_action(
     event: Event,
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
-) -> Result<(), TuiError> {
+) -> Result<(), Error> {
     match event {
         Event::NewEra(era) => {
             tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
@@ -855,87 +906,15 @@ fn dispatch_event_action(
                 epoch,
             )))?;
         }
-        _ => {
-            error!("Unhandled event type: {:?}", event);
-        }
-    }
-    Ok(())
-}
-
-async fn fetch_initial_data_from_relay(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let (epoch_result,) = match runtime {
-        SupportedRuntime::Polkadot => {
-            tokio::join!(suno_polkadot::fetch_epoch_data(api, block_hash),)
-        }
-        SupportedRuntime::Kusama => {
-            tokio::join!(suno_kusama::fetch_epoch_data(api, block_hash),)
-        }
-        SupportedRuntime::Paseo => {
-            tokio::join!(suno_paseo::fetch_epoch_data(api, block_hash),)
-        }
-        SupportedRuntime::Westend => {
-            tokio::join!(suno_westend::fetch_epoch_data(api, block_hash),)
-        }
-        _ => {
-            error!("Unsupported runtime: {:?}", runtime);
-            return Ok(());
-        }
-    };
-
-    // Handle epoch result
-    match epoch_result {
-        Ok(epoch) => {
-            tx.send(Action::Chain(ChainAction::UpdateEpoch(
-                runtime.clone(),
-                epoch,
-            )))?;
-        }
-        Err(e) => warn!("{e}"),
-    }
-
-    Ok(())
-}
-
-async fn fetch_and_send_total_staked(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    era_index: u32,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let total_staked_result = match runtime {
-        SupportedRuntime::AssetHubPolkadot => {
-            suno_asset_hub_polkadot::fetch_total_staked(api, block_hash, era_index).await
-        }
-        SupportedRuntime::AssetHubKusama => {
-            suno_asset_hub_kusama::fetch_total_staked(api, block_hash, era_index).await
-        }
-        SupportedRuntime::AssetHubPaseo => {
-            suno_asset_hub_paseo::fetch_total_staked(api, block_hash, era_index).await
-        }
-        SupportedRuntime::AssetHubWestend => {
-            suno_asset_hub_westend::fetch_total_staked(api, block_hash, era_index).await
-        }
-        _ => {
-            error!("Unsupported runtime: {:?}", runtime);
-            return Ok(());
-        }
-    };
-
-    match total_staked_result {
-        Ok(value) => {
+        Event::TotalStakedFetched(value) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
                 runtime.clone(),
                 value,
             )))?;
         }
-        Err(e) => warn!("{e}"),
+        _ => {
+            error!("Unhandled event type: {:?}", event);
+        }
     }
-
     Ok(())
 }

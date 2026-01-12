@@ -179,9 +179,8 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.chains.spawn_fetch_initial_data_from_relay(
-                                    &api, block_hash, &runtime,
-                                );
+                                self.chains
+                                    .spawn_fetch_epoch_data(&api, block_hash, &runtime);
 
                                 self.validators
                                     .spawn_fetch_validators_authority_status_from_relay(

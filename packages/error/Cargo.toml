@@ -9,5 +9,8 @@ edition.workspace = true
 
 [dependencies]
 subxt = { workspace = true }
+suno-actions = { path = "../actions" }
+suno-config = { path = "../config" }
 suno-signer = { path = "../signer" }
 thiserror = { workspace = true }
+tokio = { workspace = true }
