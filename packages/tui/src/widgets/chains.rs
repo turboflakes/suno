@@ -704,7 +704,7 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 ConnectionState::Connected,
                             )));
 
-                            // Process events
+                            // Fetch block events
                             let events = match block.events().await {
                                 Ok(events) => events,
                                 Err(e) => {
@@ -713,11 +713,8 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 }
                             };
 
-                            if let Err(e) =
-                                process_events(&api, block.hash(), events, &runtime, &tx).await
-                            {
-                                error!("Failed to process block events: {}", e);
-                            }
+                            // Process block events in a separate task
+                            spawn_process_runtime_events(&api, block.hash(), events, &runtime, &tx);
                         }
                         Err(e) => {
                             if e.is_disconnected_will_reconnect() {
@@ -740,14 +737,32 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
     });
 }
 
-async fn process_events(
+pub fn spawn_process_runtime_events(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    events: Events<SubstrateConfig>,
+    runtime: &SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let runtime = runtime.clone();
+    let tx = tx.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = process_runtime_events(&api, block_hash, events, &runtime, &tx).await {
+            let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+        }
+    });
+}
+
+async fn process_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     events: Events<SubstrateConfig>,
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), TuiError> {
-    let processed_events = handle_events(api, block_hash, events, runtime).await;
+    let processed_events = handle_runtime_events(api, block_hash, events, runtime).await;
 
     for event in processed_events {
         dispatch_event_action(event, runtime, tx)?;
@@ -756,7 +771,7 @@ async fn process_events(
     Ok(())
 }
 
-async fn handle_events(
+async fn handle_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     events: Events<SubstrateConfig>,
@@ -765,62 +780,61 @@ async fn handle_events(
     match runtime {
         SupportedRuntime::Polkadot => suno_polkadot::handle_events(api, block_hash, events)
             .await
-            .unwrap_or_else(|err| {
-                error!("Error processing Polkadot events: {}", err);
+            .unwrap_or_else(|e| {
+                error!("Error processing Polkadot events: {}", e);
                 vec![]
             }),
         SupportedRuntime::Kusama => suno_kusama::handle_events(api, block_hash, events)
             .await
-            .unwrap_or_else(|err| {
-                error!("Error processing Kusama events: {}", err);
+            .unwrap_or_else(|e| {
+                error!("Error processing Kusama events: {}", e);
                 vec![]
             }),
         SupportedRuntime::Paseo => suno_paseo::handle_events(api, block_hash, events)
             .await
-            .unwrap_or_else(|err| {
-                error!("Error processing Paseo events: {}", err);
+            .unwrap_or_else(|e| {
+                error!("Error processing Paseo events: {}", e);
                 vec![]
             }),
         SupportedRuntime::Westend => suno_westend::handle_events(api, block_hash, events)
             .await
-            .unwrap_or_else(|err| {
-                error!("Error processing Westend events: {}", err);
+            .unwrap_or_else(|e| {
+                error!("Error processing Westend events: {}", e);
                 vec![]
             }),
         SupportedRuntime::AssetHubPolkadot => {
             suno_asset_hub_polkadot::handle_events(api, block_hash, events)
                 .await
-                .unwrap_or_else(|err| {
-                    error!("Error processing AssetHubPolkadot events: {}", err);
+                .unwrap_or_else(|e| {
+                    error!("Error processing AssetHubPolkadot events: {}", e);
                     vec![]
                 })
         }
         SupportedRuntime::AssetHubKusama => {
             suno_asset_hub_kusama::handle_events(api, block_hash, events)
                 .await
-                .unwrap_or_else(|err| {
-                    error!("Error processing AssetHubKusama events: {}", err);
+                .unwrap_or_else(|e| {
+                    error!("Error processing AssetHubKusama events: {}", e);
                     vec![]
                 })
         }
         SupportedRuntime::AssetHubPaseo => {
             suno_asset_hub_paseo::handle_events(api, block_hash, events)
                 .await
-                .unwrap_or_else(|err| {
-                    error!("Error processing AssetHubPaseo events: {}", err);
+                .unwrap_or_else(|e| {
+                    error!("Error processing AssetHubPaseo events: {}", e);
                     vec![]
                 })
         }
         SupportedRuntime::AssetHubWestend => {
             suno_asset_hub_westend::handle_events(api, block_hash, events)
                 .await
-                .unwrap_or_else(|err| {
-                    error!("Error processing AssetHubWestend events: {}", err);
+                .unwrap_or_else(|e| {
+                    error!("Error processing AssetHubWestend events: {}", e);
                     vec![]
                 })
         }
         _ => {
-            debug!("No event handler for runtime: {:?}", runtime);
             vec![]
         }
     }
