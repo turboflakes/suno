@@ -1,7 +1,9 @@
 pub mod constants;
+pub mod events;
 pub mod extrinsics;
 pub mod storage;
 pub mod submit;
+pub use events::handle_events;
 pub use storage::{
     fetch_active_nominators_count, fetch_active_validators_count, fetch_era_data,
     fetch_total_nominators_count, fetch_total_staked, fetch_total_validators_count,

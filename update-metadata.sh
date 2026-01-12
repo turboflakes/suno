@@ -35,7 +35,7 @@ subxt metadata --url wss://people-polkadot.rpc.turboflakes.io:443 --pallets Iden
 # subxt codegen --url wss://rpc.turboflakes.io:443/kusama | rustfmt --edition=2018 --emit=stdout > kusama_runtime.rs
 # subxt codegen --url wss://asset-hub-paseo.rpc.turboflakes.io:443 | rustfmt --edition=2018 --emit=stdout > asset_hub_paseo_runtime.rs
 # subxt codegen --url wss://paseo.rpc.turboflakes.io:443 | rustfmt --edition=2018 --emit=stdout > paseo_runtime.rs
-subxt codegen --url wss://polkadot.rpc.turboflakes.io:443 | rustfmt --edition=2018 --emit=stdout > polkadot_runtime.rs
+# subxt codegen --url wss://polkadot.rpc.turboflakes.io:443 | rustfmt --edition=2018 --emit=stdout > polkadot_runtime.rs
 # subxt codegen --url wss://sys.turboflakes.io:443/people-kusama | rustfmt --edition=2018 --emit=stdout > people_kusama_runtime.rs
 # subxt codegen --url wss://sys.turboflakes.io:443/people-polkadot | rustfmt --edition=2018 --emit=stdout > people_polkadot_runtime.rs
 # subxt codegen --url wss://sys.turboflakes.io:443/people-paseo | rustfmt --edition=2018 --emit=stdout > people_paseo_runtime.rs

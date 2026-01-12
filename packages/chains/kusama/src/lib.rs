@@ -1,5 +1,7 @@
 pub mod constants;
+pub mod events;
 pub mod storage;
+pub use events::handle_events;
 pub use storage::{fetch_epoch_data, fetch_validator_points, fetch_validators_authority_status};
 
 #[subxt::subxt(

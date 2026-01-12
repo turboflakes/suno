@@ -14,11 +14,12 @@ use sp_arithmetic::Permill;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use subxt::{utils::H256, OnlineClient, SubstrateConfig};
+use subxt::{events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
+    event::Event,
     Epoch, Era,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -702,6 +703,21 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 runtime.clone(),
                                 ConnectionState::Connected,
                             )));
+
+                            // Process events
+                            let events = match block.events().await {
+                                Ok(events) => events,
+                                Err(e) => {
+                                    error!("Failed to fetch block events: {}", e);
+                                    continue; // Skip this block and continue with the next one
+                                }
+                            };
+
+                            if let Err(e) =
+                                process_events(&api, block.hash(), events, &runtime, &tx).await
+                            {
+                                error!("Failed to process block events: {}", e);
+                            }
                         }
                         Err(e) => {
                             if e.is_disconnected_will_reconnect() {
@@ -722,6 +738,114 @@ fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
             }
         }
     });
+}
+
+async fn process_events(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    events: Events<SubstrateConfig>,
+    runtime: &SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    let processed_events = handle_events(api, block_hash, events, runtime).await;
+
+    for event in processed_events {
+        dispatch_event_action(event, runtime, tx)?;
+    }
+
+    Ok(())
+}
+
+async fn handle_events(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    events: Events<SubstrateConfig>,
+    runtime: &SupportedRuntime,
+) -> Vec<Event> {
+    match runtime {
+        SupportedRuntime::Polkadot => suno_polkadot::handle_events(api, block_hash, events)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error processing Polkadot events: {}", err);
+                vec![]
+            }),
+        SupportedRuntime::Kusama => suno_kusama::handle_events(api, block_hash, events)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error processing Kusama events: {}", err);
+                vec![]
+            }),
+        SupportedRuntime::Paseo => suno_paseo::handle_events(api, block_hash, events)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error processing Paseo events: {}", err);
+                vec![]
+            }),
+        SupportedRuntime::Westend => suno_westend::handle_events(api, block_hash, events)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error processing Westend events: {}", err);
+                vec![]
+            }),
+        SupportedRuntime::AssetHubPolkadot => {
+            suno_asset_hub_polkadot::handle_events(api, block_hash, events)
+                .await
+                .unwrap_or_else(|err| {
+                    error!("Error processing AssetHubPolkadot events: {}", err);
+                    vec![]
+                })
+        }
+        SupportedRuntime::AssetHubKusama => {
+            suno_asset_hub_kusama::handle_events(api, block_hash, events)
+                .await
+                .unwrap_or_else(|err| {
+                    error!("Error processing AssetHubKusama events: {}", err);
+                    vec![]
+                })
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            suno_asset_hub_paseo::handle_events(api, block_hash, events)
+                .await
+                .unwrap_or_else(|err| {
+                    error!("Error processing AssetHubPaseo events: {}", err);
+                    vec![]
+                })
+        }
+        SupportedRuntime::AssetHubWestend => {
+            suno_asset_hub_westend::handle_events(api, block_hash, events)
+                .await
+                .unwrap_or_else(|err| {
+                    error!("Error processing AssetHubWestend events: {}", err);
+                    vec![]
+                })
+        }
+        _ => {
+            debug!("No event handler for runtime: {:?}", runtime);
+            vec![]
+        }
+    }
+}
+
+fn dispatch_event_action(
+    event: Event,
+    runtime: &SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), TuiError> {
+    match event {
+        Event::NewEra(era) => {
+            tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
+        }
+        Event::NewEpoch(epoch) => {
+            tx.send(Action::Chain(ChainAction::UpdateEpoch(
+                runtime.clone(),
+                epoch,
+            )))?;
+        }
+        _ => {
+            error!("Unhandled event type: {:?}", event);
+        }
+    }
+    Ok(())
 }
 
 async fn fetch_initial_data_from_relay(
