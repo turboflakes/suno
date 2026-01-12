@@ -7,7 +7,7 @@ use ratatui::{
 pub fn render_scrollbar(position: usize, max: usize, area: Rect, buf: &mut Buffer) {
     let mut state = ScrollbarState::default()
         .content_length(max)
-        .viewport_content_length(3)
+        .viewport_content_length((area.height / 8) as usize)
         .position(position);
     Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(None)

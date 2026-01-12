@@ -1,23 +1,17 @@
 use crate::error::TuiError;
-use crate::theme::THEME;
 use crate::widgets::chains::ChainsListWidget;
+use crate::widgets::validators_compact::ValidatorsCompactWidget;
+use crate::widgets::validators_detailed_group::{
+    ValidatorsDetailedGroupWidget, BOTTOM_PADDING, GROUP_HEADER_HEIGHT,
+};
+use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
 // use crate::widgets::popup::PopupWidget;
-// use crate::widgets::scrollbar::render_scrollbar;
 use futures::{
     future::{BoxFuture, FutureExt},
     select, stream, StreamExt,
 };
 use log::{error, warn};
-use ratatui::{
-    buffer::Buffer,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    prelude::Stylize,
-    style::{Color, Modifier, Style, Styled},
-    text::{Line, Text},
-    widgets::{
-        Block, BorderType, Borders, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget,
-    },
-};
+use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -28,7 +22,6 @@ use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_error::Error;
 use suno_primitives::{
-    display::{create_progress_bar_by_blocks, format_planks},
     staking::{Era, StakeLedger, StakeOverview},
     validator::{Validator, ValidatorStatus},
     AccountKey,
@@ -41,10 +34,12 @@ type ValidatorKey = AccountKey;
 
 #[derive(Debug, Default)]
 pub struct ValidatorsListState {
-    validators: HashMap<ValidatorKey, Validator>,
-    validators_order: Vec<ValidatorKey>,
-    table_state: TableState,
-    is_active: bool,
+    pub validators: HashMap<ValidatorKey, Validator>,
+    pub validators_order: Vec<ValidatorKey>,
+    pub table_state: TableState,
+    pub scroll_offset: u16,
+    pub viewport_height: u16,
+    pub is_active: bool,
 }
 
 impl ValidatorsListState {
@@ -115,6 +110,10 @@ impl ValidatorsListState {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.status = status;
         }
+    }
+
+    pub fn set_viewport_height(&mut self, height: u16) {
+        self.viewport_height = height;
     }
 
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
@@ -191,6 +190,55 @@ impl ValidatorsListState {
             .selected()
             .and_then(|i| self.get_validator_by_index_cloned(i))
     }
+
+    // Helpers specific to the ValidatorsDetailedGroupWidget
+
+    pub fn total_detailed_group_height(&self) -> u16 {
+        let validators_grouped = self.get_validators_grouped_by_runtime();
+
+        validators_grouped
+            .iter()
+            .map(|(_, v)| GROUP_HEADER_HEIGHT + v.len() as u16 + BOTTOM_PADDING)
+            .sum()
+    }
+
+    // Scroll to the selected validator if it's not in view
+    pub fn ensure_selection_in_view(&mut self) {
+        let selected_y_position = self.get_selected_y_position();
+
+        if selected_y_position < self.scroll_offset {
+            self.scroll_offset = selected_y_position;
+        } else if selected_y_position >= self.scroll_offset + self.viewport_height {
+            self.scroll_offset = selected_y_position - self.viewport_height + 1;
+        }
+    }
+
+    // Determine the Y position of the current validator selection
+    fn get_selected_y_position(&self) -> u16 {
+        let mut selected_y_position = 0;
+        let selected_ref = self.get_selected_ref();
+
+        for (_, validators) in self.get_validators_grouped_by_runtime() {
+            if let Some(idx) = validators.iter().position(|v| Some(*v) == selected_ref) {
+                // Header + index + table header
+                return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
+            }
+            selected_y_position += GROUP_HEADER_HEIGHT + validators.len() as u16 + BOTTOM_PADDING;
+        }
+        0
+    }
+
+    // Scroll down if content is taller than the screen
+    pub fn scroll_down(&mut self, viewport_height: u16, total_content_height: u16) {
+        if total_content_height > viewport_height {
+            let max_scroll = total_content_height.saturating_sub(viewport_height);
+            self.scroll_offset = (self.scroll_offset + 1).min(max_scroll);
+        }
+    }
+
+    pub fn scroll_up(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+    }
 }
 
 #[derive(Debug)]
@@ -198,17 +246,6 @@ pub struct ValidatorsListWidget {
     state: Arc<RwLock<ValidatorsListState>>,
     /// The sender to send actions to update the state to the app.
     tx: UnboundedSender<Action>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ValidatorsCompactWidget {
-    state: Arc<RwLock<ValidatorsListState>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ValidatorsDetailWidget<'a> {
-    state: Arc<RwLock<ValidatorsListState>>,
-    chains: &'a ChainsListWidget,
 }
 
 impl<'a> ValidatorsListWidget {
@@ -219,10 +256,19 @@ impl<'a> ValidatorsListWidget {
         }
     }
 
-    pub fn as_detail(&self, chains: &'a ChainsListWidget) -> ValidatorsDetailWidget<'a> {
-        ValidatorsDetailWidget {
+    pub fn as_detailed_group(
+        &self,
+        chains: &'a ChainsListWidget,
+    ) -> ValidatorsDetailedGroupWidget<'a> {
+        ValidatorsDetailedGroupWidget {
             state: self.state.clone(),
             chains,
+        }
+    }
+
+    pub fn as_detailed_list(&self) -> ValidatorsDetailedListWidget {
+        ValidatorsDetailedListWidget {
+            state: self.state.clone(),
         }
     }
 }
@@ -282,6 +328,7 @@ impl ValidatorsListWidget {
             } else {
                 state.table_state.scroll_down_by(1);
             }
+            state.ensure_selection_in_view();
             state
                 .table_state
                 .selected()
@@ -300,6 +347,7 @@ impl ValidatorsListWidget {
             } else {
                 state.table_state.scroll_up_by(1);
             }
+            state.ensure_selection_in_view();
             state
                 .table_state
                 .selected()
@@ -361,27 +409,27 @@ impl ValidatorsListWidget {
         state.set_status(validator_key, status);
     }
 
-    // DEPRECATED
-    fn fetch_validator_data(&self, validator: &Validator) {
-        self.tx
-            .send(Action::Chain(ChainAction::FetchValidatorData(
-                validator.key().clone(),
-            )))
-            .unwrap_or_else(|err| self.on_error(err.into()));
-    }
+    // // DEPRECATED
+    // fn fetch_validator_data(&self, validator: &Validator) {
+    //     self.tx
+    //         .send(Action::Chain(ChainAction::FetchValidatorData(
+    //             validator.key().clone(),
+    //         )))
+    //         .unwrap_or_else(|err| self.on_error(err.into()));
+    // }
 
-    // DEPRECATED
-    fn fetch_all_validators_data(&self) {
-        let state = self.state.read().unwrap();
-        let keys_grouped = state.get_keys_grouped_by_runtime_cloned();
-        keys_grouped.into_iter().for_each(|(runtime, keys)| {
-            self.tx
-                .send(Action::Chain(ChainAction::FetchValidatorsData(
-                    runtime, keys,
-                )))
-                .unwrap_or_else(|err| self.on_error(err.into()));
-        });
-    }
+    // // DEPRECATED
+    // fn fetch_all_validators_data(&self) {
+    //     let state = self.state.read().unwrap();
+    //     let keys_grouped = state.get_keys_grouped_by_runtime_cloned();
+    //     keys_grouped.into_iter().for_each(|(runtime, keys)| {
+    //         self.tx
+    //             .send(Action::Chain(ChainAction::FetchValidatorsData(
+    //                 runtime, keys,
+    //             )))
+    //             .unwrap_or_else(|err| self.on_error(err.into()));
+    //     });
+    // }
 
     // TODO
     // pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
@@ -625,379 +673,6 @@ impl ValidatorsListWidget {
         });
     }
 }
-
-// Compact widget implementation, mostly to be used on the left menu
-impl Widget for &ValidatorsCompactWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
-
-        let (table_style, highlight_style, highlight_symbol) = match state.is_active {
-            true => (
-                Style::default().fg(Color::White),
-                Style::default().fg(Color::Black).bg(Color::White),
-                "❯ ",
-            ),
-            false => (
-                Style::default().fg(Color::Blue),
-                Style::default().fg(Color::Blue),
-                "",
-            ),
-        };
-
-        let block = Block::new()
-            .title("Validators")
-            .title_style(Style::default().add_modifier(Modifier::BOLD))
-            .borders(Borders::LEFT | Borders::BOTTOM)
-            .border_type(BorderType::Plain);
-
-        let rows = state.validators_iter();
-
-        let widths = [
-            Constraint::Fill(1),    // Network column
-            Constraint::Length(14), // Stash column
-        ];
-
-        let table = Table::new(rows, widths)
-            .block(block)
-            .style(table_style)
-            .row_highlight_style(highlight_style)
-            .highlight_symbol(highlight_symbol);
-
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
-
-        // // Render scrollbar when active
-        // if state.is_active {
-
-        //     let scrollbar_area = Rect {
-        //         x: area.x,
-        //         y: area.y + 1,
-        //         width: 1,
-        //         height: area.height - 2,
-        //         ..area
-        //     };
-        //     if let Some(row_index) = state.table_state.selected() {
-        //         render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
-        //     }
-        // }
-    }
-}
-
-// Detailed widget implementation, with all relevant information
-impl<'a> Widget for &ValidatorsDetailWidget<'a> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let state = self.state.write().unwrap();
-
-        let validators_grouped = state.get_validators_grouped_by_runtime();
-
-        // Calculate heights for each section
-        const HEADER_HEIGHT: u16 = 6;
-        let mut constraints = Vec::new();
-        for (_, validators) in &validators_grouped {
-            // height of header + validators + 1 for the validators table header + 1 for bottom padding
-            let group_height = HEADER_HEIGHT + validators.len() as u16 + 1 + 1;
-            constraints.push(Constraint::Length(group_height));
-        }
-
-        // Split area into sections for each runtime group
-        let layout_rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(constraints)
-            .split(area);
-
-        for (i, (runtime, validators)) in validators_grouped.into_iter().enumerate() {
-            let section_area = layout_rows[i];
-
-            // Split section area into header and body
-            let section_rows = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(HEADER_HEIGHT), // Header height
-                    Constraint::Min(0),                // Body takes remaining
-                ])
-                .split(section_area);
-
-            // Render header with custom layout
-            self.render_table_header(runtime, validators.clone(), section_rows[0], buf);
-
-            // Get selected validator if one of the validators in the current section
-            let selected_validator = match state.get_selected_ref() {
-                Some(selected) if validators.contains(&selected) && state.is_active => {
-                    Some(selected)
-                }
-                _ => None,
-            };
-
-            // Render validators table
-            self.render_table_body(
-                validators,
-                selected_validator,
-                section_rows[1],
-                buf,
-                &mut state.table_state.clone(),
-            );
-        }
-    }
-}
-
-impl<'a> ValidatorsDetailWidget<'a> {
-    fn render_table_header(
-        &self,
-        runtime: SupportedRuntime,
-        validators: Vec<&Validator>,
-        area: Rect,
-        buf: &mut Buffer,
-    ) {
-        if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
-            if let Some(ah_chain) = self
-                .chains
-                .get_chain_by_runtime(&runtime.asset_hub_runtime())
-            {
-                let header_layout_cols = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(82), // Network info
-                        Constraint::Fill(1),    // Era / Session progress bar
-                        Constraint::Length(16), // Countdown
-                    ])
-                    .split(area);
-
-                let network_info = Paragraph::new(vec![
-                    Line::from(format!("# {}", runtime))
-                        .style(Style::default().fg(Color::Blue).bold()),
-                    Line::from(format!(
-                        "Total validators: {} active, {} waiting",
-                        ah_chain.active_validators_count(),
-                        ah_chain.waiting_validators_count(),
-                    )),
-                    Line::from(format!(
-                        "Total nominators: {} active, {} waiting",
-                        ah_chain.active_nominators_count(),
-                        ah_chain.waiting_nominators_count()
-                    )),
-                    Line::from(format!(
-                        "Total staked: {}",
-                        ah_chain.total_staked_percentage()
-                    )),
-                    Line::from(format!(
-                        "On display: {} active, {} waiting",
-                        validators.iter().filter(|v| v.is_active()).count(),
-                        validators.iter().filter(|v| v.is_waiting()).count(),
-                    )),
-                ])
-                .style(Style::default().fg(Color::Blue));
-
-                network_info.render(header_layout_cols[0], buf);
-
-                let Some(epoch) = chain.epoch() else {
-                    // TODO: Handle epoch not available, maybe render loading indicator
-                    return;
-                };
-
-                let epoch_progress = epoch.progress(chain.finalized_block());
-                let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
-
-                let Some(era) = ah_chain.era() else {
-                    // TODO: Handle era not available, maybe render loading indicator
-                    return;
-                };
-
-                let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
-                let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
-
-                let progress_info = Paragraph::new(vec![
-                    Line::from(""),
-                    Line::from(format!(
-                        "era {} {:.0}% {}",
-                        era.index(),
-                        era_progress * 100 as f64,
-                        era_progress_bar
-                    ))
-                    .alignment(Alignment::Right),
-                    Line::from(format!(
-                        "epoch {} {:.0}% {}",
-                        epoch.index(),
-                        epoch_progress * 100 as f64,
-                        epoch_progress_bar,
-                    ))
-                    .alignment(Alignment::Right),
-                ])
-                .style(Style::default().fg(Color::Blue));
-
-                progress_info.render(header_layout_cols[1], buf);
-
-                let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
-                let era_countdown_time =
-                    era.countdown_time(epoch.duration(), epoch.block_time_ms());
-
-                let countdown_info = Paragraph::new(vec![
-                    Line::from(""),
-                    Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
-                    Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
-                ])
-                .style(Style::default().fg(Color::Blue));
-
-                countdown_info.render(header_layout_cols[2], buf);
-            };
-        };
-    }
-
-    fn render_table_body(
-        &self,
-        validators: Vec<&Validator>,
-        selected_validator: Option<&Validator>,
-        area: Rect,
-        buf: &mut Buffer,
-        table_state: &mut TableState,
-    ) {
-        let mut rows = Vec::new();
-
-        for v in validators {
-            let text_points = match v.delta_points() {
-                Some(d) => Text::from(format!("+{}", d)).style(Style::default().fg(Color::White)),
-                None => Text::from(v.total_points().to_string()),
-            };
-
-            let decimals = v.runtime().token_decimals();
-            let staked_total = if v.is_active() { v.stake.total() } else { 0 };
-            let staked_own = if v.is_active() {
-                v.stake.own()
-            } else {
-                v.ledger.active()
-            };
-
-            let (cell_style, highlight_symbol) = match selected_validator {
-                Some(selected) if v == selected => {
-                    (Style::default().fg(Color::Black).bg(Color::White), "❯")
-                }
-                _ => (Style::default(), ""),
-            };
-
-            let mut validator_cells = vec![
-                Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
-                Cell::from(Text::from(format!("{}", v.display_name())).alignment(Alignment::Left)),
-                Cell::from(text_points.alignment(Alignment::Right)),
-                Cell::from(
-                    Text::from(format_planks(staked_total, decimals, 4))
-                        .alignment(Alignment::Right),
-                ),
-                Cell::from(
-                    Text::from(format_planks(staked_own, decimals, 4)).alignment(Alignment::Right),
-                ),
-                Cell::from(
-                    Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
-                ),
-                Cell::from(Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right)),
-            ];
-            if selected_validator.is_some() {
-                validator_cells.insert(
-                    1,
-                    Cell::from(
-                        Text::from(format!("{}", highlight_symbol)).alignment(Alignment::Left),
-                    )
-                    .style(cell_style),
-                );
-            }
-            rows.push(Row::new(validator_cells));
-        }
-
-        let mut widths = vec![
-            Constraint::Length(3),
-            Constraint::Length(28),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-        ];
-
-        let mut header_cells = vec![
-            Cell::from(Text::from("◈").alignment(Alignment::Center)),
-            Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("points").alignment(Alignment::Right)),
-            Cell::from(Text::from("total").alignment(Alignment::Right)),
-            Cell::from(Text::from("own").alignment(Alignment::Right)),
-            Cell::from(Text::from("nominators").alignment(Alignment::Right)),
-            Cell::from(Text::from("commission").alignment(Alignment::Right)),
-        ];
-
-        // If selected validator is in this group, add a column for the highlight symbol
-        if selected_validator.is_some() {
-            widths.insert(1, Constraint::Length(1));
-            header_cells.insert(1, Cell::from(Text::from("")));
-        };
-
-        let table = Table::new(rows, widths)
-            .header(Row::new(header_cells).set_style(THEME.table.header))
-            .style(Style::default().fg(Color::Blue));
-
-        StatefulWidget::render(table, area, buf, table_state);
-    }
-}
-
-// impl Widget for &ValidatorsDetailWidget {
-//     fn render(self, area: Rect, buf: &mut Buffer) {
-//         let mut state = self.state.write().unwrap();
-
-//         let (table_style, highlight_style) = match state.is_active {
-//             true => (
-//                 Style::default().fg(Color::White),
-//                 Style::default().fg(Color::Black).bg(Color::White),
-//             ),
-//             false => (
-//                 Style::default().fg(Color::Blue),
-//                 Style::default().fg(Color::Blue),
-//             ),
-//         };
-
-//         let block = Block::new()
-//             .borders(Borders::NONE)
-//             .border_type(BorderType::Plain);
-
-//         let rows = state.validators_iter().map(|v| {
-//             let points = match v.delta_points() {
-//                 Some(d) => format!("+{} {}", d, v.total_points()),
-//                 None => v.total_points().to_string(),
-//             };
-
-//             let decimals = v.account.token_decimals();
-//             Row::new(vec![
-//                 Text::from(v.display_name()).alignment(Alignment::Left),
-//                 Text::from(points).alignment(Alignment::Right),
-//                 Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
-//                 Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),
-//                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
-//                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
-//             ])
-//         });
-
-//         let widths = [
-//             Constraint::Length(20),
-//             Constraint::Fill(1),
-//             Constraint::Fill(1),
-//             Constraint::Fill(1),
-//             Constraint::Fill(1),
-//             Constraint::Fill(1),
-//         ];
-
-//         let table = Table::new(rows, widths)
-//             .block(block)
-//             .header(
-//                 Row::new(vec![
-//                     Cell::from(""),
-//                     Cell::from(Text::from("points").alignment(Alignment::Right)),
-//                     Cell::from(Text::from("total").alignment(Alignment::Right)),
-//                     Cell::from(Text::from("own").alignment(Alignment::Right)),
-//                     Cell::from(Text::from("nominators").alignment(Alignment::Right)),
-//                     Cell::from(Text::from("commission").alignment(Alignment::Right)),
-//                 ])
-//                 .set_style(THEME.table.header),
-//             )
-//             .style(table_style)
-//             .row_highlight_style(highlight_style);
-
-//         StatefulWidget::render(table, area, buf, &mut state.table_state);
-//     }
-// }
 
 // Helper functions
 

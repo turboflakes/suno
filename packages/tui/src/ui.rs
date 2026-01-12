@@ -146,7 +146,7 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    frame.render_widget(&app.validators.as_detail(&app.chains), block_area);
+    frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
 }
 
 fn render_logs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
