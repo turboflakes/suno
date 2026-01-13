@@ -906,7 +906,7 @@ fn dispatch_event_action(
                 epoch,
             )))?;
         }
-        Event::TotalStakedFetched(value) => {
+        Event::TotalStaked(value) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
                 runtime.clone(),
                 value,

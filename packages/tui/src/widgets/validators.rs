@@ -21,6 +21,7 @@ use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_error::Error;
+use suno_events::Event;
 use suno_primitives::{
     staking::{Era, StakeLedger, StakeOverview},
     validator::{Validator, ValidatorStatus},
@@ -661,12 +662,12 @@ impl ValidatorsListWidget {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_authority_status(
+            if let Err(e) = fetch_and_dispatch_validators_authority_status(
                 &api,
                 block_hash,
                 &runtime,
                 &validator_keys,
-                tx.clone(),
+                &tx,
             )
             .await
             {
@@ -1195,45 +1196,59 @@ async fn fetch_and_send_validators_staking_ledger(
     Ok(())
 }
 
-async fn fetch_and_send_validators_authority_status(
+async fn fetch_and_dispatch_validators_authority_status(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
     validator_keys: &Vec<ValidatorKey>,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let validators_authority_status_result = match runtime {
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    let events = match runtime {
         SupportedRuntime::Polkadot => {
-            suno_polkadot::fetch_validators_authority_status(api, block_hash, validator_keys).await
+            suno_polkadot::fetch_validators_authority_status_event(api, block_hash, validator_keys)
+                .await?
         }
         SupportedRuntime::Kusama => {
-            suno_kusama::fetch_validators_authority_status(api, block_hash, validator_keys).await
+            suno_kusama::fetch_validators_authority_status_event(api, block_hash, validator_keys)
+                .await?
         }
         SupportedRuntime::Paseo => {
-            suno_paseo::fetch_validators_authority_status(api, block_hash, validator_keys).await
+            suno_paseo::fetch_validators_authority_status_event(api, block_hash, validator_keys)
+                .await?
         }
         SupportedRuntime::Westend => {
-            suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys).await
+            suno_westend::fetch_validators_authority_status_event(api, block_hash, validator_keys)
+                .await?
         }
         _ => {
-            error!("Unsupported runtime: {:?}", runtime);
-            return Ok(());
+            return Err(Error::UnsupportedRuntime(runtime.clone()));
         }
     };
 
-    match validators_authority_status_result {
-        Ok(status_map) => {
-            for key in validator_keys {
-                if let Some(status) = status_map.get(&key.bytes()).copied() {
-                    tx.send(Action::Validator(ValidatorAction::UpdateStatus(
-                        key.clone(),
-                        status,
-                    )))?;
-                }
-            }
-        }
-        Err(e) => warn!("{e}"),
+    for event in events {
+        dispatch_event_action(event, runtime, tx)?;
     }
 
+    Ok(())
+}
+
+// TODO: Implement dispatch_event_action for all other validator actions
+fn dispatch_event_action(
+    event: Event,
+    runtime: &SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    match event {
+        Event::AuthorityStatus(bytes, status) => {
+            let account_key = AccountKey::from_bytes(runtime.clone(), bytes);
+            tx.send(Action::Validator(ValidatorAction::UpdateStatus(
+                account_key,
+                status,
+            )))?;
+        }
+        _ => {
+            error!("Unhandled event type: {:?}", event);
+        }
+    }
     Ok(())
 }

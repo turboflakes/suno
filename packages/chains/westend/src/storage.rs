@@ -3,7 +3,7 @@ use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::polkadot_primitives::v9::ValidatorIndex,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
@@ -50,28 +50,31 @@ pub async fn fetch_epoch_data_event(
 }
 
 /// Fetch validators authority status
-pub async fn fetch_validators_authority_status(
+pub async fn fetch_validators_authority_status_event(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     validator_keys: &Vec<AccountKey>,
-) -> Result<HashMap<[u8; 32], ValidatorStatus>, Error> {
+) -> Result<Vec<Event>, Error> {
+    let mut events: Vec<Event> = Vec::new();
     let validators = fetch_session_validators(api, block_hash).await?;
     let validator_indices = fetch_active_validator_indices(api, block_hash).await?;
-
     let validator_bytes: HashSet<[u8; 32]> = validator_keys.iter().map(|key| key.bytes()).collect();
-    let mut status: HashMap<[u8; 32], ValidatorStatus> = HashMap::new();
 
     for (i, stash) in validators.iter().enumerate() {
         let bytes = *stash.as_ref();
         if validator_bytes.contains(&bytes) {
-            status.insert(bytes, ValidatorStatus::Authority);
             if validator_indices.contains(&ValidatorIndex(i as u32)) {
-                status.insert(bytes, ValidatorStatus::ParaAuthority);
+                events.push(Event::AuthorityStatus(
+                    bytes,
+                    ValidatorStatus::ParaAuthority,
+                ));
+                continue;
             }
+            events.push(Event::AuthorityStatus(bytes, ValidatorStatus::Authority));
         }
     }
 
-    Ok(status)
+    Ok(events)
 }
 
 /// Fetch babe epoch index at the specified block hash

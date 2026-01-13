@@ -15,6 +15,10 @@ impl AccountKey {
         }
     }
 
+    pub fn from_bytes(runtime: SupportedRuntime, bytes: [u8; 32]) -> Self {
+        Self { runtime, bytes }
+    }
+
     pub fn runtime(&self) -> &SupportedRuntime {
         &self.runtime
     }

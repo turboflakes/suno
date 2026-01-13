@@ -214,10 +214,10 @@ pub async fn fetch_total_staked_event(
     let active_issuance = total_issuance.saturating_sub(inactive_issuance);
 
     if active_issuance == 0 {
-        return Ok(Event::TotalStakedFetched(Permill::zero()));
+        return Ok(Event::TotalStaked(Permill::zero()));
     }
 
-    Ok(Event::TotalStakedFetched(Permill::from_rational(
+    Ok(Event::TotalStaked(Permill::from_rational(
         total_staked,
         active_issuance,
     )))
