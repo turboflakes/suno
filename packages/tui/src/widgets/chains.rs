@@ -1,6 +1,11 @@
 use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
+use futures::{
+    future::{BoxFuture, FutureExt},
+    select, stream,
+    stream::{FuturesUnordered, StreamExt},
+};
 use log::{debug, error, info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -516,6 +521,27 @@ impl ChainsListWidget {
         state.set_total_staked(chain_key, value)
     }
 
+    pub fn spawn_fetch_active_counters(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: &SupportedRuntime,
+        era_index: u32,
+    ) {
+        // let state = self.state.read().unwrap();
+        let api = api.clone();
+        let runtime = runtime.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) =
+                fetch_and_dispatch_active_counters(&api, block_hash, &runtime, era_index, &tx).await
+            {
+                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
+            }
+        });
+    }
+
     pub fn spawn_fetch_epoch_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -837,6 +863,65 @@ async fn handle_runtime_events(
     }
 }
 
+async fn fetch_and_dispatch_active_counters(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    era_index: u32,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    let mut futures: FuturesUnordered<BoxFuture<'_, Result<Response, Error>>> =
+        FuturesUnordered::new();
+
+    match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            futures.push(Box::pin(
+                suno_asset_hub_polkadot::fetch_active_validators_count(api, block_hash, era_index),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_polkadot::fetch_active_nominators_count(api, block_hash, era_index),
+            ));
+        }
+        SupportedRuntime::AssetHubKusama => {
+            futures.push(Box::pin(
+                suno_asset_hub_kusama::fetch_active_validators_count(api, block_hash, era_index),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_kusama::fetch_active_nominators_count(api, block_hash, era_index),
+            ));
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            futures.push(Box::pin(
+                suno_asset_hub_paseo::fetch_active_validators_count(api, block_hash, era_index),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_paseo::fetch_active_nominators_count(api, block_hash, era_index),
+            ));
+        }
+        SupportedRuntime::AssetHubWestend => {
+            futures.push(Box::pin(
+                suno_asset_hub_westend::fetch_active_validators_count(api, block_hash, era_index),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_westend::fetch_active_nominators_count(api, block_hash, era_index),
+            ));
+        }
+        _ => {
+            error!("Unsupported runtime: {:?}", runtime);
+            return Ok(());
+        }
+    }
+
+    while let Some(result) = futures.next().await {
+        match result {
+            Ok(response) => dispatch_response_action(response, runtime, &tx)?,
+            Err(e) => warn!("{e}"),
+        }
+    }
+
+    Ok(())
+}
+
 async fn fetch_and_dispatch_epoch_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
@@ -908,6 +993,18 @@ fn dispatch_response_action(
         }
         Response::TotalStaked(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
+        Response::ActiveValidators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
+        Response::ActiveNominators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateActiveNominators(
                 runtime.clone(),
                 data.value,
             )))?;

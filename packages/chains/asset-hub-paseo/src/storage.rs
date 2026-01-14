@@ -67,29 +67,23 @@ pub async fn fetch_validators_era_points(
     block_hash: H256,
     era: u32,
     validator_keys: &Vec<AccountKey>,
-) -> Result<HashMap<[u8; 32], u32>, Error> {
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
     if let Some(reward_points) = fetch_era_reward_points(api, block_hash, era).await? {
         let validator_bytes: HashSet<[u8; 32]> =
             validator_keys.iter().map(|key| key.bytes()).collect();
 
-        let points_map: HashMap<[u8; 32], u32> = reward_points
-            .individual
-            .0
-            .iter()
-            .filter_map(|(stash, points)| {
-                let bytes = *stash.as_ref();
-                if validator_bytes.contains(&bytes) {
-                    Some((bytes, *points))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        for (stash, points) in reward_points.individual.0.iter() {
+            let bytes = *stash.as_ref();
+            if validator_bytes.contains(&bytes) {
+                responses.push(Response::authority_era_points(bytes, *points));
+            }
+        }
 
-        return Ok(points_map);
+        return Ok(responses);
     }
 
-    Ok(HashMap::new())
+    Ok(responses)
 }
 
 /// Fetch era data at the specified block hash
@@ -119,7 +113,7 @@ pub async fn fetch_active_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     era: u32,
-) -> Result<u32, Error> {
+) -> Result<Response, Error> {
     let addr = node_runtime::storage()
         .staking()
         .eras_stakers_overview_iter1(era);
@@ -147,7 +141,7 @@ pub async fn fetch_active_nominators_count(
         }
     }
 
-    Ok(nominators_count)
+    Ok(Response::active_nominators(nominators_count))
 }
 
 /// Fetch active validators at the specified block hash
@@ -155,7 +149,7 @@ pub async fn fetch_active_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     era: u32,
-) -> Result<u32, Error> {
+) -> Result<Response, Error> {
     let addr = node_runtime::storage()
         .staking()
         .eras_stakers_overview_iter1(era);
@@ -163,7 +157,7 @@ pub async fn fetch_active_validators_count(
     let iter = api.storage().at(block_hash).iter(addr).await?;
     let count = iter.count().await;
 
-    Ok(count as u32)
+    Ok(Response::active_validators(count as u32))
 }
 
 /// Fetch total validators at the specified block hash
