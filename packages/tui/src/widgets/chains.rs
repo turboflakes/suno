@@ -119,7 +119,7 @@ impl Chain {
     }
 
     pub fn waiting_validators_count(&self) -> u32 {
-        self.total_vals - self.active_vals
+        self.total_vals.saturating_sub(self.active_vals)
     }
 
     pub fn active_nominators_count(&self) -> u32 {
@@ -131,7 +131,7 @@ impl Chain {
     }
 
     pub fn waiting_nominators_count(&self) -> u32 {
-        self.total_noms - self.active_noms
+        self.total_noms.saturating_sub(self.active_noms)
     }
 
     pub fn total_staked_percentage(&self) -> String {

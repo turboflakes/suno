@@ -8,7 +8,8 @@ use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
 // use crate::widgets::popup::PopupWidget;
 use futures::{
     future::{BoxFuture, FutureExt},
-    select, stream, StreamExt,
+    select, stream,
+    stream::{FuturesUnordered, StreamExt},
 };
 use log::{error, warn};
 use ratatui::widgets::TableState;
@@ -684,90 +685,64 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     runtime: &SupportedRuntime,
     tx: UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    let (era_data_fut, total_validators_count_fut, total_nominators_count_fut): (
-        BoxFuture<'_, Result<Response, Error>>,
-        BoxFuture<'_, Result<u32, Error>>,
-        BoxFuture<'_, Result<u32, Error>>,
-    ) = match runtime {
-        SupportedRuntime::AssetHubPolkadot => (
-            Box::pin(suno_asset_hub_polkadot::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_polkadot::fetch_total_validators_count(
+    let mut futures: FuturesUnordered<BoxFuture<'_, Result<Response, Error>>> =
+        FuturesUnordered::new();
+
+    match runtime {
+        SupportedRuntime::AssetHubPolkadot => {
+            futures.push(Box::pin(suno_asset_hub_polkadot::fetch_era_data(
                 api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_polkadot::fetch_total_nominators_count(
+            )));
+            futures.push(Box::pin(
+                suno_asset_hub_polkadot::fetch_total_validators_count(api, block_hash),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_polkadot::fetch_total_nominators_count(api, block_hash),
+            ));
+        }
+        SupportedRuntime::AssetHubKusama => {
+            futures.push(Box::pin(suno_asset_hub_kusama::fetch_era_data(
                 api, block_hash,
-            )),
-        ),
-        SupportedRuntime::AssetHubKusama => (
-            Box::pin(suno_asset_hub_kusama::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_kusama::fetch_total_validators_count(
+            )));
+            futures.push(Box::pin(
+                suno_asset_hub_kusama::fetch_total_validators_count(api, block_hash),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_kusama::fetch_total_nominators_count(api, block_hash),
+            ));
+        }
+        SupportedRuntime::AssetHubPaseo => {
+            futures.push(Box::pin(suno_asset_hub_paseo::fetch_era_data(
                 api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_kusama::fetch_total_nominators_count(
+            )));
+            futures.push(Box::pin(
+                suno_asset_hub_paseo::fetch_total_validators_count(api, block_hash),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_paseo::fetch_total_nominators_count(api, block_hash),
+            ));
+        }
+        SupportedRuntime::AssetHubWestend => {
+            futures.push(Box::pin(suno_asset_hub_westend::fetch_era_data(
                 api, block_hash,
-            )),
-        ),
-        SupportedRuntime::AssetHubPaseo => (
-            Box::pin(suno_asset_hub_paseo::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_paseo::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_paseo::fetch_total_nominators_count(
-                api, block_hash,
-            )),
-        ),
-        SupportedRuntime::AssetHubWestend => (
-            Box::pin(suno_asset_hub_westend::fetch_era_data(api, block_hash)),
-            Box::pin(suno_asset_hub_westend::fetch_total_validators_count(
-                api, block_hash,
-            )),
-            Box::pin(suno_asset_hub_westend::fetch_total_nominators_count(
-                api, block_hash,
-            )),
-        ),
+            )));
+            futures.push(Box::pin(
+                suno_asset_hub_westend::fetch_total_validators_count(api, block_hash),
+            ));
+            futures.push(Box::pin(
+                suno_asset_hub_westend::fetch_total_nominators_count(api, block_hash),
+            ));
+        }
         _ => {
             error!("Unsupported runtime: {:?}", runtime);
             return Ok(());
         }
-    };
+    }
 
-    let mut era_data_fut = era_data_fut.fuse();
-    let mut total_validators_count_fut = total_validators_count_fut.fuse();
-    let mut total_nominators_count_fut = total_nominators_count_fut.fuse();
-
-    loop {
-        select! {
-            era_data_result = era_data_fut => {
-                match era_data_result {
-                    Ok(response) => {
-                        dispatch_response_action(response, runtime, &tx)?;
-                    }
-                    Err(e) => warn!("{e}"),
-                }
-            }
-            total_validators_count_result = total_validators_count_fut => {
-                match total_validators_count_result {
-                    Ok(count) => {
-                        tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
-                            runtime.clone(),
-                            count,
-                        )))?;
-                    }
-                    Err(e) => warn!("{e}"),
-                }
-            }
-            total_nominators_count_result = total_nominators_count_fut => {
-                match total_nominators_count_result {
-                    Ok(count) => {
-                        tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
-                            runtime.clone(),
-                            count,
-                        )))?;
-                    }
-                    Err(e) => warn!("{e}"),
-                }
-            }
-            complete => break
+    while let Some(result) = futures.next().await {
+        match result {
+            Ok(response) => dispatch_response_action(response, runtime, &tx)?,
+            Err(e) => warn!("{e}"),
         }
     }
 
@@ -1248,6 +1223,18 @@ fn dispatch_response_action(
             } else {
                 warn!("No stake ledger data found for {}", account_key.to_string(),);
             }
+        }
+        Response::TotalValidators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
+        Response::TotalNominators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
+                runtime.clone(),
+                data.value,
+            )))?;
         }
         _ => {
             error!("Unhandled response type: {:?}", response);

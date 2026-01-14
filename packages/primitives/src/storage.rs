@@ -43,6 +43,8 @@ pub enum Response {
     TotalStaked(Data<Permill>),
     AuthorityStatus(Data<AuthorityStatus>),
     StakeLedger(Data<StakeLedgerData>),
+    TotalValidators(Data<u32>),
+    TotalNominators(Data<u32>),
 }
 
 // Some constructors for convenience
@@ -65,5 +67,13 @@ impl Response {
 
     pub fn stake_ledger(account: AccountBytes, ledger: Option<StakeLedger>) -> Self {
         Response::StakeLedger(Data::new(StakeLedgerData { account, ledger }))
+    }
+
+    pub fn total_validators(value: u32) -> Self {
+        Response::TotalValidators(Data::new(value))
+    }
+
+    pub fn total_nominators(value: u32) -> Self {
+        Response::TotalNominators(Data::new(value))
     }
 }

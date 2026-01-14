@@ -170,10 +170,11 @@ pub async fn fetch_active_validators_count(
 pub async fn fetch_total_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-) -> Result<u32, Error> {
+) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_validators();
 
-    api.storage()
+    let count = api
+        .storage()
         .at(block_hash)
         .fetch(&addr)
         .await?
@@ -181,17 +182,20 @@ pub async fn fetch_total_validators_count(
             Error::from(format!(
                 "Total validators not defined at block hash {block_hash:?}"
             ))
-        })
+        })?;
+
+    Ok(Response::total_validators(count))
 }
 
 /// Fetch total nominators at the specified block hash
 pub async fn fetch_total_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-) -> Result<u32, Error> {
+) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_nominators();
 
-    api.storage()
+    let count = api
+        .storage()
         .at(block_hash)
         .fetch(&addr)
         .await?
@@ -199,7 +203,9 @@ pub async fn fetch_total_nominators_count(
             Error::from(format!(
                 "Total nominators not defined at block hash {block_hash:?}"
             ))
-        })
+        })?;
+
+        Ok(Response::total_nominators(count))
 }
 
 /// Fetch total total staked for a specific era at the specified block hash
