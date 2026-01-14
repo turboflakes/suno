@@ -21,11 +21,10 @@ use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
 use suno_asset_hub_paseo;
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_error::Error;
-use suno_events::Event;
 use suno_primitives::{
     staking::{Era, StakeLedger, StakeOverview},
     validator::{Validator, ValidatorStatus},
-    AccountKey,
+    AccountKey, Response,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -684,9 +683,9 @@ async fn fetch_and_send_initial_data_from_asset_hub(
     block_hash: H256,
     runtime: &SupportedRuntime,
     tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
+) -> Result<(), Error> {
     let (era_data_fut, total_validators_count_fut, total_nominators_count_fut): (
-        BoxFuture<'_, Result<Era, Error>>,
+        BoxFuture<'_, Result<Response, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
         BoxFuture<'_, Result<u32, Error>>,
     ) = match runtime {
@@ -740,8 +739,8 @@ async fn fetch_and_send_initial_data_from_asset_hub(
         select! {
             era_data_result = era_data_fut => {
                 match era_data_result {
-                    Ok(era) => {
-                        tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
+                    Ok(response) => {
+                        dispatch_response_action(response, runtime, &tx)?;
                     }
                     Err(e) => warn!("{e}"),
                 }
@@ -1136,14 +1135,14 @@ async fn fetch_and_send_validators_staking_ledger(
     runtime: &SupportedRuntime,
     validator_keys: Vec<ValidatorKey>,
     tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
+) -> Result<(), Error> {
     let mut stream = stream::iter(validator_keys)
         .map(|validator_key| {
             let api = api.clone();
             let stash = validator_key.stash();
             let runtime = runtime.clone();
             async move {
-                let result = match runtime {
+                match runtime {
                     SupportedRuntime::AssetHubPolkadot => {
                         suno_asset_hub_polkadot::fetch_validator_staking_ledger(
                             &api, block_hash, &stash,
@@ -1169,25 +1168,15 @@ async fn fetch_and_send_validators_staking_ledger(
                         .await
                     }
                     _ => Err(suno_error::Error::from("Unsupported runtime")),
-                };
-                (validator_key, result)
+                }
             }
         })
         .buffer_unordered(CONCURRENT_REQUESTS);
 
-    while let Some((validator_key, result)) = stream.next().await {
+    while let Some(result) = stream.next().await {
         match result {
-            Ok(Some(data)) => {
-                tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
-                    validator_key.clone(),
-                    data,
-                )))?;
-            }
-            Ok(None) => {
-                warn!(
-                    "No stake ledger data found for {}",
-                    validator_key.to_string(),
-                )
+            Ok(response) => {
+                dispatch_response_action(response, runtime, &tx)?;
             }
             Err(e) => warn!("{e}"),
         }
@@ -1203,51 +1192,65 @@ async fn fetch_and_dispatch_validators_authority_status(
     validator_keys: &Vec<ValidatorKey>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    let events = match runtime {
+    let responses = match runtime {
         SupportedRuntime::Polkadot => {
-            suno_polkadot::fetch_validators_authority_status_event(api, block_hash, validator_keys)
+            suno_polkadot::fetch_validators_authority_status(api, block_hash, validator_keys)
                 .await?
         }
         SupportedRuntime::Kusama => {
-            suno_kusama::fetch_validators_authority_status_event(api, block_hash, validator_keys)
-                .await?
+            suno_kusama::fetch_validators_authority_status(api, block_hash, validator_keys).await?
         }
         SupportedRuntime::Paseo => {
-            suno_paseo::fetch_validators_authority_status_event(api, block_hash, validator_keys)
-                .await?
+            suno_paseo::fetch_validators_authority_status(api, block_hash, validator_keys).await?
         }
         SupportedRuntime::Westend => {
-            suno_westend::fetch_validators_authority_status_event(api, block_hash, validator_keys)
-                .await?
+            suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys).await?
         }
         _ => {
             return Err(Error::UnsupportedRuntime(runtime.clone()));
         }
     };
 
-    for event in events {
-        dispatch_event_action(event, runtime, tx)?;
+    for response in responses {
+        dispatch_response_action(response, runtime, tx)?;
     }
 
     Ok(())
 }
 
-// TODO: Implement dispatch_event_action for all other validator actions
-fn dispatch_event_action(
-    event: Event,
+// TODO: Implement dispatch_response_action for all other validator actions
+fn dispatch_response_action(
+    response: Response,
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    match event {
-        Event::AuthorityStatus(bytes, status) => {
-            let account_key = AccountKey::from_bytes(runtime.clone(), bytes);
-            tx.send(Action::Validator(ValidatorAction::UpdateStatus(
-                account_key,
-                status,
+    match response {
+        Response::Era(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateEra(
+                runtime.clone(),
+                data.value,
             )))?;
         }
+        Response::AuthorityStatus(data) => {
+            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdateStatus(
+                account_key,
+                data.value.status,
+            )))?;
+        }
+        Response::StakeLedger(data) => {
+            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            if let Some(ledger) = data.value.ledger {
+                tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
+                    account_key,
+                    ledger,
+                )))?;
+            } else {
+                warn!("No stake ledger data found for {}", account_key.to_string(),);
+            }
+        }
         _ => {
-            error!("Unhandled event type: {:?}", event);
+            error!("Unhandled response type: {:?}", response);
         }
     }
     Ok(())

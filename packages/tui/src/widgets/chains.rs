@@ -17,10 +17,9 @@ use subxt::{events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, ChainAction, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_error::Error;
-use suno_events::Event;
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
-    Epoch, Era,
+    Epoch, Era, Response,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -762,8 +761,8 @@ async fn process_runtime_events(
 ) -> Result<(), Error> {
     let processed_events = handle_runtime_events(api, block_hash, events, runtime).await;
 
-    for event in processed_events {
-        dispatch_event_action(event, runtime, tx)?;
+    for response in processed_events {
+        dispatch_response_action(response, runtime, tx)?;
     }
 
     Ok(())
@@ -774,7 +773,7 @@ async fn handle_runtime_events(
     block_hash: H256,
     events: Events<SubstrateConfig>,
     runtime: &SupportedRuntime,
-) -> Vec<Event> {
+) -> Vec<Response> {
     match runtime {
         SupportedRuntime::Polkadot => suno_polkadot::handle_events(api, block_hash, events)
             .await
@@ -844,19 +843,17 @@ async fn fetch_and_dispatch_epoch_data(
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    let event = match runtime {
-        SupportedRuntime::Polkadot => {
-            suno_polkadot::fetch_epoch_data_event(api, block_hash).await?
-        }
-        SupportedRuntime::Kusama => suno_kusama::fetch_epoch_data_event(api, block_hash).await?,
-        SupportedRuntime::Paseo => suno_paseo::fetch_epoch_data_event(api, block_hash).await?,
-        SupportedRuntime::Westend => suno_westend::fetch_epoch_data_event(api, block_hash).await?,
+    let response = match runtime {
+        SupportedRuntime::Polkadot => suno_polkadot::fetch_epoch_data(api, block_hash).await?,
+        SupportedRuntime::Kusama => suno_kusama::fetch_epoch_data(api, block_hash).await?,
+        SupportedRuntime::Paseo => suno_paseo::fetch_epoch_data(api, block_hash).await?,
+        SupportedRuntime::Westend => suno_westend::fetch_epoch_data(api, block_hash).await?,
         _ => {
             return Err(Error::UnsupportedRuntime(runtime.clone()));
         }
     };
 
-    dispatch_event_action(event, runtime, tx)?;
+    dispatch_response_action(response, runtime, tx)?;
 
     Ok(())
 }
@@ -868,52 +865,55 @@ async fn fetch_and_dispatch_total_staked(
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    let event = match runtime {
+    let response = match runtime {
         SupportedRuntime::AssetHubPolkadot => {
-            suno_asset_hub_polkadot::fetch_total_staked_event(api, block_hash, era_index).await?
+            suno_asset_hub_polkadot::fetch_total_staked(api, block_hash, era_index).await?
         }
         SupportedRuntime::AssetHubKusama => {
-            suno_asset_hub_kusama::fetch_total_staked_event(api, block_hash, era_index).await?
+            suno_asset_hub_kusama::fetch_total_staked(api, block_hash, era_index).await?
         }
         SupportedRuntime::AssetHubPaseo => {
-            suno_asset_hub_paseo::fetch_total_staked_event(api, block_hash, era_index).await?
+            suno_asset_hub_paseo::fetch_total_staked(api, block_hash, era_index).await?
         }
         SupportedRuntime::AssetHubWestend => {
-            suno_asset_hub_westend::fetch_total_staked_event(api, block_hash, era_index).await?
+            suno_asset_hub_westend::fetch_total_staked(api, block_hash, era_index).await?
         }
         _ => {
             return Err(Error::UnsupportedRuntime(runtime.clone()));
         }
     };
 
-    dispatch_event_action(event, runtime, tx)?;
+    dispatch_response_action(response, runtime, tx)?;
 
     Ok(())
 }
 
-fn dispatch_event_action(
-    event: Event,
+fn dispatch_response_action(
+    response: Response,
     runtime: &SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
-    match event {
-        Event::NewEra(era) => {
-            tx.send(Action::Chain(ChainAction::UpdateEra(runtime.clone(), era)))?;
-        }
-        Event::NewEpoch(epoch) => {
-            tx.send(Action::Chain(ChainAction::UpdateEpoch(
+    match response {
+        Response::Era(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateEra(
                 runtime.clone(),
-                epoch,
+                data.value,
             )))?;
         }
-        Event::TotalStaked(value) => {
+        Response::Epoch(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateEpoch(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
+        Response::TotalStaked(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
                 runtime.clone(),
-                value,
+                data.value,
             )))?;
         }
         _ => {
-            error!("Unhandled event type: {:?}", event);
+            error!("Unhandled response type: {:?}", response);
         }
     }
     Ok(())

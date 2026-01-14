@@ -17,11 +17,10 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_events::Event;
 use suno_primitives::{
     node_account::get_account_bytes_from_storage_key,
     staking::{Era, StakeLedger, StakeOverview},
-    AccountKey,
+    AccountKey, Response,
 };
 
 /// Fetch validator commission
@@ -52,12 +51,14 @@ pub async fn fetch_validator_staking_ledger(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
-) -> Result<Option<StakeLedger>, Error> {
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
     if let Some(data) = fetch_staking_ledger(api, block_hash, stash).await? {
         let stake_ledger = StakeLedger::new(data.active, data.total);
-        return Ok(Some(stake_ledger));
+        return Ok(Response::stake_ledger(account_bytes, Some(stake_ledger)));
     }
-    Ok(None)
+    Ok(Response::stake_ledger(account_bytes, None))
 }
 
 /// Fetch validators era points
@@ -95,7 +96,7 @@ pub async fn fetch_validators_era_points(
 pub async fn fetch_era_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-) -> Result<Era, Error> {
+) -> Result<Response, Error> {
     let sessions_per_era = fetch_sessions_per_era(api)?;
     let era_info = fetch_active_era_info(api, block_hash).await?;
     let BoundedVec(bonded_eras) = fetch_bonded_eras(api, block_hash).await?;
@@ -105,12 +106,12 @@ pub async fn fetch_era_data(
         .map(|c| c.1 as u64)
         .unwrap_or(0);
 
-    Ok(Era::new(
+    Ok(Response::era(Era::new(
         era_info.index,
         era_info.start.unwrap_or(0),
         start_session,
         sessions_per_era,
-    ))
+    )))
 }
 
 /// Fetch active validators and nominators at the specified block hash
@@ -202,11 +203,11 @@ pub async fn fetch_total_nominators_count(
 }
 
 /// Fetch total total staked for a specific era at the specified block hash
-pub async fn fetch_total_staked_event(
+pub async fn fetch_total_staked(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     era: u32,
-) -> Result<Event, Error> {
+) -> Result<Response, Error> {
     let total_issuance = fetch_total_issuance(api, block_hash).await?;
     let inactive_issuance = fetch_inactive_issuance(api, block_hash).await?;
     let total_staked = fetch_eras_total_stake(api, block_hash, era).await?;
@@ -214,10 +215,10 @@ pub async fn fetch_total_staked_event(
     let active_issuance = total_issuance.saturating_sub(inactive_issuance);
 
     if active_issuance == 0 {
-        return Ok(Event::TotalStaked(Permill::zero()));
+        return Ok(Response::total_staked(Permill::zero()));
     }
 
-    Ok(Event::TotalStaked(Permill::from_rational(
+    Ok(Response::total_staked(Permill::from_rational(
         total_staked,
         active_issuance,
     )))

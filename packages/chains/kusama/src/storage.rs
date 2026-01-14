@@ -3,14 +3,13 @@ use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::polkadot_primitives::v8::ValidatorIndex,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_events::Event;
-use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch};
+use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch, Response};
 
 type Points = u32;
 type Index = u64;
@@ -35,27 +34,27 @@ pub async fn fetch_validator_points(
 }
 
 /// Fetch epoch data at the specified block hash
-pub async fn fetch_epoch_data_event(
+pub async fn fetch_epoch_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-) -> Result<Event, Error> {
+) -> Result<Response, Error> {
     let duration = fetch_epoch_duration(api)?;
     let block_time = fetch_expected_block_time(api)?;
     let (_, start) = fetch_epoch_start(api, block_hash).await?;
     let index = fetch_epoch_index(api, block_hash).await?;
 
-    Ok(Event::NewEpoch(Epoch::new(
+    Ok(Response::epoch(Epoch::new(
         index, start, duration, block_time,
     )))
 }
 
 /// Fetch validators authority status
-pub async fn fetch_validators_authority_status_event(
+pub async fn fetch_validators_authority_status(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     validator_keys: &Vec<AccountKey>,
-) -> Result<Vec<Event>, Error> {
-    let mut events: Vec<Event> = Vec::new();
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
     let validators = fetch_session_validators(api, block_hash).await?;
     let validator_indices = fetch_active_validator_indices(api, block_hash).await?;
     let validator_bytes: HashSet<[u8; 32]> = validator_keys.iter().map(|key| key.bytes()).collect();
@@ -64,17 +63,20 @@ pub async fn fetch_validators_authority_status_event(
         let bytes = *stash.as_ref();
         if validator_bytes.contains(&bytes) {
             if validator_indices.contains(&ValidatorIndex(i as u32)) {
-                events.push(Event::AuthorityStatus(
+                responses.push(Response::authority_status(
                     bytes,
                     ValidatorStatus::ParaAuthority,
                 ));
                 continue;
             }
-            events.push(Event::AuthorityStatus(bytes, ValidatorStatus::Authority));
+            responses.push(Response::authority_status(
+                bytes,
+                ValidatorStatus::Authority,
+            ));
         }
     }
 
-    Ok(events)
+    Ok(responses)
 }
 
 /// Fetch babe epoch index at the specified block hash

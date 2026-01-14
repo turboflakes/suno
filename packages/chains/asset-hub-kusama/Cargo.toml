@@ -14,7 +14,6 @@ subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../../actions" }
 suno-error = { path = "../../error" }
-suno-events = { path = "../../events" }
 suno-signer = { path = "../../signer" }
 suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }
