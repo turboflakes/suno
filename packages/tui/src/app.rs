@@ -1,3 +1,4 @@
+use crate::bridge::sync;
 use crate::error::TuiError;
 use crate::menu::Command;
 use crate::section::Section;
@@ -179,8 +180,7 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.chains
-                                    .spawn_fetch_epoch_data(&api, block_hash, &runtime);
+                                sync::spawn_fetch_epoch_data(&api, block_hash, &runtime, &self.tx);
 
                                 self.validators
                                     .spawn_fetch_validators_authority_status_from_relay(
@@ -258,11 +258,20 @@ impl App {
                         if let Some((api, block_hash)) =
                             self.chains.get_api_and_block_hash(&runtime)
                         {
-                            self.chains.spawn_fetch_active_counters(
+                            sync::spawn_fetch_active_validators_count(
                                 &api,
                                 block_hash,
                                 &runtime,
                                 era.index(),
+                                &self.tx,
+                            );
+
+                            sync::spawn_fetch_active_nominators_count(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                                &self.tx,
                             );
 
                             self.validators.spawn_fetch_validators_era_points(
@@ -279,11 +288,12 @@ impl App {
                                 era.index(),
                             );
 
-                            self.chains.spawn_fetch_total_staked(
+                            sync::spawn_fetch_total_staked(
                                 &api,
                                 block_hash,
                                 &runtime,
                                 era.index(),
+                                &self.tx,
                             );
                         }
                     }
