@@ -39,12 +39,16 @@ pub async fn fetch_validator_stake_overview(
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
-) -> Result<Option<StakeOverview>, Error> {
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
     if let Some(data) = fetch_eras_stakers_overview(api, block_hash, era, stash).await? {
         let stake_overview = StakeOverview::new(data.own, data.total, data.nominator_count);
-        return Ok(Some(stake_overview));
+        return Ok(Response::stake_overview(
+            account_bytes,
+            Some(stake_overview),
+        ));
     }
-    Ok(None)
+    Ok(Response::stake_overview(account_bytes, None))
 }
 
 pub async fn fetch_validator_staking_ledger(

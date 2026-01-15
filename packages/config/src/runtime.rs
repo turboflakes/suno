@@ -19,6 +19,8 @@ pub const WESTEND_SPEC: &str = include_str!("../chain-specs/westend.json");
 pub const ASSET_HUB_WESTEND_SPEC: &str = include_str!("../chain-specs/asset-hub-westend.json");
 pub const PEOPLE_WESTEND_SPEC: &str = include_str!("../chain-specs/people-westend.json");
 
+pub type Runtime = SupportedRuntime;
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {

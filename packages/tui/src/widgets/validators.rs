@@ -378,6 +378,11 @@ impl ValidatorsListWidget {
         state.get_selected()
     }
 
+    pub fn get_validator_keys_by_runtime(&self, runtime: &SupportedRuntime) -> Vec<AccountKey> {
+        let state = self.state.read().unwrap();
+        state.get_keys_by_runtime(&runtime.relay_chain())
+    }
+
     pub fn update_commission(&self, validator_key: &AccountKey, commission: Commission) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_commission(validator_key, commission)
@@ -464,35 +469,6 @@ impl ValidatorsListWidget {
     //     });
     // }
 
-    pub fn spawn_fetch_validators_era_points(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-        era_index: u32,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_dispatch_validators_era_points(
-                &api,
-                block_hash,
-                &runtime,
-                era_index,
-                &validator_keys,
-                &tx,
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-
     pub fn spawn_fetch_validators_staking_ledger(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -537,35 +513,6 @@ impl ValidatorsListWidget {
                 &api,
                 block_hash,
                 &runtime,
-                validator_keys.clone(),
-                tx.clone(),
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-
-    pub fn spawn_fetch_validators_stake_overview(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-        era_index: u32,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_stake_overview(
-                &api,
-                block_hash,
-                &runtime,
-                era_index,
                 validator_keys.clone(),
                 tx.clone(),
             )
@@ -760,73 +707,6 @@ async fn fetch_and_send_validators_points_from_relay(
     Ok(())
 }
 
-async fn fetch_and_send_validators_stake_overview(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    era_index: u32,
-    validator_keys: Vec<ValidatorKey>,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let mut stream = stream::iter(validator_keys)
-        .map(|validator_key| {
-            let api = api.clone();
-            let stash = validator_key.stash();
-            let runtime = runtime.clone();
-            async move {
-                let result = match runtime {
-                    SupportedRuntime::AssetHubPolkadot => {
-                        suno_asset_hub_polkadot::fetch_validator_stake_overview(
-                            &api, block_hash, era_index, &stash,
-                        )
-                        .await
-                    }
-                    SupportedRuntime::AssetHubKusama => {
-                        suno_asset_hub_kusama::fetch_validator_stake_overview(
-                            &api, block_hash, era_index, &stash,
-                        )
-                        .await
-                    }
-                    SupportedRuntime::AssetHubPaseo => {
-                        suno_asset_hub_paseo::fetch_validator_stake_overview(
-                            &api, block_hash, era_index, &stash,
-                        )
-                        .await
-                    }
-                    SupportedRuntime::AssetHubWestend => {
-                        suno_asset_hub_westend::fetch_validator_stake_overview(
-                            &api, block_hash, era_index, &stash,
-                        )
-                        .await
-                    }
-                    _ => Err(suno_error::Error::from("Unsupported runtime")),
-                };
-                (validator_key, result)
-            }
-        })
-        .buffer_unordered(CONCURRENT_REQUESTS);
-
-    while let Some((validator_key, result)) = stream.next().await {
-        match result {
-            Ok(Some(data)) => {
-                tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
-                    validator_key.clone(),
-                    data,
-                )))?;
-            }
-            Ok(None) => {
-                warn!(
-                    "No stake overview data found for {}",
-                    validator_key.to_string(),
-                );
-            }
-            Err(e) => warn!("{e}"),
-        }
-    }
-
-    Ok(())
-}
-
 async fn fetch_and_send_validators_commission(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
@@ -941,63 +821,6 @@ async fn fetch_and_send_validators_staking_ledger(
             }
             Err(e) => warn!("{e}"),
         }
-    }
-
-    Ok(())
-}
-
-async fn fetch_and_dispatch_validators_era_points(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    era_index: u32,
-    validator_keys: &Vec<ValidatorKey>,
-    tx: &UnboundedSender<Action>,
-) -> Result<(), Error> {
-    let responses = match runtime {
-        SupportedRuntime::AssetHubPolkadot => {
-            suno_asset_hub_polkadot::fetch_validators_era_points(
-                api,
-                block_hash,
-                era_index,
-                validator_keys,
-            )
-            .await?
-        }
-        SupportedRuntime::AssetHubKusama => {
-            suno_asset_hub_kusama::fetch_validators_era_points(
-                api,
-                block_hash,
-                era_index,
-                validator_keys,
-            )
-            .await?
-        }
-        SupportedRuntime::AssetHubPaseo => {
-            suno_asset_hub_paseo::fetch_validators_era_points(
-                api,
-                block_hash,
-                era_index,
-                validator_keys,
-            )
-            .await?
-        }
-        SupportedRuntime::AssetHubWestend => {
-            suno_asset_hub_westend::fetch_validators_era_points(
-                api,
-                block_hash,
-                era_index,
-                validator_keys,
-            )
-            .await?
-        }
-        _ => {
-            return Err(Error::UnsupportedRuntime(runtime.clone()));
-        }
-    };
-
-    for response in responses {
-        dispatch_response_action(response, runtime, tx)?;
     }
 
     Ok(())

@@ -278,25 +278,32 @@ impl App {
                                 &self.tx,
                             );
 
-                            self.validators.spawn_fetch_validators_era_points(
-                                &api,
-                                block_hash,
-                                &runtime,
-                                era.index(),
-                            );
-
-                            self.validators.spawn_fetch_validators_stake_overview(
-                                &api,
-                                block_hash,
-                                &runtime,
-                                era.index(),
-                            );
-
                             sync::spawn_fetch_total_staked(
                                 &api,
                                 block_hash,
                                 &runtime,
                                 era.index(),
+                                &self.tx,
+                            );
+
+                            let validator_keys =
+                                self.validators.get_validator_keys_by_runtime(&runtime);
+
+                            sync::spawn_fetch_validators_era_points(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                                &validator_keys,
+                                &self.tx,
+                            );
+
+                            sync::spawn_fetch_validators_stake_overview(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                                &validator_keys,
                                 &self.tx,
                             );
                         }

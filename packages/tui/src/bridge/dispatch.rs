@@ -41,6 +41,18 @@ pub fn dispatch_response_action(
                 data.value,
             )))?;
         }
+        Response::TotalValidators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
+        Response::TotalNominators(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
+                runtime.clone(),
+                data.value,
+            )))?;
+        }
         Response::AuthorityStatus(data) => {
             let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdateStatus(
@@ -55,6 +67,20 @@ pub fn dispatch_response_action(
                 data.value.points,
             )))?;
         }
+        Response::StakeOverview(data) => {
+            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            if let Some(overview) = data.value.overview {
+                tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
+                    account_key,
+                    overview,
+                )))?;
+            } else {
+                warn!(
+                    "No stake overview data found for {}",
+                    account_key.to_string(),
+                );
+            }
+        }
         Response::StakeLedger(data) => {
             let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
             if let Some(ledger) = data.value.ledger {
@@ -65,18 +91,6 @@ pub fn dispatch_response_action(
             } else {
                 warn!("No stake ledger data found for {}", account_key.to_string(),);
             }
-        }
-        Response::TotalValidators(data) => {
-            tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
-                runtime.clone(),
-                data.value,
-            )))?;
-        }
-        Response::TotalNominators(data) => {
-            tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
-                runtime.clone(),
-                data.value,
-            )))?;
         }
         _ => {
             error!("Unhandled response type: {:?}", response);

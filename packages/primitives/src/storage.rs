@@ -1,6 +1,6 @@
 use crate::{
     babe::Epoch,
-    staking::{Era, StakeLedger},
+    staking::{Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::Permill;
@@ -34,6 +34,13 @@ pub struct AuthorityPoints {
     pub points: Points,
 }
 
+/// Stake overview data combining account and overview
+#[derive(Debug)]
+pub struct StakeOverviewData {
+    pub account: AccountBytes,
+    pub overview: Option<StakeOverview>,
+}
+
 /// Stake ledger data combining account and ledger
 #[derive(Debug)]
 pub struct StakeLedgerData {
@@ -51,6 +58,7 @@ pub enum Response {
     AuthorityStatus(Data<AuthorityStatus>),
     AuthorityEraPoints(Data<AuthorityPoints>),
     AuthorityPoints(Data<AuthorityPoints>),
+    StakeOverview(Data<StakeOverviewData>),
     StakeLedger(Data<StakeLedgerData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
@@ -82,6 +90,10 @@ impl Response {
 
     pub fn authority_points(account: AccountBytes, points: Points) -> Self {
         Response::AuthorityPoints(Data::new(AuthorityPoints { account, points }))
+    }
+
+    pub fn stake_overview(account: AccountBytes, overview: Option<StakeOverview>) -> Self {
+        Response::StakeOverview(Data::new(StakeOverviewData { account, overview }))
     }
 
     pub fn stake_ledger(account: AccountBytes, ledger: Option<StakeLedger>) -> Self {
