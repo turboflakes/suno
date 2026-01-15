@@ -6,6 +6,12 @@ use suno_primitives::Response;
 
 #[async_trait]
 pub trait RuntimeFetcher {
+    async fn fetch_era_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error>;
+
     async fn fetch_epoch_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -32,10 +38,44 @@ pub trait RuntimeFetcher {
         hash: H256,
         era: u32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_total_validators_count(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_total_nominators_count(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
 impl RuntimeFetcher for SupportedRuntime {
+    async fn fetch_era_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error> {
+        match self {
+            SupportedRuntime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_era_data(api, hash).await
+            }
+            SupportedRuntime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_era_data(api, hash).await
+            }
+            SupportedRuntime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_era_data(api, hash).await
+            }
+            SupportedRuntime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_era_data(api, hash).await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
     async fn fetch_epoch_data(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -114,6 +154,50 @@ impl RuntimeFetcher for SupportedRuntime {
             }
             SupportedRuntime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_active_nominators_count(api, hash, era_index).await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_total_validators_count(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error> {
+        match self {
+            SupportedRuntime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_total_validators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_total_validators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_total_validators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_total_validators_count(api, hash).await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_total_nominators_count(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        hash: H256,
+    ) -> Result<Response, Error> {
+        match self {
+            SupportedRuntime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_total_nominators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_total_nominators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_total_nominators_count(api, hash).await
+            }
+            SupportedRuntime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_total_nominators_count(api, hash).await
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }

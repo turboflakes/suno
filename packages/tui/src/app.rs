@@ -195,8 +195,12 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.validators.spawn_fetch_initial_data_from_asset_hub(
-                                    &api, block_hash, &runtime,
+                                sync::spawn_fetch_era_data(&api, block_hash, &runtime, &self.tx);
+                                sync::spawn_fetch_total_validators_count(
+                                    &api, block_hash, &runtime, &self.tx,
+                                );
+                                sync::spawn_fetch_total_nominators_count(
+                                    &api, block_hash, &runtime, &self.tx,
                                 );
 
                                 self.validators

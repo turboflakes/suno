@@ -12,7 +12,7 @@ use futures::{
     select, stream,
     stream::{FuturesUnordered, StreamExt},
 };
-use log::{error, warn};
+use log::{error, info, warn};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
@@ -464,26 +464,6 @@ impl ValidatorsListWidget {
     //     });
     // }
 
-    pub fn spawn_fetch_initial_data_from_asset_hub(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-    ) {
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) =
-                fetch_and_send_initial_data_from_asset_hub(&api, block_hash, &runtime, tx.clone())
-                    .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-
     pub fn spawn_fetch_validators_era_points(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -679,76 +659,6 @@ impl ValidatorsListWidget {
 }
 
 // Helper functions
-
-async fn fetch_and_send_initial_data_from_asset_hub(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    tx: UnboundedSender<Action>,
-) -> Result<(), Error> {
-    let mut futures: FuturesUnordered<BoxFuture<'_, Result<Response, Error>>> =
-        FuturesUnordered::new();
-
-    match runtime {
-        SupportedRuntime::AssetHubPolkadot => {
-            futures.push(Box::pin(suno_asset_hub_polkadot::fetch_era_data(
-                api, block_hash,
-            )));
-            futures.push(Box::pin(
-                suno_asset_hub_polkadot::fetch_total_validators_count(api, block_hash),
-            ));
-            futures.push(Box::pin(
-                suno_asset_hub_polkadot::fetch_total_nominators_count(api, block_hash),
-            ));
-        }
-        SupportedRuntime::AssetHubKusama => {
-            futures.push(Box::pin(suno_asset_hub_kusama::fetch_era_data(
-                api, block_hash,
-            )));
-            futures.push(Box::pin(
-                suno_asset_hub_kusama::fetch_total_validators_count(api, block_hash),
-            ));
-            futures.push(Box::pin(
-                suno_asset_hub_kusama::fetch_total_nominators_count(api, block_hash),
-            ));
-        }
-        SupportedRuntime::AssetHubPaseo => {
-            futures.push(Box::pin(suno_asset_hub_paseo::fetch_era_data(
-                api, block_hash,
-            )));
-            futures.push(Box::pin(
-                suno_asset_hub_paseo::fetch_total_validators_count(api, block_hash),
-            ));
-            futures.push(Box::pin(
-                suno_asset_hub_paseo::fetch_total_nominators_count(api, block_hash),
-            ));
-        }
-        SupportedRuntime::AssetHubWestend => {
-            futures.push(Box::pin(suno_asset_hub_westend::fetch_era_data(
-                api, block_hash,
-            )));
-            futures.push(Box::pin(
-                suno_asset_hub_westend::fetch_total_validators_count(api, block_hash),
-            ));
-            futures.push(Box::pin(
-                suno_asset_hub_westend::fetch_total_nominators_count(api, block_hash),
-            ));
-        }
-        _ => {
-            error!("Unsupported runtime: {:?}", runtime);
-            return Ok(());
-        }
-    }
-
-    while let Some(result) = futures.next().await {
-        match result {
-            Ok(response) => dispatch_response_action(response, runtime, &tx)?,
-            Err(e) => warn!("{e}"),
-        }
-    }
-
-    Ok(())
-}
 
 // Helper functions to fetch all types of validator data in parallel and without overflowing the RPCs
 // Useful when a large list of validators is configured
@@ -1045,7 +955,7 @@ async fn fetch_and_dispatch_validators_era_points(
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     let responses = match runtime {
-        SupportedRuntime::Polkadot => {
+        SupportedRuntime::AssetHubPolkadot => {
             suno_asset_hub_polkadot::fetch_validators_era_points(
                 api,
                 block_hash,
@@ -1054,7 +964,7 @@ async fn fetch_and_dispatch_validators_era_points(
             )
             .await?
         }
-        SupportedRuntime::Kusama => {
+        SupportedRuntime::AssetHubKusama => {
             suno_asset_hub_kusama::fetch_validators_era_points(
                 api,
                 block_hash,
@@ -1063,7 +973,7 @@ async fn fetch_and_dispatch_validators_era_points(
             )
             .await?
         }
-        SupportedRuntime::Paseo => {
+        SupportedRuntime::AssetHubPaseo => {
             suno_asset_hub_paseo::fetch_validators_era_points(
                 api,
                 block_hash,
@@ -1072,7 +982,7 @@ async fn fetch_and_dispatch_validators_era_points(
             )
             .await?
         }
-        SupportedRuntime::Westend => {
+        SupportedRuntime::AssetHubWestend => {
             suno_asset_hub_westend::fetch_validators_era_points(
                 api,
                 block_hash,
