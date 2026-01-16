@@ -70,7 +70,12 @@ pub fn dispatch_response_action(
             )))?;
         }
         Response::AuthorityPoints(data) => {
-            warn!("AuthorityPoints {:?}", data);
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdatePoints(
+                account_key,
+                data.value.points,
+            )))?;
         }
         Response::StakeOverview(data) => {
             let rc_runtime = runtime.relay_chain();

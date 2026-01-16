@@ -1,5 +1,5 @@
 pub mod dispatch;
-pub mod provider;
-pub use provider::RuntimeFetcher;
+pub mod fetcher;
+pub use fetcher::RuntimeFetcher;
 pub mod subscribe;
 pub mod sync;

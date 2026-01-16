@@ -523,33 +523,6 @@ impl ValidatorsListWidget {
         });
     }
 
-    pub fn spawn_fetch_validators_points_from_relay(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(runtime);
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_points_from_relay(
-                &api,
-                block_hash,
-                &runtime,
-                validator_keys,
-                tx.clone(),
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-
     pub fn spawn_fetch_validators_authority_status_from_relay(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -623,54 +596,6 @@ async fn fetch_and_send_validators_identities(
                 tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
                     validator_key.clone(),
                     identity,
-                )))?;
-            }
-            Err(e) => warn!("{e}"),
-        }
-    }
-
-    Ok(())
-}
-
-async fn fetch_and_send_validators_points_from_relay(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    validator_keys: Vec<ValidatorKey>,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let mut stream = stream::iter(validator_keys)
-        .map(|validator_key| {
-            let api = api.clone();
-            let stash = validator_key.stash();
-            let runtime = runtime.clone();
-            async move {
-                let result = match runtime {
-                    SupportedRuntime::Polkadot => {
-                        suno_polkadot::fetch_validator_points(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::Kusama => {
-                        suno_kusama::fetch_validator_points(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::Paseo => {
-                        suno_paseo::fetch_validator_points(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::Westend => {
-                        suno_westend::fetch_validator_points(&api, block_hash, &stash).await
-                    }
-                    _ => Err(suno_error::Error::from("Unsupported runtime")),
-                };
-                (validator_key, result)
-            }
-        })
-        .buffer_unordered(CONCURRENT_REQUESTS);
-
-    while let Some((validator_key, result)) = stream.next().await {
-        match result {
-            Ok(points) => {
-                tx.send(Action::Validator(ValidatorAction::UpdatePoints(
-                    validator_key,
-                    points,
                 )))?;
             }
             Err(e) => warn!("{e}"),

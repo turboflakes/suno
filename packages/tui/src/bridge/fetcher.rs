@@ -62,6 +62,13 @@ pub trait RuntimeFetcher {
         validator_keys: &Vec<AccountKey>,
     ) -> Result<Vec<Response>, Error>;
 
+    async fn fetch_validator_points(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_stake_overview(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -337,6 +344,23 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_validator_points(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::Polkadot => {
+                suno_polkadot::fetch_validator_points(api, block_hash, stash).await
+            }
+            Runtime::Kusama => suno_kusama::fetch_validator_points(api, block_hash, stash).await,
+            Runtime::Paseo => suno_paseo::fetch_validator_points(api, block_hash, stash).await,
+            Runtime::Westend => suno_westend::fetch_validator_points(api, block_hash, stash).await,
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }

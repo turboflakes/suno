@@ -11,7 +11,6 @@ use subxt::{
 use suno_error::Error;
 use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch, Response};
 
-type Points = u32;
 type Index = u64;
 type BlockNumber = u32;
 
@@ -20,17 +19,21 @@ pub async fn fetch_validator_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
-) -> Result<Points, Error> {
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
     let addr = node_runtime::storage()
         .staking_ah_client()
         .validator_points(stash.clone());
 
-    Ok(api
+    let points = api
         .storage()
         .at(block_hash)
         .fetch(&addr)
         .await?
-        .unwrap_or(0))
+        .unwrap_or(0);
+
+    Ok(Response::authority_points(account_bytes, points))
 }
 
 /// Fetch epoch data at the specified block hash

@@ -249,8 +249,16 @@ impl App {
                     | SupportedRuntime::Westend => {
                         if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
                             let api = chain.client();
-                            self.validators
-                                .spawn_fetch_validators_points_from_relay(api, block_hash, &runtime)
+                            let validator_keys =
+                                self.validators.get_validator_keys_by_runtime(&runtime);
+
+                            sync::spawn_fetch_validators_points(
+                                api,
+                                block_hash,
+                                &runtime,
+                                &validator_keys,
+                                &self.tx,
+                            )
                         }
                     }
                     _ => {}
