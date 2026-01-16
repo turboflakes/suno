@@ -69,6 +69,13 @@ pub trait RuntimeFetcher {
         era_index: u32,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_stake_ledger(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -305,6 +312,30 @@ impl RuntimeFetcher for Runtime {
                     api, block_hash, era_index, stash,
                 )
                 .await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_stake_ledger(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_validator_staking_ledger(api, block_hash, stash)
+                    .await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_validator_staking_ledger(api, block_hash, stash).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_validator_staking_ledger(api, block_hash, stash).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }

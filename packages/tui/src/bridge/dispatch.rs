@@ -54,21 +54,27 @@ pub fn dispatch_response_action(
             )))?;
         }
         Response::AuthorityStatus(data) => {
-            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdateStatus(
                 account_key,
                 data.value.status,
             )))?;
         }
         Response::AuthorityEraPoints(data) => {
-            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
                 account_key,
                 data.value.points,
             )))?;
         }
+        Response::AuthorityPoints(data) => {
+            warn!("AuthorityPoints {:?}", data);
+        }
         Response::StakeOverview(data) => {
-            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
             if let Some(overview) = data.value.overview {
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
                     account_key,
@@ -82,7 +88,8 @@ pub fn dispatch_response_action(
             }
         }
         Response::StakeLedger(data) => {
-            let account_key = AccountKey::from_bytes(runtime.clone(), data.value.account);
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
             if let Some(ledger) = data.value.ledger {
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
                     account_key,
@@ -92,6 +99,7 @@ pub fn dispatch_response_action(
                 warn!("No stake ledger data found for {}", account_key.to_string(),);
             }
         }
+
         _ => {
             error!("Unhandled response type: {:?}", response);
         }

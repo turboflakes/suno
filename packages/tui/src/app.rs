@@ -206,8 +206,15 @@ impl App {
                                 self.validators
                                     .spawn_fetch_validators_commission(&api, block_hash, &runtime);
 
-                                self.validators.spawn_fetch_validators_staking_ledger(
-                                    &api, block_hash, &runtime,
+                                let validator_keys =
+                                    self.validators.get_validator_keys_by_runtime(&runtime);
+
+                                sync::spawn_fetch_validators_staking_ledger(
+                                    &api,
+                                    block_hash,
+                                    &runtime,
+                                    &validator_keys,
+                                    &self.tx,
                                 );
                             }
                         }
