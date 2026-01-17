@@ -6,6 +6,7 @@ use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
+    identity::Identity,
     staking::{Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
     AccountKey,
@@ -84,7 +85,7 @@ pub enum ValidatorAction {
     UpdateCommission(ValidatorKey, Commission),
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),
-    UpdateIdentity(ValidatorKey, String),
+    UpdateIdentity(ValidatorKey, Identity),
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
     UpdateStatus(ValidatorKey, ValidatorStatus),

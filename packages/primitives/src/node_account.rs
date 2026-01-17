@@ -1,4 +1,4 @@
-use crate::key::AccountKey;
+use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
 use subxt::{backend::legacy::rpc_methods::StorageKey, utils::AccountId32};
 use suno_config::SupportedRuntime;
@@ -21,7 +21,7 @@ pub trait AccountDisplay {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeAccount {
     account_key: AccountKey,
-    identity: Option<String>,
+    identity: Option<Identity>,
 }
 
 impl NodeAccount {
@@ -44,12 +44,12 @@ impl NodeAccount {
         self.account_key.stash()
     }
 
-    pub fn identity(&self) -> &Option<String> {
+    pub fn identity(&self) -> &Option<Identity> {
         &self.identity
     }
 
-    pub fn set_identity(&mut self, identity: String) {
-        self.identity = Some(identity);
+    pub fn set_identity(&mut self, identity: Option<Identity>) {
+        self.identity = identity;
     }
 
     pub fn account_format(&self) -> u32 {
@@ -89,7 +89,7 @@ impl Collator {
         &self.account.runtime()
     }
 
-    pub fn identity(&self) -> Option<&String> {
+    pub fn identity(&self) -> Option<&Identity> {
         self.account.identity.as_ref()
     }
 }

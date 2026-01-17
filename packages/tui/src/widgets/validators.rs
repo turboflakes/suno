@@ -1,4 +1,3 @@
-use crate::error::TuiError;
 use crate::widgets::chains::ChainsListWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::{
@@ -6,27 +5,17 @@ use crate::widgets::validators_detailed_group::{
 };
 use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
 // use crate::widgets::popup::PopupWidget;
-use crate::bridge::dispatch::dispatch_response_action;
-use futures::{
-    future::{BoxFuture, FutureExt},
-    select, stream,
-    stream::{FuturesUnordered, StreamExt},
-};
-use log::{error, info, warn};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use subxt::utils::H256;
-use subxt::{OnlineClient, SubstrateConfig};
-use suno_actions::{Action, ChainAction, SystemAction, ValidatorAction};
-use suno_asset_hub_paseo;
+use suno_actions::{Action, SystemAction};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
-use suno_error::Error;
+use suno_primitives::identity::Identity;
 use suno_primitives::{
-    staking::{Era, StakeLedger, StakeOverview},
+    staking::{StakeLedger, StakeOverview},
     validator::{Validator, ValidatorStatus},
-    AccountKey, Response,
+    AccountKey,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -90,9 +79,9 @@ impl ValidatorsListState {
         false
     }
 
-    pub fn set_identity(&mut self, validator_key: &AccountKey, identity: String) {
+    pub fn set_identity(&mut self, validator_key: &AccountKey, identity: Identity) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            validator.account.set_identity(identity);
+            validator.account.set_identity(Some(identity));
         }
     }
 
@@ -398,7 +387,7 @@ impl ValidatorsListWidget {
         state.set_era_points(validator_key, points)
     }
 
-    pub fn update_identity(&self, validator_key: &AccountKey, identity: String) {
+    pub fn update_identity(&self, validator_key: &AccountKey, identity: Identity) {
         let mut state = self.state.write().unwrap();
         state.set_identity(validator_key, identity);
     }
@@ -468,85 +457,4 @@ impl ValidatorsListWidget {
     //         // }
     //     });
     // }
-
-    pub fn spawn_fetch_validators_identities(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_identities(
-                &api,
-                block_hash,
-                &runtime,
-                validator_keys,
-                tx.clone(),
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-}
-
-// Helper functions
-
-// Helper functions to fetch all types of validator data in parallel and without overflowing the RPCs
-// Useful when a large list of validators is configured
-const CONCURRENT_REQUESTS: usize = 3;
-
-async fn fetch_and_send_validators_identities(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    validator_keys: Vec<AccountKey>,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let mut stream = stream::iter(validator_keys)
-        .map(|validator_key| {
-            let api = api.clone();
-            let stash = validator_key.stash();
-            let runtime = runtime.clone();
-            async move {
-                let result = match runtime {
-                    SupportedRuntime::PeoplePolkadot => {
-                        suno_people_polkadot::fetch_display_name(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::PeopleKusama => {
-                        suno_people_kusama::fetch_display_name(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::PeoplePaseo => {
-                        suno_people_paseo::fetch_display_name(&api, block_hash, &stash).await
-                    }
-                    SupportedRuntime::PeopleWestend => {
-                        suno_people_westend::fetch_display_name(&api, block_hash, &stash).await
-                    }
-                    _ => Err(suno_error::Error::from("Unsupported runtime")),
-                };
-                (validator_key, result)
-            }
-        })
-        .buffer_unordered(CONCURRENT_REQUESTS);
-
-    while let Some((validator_key, result)) = stream.next().await {
-        match result {
-            Ok(identity) => {
-                tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
-                    validator_key.clone(),
-                    identity,
-                )))?;
-            }
-            Err(e) => warn!("{e}"),
-        }
-    }
-
-    Ok(())
 }

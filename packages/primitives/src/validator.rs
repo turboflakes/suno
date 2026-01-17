@@ -1,5 +1,6 @@
 use crate::{
     display::get_elapsed_millis,
+    identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
     staking::{StakeLedger, StakeOverview},
@@ -88,13 +89,13 @@ impl Validator {
         &self.account.runtime()
     }
 
-    pub fn identity(&self) -> &Option<String> {
+    pub fn identity(&self) -> &Option<Identity> {
         self.account.identity()
     }
 
     pub fn display_name(&self) -> String {
         if let Some(display_name) = self.identity() {
-            display_name.clone()
+            display_name.to_string()
         } else {
             self.to_compact_string(6)
         }

@@ -1,5 +1,5 @@
 pub mod storage;
-pub use storage::fetch_display_name;
+pub use storage::fetch_identity;
 
 #[subxt::subxt(
     runtime_metadata_path = "artifacts/metadata/people_westend_metadata_small.scale",

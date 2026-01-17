@@ -10,19 +10,16 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_primitives::identity::Identity;
+use suno_primitives::{identity::Identity, Response};
 
-pub async fn fetch_display_name(
+pub async fn fetch_identity(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
-) -> Result<String, Error> {
-    if let Some(identity) = get_identity(api, block_hash, &stash, None).await? {
-        return Ok(identity.to_string());
-    } else {
-        let s = &stash.to_string();
-        Ok(format!("{}...{}", &s[..6], &s[s.len() - 6..]))
-    }
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    let identity = get_identity(api, block_hash, &stash, None).await?;
+    Ok(Response::identity(account_bytes, identity))
 }
 
 #[async_recursion]

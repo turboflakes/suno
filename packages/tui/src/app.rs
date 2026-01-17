@@ -200,6 +200,7 @@ impl App {
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
                                 sync::spawn_fetch_era_data(&api, block_hash, &runtime, &self.tx);
+
                                 sync::spawn_fetch_total_validators_count(
                                     &api, block_hash, &runtime, &self.tx,
                                 );
@@ -231,8 +232,13 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(&runtime)
                             {
-                                self.validators
-                                    .spawn_fetch_validators_identities(&api, block_hash, &runtime)
+                                sync::spawn_fetch_validators_identity(
+                                    &api,
+                                    block_hash,
+                                    &runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                )
                             }
                         }
                         _ => {}

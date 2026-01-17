@@ -97,6 +97,13 @@ pub trait RuntimeFetcher {
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_validator_identity(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -423,6 +430,27 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_commission(api, block_hash, stash).await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_validator_identity(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_identity(api, block_hash, stash).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_identity(api, block_hash, stash).await
+            }
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, block_hash, stash).await,
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_identity(api, block_hash, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }

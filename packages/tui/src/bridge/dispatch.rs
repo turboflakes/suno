@@ -112,6 +112,18 @@ pub fn dispatch_response_action(
                 data.value.commission.deconstruct(),
             )))?;
         }
+        Response::Identity(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            if let Some(identity) = data.value.identity {
+                tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
+                    account_key,
+                    identity,
+                )))?;
+            } else {
+                warn!("No identity data found for {}", account_key.to_string(),);
+            }
+        }
 
         _ => {
             error!("Unhandled response type: {:?}", response);

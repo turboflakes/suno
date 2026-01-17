@@ -498,3 +498,51 @@ pub fn spawn_fetch_validators_commission(
         }
     });
 }
+
+pub fn spawn_fetch_validators_identity(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    validator_keys: &Vec<AccountKey>,
+    tx: &UnboundedSender<Action>,
+) {
+    let validator_keys = validator_keys.clone();
+    let api = api.clone();
+    let runtime = runtime.clone();
+    let tx = tx.clone();
+
+    tokio::spawn(async move {
+        let mut stream = stream::iter(validator_keys)
+            .map(|key| {
+                let api = api.clone();
+                let runtime = runtime.clone();
+                let stash = key.stash();
+
+                async move {
+                    runtime
+                        .fetch_validator_identity(&api, block_hash, &stash)
+                        .await
+                }
+            })
+            .buffer_unordered(CONCURRENT_REQUESTS);
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(response) => {
+                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Fetch error: {}",
+                        e
+                    ))));
+                }
+            }
+        }
+    });
+}

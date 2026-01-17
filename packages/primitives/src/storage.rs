@@ -1,5 +1,6 @@
 use crate::{
     babe::Epoch,
+    identity::Identity,
     staking::{Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
 };
@@ -48,11 +49,18 @@ pub struct StakeLedgerData {
     pub ledger: Option<StakeLedger>,
 }
 
-/// Stake ledger data combining account and ledger
+/// Commission data combining account and commission
 #[derive(Debug)]
 pub struct CommissionData {
     pub account: AccountBytes,
     pub commission: Perbill,
+}
+
+/// Stake ledger data combining account and ledger
+#[derive(Debug)]
+pub struct IdentityData {
+    pub account: AccountBytes,
+    pub identity: Option<Identity>,
 }
 
 /// Response types from chain storage queries
@@ -68,6 +76,7 @@ pub enum Response {
     StakeOverview(Data<StakeOverviewData>),
     StakeLedger(Data<StakeLedgerData>),
     Commission(Data<CommissionData>),
+    Identity(Data<IdentityData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
     TotalValidators(Data<u32>),
@@ -129,5 +138,9 @@ impl Response {
             account,
             commission,
         }))
+    }
+
+    pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {
+        Response::Identity(Data::new(IdentityData { account, identity }))
     }
 }
