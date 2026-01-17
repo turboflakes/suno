@@ -172,6 +172,7 @@ impl App {
 
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
+                    let validator_keys = self.validators.get_validator_keys_by_runtime(&runtime);
                     match runtime {
                         SupportedRuntime::Polkadot
                         | SupportedRuntime::Kusama
@@ -182,10 +183,13 @@ impl App {
                             {
                                 sync::spawn_fetch_epoch_data(&api, block_hash, &runtime, &self.tx);
 
-                                self.validators
-                                    .spawn_fetch_validators_authority_status_from_relay(
-                                        &api, block_hash, &runtime,
-                                    );
+                                sync::spawn_fetch_validators_authority_status(
+                                    &api,
+                                    block_hash,
+                                    &runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -205,9 +209,6 @@ impl App {
 
                                 self.validators
                                     .spawn_fetch_validators_commission(&api, block_hash, &runtime);
-
-                                let validator_keys =
-                                    self.validators.get_validator_keys_by_runtime(&runtime);
 
                                 sync::spawn_fetch_validators_staking_ledger(
                                     &api,

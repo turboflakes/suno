@@ -273,6 +273,43 @@ pub fn spawn_fetch_validators_era_points(
     });
 }
 
+pub fn spawn_fetch_validators_authority_status(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: &SupportedRuntime,
+    validator_keys: &Vec<AccountKey>,
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let runtime = runtime.clone();
+    let validator_keys = validator_keys.clone();
+    let tx = tx.clone();
+
+    tokio::spawn(async move {
+        let result = runtime
+            .fetch_validators_authority_status(&api, block_hash, &validator_keys)
+            .await;
+        match result {
+            Ok(responses) => {
+                for response in responses {
+                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                    "Fetch error: {}",
+                    e
+                ))));
+            }
+        }
+    });
+}
+
 pub fn spawn_fetch_validators_stake_overview(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,

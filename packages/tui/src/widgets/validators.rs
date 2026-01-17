@@ -522,33 +522,6 @@ impl ValidatorsListWidget {
             }
         });
     }
-
-    pub fn spawn_fetch_validators_authority_status_from_relay(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_dispatch_validators_authority_status(
-                &api,
-                block_hash,
-                &runtime,
-                &validator_keys,
-                &tx,
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
 }
 
 // Helper functions
@@ -663,39 +636,6 @@ async fn fetch_and_send_validators_commission(
                 warn!("{e}")
             }
         }
-    }
-
-    Ok(())
-}
-
-async fn fetch_and_dispatch_validators_authority_status(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    validator_keys: &Vec<ValidatorKey>,
-    tx: &UnboundedSender<Action>,
-) -> Result<(), Error> {
-    let responses = match runtime {
-        SupportedRuntime::Polkadot => {
-            suno_polkadot::fetch_validators_authority_status(api, block_hash, validator_keys)
-                .await?
-        }
-        SupportedRuntime::Kusama => {
-            suno_kusama::fetch_validators_authority_status(api, block_hash, validator_keys).await?
-        }
-        SupportedRuntime::Paseo => {
-            suno_paseo::fetch_validators_authority_status(api, block_hash, validator_keys).await?
-        }
-        SupportedRuntime::Westend => {
-            suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys).await?
-        }
-        _ => {
-            return Err(Error::UnsupportedRuntime(runtime.clone()));
-        }
-    };
-
-    for response in responses {
-        dispatch_response_action(response, runtime, tx)?;
     }
 
     Ok(())

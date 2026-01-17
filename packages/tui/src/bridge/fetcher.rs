@@ -69,6 +69,13 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_validators_authority_status(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        validator_keys: &Vec<AccountKey>,
+    ) -> Result<Vec<Response>, Error>;
+
     async fn fetch_stake_overview(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -283,6 +290,32 @@ impl RuntimeFetcher for Runtime {
                     validator_keys,
                 )
                 .await
+            }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    async fn fetch_validators_authority_status(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        validator_keys: &Vec<AccountKey>,
+    ) -> Result<Vec<Response>, Error> {
+        match self {
+            Runtime::Polkadot => {
+                suno_polkadot::fetch_validators_authority_status(api, block_hash, validator_keys)
+                    .await
+            }
+            Runtime::Kusama => {
+                suno_kusama::fetch_validators_authority_status(api, block_hash, validator_keys)
+                    .await
+            }
+            Runtime::Paseo => {
+                suno_paseo::fetch_validators_authority_status(api, block_hash, validator_keys).await
+            }
+            Runtime::Westend => {
+                suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys)
+                    .await
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
