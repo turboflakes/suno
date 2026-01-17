@@ -3,7 +3,7 @@ use crate::{
     staking::{Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
 };
-use sp_arithmetic::Permill;
+use sp_arithmetic::{Perbill, Permill};
 use std::fmt::Debug;
 
 type AccountBytes = [u8; 32];
@@ -48,6 +48,13 @@ pub struct StakeLedgerData {
     pub ledger: Option<StakeLedger>,
 }
 
+/// Stake ledger data combining account and ledger
+#[derive(Debug)]
+pub struct CommissionData {
+    pub account: AccountBytes,
+    pub commission: Perbill,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -60,6 +67,7 @@ pub enum Response {
     AuthorityPoints(Data<AuthorityPoints>),
     StakeOverview(Data<StakeOverviewData>),
     StakeLedger(Data<StakeLedgerData>),
+    Commission(Data<CommissionData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
     TotalValidators(Data<u32>),
@@ -114,5 +122,12 @@ impl Response {
 
     pub fn total_nominators(value: u32) -> Self {
         Response::TotalNominators(Data::new(value))
+    }
+
+    pub fn validator_commission(account: AccountBytes, commission: Perbill) -> Self {
+        Response::Commission(Data::new(CommissionData {
+            account,
+            commission,
+        }))
     }
 }

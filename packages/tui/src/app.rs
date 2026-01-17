@@ -207,8 +207,13 @@ impl App {
                                     &api, block_hash, &runtime, &self.tx,
                                 );
 
-                                self.validators
-                                    .spawn_fetch_validators_commission(&api, block_hash, &runtime);
+                                sync::spawn_fetch_validators_commission(
+                                    &api,
+                                    block_hash,
+                                    &runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
 
                                 sync::spawn_fetch_validators_staking_ledger(
                                     &api,

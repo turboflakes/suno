@@ -9,8 +9,8 @@ use node_runtime::{
     },
     staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
 };
-use sp_arithmetic::Permill;
-use std::collections::{HashMap, HashSet};
+use sp_arithmetic::{Perbill, Permill};
+use std::collections::HashSet;
 use subxt::{
     ext::futures::StreamExt,
     utils::{AccountId32, H256},
@@ -28,9 +28,14 @@ pub async fn fetch_validator_commission(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
-) -> Result<u32, Error> {
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
     let prefs = fetch_validator_prefs(api, block_hash, stash).await?;
-    Ok(prefs.commission.0)
+
+    Ok(Response::validator_commission(
+        account_bytes,
+        Perbill::from_parts(prefs.commission.0),
+    ))
 }
 
 /// Fetch validator stake overview

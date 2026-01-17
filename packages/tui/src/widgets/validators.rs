@@ -469,33 +469,6 @@ impl ValidatorsListWidget {
     //     });
     // }
 
-    pub fn spawn_fetch_validators_commission(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        block_hash: H256,
-        runtime: &SupportedRuntime,
-    ) {
-        let state = self.state.read().unwrap();
-        let validator_keys = state.get_keys_by_runtime(&runtime.relay_chain());
-        let api = api.clone();
-        let runtime = runtime.clone();
-        let tx = self.tx.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = fetch_and_send_validators_commission(
-                &api,
-                block_hash,
-                &runtime,
-                validator_keys.clone(),
-                tx.clone(),
-            )
-            .await
-            {
-                let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
-            }
-        });
-    }
-
     pub fn spawn_fetch_validators_identities(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -572,69 +545,6 @@ async fn fetch_and_send_validators_identities(
                 )))?;
             }
             Err(e) => warn!("{e}"),
-        }
-    }
-
-    Ok(())
-}
-
-async fn fetch_and_send_validators_commission(
-    api: &OnlineClient<SubstrateConfig>,
-    block_hash: H256,
-    runtime: &SupportedRuntime,
-    validator_keys: Vec<ValidatorKey>,
-    tx: UnboundedSender<Action>,
-) -> Result<(), TuiError> {
-    let mut stream = stream::iter(validator_keys)
-        .map(|validator_key| {
-            let api = api.clone();
-            let stash = validator_key.stash();
-            let runtime = runtime.clone();
-            async move {
-                let result = match runtime {
-                    SupportedRuntime::AssetHubPolkadot => {
-                        suno_asset_hub_polkadot::fetch_validator_commission(
-                            &api, block_hash, &stash,
-                        )
-                        .await
-                    }
-                    SupportedRuntime::AssetHubKusama => {
-                        suno_asset_hub_kusama::fetch_validator_commission(&api, block_hash, &stash)
-                            .await
-                    }
-                    SupportedRuntime::AssetHubPaseo => {
-                        suno_asset_hub_paseo::fetch_validator_commission(&api, block_hash, &stash)
-                            .await
-                    }
-                    SupportedRuntime::AssetHubWestend => {
-                        suno_asset_hub_westend::fetch_validator_commission(&api, block_hash, &stash)
-                            .await
-                    }
-                    _ => Err(suno_error::Error::from("Unsupported runtime")),
-                };
-                (validator_key, result)
-            }
-        })
-        .buffer_unordered(CONCURRENT_REQUESTS);
-
-    while let Some((validator_key, result)) = stream.next().await {
-        match result {
-            Ok(commission) => {
-                tx.send(Action::Validator(ValidatorAction::UpdateCommission(
-                    validator_key.clone(),
-                    commission,
-                )))?;
-            }
-            Err(e) => {
-                // Note: When an error is reported here it could be a connectivity issue,
-                // or that the commission was never set for the specific stash, so we set the
-                // validator status to unknown.
-                tx.send(Action::Validator(ValidatorAction::UpdateStatus(
-                    validator_key.clone(),
-                    ValidatorStatus::Unknown,
-                )))?;
-                warn!("{e}")
-            }
         }
     }
 

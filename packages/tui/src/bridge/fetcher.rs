@@ -90,6 +90,13 @@ pub trait RuntimeFetcher {
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_validator_commission(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -295,6 +302,23 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_validator_points(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::Polkadot => {
+                suno_polkadot::fetch_validator_points(api, block_hash, stash).await
+            }
+            Runtime::Kusama => suno_kusama::fetch_validator_points(api, block_hash, stash).await,
+            Runtime::Paseo => suno_paseo::fetch_validator_points(api, block_hash, stash).await,
+            Runtime::Westend => suno_westend::fetch_validator_points(api, block_hash, stash).await,
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
     async fn fetch_validators_authority_status(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -381,19 +405,25 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
-    async fn fetch_validator_points(
+    async fn fetch_validator_commission(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
-            Runtime::Polkadot => {
-                suno_polkadot::fetch_validator_points(api, block_hash, stash).await
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_validator_commission(api, block_hash, stash).await
             }
-            Runtime::Kusama => suno_kusama::fetch_validator_points(api, block_hash, stash).await,
-            Runtime::Paseo => suno_paseo::fetch_validator_points(api, block_hash, stash).await,
-            Runtime::Westend => suno_westend::fetch_validator_points(api, block_hash, stash).await,
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_validator_commission(api, block_hash, stash).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_validator_commission(api, block_hash, stash).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_validator_commission(api, block_hash, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }
