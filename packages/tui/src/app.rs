@@ -553,16 +553,24 @@ impl App {
                             },
                             Command::Instruction(call) => {
                                 if let Some(validator) = self.validators.get_selected() {
-                                    if let Some(chain_client) =
-                                        self.chains.get_chain_by_runtime(validator.runtime())
-                                    {
-                                        match call {
-                                            popup::Staking::Chill => {
-                                                // TODO: Implement chill functionality
-                                                // validator.chill(&chain_client, self.tx.clone());
+                                    match call {
+                                        popup::Staking::Chill => {
+                                            let runtime = validator.runtime().asset_hub_runtime();
+                                            if let Some(chain) =
+                                                self.chains.get_chain_by_runtime(&runtime)
+                                            {
+                                                let api = chain.client();
+                                                let account_key = validator.key();
+                                                // TODO: Implement spawn_call_chill
+                                                sync::spawn_call_remark(
+                                                    &api,
+                                                    &runtime,
+                                                    &account_key,
+                                                    &self.tx,
+                                                );
                                             }
-                                            _ => {}
                                         }
+                                        _ => {}
                                     }
                                 }
                             }

@@ -1,3 +1,5 @@
+pub mod caller;
+pub use caller::RuntimeCaller;
 pub mod dispatch;
 pub mod fetcher;
 pub use fetcher::RuntimeFetcher;

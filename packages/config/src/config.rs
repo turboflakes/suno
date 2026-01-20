@@ -78,13 +78,15 @@ impl Default for Features {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Signer {
-    proxy_seed_path: String,
+    proxy_seed_path: Option<String>,
+    proxy_json_path: Option<String>,
 }
 
 impl Default for Signer {
     fn default() -> Self {
         Self {
-            proxy_seed_path: ".proxy_private.seed".into(),
+            proxy_seed_path: Some(".proxy_private.seed".into()),
+            proxy_json_path: None,
         }
     }
 }
@@ -135,7 +137,11 @@ impl Config {
     //     Ok(())
     // }
 
-    pub fn signer_path(&self) -> String {
+    pub fn signer_json_path(&self) -> Option<String> {
+        self.signer.proxy_json_path.clone()
+    }
+
+    pub fn signer_seed_path(&self) -> Option<String> {
         self.signer.proxy_seed_path.clone()
     }
 }
@@ -233,7 +239,7 @@ mod tests {
         assert_eq!(SupportedRuntime::Paseo.to_string(), "Paseo");
         assert_eq!(
             SupportedRuntime::AssetHubPolkadot.to_string(),
-            "AssetHub Polkadot"
+            "Asset Hub Polkadot"
         );
     }
 

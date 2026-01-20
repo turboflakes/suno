@@ -9,6 +9,7 @@ use ratatui::{
 };
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
+use subxt::utils::H256;
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -68,7 +69,7 @@ impl std::fmt::Display for Staking {
             Self::ChangeRewardDestination => write!(f, "staking.change_reward_destination"),
             Self::ChangeCommission => write!(f, "staking.change_commission"),
             Self::KickNominators => write!(f, "staking.kick_nominators"),
-            Self::SetSessionKey => write!(f, "staking.set_session_key"),
+            Self::SetSessionKey => write!(f, "session.set_session_key"),
         }
     }
 }

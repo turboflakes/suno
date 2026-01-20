@@ -1,5 +1,9 @@
-use log::{error, warn};
-use suno_actions::{Action, ChainAction, ValidatorAction};
+use log::{error, info, warn};
+use subxt::{
+    blocks::ExtrinsicEvents, error::TransactionError, tx::TxProgress, tx::TxStatus, OnlineClient,
+    SubstrateConfig,
+};
+use suno_actions::{Action, ChainAction, SystemAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
 use suno_error::Error;
 use suno_primitives::{AccountKey, Response};
@@ -124,10 +128,125 @@ pub fn dispatch_response_action(
                 warn!("No identity data found for {}", account_key.to_string(),);
             }
         }
-
+        Response::TxProgress(data) => {
+            let response = data.value;
+            spawn_process_transaction_progress(runtime, response, tx);
+        }
+        Response::TxSuccess => {
+            let _ = tx.send(Action::Transaction(TxAction::Success));
+        }
+        Response::TxError(err) => {
+            let _ = tx.send(Action::Transaction(TxAction::Error(err)));
+        }
         _ => {
             error!("Unhandled response type: {:?}", response);
         }
     }
     Ok(())
+}
+
+fn spawn_process_transaction_progress(
+    runtime: &SupportedRuntime,
+    progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) {
+    let runtime = runtime.clone();
+    let mut progress = progress;
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = process_transaction_progress(&runtime, &mut progress, &tx).await {
+            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                "Dispatch error: {}",
+                e
+            ))));
+        }
+    });
+}
+
+async fn process_transaction_progress(
+    runtime: &SupportedRuntime,
+    progress: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    while let Some(status) = progress.next().await {
+        match status? {
+            TxStatus::Broadcasted => {
+                let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
+            }
+            TxStatus::InBestBlock(_) => {
+                let _ = tx.send(Action::Transaction(TxAction::InBestBlock));
+            }
+            TxStatus::InFinalizedBlock(in_block) => {
+                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock));
+                info!(
+                    "Transaction {:?} is finalized in block {:?}",
+                    in_block.extrinsic_hash(),
+                    in_block.block_hash()
+                );
+
+                match in_block.wait_for_success().await {
+                    Ok(events) => {
+                        let processed_events = process_extrinsic_events(events, &runtime);
+
+                        for response in processed_events {
+                            dispatch_response_action(response, runtime, tx)?;
+                        }
+                    }
+                    Err(err) => {
+                        return Err(Error::Other(format!(
+                            "Failed to wait for transaction success: {:?}",
+                            err,
+                        ))
+                        .into());
+                    }
+                }
+            }
+            TxStatus::Error { message } => return Err(TransactionError::Error(message).into()),
+            TxStatus::Invalid { message } => return Err(TransactionError::Invalid(message).into()),
+            TxStatus::Dropped { message } => return Err(TransactionError::Dropped(message).into()),
+
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn process_extrinsic_events(
+    events: ExtrinsicEvents<SubstrateConfig>,
+    runtime: &SupportedRuntime,
+) -> Vec<Response> {
+    match runtime {
+        //  SupportedRuntime::AssetHubPolkadot => {
+        //     suno_asset_hub_polkadot::handle_events(api, block_hash, events)
+        //         .await
+        //         .unwrap_or_else(|e| {
+        //             error!("Error processing AssetHubPolkadot events: {}", e);
+        //             vec![]
+        //         })
+        // }
+        // SupportedRuntime::AssetHubKusama => {
+        //     suno_asset_hub_kusama::handle_events(api, block_hash, events)
+        //         .await
+        //         .unwrap_or_else(|e| {
+        //             error!("Error processing AssetHubKusama events: {}", e);
+        //             vec![]
+        //         })
+        // }
+        SupportedRuntime::AssetHubPaseo => suno_asset_hub_paseo::handle_extrinsic_events(events)
+            .unwrap_or_else(|e| {
+                error!("Error processing AssetHubPaseo extrinsic events: {}", e);
+                vec![]
+            }),
+        // SupportedRuntime::AssetHubWestend => {
+        //     suno_asset_hub_westend::handle_events(api, block_hash, events)
+        //         .await
+        //         .unwrap_or_else(|e| {
+        //             error!("Error processing AssetHubWestend events: {}", e);
+        //             vec![]
+        //         })
+        // }
+        _ => {
+            vec![]
+        }
+    }
 }

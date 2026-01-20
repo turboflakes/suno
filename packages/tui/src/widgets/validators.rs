@@ -429,32 +429,32 @@ impl ValidatorsListWidget {
     //     });
     // }
 
-    // TODO
-    // pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
-    //     if chain.is_offline() {
-    //         warn!("TODO: Chain {} not ready", chain.runtime());
-    //         return;
-    //     }
+    //     // TODO
+    //     pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
+    //         if chain.is_offline() {
+    //             warn!("TODO: Chain {} not ready", chain.runtime());
+    //             return;
+    //         }
 
-    //     let api = chain.client().clone();
-    //     let runtime = self.runtime().clone();
-    //     let tx = tx.clone();
-    //     let stash = self.account.stash().clone();
-    //     tokio::spawn(async move {
-    //         // let response = match runtime {
-    //         //     SupportedRuntime::Westend => {
-    //         //         // TODO: Implement password input for proxy signing
-    //         //         let chill_xt = suno_westend::staking::chill();
-    //         //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
-    //         //     }
-    //         //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
-    //         // };
-    //         // match response {
-    //         //     Err(e) => {
-    //         //         warn!("TODO: error: {:?}", e);
-    //         //     }
-    //         //     _ => (),
-    //         // }
-    //     });
-    // }
+    //         let api = chain.client().clone();
+    //         let runtime = self.runtime().clone();
+    //         let tx = tx.clone();
+    //         let stash = self.account.stash().clone();
+    //         tokio::spawn(async move {
+    //             // let response = match runtime {
+    //             //     SupportedRuntime::Westend => {
+    //             //         // TODO: Implement password input for proxy signing
+    //             //         let chill_xt = suno_westend::staking::chill();
+    //             //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
+    //             //     }
+    //             //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
+    //             // };
+    //             // match response {
+    //             //     Err(e) => {
+    //             //         warn!("TODO: error: {:?}", e);
+    //             //     }
+    //             //     _ => (),
+    //             // }
+    //         });
+    //     }
 }

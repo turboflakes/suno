@@ -43,9 +43,9 @@ async fn handle_response(
 ) -> Result<(), Error> {
     while let Some(status) = response.next().await {
         match status? {
-            TxStatus::Broadcasted => {
-                let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
-            }
+            // TxStatus::Broadcasted => {
+            //     let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
+            // }
             TxStatus::InBestBlock(_) => {
                 let _ = tx.send(Action::Transaction(TxAction::InBestBlock));
             }

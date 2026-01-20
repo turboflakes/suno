@@ -1,6 +1,5 @@
-use crate::bridge::{dispatch::dispatch_response_action, RuntimeFetcher};
+use crate::bridge::{dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher};
 use futures::{stream, stream::StreamExt};
-use log::info;
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{Action, SystemAction};
 use suno_config::SupportedRuntime;
@@ -8,6 +7,10 @@ use suno_primitives::AccountKey;
 use tokio::sync::mpsc::UnboundedSender;
 
 const CONCURRENT_REQUESTS: usize = 3;
+
+// ----
+// Fetcher tasks
+// ----
 
 pub fn spawn_fetch_era_data(
     api: &OnlineClient<SubstrateConfig>,
@@ -542,6 +545,42 @@ pub fn spawn_fetch_validators_identity(
                         e
                     ))));
                 }
+            }
+        }
+    });
+}
+
+// ----
+// Caller tasks
+// ----
+
+pub fn spawn_call_remark(
+    api: &OnlineClient<SubstrateConfig>,
+    runtime: &SupportedRuntime,
+    key: &AccountKey,
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let runtime = runtime.clone();
+    let tx = tx.clone();
+    let stash = key.stash().clone();
+
+    tokio::spawn(async move {
+        let result = runtime.remark_with_event(&api, stash).await;
+        match result {
+            Ok(response) => {
+                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Dispatch error: {}",
+                        e
+                    ))));
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                    "Fetch error: {}",
+                    e
+                ))));
             }
         }
     });

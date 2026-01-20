@@ -6,6 +6,12 @@ use crate::{
 };
 use sp_arithmetic::{Perbill, Permill};
 use std::fmt::Debug;
+use subxt::{
+    error::TransactionError,
+    tx::TxProgress,
+    utils::{AccountId32, H256},
+    OnlineClient, SubstrateConfig,
+};
 
 type AccountBytes = [u8; 32];
 type Points = u32;
@@ -81,6 +87,9 @@ pub enum Response {
     ActiveNominators(Data<u32>),
     TotalValidators(Data<u32>),
     TotalNominators(Data<u32>),
+    TxProgress(Data<TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>>),
+    TxSuccess,
+    TxError(String),
 }
 
 // Some constructors for convenience
@@ -142,5 +151,11 @@ impl Response {
 
     pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {
         Response::Identity(Data::new(IdentityData { account, identity }))
+    }
+
+    pub fn transaction_progress(
+        progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    ) -> Self {
+        Response::TxProgress(Data::new(progress))
     }
 }
