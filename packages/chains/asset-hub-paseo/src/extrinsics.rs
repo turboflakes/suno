@@ -1,5 +1,4 @@
-use super::node_runtime;
-pub use node_runtime::staking::storage::types::nominators::Nominators;
+use crate::node_runtime;
 
 type Call = node_runtime::runtime_types::asset_hub_paseo_runtime::RuntimeCall;
 type SystemCall = node_runtime::runtime_types::frame_system::pallet::Call;

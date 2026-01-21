@@ -24,16 +24,16 @@ pub async fn fetch_validator_points(
 
     let addr = node_runtime::storage()
         .staking_ah_client()
-        .validator_points(stash.clone());
+        .validator_points();
 
-    let points = api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .fetch((stash.clone(),))
         .await?
-        .unwrap_or(0);
+        .decode()?;
 
-    Ok(Response::authority_points(account_bytes, points))
+    Ok(Response::authority_points(account_bytes, value))
 }
 
 /// Fetch epoch data at the specified block hash
@@ -89,12 +89,10 @@ async fn fetch_epoch_index(
 ) -> Result<Index, Error> {
     let addr = node_runtime::storage().babe().epoch_index();
 
-    Ok(api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .unwrap_or(0))
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch babe epoch start at the specified block hash
@@ -104,12 +102,10 @@ async fn fetch_epoch_start(
 ) -> Result<(BlockNumber, BlockNumber), Error> {
     let addr = node_runtime::storage().babe().epoch_start();
 
-    Ok(api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .unwrap_or((0, 0)))
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch session validators at the specified block hash
@@ -119,12 +115,10 @@ async fn fetch_session_validators(
 ) -> Result<Vec<AccountId32>, Error> {
     let addr = node_runtime::storage().session().validators();
 
-    Ok(api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .unwrap_or_default())
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch active validator indices at the specified block hash
@@ -136,10 +130,8 @@ async fn fetch_active_validator_indices(
         .paras_shared()
         .active_validator_indices();
 
-    Ok(api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .unwrap_or_default())
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }

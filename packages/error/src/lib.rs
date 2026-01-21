@@ -5,24 +5,26 @@ use suno_signer::error::Error as SignerError;
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Signer error: {0}")]
-    SignerError(#[from] SignerError),
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Subxt error: {0}")]
-    SubxtError(#[from] subxt::Error),
-    #[error("SubxtCore error: {0}")]
-    SubxtCoreError(#[from] subxt::ext::subxt_core::Error),
-    #[error("Metadata error: {0}")]
-    MetadataError(#[from] subxt::error::MetadataError),
-    #[error("Dispatch error: {0}")]
-    DispatchError(#[from] subxt::error::DispatchError),
-    #[error("Rpc error: {0}")]
-    RpcError(#[from] subxt::error::RpcError),
-    #[error("Tx error: {0}")]
-    TransactionError(#[from] subxt::error::TransactionError),
+    #[error("Backend error: {0}")]
+    BackendError(#[from] subxt::error::BackendError),
+    #[error("Events error: {0}")]
+    EventsError(#[from] subxt::error::EventsError),
+    #[error("Extrinsic error: {0}")]
+    ExtrinsicError(#[from] subxt::error::ExtrinsicError),
+    #[error("Transaction progress error: {0}")]
+    TransactionProgressError(#[from] subxt::error::TransactionProgressError),
+    #[error("Transaction status error: {0}")]
+    TransactionStatusError(#[from] subxt::error::TransactionStatusError),
+    #[error("Storage error: {0}")]
+    StorageError(#[from] subxt::error::StorageError),
+    #[error("Storage value error: {0}")]
+    StorageValueError(#[from] subxt::ext::subxt_core::error::StorageValueError),
+    #[error("Constant error: {0}")]
+    ConstantError(#[from] subxt::ext::subxt_core::error::ConstantError),
     #[error("Send error: {0}")]
     SendError(#[from] tokio::sync::mpsc::error::SendError<Action>),
+    #[error("Signer error: {0}")]
+    SignerError(#[from] SignerError),
     #[error("Genesis hash does not match the expected hash from the configured chain.")]
     GenesisError,
     #[error("Unsupported runtime: {0}")]

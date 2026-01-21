@@ -57,11 +57,16 @@ async fn fetch_identity_of(
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<Registration<u128, IdentityInfo>>, Error> {
-    let addr = node_runtime::storage()
-        .identity()
-        .identity_of(stash.clone());
+    let addr = node_runtime::storage().identity().identity_of();
 
-    let result = api.storage().at(block_hash).fetch(&addr).await?;
+    let api_at = api.storage().at(block_hash);
+    let result = api_at
+        .entry(addr)?
+        .try_fetch((stash.clone(),))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
+
     Ok(result)
 }
 
@@ -70,9 +75,16 @@ async fn fetch_super_of(
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<(AccountId32, Data)>, Error> {
-    let addr = node_runtime::storage().identity().super_of(stash.clone());
+    let addr = node_runtime::storage().identity().super_of();
 
-    let result = api.storage().at(block_hash).fetch(&addr).await?;
+    let api_at = api.storage().at(block_hash);
+    let result = api_at
+        .entry(addr)?
+        .try_fetch((stash.clone(),))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
+
     Ok(result)
 }
 

@@ -1,6 +1,9 @@
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
-use subxt::{backend::legacy::rpc_methods::StorageKey, utils::AccountId32};
+use subxt::{
+    ext::subxt_core::storage::{address::StaticAddress, StorageKeyValue},
+    utils::AccountId32,
+};
 use suno_config::SupportedRuntime;
 
 /// Common trait for account-related functionality
@@ -107,12 +110,12 @@ impl From<&Collator> for Row<'_> {
     }
 }
 
-pub fn get_account_id_from_storage_key(key: StorageKey) -> AccountId32 {
-    let v: [u8; 32] = get_account_bytes_from_storage_key(key);
+pub fn get_account_id_from_storage_key(bytes: &[u8]) -> AccountId32 {
+    let v: [u8; 32] = get_account_bytes_from_storage_key(bytes);
     v.into()
 }
 
-pub fn get_account_bytes_from_storage_key(key: StorageKey) -> [u8; 32] {
-    let s = &key[key.len() - 32..];
+pub fn get_account_bytes_from_storage_key(bytes: &[u8]) -> [u8; 32] {
+    let s = &bytes[bytes.len() - 32..];
     s.try_into().expect("slice with incorrect length")
 }

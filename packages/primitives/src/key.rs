@@ -34,6 +34,11 @@ impl AccountKey {
 
 impl std::fmt::Display for AccountKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.runtime(), self.stash().to_string())
+        write!(
+            f,
+            "account {} at {}",
+            self.stash().to_string(),
+            self.runtime()
+        )
     }
 }

@@ -26,5 +26,6 @@ Cargo.lock
 
 # Seed files
 .proxy_private.seed
+.proxy_private.json
 
 .DS_Store

@@ -1,13 +1,11 @@
-use super::node_runtime;
 use crate::constants::fetch_sessions_per_era;
-use node_runtime::{
-    runtime_types::{
-        bounded_collections::bounded_vec::BoundedVec,
-        pallet_staking_async::{
-            ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, ValidatorPrefs,
-        },
+use crate::node_runtime;
+use crate::node_runtime::runtime_types::{
+    bounded_collections::bounded_vec::BoundedVec,
+    pallet_staking_async::{
+        ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, ValidatorPrefs,
     },
-    staking::storage::types::{eras_stakers_overview::ErasStakersOverview, nominators::Nominators},
+    sp_staking::PagedExposureMetadata,
 };
 use sp_arithmetic::{Perbill, Permill};
 use std::collections::HashSet;
@@ -123,28 +121,28 @@ pub async fn fetch_active_nominators_count(
     block_hash: H256,
     era: u32,
 ) -> Result<Response, Error> {
-    let addr = node_runtime::storage()
-        .staking()
-        .eras_stakers_overview_iter1(era);
+    let addr = node_runtime::storage().staking().eras_stakers_overview();
 
     let mut validators_set = HashSet::<[u8; 32]>::new();
-    let mut iter = api.storage().at(block_hash).iter(addr).await?;
+    let api_at = api.storage().at(block_hash);
+    let mut iter = api_at.entry(addr)?.iter((era,)).await?;
     while let Some(Ok(storage_kv)) = iter.next().await {
-        let account_id = get_account_bytes_from_storage_key(storage_kv.key_bytes);
+        let account_id = get_account_bytes_from_storage_key(storage_kv.key_bytes());
         validators_set.insert(account_id);
     }
 
     let mut nominators_count = 0u32;
-    let addr = node_runtime::storage().staking().nominators_iter();
-    let mut iter = api.storage().at(block_hash).iter(addr).await?;
+    let addr = node_runtime::storage().staking().nominators();
+    let api_at = api.storage().at(block_hash);
+    let mut iter = api_at.entry(addr)?.iter(()).await?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         // Check if any of the nominator's targets is in the validators_set
-        if storage_kv
-            .value
+        let nominations = storage_kv.value().decode()?;
+        if nominations
             .targets
             .0
             .iter()
-            .any(|target| validators_set.contains(&target.0))
+            .any(|acc| validators_set.contains(&acc.0))
         {
             nominators_count += 1;
         }
@@ -159,11 +157,10 @@ pub async fn fetch_active_validators_count(
     block_hash: H256,
     era: u32,
 ) -> Result<Response, Error> {
-    let addr = node_runtime::storage()
-        .staking()
-        .eras_stakers_overview_iter1(era);
+    let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    let iter = api.storage().at(block_hash).iter(addr).await?;
+    let api_at = api.storage().at(block_hash);
+    let iter = api_at.entry(addr)?.iter((era,)).await?;
     let count = iter.count().await;
 
     Ok(Response::active_validators(count as u32))
@@ -176,18 +173,10 @@ pub async fn fetch_total_validators_count(
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_validators();
 
-    let count = api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "Total validators not defined at block hash {block_hash:?}"
-            ))
-        })?;
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
 
-    Ok(Response::total_validators(count))
+    Ok(Response::total_validators(value))
 }
 
 /// Fetch total nominators at the specified block hash
@@ -197,18 +186,10 @@ pub async fn fetch_total_nominators_count(
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_nominators();
 
-    let count = api
-        .storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "Total nominators not defined at block hash {block_hash:?}"
-            ))
-        })?;
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
 
-    Ok(Response::total_nominators(count))
+    Ok(Response::total_nominators(value))
 }
 
 /// Fetch total total staked for a specific era at the specified block hash
@@ -240,15 +221,10 @@ async fn fetch_bonded_eras(
 ) -> Result<BoundedVec<(u32, u32)>, Error> {
     let addr = node_runtime::storage().staking().bonded_eras();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "BondedEras not defined at block hash {block_hash:?}"
-            ))
-        })
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch eras total stake for a specific era at the specified block hash
@@ -257,17 +233,11 @@ async fn fetch_eras_total_stake(
     block_hash: H256,
     era: u32,
 ) -> Result<u128, Error> {
-    let addr = node_runtime::storage().staking().eras_total_stake(era);
+    let addr = node_runtime::storage().staking().eras_total_stake();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "TotalStake not defined at block hash {block_hash:?} for era {era}"
-            ))
-        })
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch((era,)).await?.decode()?;
+    Ok(value)
 }
 
 /// Fetch total issuance for at the specified block hash
@@ -277,15 +247,10 @@ async fn fetch_total_issuance(
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().total_issuance();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "TotalIssuance not defined at block hash {block_hash:?}"
-            ))
-        })
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch inactive issuance for at the specified block hash
@@ -295,15 +260,10 @@ async fn fetch_inactive_issuance(
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().inactive_issuance();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "InactiveIssuance not defined at block hash {block_hash:?}"
-            ))
-        })
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch validator prefs at the specified block hash
@@ -312,17 +272,16 @@ async fn fetch_validator_prefs(
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<ValidatorPrefs, Error> {
-    let addr = node_runtime::storage().staking().validators(stash.clone());
+    let addr = node_runtime::storage().staking().validators();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .fetch((stash.clone(),))
         .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "ValidatorPrefs not defined at block hash {block_hash:?} for stash {stash}"
-            ))
-        })
+        .decode()?;
+
+    Ok(value)
 }
 
 /// Fetch staking ledger at the specified block hash
@@ -331,13 +290,17 @@ async fn fetch_staking_ledger(
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<StakingLedger>, Error> {
-    let addr = node_runtime::storage().staking().ledger(stash.clone());
+    let addr = node_runtime::storage().staking().ledger();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await
-        .map_err(|e| e.into())
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .try_fetch((stash.clone(),))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
+
+    Ok(value)
 }
 
 /// Fetch active era at the specified block hash
@@ -347,15 +310,10 @@ async fn fetch_active_era_info(
 ) -> Result<ActiveEraInfo, Error> {
     let addr = node_runtime::storage().staking().active_era();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "Active era not defined at block hash {block_hash:?}"
-            ))
-        })
+    let api_at = api.storage().at(block_hash);
+    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+
+    Ok(value)
 }
 
 /// Fetch era reward points at the specified block hash
@@ -364,13 +322,17 @@ async fn fetch_era_reward_points(
     block_hash: H256,
     era: u32,
 ) -> Result<Option<EraRewardPoints>, Error> {
-    let addr = node_runtime::storage().staking().eras_reward_points(era);
+    let addr = node_runtime::storage().staking().eras_reward_points();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await
-        .map_err(|e| e.into())
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .try_fetch((era,))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
+
+    Ok(value)
 }
 
 /// Fetch eras_stakers_overview at the specified block hash for the given era and stash
@@ -379,16 +341,18 @@ async fn fetch_eras_stakers_overview(
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
-) -> Result<Option<ErasStakersOverview>, Error> {
-    let addr = node_runtime::storage()
-        .staking()
-        .eras_stakers_overview(era, stash.clone());
+) -> Result<Option<PagedExposureMetadata<u128>>, Error> {
+    let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
-        .await
-        .map_err(|e| e.into())
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .try_fetch((era, stash.clone()))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
+
+    Ok(value)
 }
 
 /// Fetch nominators at the specified block hash
@@ -396,16 +360,15 @@ async fn _fetch_nominators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: AccountId32,
-) -> Result<Nominators, Error> {
-    let addr = node_runtime::storage().staking().nominators(stash.clone());
+) -> Result<Nominations, Error> {
+    let addr = node_runtime::storage().staking().nominators();
 
-    api.storage()
-        .at(block_hash)
-        .fetch(&addr)
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .fetch((stash.clone(),))
         .await?
-        .ok_or_else(|| {
-            Error::from(format!(
-                "Nominators not defined at block hash {block_hash:?} for stash {stash}"
-            ))
-        })
+        .decode()?;
+
+    Ok(value)
 }

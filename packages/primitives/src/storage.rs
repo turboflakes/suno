@@ -6,12 +6,7 @@ use crate::{
 };
 use sp_arithmetic::{Perbill, Permill};
 use std::fmt::Debug;
-use subxt::{
-    error::TransactionError,
-    tx::TxProgress,
-    utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
-};
+use subxt::{tx::TxProgress, OnlineClient, SubstrateConfig};
 
 type AccountBytes = [u8; 32];
 type Points = u32;

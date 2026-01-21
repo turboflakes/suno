@@ -1,7 +1,7 @@
 use log::{error, info, warn};
 use subxt::{
-    blocks::ExtrinsicEvents, error::TransactionError, tx::TxProgress, tx::TxStatus, OnlineClient,
-    SubstrateConfig,
+    blocks::ExtrinsicEvents, error::TransactionStatusError, tx::TxProgress, tx::TxStatus,
+    OnlineClient, SubstrateConfig,
 };
 use suno_actions::{Action, ChainAction, SystemAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
@@ -201,9 +201,15 @@ async fn process_transaction_progress(
                     }
                 }
             }
-            TxStatus::Error { message } => return Err(TransactionError::Error(message).into()),
-            TxStatus::Invalid { message } => return Err(TransactionError::Invalid(message).into()),
-            TxStatus::Dropped { message } => return Err(TransactionError::Dropped(message).into()),
+            TxStatus::Error { message } => {
+                return Err(TransactionStatusError::Error(message).into())
+            }
+            TxStatus::Invalid { message } => {
+                return Err(TransactionStatusError::Invalid(message).into())
+            }
+            TxStatus::Dropped { message } => {
+                return Err(TransactionStatusError::Dropped(message).into())
+            }
 
             _ => {}
         }
