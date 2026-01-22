@@ -5,13 +5,13 @@ use ratatui::prelude::Margin;
 use ratatui::text::Text;
 use ratatui::widgets::Widget;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Logo {
     size: Size,
 }
 
 /// The size of the logo
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Size {
     /// The small size of the logo (1x5 characters)
@@ -51,7 +51,7 @@ impl Logo {
     }
 }
 
-impl Widget for Logo {
+impl Widget for &Logo {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let logo = self.size.as_str();
         let area = area.inner(Margin {
@@ -63,7 +63,7 @@ impl Widget for Logo {
 }
 
 impl Size {
-    const fn as_str(self) -> &'static str {
+    const fn as_str(&self) -> &'static str {
         match self {
             Self::Inline => Self::inline(),
             Self::Medium => Self::medium(),

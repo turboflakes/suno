@@ -1,6 +1,5 @@
 use crate::section::Section;
-use crate::widgets::logo::Logo;
-use crate::widgets::popup::Mode;
+use crate::widgets::{logo::Logo, popup::Mode};
 use crate::{app::App, tab::Tab};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -81,7 +80,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     // Display logo version in footer.
     render_logo_widget(app, frame, container[1]);
-    frame.render_widget(Logo::inline(), container[1]);
 
     // Render the frame.
     if app.popup.is_visible() {
@@ -185,5 +183,6 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_logo_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(Logo::inline(), area);
+    let logo = Logo::inline();
+    frame.render_widget(&logo, area);
 }
