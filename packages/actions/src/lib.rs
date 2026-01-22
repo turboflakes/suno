@@ -93,9 +93,10 @@ pub enum ValidatorAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TxAction {
-    Broadcasting,
-    InBestBlock,
-    InFinalizedBlock,
+    Processing,
+    Sent,
+    InBestBlock(BlockHash),
+    InFinalizedBlock(BlockHash),
     Success,
     Error(String),
 }

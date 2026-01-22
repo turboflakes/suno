@@ -3,13 +3,13 @@ use crate::theme::THEME;
 use log::warn;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::Styled,
-    widgets::{Block, BorderType, Borders, Row, StatefulWidget, Table, TableState, Widget},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use subxt::utils::H256;
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -113,7 +113,7 @@ impl ListState {
 
     fn spinner_progress(&self) -> String {
         let full = "⣿".repeat(self.spinner_counter);
-        format!("⣿{}{}", full, self.spinner_frame())
+        format!("{}{}⣿", self.spinner_frame(), full)
     }
 }
 
@@ -151,9 +151,9 @@ impl PopupWidget {
     fn init_transaction(&self, state: &mut ListState) {
         state.spinner_start_time = Instant::now();
         state.spinner_counter = 0;
-        state
-            .options
-            .push(Entry::new(Command::Text("broadcasted".to_string())));
+        state.options.push(Entry::new(Command::Text(
+            "processing transaction".to_string(),
+        )));
     }
 
     fn init_menu(&self, state: &mut ListState) {
@@ -265,15 +265,17 @@ impl PopupWidget {
         self.on_init(Mode::Menu, None);
     }
 
-    pub fn show_transaction(&self) {
+    pub fn show_transaction_status(&self) {
         self.on_init(Mode::Transaction, None);
     }
 
-    pub fn update_transaction_status(&self, message: String) {
+    pub fn update_transaction_status(&self, message: &str) {
         let mut state = self.state.write().unwrap();
         state.spinner_counter += 1;
         state.options.clear();
-        state.options.push(Entry::new(Command::Text(message)));
+        state
+            .options
+            .push(Entry::new(Command::Text(message.to_string())));
     }
 
     pub fn confirm_chill_attempt(&self) {
@@ -351,7 +353,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .options
         .iter()
         .map(|f| f.to_row(state.mode.clone(), Some(&spinner_progress)));
-    let widths = [Constraint::Length(8), Constraint::Fill(1)];
+    let widths = [Constraint::Length(7), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base(state.is_visible))
         .block(block);
@@ -365,29 +367,35 @@ impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
         let command = self.get_command();
         match command {
             Command::Instruction(c) => {
-                let mut row_data = Vec::new();
+                let mut cols = Vec::new();
 
                 // Add menu-specific formatting
                 match mode {
                     Mode::Menu => {
-                        row_data.push(c.as_char().to_string());
-                        row_data.push(c.to_string());
-                        row_data.push(c.description());
+                        cols.push(c.as_char().to_string());
+                        cols.push(c.to_string());
+                        cols.push(c.description());
                     }
                     Mode::Confirm => {
-                        row_data.push(c.to_string());
-                        row_data.push(c.description());
+                        cols.push(c.to_string());
+                        cols.push(c.description());
                     }
                     _ => {}
                 }
 
-                Row::new(row_data)
+                Row::new(cols)
             }
             Command::Text(t) => match mode {
-                Mode::Transaction => Row::new(vec![
-                    msg.unwrap_or("").to_string(),
-                    format!("Transaction {t}"),
-                ]),
+                Mode::Transaction => {
+                    let mut cols = Vec::new();
+
+                    cols.push(Cell::from(msg.unwrap_or("").to_string()));
+                    cols.push(Cell::from(
+                        Line::from(format!("[{t}]")).alignment(Alignment::Right),
+                    ));
+
+                    Row::new(cols)
+                }
                 _ => Row::new(vec![t.to_string()]),
             },
         }

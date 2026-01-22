@@ -171,20 +171,22 @@ async fn process_transaction_progress(
     while let Some(status) = progress.next().await {
         match status? {
             TxStatus::Broadcasted => {
-                let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
+                let _ = tx.send(Action::Transaction(TxAction::Sent));
             }
-            TxStatus::InBestBlock(_) => {
-                let _ = tx.send(Action::Transaction(TxAction::InBestBlock));
+            TxStatus::InBestBlock(block) => {
+                let block_hash = block.block_hash();
+                let _ = tx.send(Action::Transaction(TxAction::InBestBlock(block_hash)));
             }
-            TxStatus::InFinalizedBlock(in_block) => {
-                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock));
+            TxStatus::InFinalizedBlock(block) => {
+                let block_hash = block.block_hash();
+                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock(block_hash)));
                 info!(
                     "Transaction {:?} is finalized in block {:?}",
-                    in_block.extrinsic_hash(),
-                    in_block.block_hash()
+                    block.extrinsic_hash(),
+                    block.block_hash()
                 );
 
-                match in_block.wait_for_success().await {
+                match block.wait_for_success().await {
                     Ok(events) => {
                         let processed_events = process_extrinsic_events(events, &runtime);
 
@@ -193,24 +195,22 @@ async fn process_transaction_progress(
                         }
                     }
                     Err(err) => {
-                        return Err(Error::Other(format!(
-                            "Failed to wait for transaction success: {:?}",
-                            err,
-                        ))
-                        .into());
+                        error!("Transaction failed: {:?}", err);
+                        let _ = tx.send(Action::Transaction(TxAction::Error(
+                            "transaction failed".to_string(),
+                        )));
                     }
                 }
             }
             TxStatus::Error { message } => {
-                return Err(TransactionStatusError::Error(message).into())
+                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
             }
             TxStatus::Invalid { message } => {
-                return Err(TransactionStatusError::Invalid(message).into())
+                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
             }
             TxStatus::Dropped { message } => {
-                return Err(TransactionStatusError::Dropped(message).into())
+                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
             }
-
             _ => {}
         }
     }

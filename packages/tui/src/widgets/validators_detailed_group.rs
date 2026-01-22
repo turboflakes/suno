@@ -2,7 +2,6 @@ use crate::theme::THEME;
 use crate::widgets::chains::ChainsListWidget;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsListState;
-use log::info;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},

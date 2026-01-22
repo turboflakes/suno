@@ -37,19 +37,20 @@ async fn submit(
     while let Some(status) = response.next().await {
         match status? {
             TxStatus::Broadcasted => {
-                let _ = tx.send(Action::Transaction(TxAction::Broadcasting));
+                let _ = tx.send(Action::Transaction(TxAction::Sent));
             }
-            TxStatus::InBestBlock(_) => {
-                let _ = tx.send(Action::Transaction(TxAction::InBestBlock));
+            TxStatus::InBestBlock(in_block) => {
+                let block_number = in_block.number();
+                let _ = tx.send(Action::Transaction(TxAction::InBestBlock(block_number)));
             }
             TxStatus::InFinalizedBlock(in_block) => {
-                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock));
                 info!(
                     "Transaction {:?} is finalized in block {:?}",
                     in_block.extrinsic_hash(),
                     in_block.block_hash()
                 );
-
+                let block_number = in_block.number();
+                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock(block_number)));
                 let _ = in_block.wait_for_success().await?;
 
                 let events = in_block.fetch_events().await?;

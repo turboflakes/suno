@@ -397,16 +397,19 @@ impl App {
 
     fn handle_transaction_actions(&mut self, action: TxAction) {
         match action {
-            TxAction::Broadcasting => {
-                self.popup.show_transaction();
+            TxAction::Processing => {
+                self.popup.show_transaction_status();
             }
-            TxAction::InBestBlock => {
-                self.popup
-                    .update_transaction_status("in best block".to_string());
+            TxAction::Sent => {
+                self.popup.update_transaction_status("transaction sent");
             }
-            TxAction::InFinalizedBlock => {
-                self.popup
-                    .update_transaction_status("in finalized block".to_string());
+            TxAction::InBestBlock(block_hash) => {
+                let message = format!("transaction in block {block_hash}");
+                self.popup.update_transaction_status(&message);
+            }
+            TxAction::InFinalizedBlock(block_hash) => {
+                let message = format!("finalized in block {block_hash}");
+                self.popup.update_transaction_status(&message);
             }
             TxAction::Success => {
                 self.popup.hide();

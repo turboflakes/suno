@@ -1,7 +1,7 @@
 use crate::bridge::{dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher};
 use futures::{stream, stream::StreamExt};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
-use suno_actions::{Action, SystemAction};
+use suno_actions::{Action, SystemAction, TxAction};
 use suno_config::SupportedRuntime;
 use suno_primitives::AccountKey;
 use tokio::sync::mpsc::UnboundedSender;
@@ -564,6 +564,8 @@ pub fn spawn_call_remark(
     let runtime = runtime.clone();
     let tx = tx.clone();
     let stash = key.stash().clone();
+
+    let _ = tx.send(Action::Transaction(TxAction::Processing));
 
     tokio::spawn(async move {
         let result = runtime.remark_with_event(&api, stash).await;
