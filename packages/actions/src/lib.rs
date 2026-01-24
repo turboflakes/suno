@@ -23,6 +23,8 @@ pub enum Action {
     Navigation(NavigationAction),
     /// Popup actions
     Popup(PopupAction),
+    /// Input related actions
+    Input(InputAction),
     /// Network related actions
     Chain(ChainAction),
     /// Validator actions
@@ -47,9 +49,21 @@ pub enum NavigationAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
-    Toggle,
+    Open,
+    Close,
     Confirm,
     Cancel,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputAction {
+    Submit,
+    Char(char),
+    Delete,
+    CursorLeft,
+    CursorRight,
+    Editing,
+    Unfocus,
 }
 
 type ValidatorKey = AccountKey;

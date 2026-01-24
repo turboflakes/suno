@@ -7,6 +7,10 @@ pub enum Error {
     SecretError(#[from] subxt_signer::SecretUriError),
     #[error("Keypair error: {0}")]
     KeypairError(#[from] subxt_signer::sr25519::Error),
+    #[error("Decrypt error: {0}")]
+    DecryptError(#[from] subxt_signer::polkadot_js_compat::Error),
+    #[error("Signer {0} path not specified")]
+    SignerPathNotFound(String),
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -9,7 +9,6 @@ use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use suno_actions::{Action, SystemAction};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::identity::Identity;
 use suno_primitives::{
@@ -17,7 +16,6 @@ use suno_primitives::{
     validator::{Validator, ValidatorStatus},
     AccountKey,
 };
-use tokio::sync::mpsc::UnboundedSender;
 
 type Commission = u32;
 type Points = u32;
@@ -235,8 +233,8 @@ impl ValidatorsListState {
 #[derive(Debug)]
 pub struct ValidatorsListWidget {
     state: Arc<RwLock<ValidatorsListState>>,
-    /// The sender to send actions to update the state to the app.
-    tx: UnboundedSender<Action>,
+    // The sender to send actions to update the state to the app.
+    // tx: UnboundedSender<Action>,
 }
 
 impl<'a> ValidatorsListWidget {
@@ -265,10 +263,10 @@ impl<'a> ValidatorsListWidget {
 }
 
 impl ValidatorsListWidget {
-    pub fn new(tx: UnboundedSender<Action>) -> Self {
+    pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(ValidatorsListState::default())),
-            tx,
+            // tx,
         }
     }
 
@@ -298,12 +296,6 @@ impl ValidatorsListWidget {
             }
         }
         self.init_table();
-    }
-
-    fn on_error(&self, err: Box<dyn std::error::Error>) {
-        self.tx
-            .send(Action::System(SystemAction::Error(err.to_string())))
-            .expect("Failed to send error message");
     }
 
     fn add_validator(&self, validator: &Validator) {

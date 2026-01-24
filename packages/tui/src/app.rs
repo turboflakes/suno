@@ -1,23 +1,24 @@
 use crate::bridge::sync;
-use crate::error::TuiError;
+use crate::error::{self, TuiError};
 use crate::menu::Command;
 use crate::section::Section;
-use crate::tab::Tab;
 use crate::widgets::{
     chains::ChainsListWidget, collators::CollatorsListWidget, popup, popup::PopupWidget,
     validators::ValidatorsListWidget,
 };
+use crate::window::Window;
 use crate::{
     event::{Event, EventHandler},
     handler::handle_key_events,
     tui::Tui,
 };
-use log::error;
+use log::{error, info};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::network::ConnectionState;
 use suno_actions::{
-    Action, ChainAction, NavigationAction, PopupAction, SystemAction, TxAction, ValidatorAction,
+    Action, ChainAction, InputAction, NavigationAction, PopupAction, SystemAction, TxAction,
+    ValidatorAction,
 };
 use suno_config::{SupportedRuntime, CONFIG};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -28,13 +29,24 @@ pub type AppResult<T> = std::result::Result<T, TuiError>;
 // Constants
 const TICK_RATE: u64 = 200;
 
+/// Application active focus.
+#[derive(Debug, Clone, Default)]
+pub enum Focus {
+    #[default]
+    Main, // Arrows move the sections and tabs
+    Input, // Arrows move the cursor in the input/password fields
+    Popup, // Esc/Tab change mode state
+}
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
     /// Is the application running?
     pub running: bool,
-    /// The current selected tab.
-    pub tab: Tab,
+    /// Application active focus, useful to determine how to handle keyboard events.
+    pub focus: Focus,
+    /// The current selected window.
+    pub window: Window,
     /// The current selected section.
     pub section: Section,
     /// Holds the API clients for each supported runtime.
@@ -59,15 +71,15 @@ impl App {
 
         Self {
             running: true,
-            tab: Tab::Main,
-            section: Section::Chains,
+            focus: Focus::default(),
+            window: Window::default(),
+            section: Section::default(),
             chains: ChainsListWidget::new(tx.clone()),
-            validators: ValidatorsListWidget::new(tx.clone()),
+            validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
             tx,
             rx,
-            // is_popup_visible: false,
         }
     }
 
@@ -112,7 +124,7 @@ impl App {
     fn handle_events(&mut self, event: Event) -> AppResult<()> {
         let action = match event {
             Event::Tick => Action::System(SystemAction::Tick),
-            Event::Key(key_event) => handle_key_events(key_event),
+            Event::Key(key_event) => handle_key_events(key_event, self.focus.clone()),
             Event::Mouse(_) => Action::System(SystemAction::Noop),
             Event::Resize(_, _) => Action::System(SystemAction::Noop),
             // _ => Action::System(SystemAction::Noop),
@@ -128,6 +140,7 @@ impl App {
                 Action::System(act) => self.handle_system_actions(act),
                 Action::Navigation(act) => self.handle_navigation_actions(act),
                 Action::Popup(act) => self.handle_popup_actions(act),
+                Action::Input(act) => self.handle_input_actions(act),
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
@@ -157,9 +170,32 @@ impl App {
 
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
-            PopupAction::Toggle => self.toggle_menu_popup(),
+            PopupAction::Open => self.open_popup(),
+            PopupAction::Close => self.close_popup(),
             PopupAction::Confirm => self.confirm(),
             PopupAction::Cancel => self.cancel(),
+        }
+    }
+
+    fn handle_input_actions(&mut self, action: InputAction) {
+        if !self.popup.is_visible() {
+            return;
+        }
+        match action {
+            InputAction::Editing => {
+                self.popup.set_input_focus();
+                self.focus = Focus::Input;
+            }
+            InputAction::Unfocus => {
+                self.popup.clear_input_focus();
+                self.focus = Focus::Popup;
+            }
+            InputAction::Char(new_char) => self.popup.insert_input_char(new_char),
+            InputAction::Delete => self.popup.delete_input_char(),
+            InputAction::CursorLeft => self.popup.move_cursor_left(),
+            InputAction::CursorRight => self.popup.move_cursor_right(),
+            InputAction::Submit => self.submit_transaction(),
+            _ => {}
         }
     }
 
@@ -412,9 +448,11 @@ impl App {
                 self.popup.update_transaction_status(&message);
             }
             TxAction::Success => {
-                self.popup.hide();
+                self.close_popup();
             }
-            TxAction::Error(err) => {}
+            TxAction::Error(err) => {
+                error!("Transaction error: {}", err);
+            }
         }
     }
 
@@ -502,31 +540,44 @@ impl App {
             .set_active(self.section == Section::Collators);
     }
 
-    /// Selects the previous tab.
+    /// Selects the previous window.
     fn prev_tab(&mut self) {
-        self.tab = self.tab.prev();
+        self.window = self.window.prev();
     }
 
     /// Selects the next tab.
     fn next_tab(&mut self) {
-        self.tab = self.tab.next();
+        self.window = self.window.next();
     }
 
-    /// Toggle menu popup status
-    pub fn toggle_menu_popup(&mut self) {
+    /// Open menu popup
+    pub fn open_popup(&mut self) {
+        if self.popup.is_visible() {
+            return;
+        }
+
         match self.section {
             Section::Validators => {
-                if self.popup.is_visible() {
-                    self.popup.hide();
-                } else {
-                    self.popup.show_menu();
-                }
+                self.popup.show();
             }
             _ => {}
         };
+
+        if self.popup.is_visible() {
+            self.focus = Focus::Popup;
+        }
     }
 
-    /// Confirm and execute instruction.
+    /// Close menu popup
+    pub fn close_popup(&mut self) {
+        if !self.popup.is_visible() {
+            return;
+        }
+        self.popup.close();
+        self.focus = Focus::Main;
+    }
+
+    /// Confirm popup/list entry
     pub fn confirm(&mut self) {
         if !self.popup.is_visible() {
             return;
@@ -554,29 +605,30 @@ impl App {
                                 "cancel" => self.cancel(),
                                 _ => {}
                             },
-                            Command::Instruction(call) => {
-                                if let Some(validator) = self.validators.get_selected() {
-                                    match call {
-                                        popup::Staking::Chill => {
-                                            let runtime = validator.runtime().asset_hub_runtime();
-                                            if let Some(chain) =
-                                                self.chains.get_chain_by_runtime(&runtime)
-                                            {
-                                                let api = chain.client();
-                                                let account_key = validator.key();
-                                                // TODO: Implement spawn_call_chill
-                                                sync::spawn_call_remark(
-                                                    &api,
-                                                    &runtime,
-                                                    &account_key,
-                                                    &self.tx,
-                                                );
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
+                            // Command::Instruction(call) => {
+                            //     if let Some(validator) = self.validators.get_selected() {
+                            //         match call {
+                            //             popup::Staking::Chill => {
+                            //                 let runtime = validator.runtime().asset_hub_runtime();
+                            //                 if let Some(chain) =
+                            //                     self.chains.get_chain_by_runtime(&runtime)
+                            //                 {
+                            //                     let api = chain.client();
+                            //                     let account_key = validator.key();
+                            //                     // TODO: Implement spawn_call_chill
+                            //                     sync::spawn_call_remark(
+                            //                         &api,
+                            //                         &runtime,
+                            //                         &account_key,
+                            //                         &self.tx,
+                            //                     );
+                            //                 }
+                            //             }
+                            //             _ => {}
+                            //         }
+                            //     }
+                            // }
+                            _ => {}
                         }
                     }
                 }
@@ -588,7 +640,7 @@ impl App {
 
     /// Cancel instruction.
     pub fn cancel(&mut self) {
-        self.popup.hide();
+        self.close_popup();
     }
 
     /// Try chill instruction
@@ -599,5 +651,58 @@ impl App {
             }
             _ => {}
         };
+    }
+
+    /// Sign and Submit transaction
+    pub fn submit_transaction(&mut self) {
+        if !self.popup.is_visible() {
+            return;
+        }
+        if let Some(entry) = self.popup.get_selected() {
+            match entry.get_command() {
+                Command::Text(text) => match text.as_str() {
+                    "cancel" => self.cancel(),
+                    _ => {}
+                },
+                Command::Instruction(call) => {
+                    if let Some(validator) = self.validators.get_selected() {
+                        match call {
+                            popup::Staking::Chill => {
+                                let runtime = validator.runtime().asset_hub_runtime();
+                                if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
+                                    let api = chain.client();
+                                    let account_key = validator.key();
+                                    // TODO: Implement spawn_call_chill
+
+                                    let result = self.popup.execute_with_password(
+                                        |password| -> Result<(), TuiError> {
+                                            let signer = suno_signer::load_keypair(password)?;
+
+                                            sync::spawn_call_remark(
+                                                &api,
+                                                &runtime,
+                                                &signer,
+                                                &account_key,
+                                                &self.tx,
+                                            );
+
+                                            Ok(())
+                                        },
+                                    );
+
+                                    if let Err(e) = result {
+                                        let _ = self.tx.send(Action::System(SystemAction::Error(
+                                            e.to_string(),
+                                        )));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 use crate::section::Section;
 use crate::widgets::{logo::Logo, popup::Mode};
-use crate::{app::App, tab::Tab};
+use crate::{app::App, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
@@ -69,10 +69,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_rpcs_widget(app, frame, left_layout[3]);
     }
 
-    // Switch between main body widgets.
-    match app.tab {
-        Tab::Main => render_body_widget(app, frame, outer_layout[1]),
-        Tab::Logs => render_logs_widget(app, frame, outer_layout[1]),
+    // Switch between main body window.
+    match app.window {
+        Window::Main => render_body_widget(app, frame, outer_layout[1]),
+        Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
     }
 
     // Display commands legend in footer.
@@ -95,16 +95,20 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let area = match &app.popup.get_mode() {
         Mode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
-        Mode::Confirm => popup_area(frame.area(), 40, 10, Flex::Center),
+        Mode::Confirm => popup_area(frame.area(), 40, 16, Flex::Center),
         Mode::Transaction => {
             let mut area = popup_area(frame.area(), 20, 6, Flex::End);
-            // Set fixed height of 3 lines
             area.height = 3;
             area
         }
     };
     frame.render_widget(Clear, area); //this clears out the background
     frame.render_widget(&app.popup, area);
+    // Apply the cursor if it was set during render
+    let state = app.popup.state.read().unwrap();
+    if let Some(pos) = state.get_input_cursor_position() {
+        frame.set_cursor_position(pos);
+    }
 }
 
 fn popup_area(area: Rect, percent_x: u16, percent_y: u16, flex: Flex) -> Rect {

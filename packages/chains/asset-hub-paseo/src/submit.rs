@@ -10,20 +10,18 @@ type Call = node_runtime::runtime_types::asset_hub_paseo_runtime::RuntimeCall;
 pub async fn submit_as_proxy(
     api: &OnlineClient<SubstrateConfig>,
     call: Call,
-    proxied_account: AccountId32,
-    password: Option<String>,
+    proxied_account: &AccountId32,
+    proxy_signer: &Keypair,
 ) -> Result<Response, Error> {
-    let proxy_signer: Keypair = suno_signer::load_keypair(password)?;
-
     let proxy_call = node_runtime::tx().proxy().proxy(
-        proxied_account.into(),
+        proxied_account.clone().into(),
         Some(ProxyType::NonTransfer),
         call,
     );
 
     let response = api
         .tx()
-        .sign_and_submit_then_watch_default(&proxy_call, &proxy_signer)
+        .sign_and_submit_then_watch_default(&proxy_call, proxy_signer)
         .await?;
 
     Ok(Response::transaction_progress(response))

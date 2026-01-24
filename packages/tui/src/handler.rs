@@ -1,8 +1,11 @@
+use crate::app::Focus;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use suno_actions::{Action, NavigationAction, PopupAction, SystemAction, ValidatorAction};
+use suno_actions::{
+    Action, InputAction, NavigationAction, PopupAction, SystemAction, ValidatorAction,
+};
 
 /// Handles the key events and triggers respective action.
-pub fn handle_key_events(key_event: KeyEvent) -> Action {
+pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
     match key_event.modifiers {
         KeyModifiers::CONTROL => {
             match key_event.code {
@@ -16,14 +19,22 @@ pub fn handle_key_events(key_event: KeyEvent) -> Action {
             KeyCode::Tab => Action::Navigation(NavigationAction::NextTab),
             _ => Action::System(SystemAction::Noop),
         },
-        _ => handle_key_events_without_modifiers(key_event),
+        _ => handle_key_events_without_modifiers(key_event, app_focus),
     }
 }
 
-pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
+fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) -> Action {
+    match app_focus {
+        Focus::Main => handle_main_key_events(key_event),
+        Focus::Popup => handle_popup_key_events(key_event),
+        Focus::Input => handle_editing_key_events(key_event),
+    }
+}
+
+fn handle_main_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
         // Open popup menu within the active section
-        KeyCode::Char('x') | KeyCode::Char('X') => Action::Popup(PopupAction::Toggle),
+        KeyCode::Char('x') | KeyCode::Char('X') => Action::Popup(PopupAction::Open),
         // Section Down on `Right`
         KeyCode::Right | KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
         // Section Up on `Left`
@@ -36,6 +47,17 @@ pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
         KeyCode::Char('[') => Action::Navigation(NavigationAction::PrevTab),
         // Fallback to NextTab
         KeyCode::Char(']') => Action::Navigation(NavigationAction::NextTab),
+        _ => Action::System(SystemAction::Noop),
+    }
+}
+
+fn handle_popup_key_events(key_event: KeyEvent) -> Action {
+    match key_event.code {
+        // Close popup menu
+        KeyCode::Char('x') | KeyCode::Char('X') => Action::Popup(PopupAction::Close),
+        KeyCode::Tab => Action::Input(InputAction::Editing),
+        KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
+        KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
         // TODO: Implement KeyBinddings dynamically from config.
         KeyCode::Char('c') => Action::Validator(ValidatorAction::SubmitChill),
         KeyCode::Char('b') => Action::Validator(ValidatorAction::SubmitBond),
@@ -44,8 +66,20 @@ pub fn handle_key_events_without_modifiers(key_event: KeyEvent) -> Action {
         KeyCode::Char('f') => Action::Validator(ValidatorAction::SubmitChangeCommission),
         KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
-        KeyCode::Char('y') | KeyCode::Enter => Action::Popup(PopupAction::Confirm),
-        KeyCode::Char('n') | KeyCode::Esc => Action::Popup(PopupAction::Cancel),
+        KeyCode::Enter => Action::Popup(PopupAction::Confirm),
+        KeyCode::Esc => Action::Popup(PopupAction::Cancel),
+        _ => Action::System(SystemAction::Noop),
+    }
+}
+
+fn handle_editing_key_events(key_event: KeyEvent) -> Action {
+    match key_event.code {
+        KeyCode::Enter => Action::Input(InputAction::Submit),
+        KeyCode::Char(letter) => Action::Input(InputAction::Char(letter)),
+        KeyCode::Backspace => Action::Input(InputAction::Delete),
+        KeyCode::Left => Action::Input(InputAction::CursorLeft),
+        KeyCode::Right => Action::Input(InputAction::CursorRight),
+        KeyCode::Esc => Action::Input(InputAction::Unfocus),
         _ => Action::System(SystemAction::Noop),
     }
 }

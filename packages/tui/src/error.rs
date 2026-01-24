@@ -3,6 +3,8 @@ use suno_actions::Action;
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
 pub enum TuiError {
+    #[error("Signer error: {0}")]
+    SignerError(#[from] suno_signer::error::Error),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Send error: {0}")]

@@ -1,6 +1,7 @@
 use crate::bridge::{dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher};
 use futures::{stream, stream::StreamExt};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
+use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
 use suno_config::SupportedRuntime;
 use suno_primitives::AccountKey;
@@ -557,18 +558,20 @@ pub fn spawn_fetch_validators_identity(
 pub fn spawn_call_remark(
     api: &OnlineClient<SubstrateConfig>,
     runtime: &SupportedRuntime,
+    signer: &Keypair,
     key: &AccountKey,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
+    let signer = signer.clone();
     let stash = key.stash().clone();
 
     let _ = tx.send(Action::Transaction(TxAction::Processing));
 
     tokio::spawn(async move {
-        let result = runtime.remark_with_event(&api, stash).await;
+        let result = runtime.remark_with_event(&api, &stash, &signer).await;
         match result {
             Ok(response) => {
                 if let Err(e) = dispatch_response_action(response, &runtime, &tx) {

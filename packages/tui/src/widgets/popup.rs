@@ -1,12 +1,15 @@
 use crate::menu::{AsChar, Command, Entry, ToDescription};
 use crate::theme::THEME;
-use log::warn;
+use crate::widgets::input::InputWidget;
+use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Rect},
-    style::Styled,
+    layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
+    style::{Color, Style, Styled},
     text::Line,
-    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{
+        Block, BorderType, Borders, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget,
+    },
 };
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -76,11 +79,11 @@ impl std::fmt::Display for Staking {
 
 #[derive(Debug, Clone, Default)]
 pub struct PopupWidget {
-    state: Arc<RwLock<ListState>>,
+    pub state: Arc<RwLock<ListState>>,
 }
 
 #[derive(Debug)]
-struct ListState {
+pub struct ListState {
     options: Vec<Entry<Staking>>,
     table_state: TableState,
     is_visible: bool,
@@ -88,6 +91,7 @@ struct ListState {
     spinner_frames: Vec<&'static str>,
     spinner_start_time: Instant,
     spinner_counter: usize,
+    input: InputWidget,
 }
 
 impl Default for ListState {
@@ -100,6 +104,7 @@ impl Default for ListState {
             spinner_frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
             spinner_start_time: Instant::now(),
             spinner_counter: 0,
+            input: InputWidget::new(),
         }
     }
 }
@@ -114,6 +119,10 @@ impl ListState {
     fn spinner_progress(&self) -> String {
         let full = "⣿".repeat(self.spinner_counter);
         format!("{}{}⣿", self.spinner_frame(), full)
+    }
+
+    pub fn get_input_cursor_position(&self) -> Option<Position> {
+        self.input.get_cursor_position()
     }
 }
 
@@ -243,7 +252,11 @@ impl PopupWidget {
         state.is_visible
     }
 
-    pub fn hide(&self) {
+    pub fn show(&self) {
+        self.on_init(Mode::Menu, None);
+    }
+
+    pub fn close(&self) {
         let mut state = self.state.write().unwrap();
         state.is_visible = false;
     }
@@ -259,10 +272,6 @@ impl PopupWidget {
     pub fn get_mode(&self) -> Mode {
         let state = self.state.read().unwrap();
         state.mode.clone()
-    }
-
-    pub fn show_menu(&self) {
-        self.on_init(Mode::Menu, None);
     }
 
     pub fn show_transaction_status(&self) {
@@ -281,6 +290,53 @@ impl PopupWidget {
     pub fn confirm_chill_attempt(&self) {
         self.on_init(Mode::Confirm, Some(Staking::Chill));
     }
+
+    // Input actions
+    pub fn set_input_focus(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.set_focus();
+    }
+
+    pub fn clear_input_focus(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.clear_focus();
+    }
+
+    pub fn insert_input_char(&self, new_char: char) {
+        let mut state = self.state.write().unwrap();
+        state.input.insert_char(new_char);
+    }
+
+    pub fn delete_input_char(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.delete_char();
+    }
+
+    pub fn move_cursor_left(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.move_cursor_left();
+    }
+
+    pub fn move_cursor_right(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.move_cursor_right();
+    }
+
+    pub fn execute_with_password<F, R, E>(&self, f: F) -> Result<R, E>
+    where
+        F: FnOnce(&str) -> Result<R, E>,
+    {
+        let state = self.state.read().unwrap();
+
+        state.input.execute_with_password(f)
+    }
+
+    // pub fn execute_with_password(&self) -> String {
+    //     let state = self.state.read().unwrap();
+    //     state
+    //         .input
+    //         .execute_with_password(|password| password.to_string())
+    // }
 }
 
 impl Widget for &PopupWidget {
@@ -324,7 +380,8 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
-fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+// DEPRECATED
+fn _render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let block = Block::new()
         .title(" Confirm ")
         .borders(Borders::ALL)
@@ -341,6 +398,28 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
+}
+
+fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+    // Split the area into header to show transaction details and password input area
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(4), // Details
+            Constraint::Min(3),    // Password (label + input)
+        ])
+        .split(area);
+
+    // Define header details
+    let details = Paragraph::new(vec![
+        Line::from(format!("method: <chill>")).style(Style::default()),
+        Line::from(format!("call data: <0x00..>")).style(Style::default()),
+    ])
+    .block(Block::bordered().title(" Confirm "));
+    details.render(area[0], buf);
+
+    // Render input area
+    state.input.render(area[1], buf);
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {

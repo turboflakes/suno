@@ -9,8 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
-suno-config = { path = "../config" }
-
 regex = { workspace = true }
 subxt-signer = { workspace = true }
+suno-config = { path = "../config" }
 thiserror = { workspace = true }
