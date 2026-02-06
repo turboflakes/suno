@@ -5,10 +5,9 @@ use crate::widgets::validators::ValidatorsListState;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    prelude::Stylize,
     style::{Color, Style, Styled},
-    text::{Line, Text},
-    widgets::{Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
+    text::{Line, Span, Text},
+    widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
@@ -18,7 +17,7 @@ use suno_primitives::{
 };
 
 pub const GROUP_HEADER_HEIGHT: u16 = 6;
-pub const BOTTOM_PADDING: u16 = 2;
+pub const PADDING: u16 = 4;
 
 #[derive(Debug, Clone)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
@@ -48,7 +47,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
 
         // Iterate and render each group
         for (runtime, validators) in validators_grouped {
-            let group_height = GROUP_HEADER_HEIGHT + validators.len() as u16 + BOTTOM_PADDING;
+            let group_height = GROUP_HEADER_HEIGHT + validators.len() as u16 + PADDING;
             let group_area = Rect::new(0, current_y_group, area_width, group_height);
 
             // Get selected validator if one of the validators in the current section
@@ -171,32 +170,47 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                     ])
                     .split(area);
 
-                let network_info = Paragraph::new(vec![
-                    Line::from(format!("# {}", runtime))
-                        .style(Style::default().fg(Color::Blue).bold()),
-                    Line::from(format!(
-                        "Total validators: {} active, {} waiting",
-                        ah_chain.active_validators_count(),
-                        ah_chain.waiting_validators_count(),
-                    )),
-                    Line::from(format!(
-                        "Total nominators: {} active, {} waiting",
-                        ah_chain.active_nominators_count(),
-                        ah_chain.waiting_nominators_count()
-                    )),
-                    Line::from(format!(
-                        "Total staked: {}",
-                        ah_chain.total_staked_percentage()
-                    )),
-                    Line::from(format!(
-                        "On display: {} active, {} waiting",
-                        validators.iter().filter(|v| v.is_active()).count(),
-                        validators.iter().filter(|v| v.is_waiting()).count(),
-                    )),
-                ])
-                .style(Style::default().fg(Color::Blue));
+                // Draw and render general network stats
+
+                let network_lines = vec![
+                    Line::from(Span::raw(format!("{}", runtime)).style(THEME.paragraph.header)),
+                    Line::from(vec![
+                        Span::raw("total validators: ").style(THEME.paragraph.label),
+                        Span::raw(format!(
+                            "{} active, {} waiting",
+                            ah_chain.active_validators_count(),
+                            ah_chain.waiting_validators_count()
+                        )),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("total nominators: ").style(THEME.paragraph.label),
+                        Span::raw(format!(
+                            "{} active, {} waiting",
+                            ah_chain.active_nominators_count(),
+                            ah_chain.waiting_nominators_count()
+                        )),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("total staked: ").style(THEME.paragraph.label),
+                        Span::raw(format!("{}", ah_chain.total_staked_percentage())),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("displayed: ").style(THEME.paragraph.label),
+                        Span::raw(format!(
+                            "{} active, {} waiting",
+                            validators.iter().filter(|v| v.is_active()).count(),
+                            validators.iter().filter(|v| v.is_waiting()).count(),
+                        )),
+                    ]),
+                ];
+
+                let network_info = Paragraph::new(network_lines)
+                    .block(Block::new().set_style(THEME.block.main))
+                    .style(THEME.paragraph.base);
 
                 network_info.render(header_layout_cols[0], buf);
+
+                // Draw and render Progress Bars
 
                 let Some(epoch) = chain.epoch() else {
                     // TODO: Handle epoch not available, maybe render loading indicator
@@ -214,7 +228,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
                 let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
 
-                let progress_info = Paragraph::new(vec![
+                let progress_lines = vec![
                     Line::from(""),
                     Line::from(format!(
                         "era {} {:.0}% {}",
@@ -230,23 +244,33 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                         epoch_progress_bar,
                     ))
                     .alignment(Alignment::Right),
-                ])
-                .style(Style::default().fg(Color::Blue));
+                ];
+
+                let progress_info = Paragraph::new(progress_lines)
+                    .block(Block::new().set_style(THEME.block.main))
+                    .style(THEME.paragraph.base);
 
                 progress_info.render(header_layout_cols[1], buf);
+
+                // Draw and render Countdowns
 
                 let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
                 let era_countdown_time =
                     era.countdown_time(epoch.duration(), epoch.block_time_ms());
 
-                let countdown_info = Paragraph::new(vec![
+                let countdown_lines = vec![
                     Line::from(""),
                     Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
                     Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
-                ])
-                .style(Style::default().fg(Color::Blue));
+                ];
+
+                let countdown_info = Paragraph::new(countdown_lines)
+                    .block(Block::new().set_style(THEME.block.main))
+                    .style(THEME.paragraph.base);
 
                 countdown_info.render(header_layout_cols[2], buf);
+
+                return;
             };
         };
     }
@@ -259,6 +283,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
         table_state: &mut TableState,
     ) {
+        let block = Block::new()
+            .set_style(THEME.block.main)
+            .padding(Padding::symmetric(0, 1));
+
         let mut rows = Vec::new();
 
         for v in validators {
@@ -343,6 +371,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         *table_state.offset_mut() = 0;
 
         let table = Table::new(rows, widths)
+            .block(block)
             .header(Row::new(header_cells).set_style(THEME.table.header))
             .style(Style::default().fg(Color::Blue));
 

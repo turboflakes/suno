@@ -6,9 +6,9 @@ use log::debug;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::{Color, Modifier, Style, Styled},
+    style::Styled,
     text::Text,
-    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
 };
 use sp_arithmetic::Permill;
 use std::collections::HashMap;
@@ -322,6 +322,12 @@ impl ChainsListState {
             .iter()
             .filter_map(move |key| self.chains.get(key))
     }
+
+    pub fn get_selected_ref(&self) -> Option<&Chain> {
+        self.table_state
+            .selected()
+            .and_then(|i| self.get_chain_by_index(i))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -522,56 +528,44 @@ impl Widget for &ChainsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
 
-        let (table_style, highlight_style, highlight_symbol) = match state.is_active {
-            true => (
-                Style::default().fg(Color::White),
-                Style::default().fg(Color::Black).bg(Color::White),
-                "❯",
-            ),
-            false => (
-                Style::default().fg(Color::Blue),
-                Style::default().fg(Color::Blue),
-                "",
-            ),
-        };
-
         let block = Block::new()
-            // .title("Chains")
-            // .title_style(Style::default().add_modifier(Modifier::BOLD))
-            .borders(Borders::TOP | Borders::LEFT | Borders::BOTTOM)
-            .border_type(BorderType::Plain);
+            .set_style(THEME.block.menu_top(state.is_active))
+            .padding(Padding::symmetric(0, 1));
 
         let rows = state.chains_iter();
         let widths = [
+            Constraint::Length(2),
             Constraint::Fill(1),
             Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(6),
             Constraint::Length(4),
+            Constraint::Length(2),
+        ];
+
+        let header_cells = vec![
+            Cell::from(""),
+            Cell::from(Text::from("chains").alignment(Alignment::Left)),
+            Cell::from(Text::from("best").alignment(Alignment::Right)),
+            Cell::from(Text::from("finalized").alignment(Alignment::Right)),
+            Cell::from(""),
+            Cell::from(""),
+            Cell::from(""),
         ];
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(
-                Row::new(vec![
-                    Cell::from(""),
-                    Cell::from(Text::from("best").alignment(Alignment::Right)),
-                    Cell::from(Text::from("finalized").alignment(Alignment::Right)),
-                    Cell::from(""),
-                    Cell::from(""),
-                ])
-                .set_style(THEME.table.header),
-            )
-            .style(table_style)
-            .row_highlight_style(highlight_style)
-            .highlight_symbol(highlight_symbol);
+            .header(Row::new(header_cells).set_style(THEME.table.header(state.is_active)))
+            .style(THEME.table.base)
+            .row_highlight_style(THEME.table.row_highlight(state.is_active))
+            .highlight_symbol(THEME.table.highlight_symbol(state.is_active));
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
         // Render scrollbar when active
         if state.is_active && state.chains.len() >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
-                x: area.x,
+                x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
@@ -590,6 +584,7 @@ impl From<&Chain> for Row<'_> {
         let progress = create_progress_bar_by_millis(elapsed, 6);
 
         Row::new(vec![
+            Text::from(""),
             Text::from(format!(
                 "{}{}",
                 chain.state.to_string(),
@@ -600,6 +595,7 @@ impl From<&Chain> for Row<'_> {
                 .alignment(Alignment::Right),
             Text::from(progress.to_string()).alignment(Alignment::Right),
             Text::from(format_millis(elapsed)).alignment(Alignment::Right),
+            Text::from(""),
         ])
     }
 }

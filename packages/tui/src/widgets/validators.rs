@@ -1,10 +1,9 @@
 use crate::widgets::chains::ChainsListWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::{
-    ValidatorsDetailedGroupWidget, BOTTOM_PADDING, GROUP_HEADER_HEIGHT,
+    ValidatorsDetailedGroupWidget, GROUP_HEADER_HEIGHT, PADDING,
 };
 use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
-// use crate::widgets::popup::PopupWidget;
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
@@ -187,7 +186,7 @@ impl ValidatorsListState {
 
         validators_grouped
             .iter()
-            .map(|(_, v)| GROUP_HEADER_HEIGHT + v.len() as u16 + BOTTOM_PADDING)
+            .map(|(_, v)| GROUP_HEADER_HEIGHT + v.len() as u16 + PADDING)
             .sum()
     }
 
@@ -212,7 +211,7 @@ impl ValidatorsListState {
                 // Header + index + table header
                 return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
             }
-            selected_y_position += GROUP_HEADER_HEIGHT + validators.len() as u16 + BOTTOM_PADDING;
+            selected_y_position += GROUP_HEADER_HEIGHT + validators.len() as u16 + PADDING;
         }
         0
     }

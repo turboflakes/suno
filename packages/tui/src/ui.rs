@@ -1,11 +1,12 @@
 use crate::section::Section;
+use crate::theme::THEME;
 use crate::widgets::{logo::Logo, popup::Mode};
 use crate::{app::App, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph},
     Frame,
 };
 use suno_config::CONFIG;
@@ -95,6 +96,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let area = match &app.popup.get_mode() {
         Mode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
+        Mode::Details => popup_area(frame.area(), 40, 16, Flex::Center),
         Mode::Confirm => popup_area(frame.area(), 40, 16, Flex::Center),
         Mode::Transaction => {
             let mut area = popup_area(frame.area(), 20, 6, Flex::End);
@@ -148,26 +150,29 @@ fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain);
-
+        .style(THEME.block.main)
+        .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
     frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
 }
 
 fn render_logs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .style(THEME.block.main)
+        .padding(Padding::proportional(1));
+    let block_area = block.inner(area);
+    frame.render_widget(block, area);
     frame.render_widget(
         TuiLoggerWidget::default()
-            .block(Block::bordered().title(" Logs "))
             .output_separator('|')
             .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
             .output_level(Some(TuiLoggerLevelOutput::Long))
             .output_target(false)
             .output_file(false)
             .output_line(false)
-            .style(Style::default().fg(Color::Blue)),
-        area,
+            .style(THEME.block.main),
+        block_area,
     );
 }
 

@@ -1,3 +1,4 @@
+use crate::theme::THEME;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -13,5 +14,6 @@ pub fn render_scrollbar(position: usize, max: usize, area: Rect, buf: &mut Buffe
         .end_symbol(None)
         .track_symbol(None)
         .thumb_symbol("▐")
+        .style(THEME.scrollbar.base)
         .render(area, buf, &mut state);
 }

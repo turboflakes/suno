@@ -157,8 +157,10 @@ impl From<&Validator> for Row<'_> {
         let status = if has_proxy { "[P]" } else { "[R]" };
         let v = v.clone();
         Row::new(vec![
+            Text::from(""),
             Text::from(format!("{}/{}", v.runtime(), v.display_name(),)),
             Text::from(status).alignment(Alignment::Right),
+            Text::from(""),
         ])
     }
 }
