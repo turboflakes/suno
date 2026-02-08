@@ -31,7 +31,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
-    let mut constraints = vec![Constraint::Max(8)];
+    let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
     if config.features.enable_validators {
         constraints.push(Constraint::Fill(1));
     } else {
