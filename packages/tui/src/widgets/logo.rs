@@ -1,9 +1,10 @@
+use crate::theme::THEME;
 use indoc::indoc;
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::prelude::Margin;
-use ratatui::text::Text;
-use ratatui::widgets::Widget;
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::{Block, Padding, Paragraph, Widget},
+};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Logo {
@@ -54,11 +55,10 @@ impl Logo {
 impl Widget for &Logo {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let logo = self.size.as_str();
-        let area = area.inner(Margin {
-            horizontal: 1,
-            vertical: 0,
-        });
-        Text::raw(logo).render(area, buf);
+        let block = Block::default()
+            .style(THEME.block.menu_bottom)
+            .padding(Padding::new(2, 0, 0, 1));
+        Paragraph::new(logo).block(block).render(area, buf);
     }
 }
 
@@ -71,7 +71,7 @@ impl Size {
     }
 
     const fn inline() -> &'static str {
-        concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"))
+        concat!("suno v", env!("CARGO_PKG_VERSION"))
     }
 
     const fn medium() -> &'static str {

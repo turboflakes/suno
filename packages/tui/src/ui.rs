@@ -23,7 +23,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let container = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(vec![Constraint::Fill(1), Constraint::Length(1)])
+        .constraints(vec![Constraint::Fill(1), Constraint::Length(2)])
         .split(area);
 
     let outer_layout = Layout::default()
@@ -76,11 +76,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
     }
 
-    // Display commands legend in footer.
-    render_legend_widget(app, frame, container[1]);
+    let footer = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
+        .split(container[1]);
 
-    // Display logo version in footer.
-    render_logo_widget(app, frame, container[1]);
+    // Display logo version in footer, aligned left.
+    render_logo_widget(app, frame, footer[0]);
+
+    // Display commands legend in footer, aligned right.
+    render_legend_widget(app, frame, footer[1]);
 
     // Render the frame.
     if app.popup.is_visible() {
@@ -177,15 +182,18 @@ fn render_logs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .style(THEME.block.footer_right)
+        .padding(Padding::new(0, 2, 0, 1));
     let footer = if app.popup.is_visible() {
         Paragraph::new(format!(": run | ↑ ↓: navigate | x: close"))
-            .style(Style::default().fg(Color::Blue))
+            .block(block)
             .right_aligned()
     } else {
         Paragraph::new(format!(
             "tab or alt+tab or ↑ ↓: navigate | x: menu | q: quit"
         ))
-        .style(Style::default().fg(Color::Blue))
+        .block(block)
         .right_aligned()
     };
     frame.render_widget(footer, area);

@@ -54,6 +54,8 @@ pub struct Block {
     pub base: Style,
     pub menu_top: Style,
     pub menu_bottom: Style,
+    pub footer_left: Style,
+    pub footer_right: Style,
     pub main: Style,
     pub active: Style,
 }
@@ -154,6 +156,8 @@ pub const THEME: Theme = Theme {
         menu_top: Style::new().bg(GRAY_90).fg(GRAY_20),
         menu_bottom: Style::new().bg(GRAY_80).fg(GRAY_20),
         main: Style::new().bg(GRAY_100).fg(GRAY_20),
+        footer_left: Style::new().bg(GRAY_80).fg(GRAY_50),
+        footer_right: Style::new().bg(GRAY_100).fg(GRAY_50),
         active: Style::new().bg(GRAY_70).fg(GRAY_10),
     },
     table: Table {
