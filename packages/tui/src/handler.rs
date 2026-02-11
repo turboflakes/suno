@@ -1,17 +1,33 @@
 use crate::app::Focus;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use log::info;
 use suno_actions::{
     Action, InputAction, NavigationAction, PopupAction, SystemAction, ValidatorAction,
 };
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
+    info!("Key event: {:?}", key_event);
     match key_event.modifiers {
         KeyModifiers::CONTROL => {
             match key_event.code {
                 // Exit application on `Ctrl-C`
                 KeyCode::Char('c') | KeyCode::Char('C') => Action::System(SystemAction::Quit),
-                _ => Action::System(SystemAction::Noop),
+                _ => match app_focus {
+                    Focus::Popup => match key_event.code {
+                        KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
+                        KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
+                        _ => Action::System(SystemAction::Noop),
+                    },
+                    Focus::Main => match key_event.code {
+                        KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),
+                        KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
+                        KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
+                        KeyCode::Char('l') => Action::Navigation(NavigationAction::SectionDown),
+                        _ => Action::System(SystemAction::Noop),
+                    },
+                    _ => Action::System(SystemAction::Noop),
+                },
             }
         }
         // TODO: It seems that `command` key on macos is not implemented for SUPER key modifiers
@@ -28,6 +44,7 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
         Focus::Main => handle_main_key_events(key_event),
         Focus::Popup => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
+        _ => Action::System(SystemAction::Noop),
     }
 }
 
@@ -56,8 +73,8 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // Close popup menu
         KeyCode::Char('x') | KeyCode::Char('X') => Action::Popup(PopupAction::Close),
         KeyCode::Tab => Action::Input(InputAction::Editing),
-        KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
-        KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        // KeyCode::Up | KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
+        // KeyCode::Down | KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
         // TODO: Implement KeyBinddings dynamically from config.
         KeyCode::Char('c') => Action::Validator(ValidatorAction::SubmitChill),
         KeyCode::Char('b') => Action::Validator(ValidatorAction::SubmitBond),
@@ -74,6 +91,7 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
 
 fn handle_editing_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
+        KeyCode::Tab => Action::Input(InputAction::AutoComplete),
         KeyCode::Enter => Action::Input(InputAction::Submit),
         KeyCode::Char(letter) => Action::Input(InputAction::Char(letter)),
         KeyCode::Backspace => Action::Input(InputAction::Delete),

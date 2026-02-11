@@ -1,6 +1,7 @@
-use crate::bridge::sync;
+use crate::bridge::{dispatch::dispatch_response_action, sync, RuntimeCaller};
+use crate::call::Call;
+use crate::entry::Command;
 use crate::error::{self, TuiError};
-use crate::menu::Command;
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsListWidget, collators::CollatorsListWidget, popup, popup::PopupWidget,
@@ -12,22 +13,25 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
-use log::{error, info};
+use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use subxt::{OnlineClient, SubstrateConfig};
 use suno_actions::network::ConnectionState;
 use suno_actions::{
     Action, ChainAction, InputAction, NavigationAction, PopupAction, SystemAction, TxAction,
     ValidatorAction,
 };
 use suno_config::{SupportedRuntime, CONFIG};
+use suno_error::Error;
+use suno_primitives::{tx::Bytes, Validator};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, TuiError>;
 
 // Constants
-const TICK_RATE: u64 = 200;
+const TICK_RATE: u64 = 100;
 
 /// Application active focus.
 #[derive(Debug, Clone, Default)]
@@ -121,6 +125,15 @@ impl App {
         Ok(())
     }
 
+    fn context(&self) -> Option<Context> {
+        let validator = self.validators.get_selected()?;
+        let runtime = validator.runtime().asset_hub_runtime();
+        let chain = self.chains.get_chain_by_runtime(&runtime)?;
+        let api = chain.client();
+
+        Some(Context::new(api.clone(), runtime, validator))
+    }
+
     fn handle_events(&mut self, event: Event) -> AppResult<()> {
         let action = match event {
             Event::Tick => Action::System(SystemAction::Tick),
@@ -189,6 +202,9 @@ impl App {
             InputAction::Unfocus => {
                 self.popup.clear_input_focus();
                 self.focus = Focus::Popup;
+            }
+            InputAction::AutoComplete => {
+                self.popup.set_input_autocomplete();
             }
             InputAction::Char(new_char) => self.popup.insert_input_char(new_char),
             InputAction::Delete => self.popup.delete_input_char(),
@@ -399,7 +415,10 @@ impl App {
 
     fn handle_validator_actions(&mut self, action: ValidatorAction) {
         match action {
-            ValidatorAction::SubmitChill => self.chill_attempt(),
+            ValidatorAction::SubmitChill => {
+                info!("___chill_attempt_1");
+                self.chill_attempt()
+            }
             ValidatorAction::SubmitBond => {}
             ValidatorAction::SubmitUnbond => {}
             ValidatorAction::SubmitChangeRewardDestination => {}
@@ -457,7 +476,7 @@ impl App {
     }
 
     /// Handles application errors.
-    pub fn error(&self, err: Box<dyn std::error::Error>) {
+    pub fn error(&self, err: Error) {
         error!("{}", err);
     }
 
@@ -559,13 +578,11 @@ impl App {
         match self.section {
             Section::Validators => {
                 self.popup.show();
+                // Dispatch focus to the input field
+                let _ = self.tx.send(Action::Input(InputAction::Editing));
             }
             _ => {}
         };
-
-        if self.popup.is_visible() {
-            self.focus = Focus::Popup;
-        }
     }
 
     /// Close menu popup
@@ -579,6 +596,7 @@ impl App {
 
     /// Confirm popup/list entry
     pub fn confirm(&mut self) {
+        warn!("__confirm_entry");
         if !self.popup.is_visible() {
             return;
         }
@@ -592,12 +610,28 @@ impl App {
                                 _ => {}
                             },
                             Command::Instruction(call) => match call {
-                                popup::Staking::Chill => self.chill_attempt(),
+                                Call::Chill(_) => self.chill_attempt(),
                                 _ => {}
                             },
                         }
                     }
                 }
+                // popup::Mode::Details => {
+                //     if let Some(entry) = self.popup.get_selected() {
+                //         match entry.get_command() {
+                //             Command::Text(text) => match text.as_str() {
+                //                 "cancel" => self.cancel(),
+                //                 _ => {}
+                //             },
+                //             Command::Instruction(call) => match call {
+                //                 popup::Staking::Chill(bytes) => {
+                //                     warn!("__chill_details {bytes:?}");
+                //                 }
+                //                 _ => {}
+                //             },
+                //         }
+                //     }
+                // }
                 popup::Mode::Confirm => {
                     if let Some(entry) = self.popup.get_selected() {
                         match entry.get_command() {
@@ -645,12 +679,20 @@ impl App {
 
     /// Try chill instruction
     pub fn chill_attempt(&mut self) {
-        match self.section {
-            Section::Validators => {
-                self.popup.confirm_chill_attempt();
+        info!("__chill_attempt");
+        if let Some(ctx) = self.context() {
+            let stash = ctx.validator.key().stash();
+            let result = ctx.runtime.remark_with_event(&ctx.api, &stash);
+            match result {
+                Ok(bytes) => {
+                    self.popup.show_chill_details(bytes);
+                }
+                //
+                Err(err) => {
+                    self.error(err);
+                }
             }
-            _ => {}
-        };
+        }
     }
 
     /// Sign and Submit transaction
@@ -667,23 +709,18 @@ impl App {
                 Command::Instruction(call) => {
                     if let Some(validator) = self.validators.get_selected() {
                         match call {
-                            popup::Staking::Chill => {
+                            Call::Chill(bytes) => {
                                 let runtime = validator.runtime().asset_hub_runtime();
                                 if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
                                     let api = chain.client();
-                                    let account_key = validator.key();
+                                    // let account_key = validator.key();
                                     // TODO: Implement spawn_call_chill
 
                                     let result = self.popup.execute_with_password(
                                         |password| -> Result<(), TuiError> {
                                             let signer = suno_signer::load_keypair(password)?;
-
                                             sync::spawn_call_remark(
-                                                &api,
-                                                &runtime,
-                                                &signer,
-                                                &account_key,
-                                                &self.tx,
+                                                &api, &runtime, &signer, &bytes, &self.tx,
                                             );
 
                                             Ok(())
@@ -703,6 +740,27 @@ impl App {
                 }
                 _ => {}
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Context {
+    api: OnlineClient<SubstrateConfig>,
+    runtime: SupportedRuntime,
+    validator: Validator,
+}
+
+impl Context {
+    fn new(
+        api: OnlineClient<SubstrateConfig>,
+        runtime: SupportedRuntime,
+        validator: Validator,
+    ) -> Self {
+        Self {
+            api,
+            runtime,
+            validator,
         }
     }
 }

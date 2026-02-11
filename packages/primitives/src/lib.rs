@@ -5,6 +5,7 @@ pub mod key;
 pub mod node_account;
 pub mod staking;
 pub mod storage;
+pub mod tx;
 pub mod validator;
 pub use babe::Epoch;
 pub use key::AccountKey;

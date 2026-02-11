@@ -2,8 +2,8 @@ use strum::{Display, EnumIter, FromRepr};
 
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
 pub enum Window {
-    Main,
     #[default]
+    Main,
     Logs,
 }
 

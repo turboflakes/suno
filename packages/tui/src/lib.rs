@@ -5,10 +5,11 @@ use crate::app::{App, AppResult};
 
 pub mod app;
 mod bridge;
+mod call;
+mod entry;
 mod error;
 mod event;
 mod handler;
-mod menu;
 mod section;
 mod theme;
 mod tui;

@@ -10,50 +10,69 @@ use suno_primitives::{AccountKey, Response};
 
 #[async_trait]
 pub trait RuntimeCaller {
-    async fn remark_with_event(
+    async fn sign_and_submit(
         &self,
         api: &OnlineClient<SubstrateConfig>,
-        stash: &AccountId32,
         signer: &Keypair,
+        call_data: Vec<u8>,
     ) -> Result<Response, Error>;
 
-    async fn staking_chill(
+    fn remark_with_event(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         stash: &AccountId32,
-        signer: &Keypair,
-    ) -> Result<Response, Error>;
+    ) -> Result<Vec<u8>, Error>;
+
+    // async fn staking_chill(
+    //     &self,
+    //     api: &OnlineClient<SubstrateConfig>,
+    //     stash: &AccountId32,
+    //     signer: &Keypair,
+    // ) -> Result<Response, Error>;
 }
 
 #[async_trait]
 impl RuntimeCaller for Runtime {
-    async fn remark_with_event(
+    async fn sign_and_submit(
         &self,
         api: &OnlineClient<SubstrateConfig>,
-        stash: &AccountId32,
         signer: &Keypair,
+        call_data: Vec<u8>,
     ) -> Result<Response, Error> {
         match &self {
             Runtime::AssetHubPaseo => {
-                let xt = suno_asset_hub_paseo::extrinsics::remark_with_event("some_test".into());
-                suno_asset_hub_paseo::submit_as_proxy(&api, xt, stash, signer).await
+                suno_asset_hub_paseo::sign_and_submit_call_data(&api, signer, call_data).await
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }
 
-    async fn staking_chill(
+    fn remark_with_event(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         stash: &AccountId32,
-        signer: &Keypair,
-    ) -> Result<Response, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match &self {
             Runtime::AssetHubPaseo => {
-                let xt = suno_asset_hub_paseo::extrinsics::chill();
-                suno_asset_hub_paseo::submit_as_proxy(&api, xt, stash, signer).await
+                let call = suno_asset_hub_paseo::extrinsics::remark_with_event("some_test".into());
+                suno_asset_hub_paseo::wrap_call_into_proxy(&api, call, stash)
             }
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }
+
+    // async fn staking_chill(
+    //     &self,
+    //     api: &OnlineClient<SubstrateConfig>,
+    //     stash: &AccountId32,
+    //     signer: &Keypair,
+    // ) -> Result<Response, Error> {
+    //     match &self {
+    //         Runtime::AssetHubPaseo => {
+    //             let call = suno_asset_hub_paseo::extrinsics::chill();
+    //             suno_asset_hub_paseo::submit_as_proxy(&api, call, stash, signer).await
+    //         }
+    //         _ => Err(Error::UnsupportedRuntime(self.clone())),
+    //     }
+    // }
 }

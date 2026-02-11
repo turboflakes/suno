@@ -1,80 +1,30 @@
-use crate::menu::{AsChar, Command, Entry, ToDescription};
+use crate::call::Call;
+use crate::entry::{AsChar, Command, Entry, ToDescription, ToHex, ToPlaceholder};
 use crate::theme::THEME;
-use crate::widgets::input::InputWidget;
+use crate::widgets::input_field::InputFieldWidget;
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
-    style::{Color, Style, Styled},
-    text::Line,
+    style::{Color, Modifier, Style, Styled},
+    text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget,
+        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
+        TableState, Widget, Wrap,
     },
 };
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
+use suno_primitives::tx::Bytes;
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Mode {
     #[default]
     Menu,
+    Details,
     Confirm,
     Transaction,
-}
-
-// Popup Call definitions
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Staking {
-    Chill,
-    Bond,
-    Unbond,
-    ChangeRewardDestination,
-    ChangeCommission,
-    KickNominators,
-    SetSessionKey,
-}
-
-impl AsChar for Staking {
-    fn as_char(&self) -> char {
-        match self {
-            Self::Chill => 'c',
-            Self::Bond => 'b',
-            Self::Unbond => 'u',
-            Self::ChangeRewardDestination => 'r',
-            Self::ChangeCommission => 'f',
-            Self::KickNominators => 'k',
-            Self::SetSessionKey => 's',
-        }
-    }
-}
-
-impl ToDescription for Staking {
-    fn description(&self) -> String {
-        match self {
-            Self::Chill => "Declare no intention to validate".to_string(),
-            Self::Bond => "Bond more funds".to_string(),
-            Self::Unbond => "Unbond funds".to_string(),
-            Self::ChangeRewardDestination => "Change reward destination".to_string(),
-            Self::ChangeCommission => "Change commission".to_string(),
-            Self::KickNominators => "Kick nominators".to_string(),
-            Self::SetSessionKey => "Change session keys".to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for Staking {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Chill => write!(f, "staking.chill"),
-            Self::Bond => write!(f, "staking.bond"),
-            Self::Unbond => write!(f, "staking.unbond"),
-            Self::ChangeRewardDestination => write!(f, "staking.change_reward_destination"),
-            Self::ChangeCommission => write!(f, "staking.change_commission"),
-            Self::KickNominators => write!(f, "staking.kick_nominators"),
-            Self::SetSessionKey => write!(f, "session.set_session_key"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -84,14 +34,14 @@ pub struct PopupWidget {
 
 #[derive(Debug)]
 pub struct ListState {
-    options: Vec<Entry<Staking>>,
+    options: Vec<Entry<Call>>,
     table_state: TableState,
     is_visible: bool,
     mode: Mode,
     spinner_frames: Vec<&'static str>,
     spinner_start_time: Instant,
     spinner_counter: usize,
-    input: InputWidget,
+    input: InputFieldWidget,
 }
 
 impl Default for ListState {
@@ -104,7 +54,7 @@ impl Default for ListState {
             spinner_frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
             spinner_start_time: Instant::now(),
             spinner_counter: 0,
-            input: InputWidget::new(),
+            input: InputFieldWidget::new(),
         }
     }
 }
@@ -124,15 +74,52 @@ impl ListState {
     pub fn get_input_cursor_position(&self) -> Option<Position> {
         self.input.get_cursor_position()
     }
+
+    pub fn get_selected(&self) -> Option<Entry<Call>> {
+        self.table_state.selected().map(|i| self.options[i].clone())
+    }
+
+    pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
+        let input_value = self.input.value();
+        let input_command = match input_value.split_once(' ') {
+            None => input_value.as_str(),
+            Some((command, _)) => command,
+        };
+
+        self.options
+            .iter()
+            .filter(|e| e.command().to_lowercase().starts_with(&input_command))
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_selected_call(&self) -> Option<Call> {
+        let options = self.get_options_filtered();
+        options
+            .iter()
+            .next()
+            .map(|e| match e.get_command() {
+                Command::Instruction(call) => Some(call),
+                _ => None,
+            })
+            .flatten()
+    }
 }
 
 impl PopupWidget {
-    pub fn on_init(&self, mode: Mode, call: Option<Staking>) {
+    pub fn on_init(&self, mode: Mode, call: Option<Call>) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
         state.mode = mode.clone();
         match mode {
             Mode::Menu => self.init_menu(&mut state),
+            Mode::Details => {
+                if call.is_none() {
+                    self.on_err("No call provided for details mode".into());
+                    return;
+                }
+                self.update_details(&mut state, call.unwrap())
+            }
             Mode::Confirm => {
                 if call.is_none() {
                     self.on_err("No call provided for confirmation mode".into());
@@ -166,36 +153,40 @@ impl PopupWidget {
     }
 
     fn init_menu(&self, state: &mut ListState) {
-        // Note: match entries with the keys defined in the `handle_key_events` function.
         state
             .options
-            .push(Entry::new(Command::Instruction(Staking::Chill)));
+            .push(Entry::new(Command::Instruction(Call::Bond)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Staking::Bond)));
-        state.options.push(Entry::new(Command::Instruction(
-            Staking::ChangeRewardDestination,
-        )));
+            .push(Entry::new(Command::Instruction(Call::ChangeCommission)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Staking::ChangeCommission)));
+            .push(Entry::new(Command::Instruction(Call::ChangePayee)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Staking::KickNominators)));
+            .push(Entry::new(Command::Instruction(Call::Chill(Bytes::new()))));
         state
             .options
-            .push(Entry::new(Command::Instruction(Staking::SetSessionKey)));
+            .push(Entry::new(Command::Instruction(Call::KickNominators)));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::SetSessionKey)));
     }
 
-    fn init_confirmation(&self, state: &mut ListState, call: Staking) {
+    fn update_details(&self, state: &mut ListState, call: Call) {
         match call {
-            Staking::Chill => self.init_chill(state),
-            // Staking::Bond => self.init_bond(state),
-            // Staking::Unbond => self.init_unbond(state),
-            // Staking::ChangeRewardDestination => self.init_change_reward_destination(state),
-            // Staking::ChangeCommission => self.init_change_commission(state),
-            // Staking::KickNominators => self.init_kick_nominators(state),
-            // Staking::SetSessionKey => self.init_set_session_key(state),
+            Call::Chill(bytes) => {
+                // self.init_chill(state)
+                state
+                    .options
+                    .push(Entry::new(Command::Instruction(Call::Chill(bytes))));
+            }
+            // Call::Bond => self.init_bond(state),
+            // Call::Unbond => self.init_unbond(state),
+            // Call::ChangeRewardDestination => self.init_change_reward_destination(state),
+            // Call::ChangeCommission => self.init_change_commission(state),
+            // Call::KickNominators => self.init_kick_nominators(state),
+            // Call::SetSessionKey => self.init_set_session_key(state),
             _ => {
                 warn!("Unsupported call: {:?}", call);
                 return;
@@ -203,16 +194,33 @@ impl PopupWidget {
         }
     }
 
-    fn init_chill(&self, state: &mut ListState) {
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Staking::Chill)));
-        state
-            .options
-            .push(Entry::new(Command::Text("cancel".to_string())));
+    // DEPRECATE
+    fn init_confirmation(&self, state: &mut ListState, call: Call) {
+        match call {
+            // Call::Chill(_) => self.init_chill(state),
+            // Call::Bond => self.init_bond(state),
+            // Call::Unbond => self.init_unbond(state),
+            // Call::ChangeRewardDestination => self.init_change_reward_destination(state),
+            // Call::ChangeCommission => self.init_change_commission(state),
+            // Call::KickNominators => self.init_kick_nominators(state),
+            // Call::SetSessionKey => self.init_set_session_key(state),
+            _ => {
+                warn!("Unsupported call: {:?}", call);
+                return;
+            }
+        }
     }
 
-    pub fn move_down(&self) -> Option<Entry<Staking>> {
+    // fn init_chill(&self, state: &mut ListState) {
+    //     state
+    //         .options
+    //         .push(Entry::new(Command::Instruction(Call::Chill)));
+    //     state
+    //         .options
+    //         .push(Entry::new(Command::Text("cancel".to_string())));
+    // }
+
+    pub fn move_down(&self) -> Option<Entry<Call>> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == state.options.len() - 1 {
@@ -229,7 +237,7 @@ impl PopupWidget {
         }
     }
 
-    pub fn move_up(&self) -> Option<Entry<Staking>> {
+    pub fn move_up(&self) -> Option<Entry<Call>> {
         let mut state = self.state.write().unwrap();
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
@@ -261,12 +269,19 @@ impl PopupWidget {
         state.is_visible = false;
     }
 
-    pub fn get_selected(&self) -> Option<Entry<Staking>> {
+    pub fn get_selected(&self) -> Option<Entry<Call>> {
         let state = self.state.read().unwrap();
-        state
-            .table_state
-            .selected()
-            .map(|i| state.options[i].clone())
+        state.get_selected()
+    }
+
+    pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
+        let state = self.state.read().unwrap();
+        state.get_options_filtered()
+    }
+
+    pub fn get_selected_call(&self) -> Option<Call> {
+        let state = self.state.read().unwrap();
+        state.get_selected_call()
     }
 
     pub fn get_mode(&self) -> Mode {
@@ -287,8 +302,8 @@ impl PopupWidget {
             .push(Entry::new(Command::Text(message.to_string())));
     }
 
-    pub fn confirm_chill_attempt(&self) {
-        self.on_init(Mode::Confirm, Some(Staking::Chill));
+    pub fn show_chill_details(&self, bytes: Vec<u8>) {
+        self.on_init(Mode::Details, Some(Call::Chill(bytes)));
     }
 
     // Input actions
@@ -322,6 +337,13 @@ impl PopupWidget {
         state.input.move_cursor_right();
     }
 
+    pub fn set_input_autocomplete(&self) {
+        let mut state = self.state.write().unwrap();
+        if let Some(call) = state.get_selected_call() {
+            state.input.set_value(call.to_string());
+        }
+    }
+
     pub fn execute_with_password<F, R, E>(&self, f: F) -> Result<R, E>
     where
         F: FnOnce(&str) -> Result<R, E>,
@@ -349,6 +371,7 @@ impl Widget for &PopupWidget {
 
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
+            Mode::Details => render_details(area, buf, &mut state),
             Mode::Confirm => render_confirmation(area, buf, &mut state),
             Mode::Transaction => render_transaction(area, buf, &mut state),
         }
@@ -356,28 +379,93 @@ impl Widget for &PopupWidget {
 }
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
-    let block = Block::new()
-        .title(" Commands ")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain);
+    // Split the area into main body to show all options, and footer to show the input field
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(6),    // Details
+            Constraint::Length(3), // InputField as command mode (label + input)
+        ])
+        .split(area);
 
-    let rows = state
-        .options
-        .iter()
-        .map(|f| f.to_row(state.mode.clone(), None));
+    let block = Block::new()
+        .set_style(THEME.block.active)
+        .padding(Padding::symmetric(0, 1));
+
+    let options = state.get_options_filtered();
+    let rows = options.iter().map(|e| e.to_row(state.mode.clone(), None));
+
     let widths = [
-        Constraint::Length(4),
+        Constraint::Length(2),
         Constraint::Fill(1),
         Constraint::Fill(2),
+        Constraint::Length(2),
     ];
 
+    let header_labels = vec!["", "command", "description", ""];
+
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_visible))
         .block(block)
-        .header(Row::new(vec!["Key", "Extrinsic", "Description"]).set_style(THEME.table.header))
+        .header(Row::new(header_labels).set_style(THEME.table.header))
+        .style(THEME.table.base)
         .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
-    StatefulWidget::render(table, area, buf, &mut state.table_state);
+    // NOTE: ensure that the selected entry is always the first one on the list
+    state.table_state.select(Some(0));
+
+    StatefulWidget::render(table, area[0], buf, &mut state.table_state);
+
+    let call = state.get_selected_call();
+
+    // Render input area
+    state.input.as_command(call).render(area[1], buf);
+}
+
+fn render_details(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+    // Split the area into header to show transaction details and password input area
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(6),    // Details
+            Constraint::Length(3), // InputField as password mode (label + input)
+        ])
+        .split(area);
+
+    // NOTE: Should only be one entry when rendering details
+    if let Some(entry) = state.options.get(0) {
+        let extrinsic = Line::from(vec![
+            Span::styled(
+                "extrinsic ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!("<{}>", entry.command())),
+        ]);
+
+        let call_data_label = Line::from(vec![
+            Span::styled(
+                "call data ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("ctrl+y copy", Style::default().fg(Color::Yellow)),
+        ]);
+        let call_data = Line::from(entry.to_hex());
+
+        let details = Paragraph::new(vec![extrinsic, call_data_label, call_data])
+            .block(
+                Block::new()
+                    .padding(Padding::proportional(1))
+                    .style(Style::default().bg(Color::Rgb(52, 50, 51))),
+            )
+            .wrap(Wrap { trim: false });
+        details.render(area[0], buf);
+    }
+
+    // Render input area
+    state.input.as_password().render(area[1], buf);
 }
 
 // DEPRECATED
@@ -393,7 +481,7 @@ fn _render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .map(|f| f.to_row(state.mode.clone(), None));
     let widths = [Constraint::Length(24), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_visible))
+        .style(THEME.table.base)
         .block(block)
         .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
@@ -419,7 +507,7 @@ fn render_confirmation(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     details.render(area[0], buf);
 
     // Render input area
-    state.input.render(area[1], buf);
+    state.input.as_password().render(area[1], buf);
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
@@ -434,49 +522,51 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .map(|f| f.to_row(state.mode.clone(), Some(&spinner_progress)));
     let widths = [Constraint::Length(7), Constraint::Fill(1)];
     let table = Table::new(rows, widths)
-        .style(THEME.table.base(state.is_visible))
+        .style(THEME.table.base)
         .block(block);
     // .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
-impl<T: AsChar + std::fmt::Display + ToDescription + Clone> Entry<T> {
-    pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
-        let command = self.get_command();
-        match command {
-            Command::Instruction(c) => {
-                let mut cols = Vec::new();
+// impl<T: AsChar + std::fmt::Display + ToDescription + ToPlaceholder + ToHex + Clone> Entry<T> {
+//     pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
+//         let command = self.get_command();
+//         match command {
+//             Command::Instruction(c) => {
+//                 let mut cols = Vec::new();
 
-                // Add menu-specific formatting
-                match mode {
-                    Mode::Menu => {
-                        cols.push(c.as_char().to_string());
-                        cols.push(c.to_string());
-                        cols.push(c.description());
-                    }
-                    Mode::Confirm => {
-                        cols.push(c.to_string());
-                        cols.push(c.description());
-                    }
-                    _ => {}
-                }
+//                 // Add menu-specific formatting
+//                 match mode {
+//                     Mode::Menu => {
+//                         cols.push("".to_string());
+//                         // cols.push(c.as_char().to_string());
+//                         cols.push(c.to_string());
+//                         cols.push(c.description());
+//                         cols.push("".to_string());
+//                     }
+//                     Mode::Confirm => {
+//                         cols.push(c.to_string());
+//                         cols.push(c.description());
+//                     }
+//                     _ => {}
+//                 }
 
-                Row::new(cols)
-            }
-            Command::Text(t) => match mode {
-                Mode::Transaction => {
-                    let mut cols = Vec::new();
+//                 Row::new(cols)
+//             }
+//             Command::Text(t) => match mode {
+//                 Mode::Transaction => {
+//                     let mut cols = Vec::new();
 
-                    cols.push(Cell::from(msg.unwrap_or("").to_string()));
-                    cols.push(Cell::from(
-                        Line::from(format!("[{t}]")).alignment(Alignment::Right),
-                    ));
+//                     cols.push(Cell::from(msg.unwrap_or("").to_string()));
+//                     cols.push(Cell::from(
+//                         Line::from(format!("[{t}]")).alignment(Alignment::Right),
+//                     ));
 
-                    Row::new(cols)
-                }
-                _ => Row::new(vec![t.to_string()]),
-            },
-        }
-    }
-}
+//                     Row::new(cols)
+//                 }
+//                 _ => Row::new(vec![t.to_string()]),
+//             },
+//         }
+//     }
+// }

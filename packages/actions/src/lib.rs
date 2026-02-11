@@ -8,6 +8,7 @@ use suno_primitives::{
     babe::Epoch,
     identity::Identity,
     staking::{Era, StakeLedger, StakeOverview},
+    tx::Bytes,
     validator::ValidatorStatus,
     AccountKey,
 };
@@ -58,6 +59,7 @@ pub enum PopupAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputAction {
     Submit,
+    AutoComplete,
     Char(char),
     Delete,
     CursorLeft,

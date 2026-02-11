@@ -88,6 +88,7 @@ pub enum Response {
 }
 
 // Some constructors for convenience
+
 impl Response {
     pub fn era(era: Era) -> Self {
         Response::Era(Data::new(era))

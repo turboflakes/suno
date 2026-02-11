@@ -48,6 +48,7 @@ pub struct Theme {
     pub table: Table,
     pub paragraph: Paragraph,
     pub scrollbar: Scrollbar,
+    pub input: Input,
 }
 
 pub struct Block {
@@ -150,6 +151,33 @@ pub struct Scrollbar {
     pub base: Style,
 }
 
+pub struct Input {
+    pub base: Style,
+    pub base_active: Style,
+    pub label: Style,
+    pub placeholder: Style,
+    pub prefix: Style,
+    pub prefix_active: Style,
+}
+
+impl Input {
+    pub fn base(&self, active: bool) -> Style {
+        if active {
+            self.base_active
+        } else {
+            self.base
+        }
+    }
+
+    pub fn prefix(&self, active: bool) -> Style {
+        if active {
+            self.prefix_active
+        } else {
+            self.prefix
+        }
+    }
+}
+
 pub const THEME: Theme = Theme {
     block: Block {
         base: Style::new().bg(GRAY_70).fg(GRAY_20),
@@ -176,5 +204,16 @@ pub const THEME: Theme = Theme {
     },
     scrollbar: Scrollbar {
         base: Style::new().fg(GRAY_20),
+    },
+    input: Input {
+        base: Style::new().bg(GRAY_90).fg(GRAY_40),
+        base_active: Style::new()
+            .bg(GRAY_90)
+            .fg(GRAY_20)
+            .add_modifier(Modifier::SLOW_BLINK),
+        label: Style::new().fg(YELLOW_60).add_modifier(Modifier::BOLD),
+        placeholder: Style::new().fg(GRAY_50),
+        prefix: Style::new().fg(YELLOW_90),
+        prefix_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
     },
 };

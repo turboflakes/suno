@@ -559,19 +559,19 @@ pub fn spawn_call_remark(
     api: &OnlineClient<SubstrateConfig>,
     runtime: &SupportedRuntime,
     signer: &Keypair,
-    key: &AccountKey,
+    call_data: &Vec<u8>,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
     let signer = signer.clone();
-    let stash = key.stash().clone();
+    let call_data = call_data.clone();
 
     let _ = tx.send(Action::Transaction(TxAction::Processing));
 
     tokio::spawn(async move {
-        let result = runtime.remark_with_event(&api, &stash, &signer).await;
+        let result = runtime.sign_and_submit(&api, &signer, call_data).await;
         match result {
             Ok(response) => {
                 if let Err(e) = dispatch_response_action(response, &runtime, &tx) {

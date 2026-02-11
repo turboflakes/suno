@@ -1,16 +1,17 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Position, Rect},
-    prelude::Margin,
-    style::{Color, Style, Styled},
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
-};
+use crate::call::Call;
+use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
+use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
 use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Zeroize)]
-pub struct Input {
+pub struct InputField {
+    /// Label of the input field
+    #[zeroize(skip)]
+    label: Option<String>,
+    /// Placeholder of the input field
+    #[zeroize(skip)]
+    placeholder: Option<String>,
     /// Current value of the input box
     input: Zeroizing<String>,
     /// Position of cursor in the editor area.
@@ -18,6 +19,9 @@ pub struct Input {
     /// Current input mode
     #[zeroize(skip)]
     mode: Mode,
+    /// Current input type
+    #[zeroize(skip)]
+    r#type: Type,
     /// Track the calculated screen position for the cursor
     #[zeroize(skip)]
     cursor_position: Option<Position>,
@@ -30,18 +34,56 @@ pub enum Mode {
     Editing,
 }
 
-impl Input {
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum Type {
+    #[default]
+    Text,
+    Password,
+}
+
+impl InputField {
     pub fn new() -> Self {
         Self {
+            label: None,
+            placeholder: None,
             input: Zeroizing::new(String::new()),
             mode: Mode::default(),
+            r#type: Type::default(),
             character_index: 0,
             cursor_position: None,
         }
     }
 
+    pub fn label(&self) -> Option<String> {
+        self.label.clone()
+    }
+
+    fn masked_input(&self) -> String {
+        "*".repeat(self.input.chars().count())
+    }
+
+    pub fn value(&self) -> String {
+        if self.r#type == Type::Password {
+            self.masked_input()
+        } else {
+            self.input.trim().to_string()
+        }
+    }
+
     pub fn cursor_position(&self) -> Option<Position> {
         self.cursor_position
+    }
+
+    pub fn character_index(&self) -> usize {
+        self.character_index
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty()
+    }
+
+    pub fn is_editing(&self) -> bool {
+        self.mode == Mode::Editing
     }
 
     fn move_cursor_left(&mut self) {
@@ -83,29 +125,22 @@ impl Input {
                 self.move_cursor_left();
             }
         }
-        // let is_not_cursor_leftmost = self.character_index != 0;
-        // if is_not_cursor_leftmost {
-        //     // Method "remove" is not used on the saved text for deleting the selected char.
-        //     // Reason: Using remove on String works on bytes instead of the chars.
-        //     // Using remove would require special care because of char boundaries.
-
-        //     let current_index = self.character_index;
-        //     let from_left_to_current_index = current_index - 1;
-
-        //     // Getting all characters before the selected character.
-        //     let before_char_to_delete = self.input.chars().take(from_left_to_current_index);
-        //     // Getting all characters after selected character.
-        //     let after_char_to_delete = self.input.chars().skip(current_index);
-
-        //     // Put all characters together except the selected one.
-        //     // By leaving the selected one out, it is forgotten and therefore deleted.
-        //     self.input = before_char_to_delete.chain(after_char_to_delete).collect();
-        //     self.move_cursor_left();
-        // }
     }
 
     fn clamp_cursor(&self, new_pos: usize) -> usize {
         new_pos.clamp(0, self.input.chars().count())
+    }
+
+    pub fn set_cursor_position(&mut self, position: Position) {
+        self.cursor_position = Some(position);
+    }
+
+    pub fn reset_cursor_position(&mut self) {
+        self.cursor_position = None;
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.mode == Mode::Editing
     }
 
     const fn set_focus(&mut self) {
@@ -116,8 +151,22 @@ impl Input {
         self.mode = Mode::Normal;
     }
 
-    const fn reset_cursor(&mut self) {
+    fn set_value(&mut self, value: String) {
+        self.character_index = value.chars().count();
+        if let Some(old_pos) = self.cursor_position {
+            let new_pos = Position::new(old_pos.x + self.character_index as u16, old_pos.y + 1);
+
+            self.cursor_position = Some(new_pos);
+        }
+        self.input = Zeroizing::new(value);
+    }
+
+    const fn _reset_cursor(&mut self) {
         self.character_index = 0;
+    }
+
+    const fn as_password(&mut self) {
+        self.r#type = Type::Password;
     }
 
     /// Wipes the string content immediately.
@@ -130,20 +179,47 @@ impl Input {
 }
 
 #[derive(Debug)]
-pub struct InputWidget {
-    state: Arc<RwLock<Input>>,
+pub struct InputFieldWidget {
+    state: Arc<RwLock<InputField>>,
 }
 
-impl InputWidget {
+impl InputFieldWidget {
+    pub fn as_password(&self) -> InputPasswordWidget {
+        let mut state = self.state.write().unwrap();
+        state.as_password();
+        InputPasswordWidget {
+            state: self.state.clone(),
+        }
+    }
+
+    pub fn as_command(&self, call: Option<Call>) -> InputCommandWidget {
+        InputCommandWidget {
+            state: self.state.clone(),
+            call,
+        }
+    }
+}
+
+impl InputFieldWidget {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(RwLock::new(Input::default())),
+            state: Arc::new(RwLock::new(InputField::new())),
         }
+    }
+
+    pub fn value(&self) -> String {
+        let state = self.state.read().unwrap();
+        state.value()
     }
 
     pub fn get_cursor_position(&self) -> Option<Position> {
         let state = self.state.read().unwrap();
         state.cursor_position()
+    }
+
+    pub fn set_value(&mut self, value: String) {
+        let mut state = self.state.write().unwrap();
+        state.set_value(value);
     }
 
     pub fn set_focus(&mut self) {
@@ -185,39 +261,5 @@ impl InputWidget {
         state.cleanup();
 
         result
-    }
-}
-
-impl Widget for &InputWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
-
-        let input_rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(3)])
-            .split(area);
-
-        let label = Text::from(Line::from("Password:")).patch_style(Style::default());
-        label.render(input_rows[1], buf);
-
-        // Note: if input type is password, mask the input
-        let masked_input: String = "*".repeat(state.input.chars().count());
-        let input = Paragraph::new(masked_input)
-            .style(match state.mode {
-                Mode::Normal => Style::default(),
-                Mode::Editing => Style::default().fg(Color::Yellow),
-            })
-            .block(Block::bordered().title("password"));
-        input.render(input_rows[1], buf);
-
-        // Calculate and save the cursor position into the state
-        if state.mode == Mode::Editing {
-            state.cursor_position = Some(Position::new(
-                input_rows[1].x + state.character_index as u16 + 1,
-                input_rows[1].y + 1,
-            ));
-        } else {
-            state.cursor_position = None;
-        }
     }
 }
