@@ -5,7 +5,7 @@ use crate::widgets::input_field::InputFieldWidget;
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
     style::{Color, Modifier, Style, Styled},
     text::{Line, Span},
     widgets::{
@@ -379,21 +379,25 @@ impl Widget for &PopupWidget {
 }
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
-    // Split the area into main body to show all options, and footer to show the input field
-    let area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(6),    // Details
-            Constraint::Length(3), // InputField as command mode (label + input)
-        ])
-        .split(area);
-
+    
     let block = Block::new()
         .set_style(THEME.block.active)
         .padding(Padding::symmetric(0, 1));
 
     let options = state.get_options_filtered();
     let rows = options.iter().map(|e| e.to_row(state.mode.clone(), None));
+
+    // Split the area into top header to show all options, a small central box to show the input field
+    // TODO: And a bottom footer to show the extrinsic encoded data
+    let top_len = (options.len() as u16 + 3).clamp(4, 10);
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(top_len), // Top header
+            Constraint::Length(3),    // InputField as command mode (label + input)
+        ])
+        .flex(Flex::End)
+        .split(area);
 
     let widths = [
         Constraint::Length(2),
@@ -529,44 +533,43 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
-// impl<T: AsChar + std::fmt::Display + ToDescription + ToPlaceholder + ToHex + Clone> Entry<T> {
-//     pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
-//         let command = self.get_command();
-//         match command {
-//             Command::Instruction(c) => {
-//                 let mut cols = Vec::new();
+impl<T: std::fmt::Display + ToDescription + ToPlaceholder + ToHex + Clone> Entry<T> {
+    pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
+        let command = self.get_command();
+        match command {
+            Command::Instruction(c) => {
+                let mut cols = Vec::new();
 
-//                 // Add menu-specific formatting
-//                 match mode {
-//                     Mode::Menu => {
-//                         cols.push("".to_string());
-//                         // cols.push(c.as_char().to_string());
-//                         cols.push(c.to_string());
-//                         cols.push(c.description());
-//                         cols.push("".to_string());
-//                     }
-//                     Mode::Confirm => {
-//                         cols.push(c.to_string());
-//                         cols.push(c.description());
-//                     }
-//                     _ => {}
-//                 }
+                // Add menu-specific formatting
+                match mode {
+                    Mode::Menu => {
+                        cols.push("".to_string());
+                        cols.push(format!("/{}", c.to_string()));
+                        cols.push(c.description());
+                        cols.push("".to_string());
+                    }
+                    Mode::Confirm => {
+                        cols.push(c.to_string());
+                        cols.push(c.description());
+                    }
+                    _ => {}
+                }
 
-//                 Row::new(cols)
-//             }
-//             Command::Text(t) => match mode {
-//                 Mode::Transaction => {
-//                     let mut cols = Vec::new();
+                Row::new(cols)
+            }
+            Command::Text(t) => match mode {
+                Mode::Transaction => {
+                    let mut cols = Vec::new();
 
-//                     cols.push(Cell::from(msg.unwrap_or("").to_string()));
-//                     cols.push(Cell::from(
-//                         Line::from(format!("[{t}]")).alignment(Alignment::Right),
-//                     ));
+                    cols.push(Cell::from(msg.unwrap_or("").to_string()));
+                    cols.push(Cell::from(
+                        Line::from(format!("[{t}]")).alignment(Alignment::Right),
+                    ));
 
-//                     Row::new(cols)
-//                 }
-//                 _ => Row::new(vec![t.to_string()]),
-//             },
-//         }
-//     }
-// }
+                    Row::new(cols)
+                }
+                _ => Row::new(vec![t.to_string()]),
+            },
+        }
+    }
+}
