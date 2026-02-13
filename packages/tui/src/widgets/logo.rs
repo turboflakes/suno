@@ -57,7 +57,7 @@ impl Widget for &Logo {
         let logo = self.size.as_str();
         let block = Block::default()
             .style(THEME.block.menu_bottom)
-            .padding(Padding::new(2, 0, 0, 1));
+            .padding(Padding::new(2, 0, 1, 1));
         Paragraph::new(logo).block(block).render(area, buf);
     }
 }

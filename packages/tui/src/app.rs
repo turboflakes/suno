@@ -178,6 +178,7 @@ impl App {
             NavigationAction::MoveDown => self.move_down(),
             NavigationAction::NextTab => self.next_tab(),
             NavigationAction::PrevTab => self.prev_tab(),
+            NavigationAction::Reset => self.reset_selection(),
         }
     }
 
@@ -670,6 +671,13 @@ impl App {
             },
             _ => {}
         };
+    }
+
+    /// Reset selection instruction.
+    pub fn reset_selection(&mut self) {
+        self.chains.set_active(false);
+        self.validators.set_active(false);
+        self.collators.set_active(false);
     }
 
     /// Cancel instruction.

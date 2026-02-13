@@ -8,17 +8,29 @@ use suno_actions::{
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
     info!("Key event: {:?}", key_event);
+
+    // Check for pressed ctrl + shift + key combination first
+    if key_event
+        .modifiers
+        .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+    {
+        return match key_event.code {
+            // Select previous main window/tab
+            KeyCode::Char('t') => Action::Navigation(NavigationAction::PrevTab),
+            _ => Action::System(SystemAction::Noop),
+        };
+    }
+    // Check for pressed ctrl + key
     match key_event.modifiers {
         KeyModifiers::CONTROL => {
             match key_event.code {
-                // Exit application on `Ctrl-C`
-                KeyCode::Char('c') | KeyCode::Char('C') => Action::System(SystemAction::Quit),
+                // Exit application on ctrl-c`
+                KeyCode::Char('c') => Action::System(SystemAction::Quit),
+                // Open popup on `ctrl-e` within the active section
+                KeyCode::Char('e') => Action::Popup(PopupAction::Open),
+                // Select next main window/tab
+                KeyCode::Char('t') => Action::Navigation(NavigationAction::NextTab),
                 _ => match app_focus {
-                    Focus::Popup => match key_event.code {
-                        KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
-                        KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
-                        _ => Action::System(SystemAction::Noop),
-                    },
                     Focus::Main => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),
                         KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
@@ -30,11 +42,6 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 },
             }
         }
-        // TODO: It seems that `command` key on macos is not implemented for SUPER key modifiers
-        KeyModifiers::ALT => match key_event.code {
-            KeyCode::Tab => Action::Navigation(NavigationAction::NextTab),
-            _ => Action::System(SystemAction::Noop),
-        },
         _ => handle_key_events_without_modifiers(key_event, app_focus),
     }
 }
@@ -50,8 +57,6 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
 
 fn handle_main_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
-        // Open popup menu within the active section
-        KeyCode::Char('/') => Action::Popup(PopupAction::Open),
         // Section Down on `Right`
         KeyCode::Right | KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
         // Section Up on `Left`
@@ -60,10 +65,8 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
-        // Fallback to PrevTab
-        KeyCode::Char('[') => Action::Navigation(NavigationAction::PrevTab),
-        // Fallback to NextTab
-        KeyCode::Char(']') => Action::Navigation(NavigationAction::NextTab),
+        // Reset active selections
+        KeyCode::Esc => Action::Navigation(NavigationAction::Reset),
         _ => Action::System(SystemAction::Noop),
     }
 }

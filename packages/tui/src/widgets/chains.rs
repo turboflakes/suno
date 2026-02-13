@@ -297,6 +297,10 @@ impl ChainsListState {
         false
     }
 
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
+
     pub fn _get_chain_by_key(&self, chain_key: &ChainKey) -> Option<&Chain> {
         self.chains.get(chain_key)
     }
@@ -429,6 +433,11 @@ impl ChainsListWidget {
         if !state.chains.is_empty() {
             state.table_state.select(Some(0));
         }
+    }
+
+    pub fn is_active(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_active()
     }
 
     pub fn set_active(&self, active: bool) {

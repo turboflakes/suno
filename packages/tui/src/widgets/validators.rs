@@ -104,6 +104,10 @@ impl ValidatorsListState {
         self.viewport_height = height;
     }
 
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
+
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
         self.validators.get(validator_key)
     }
@@ -346,6 +350,11 @@ impl ValidatorsListWidget {
         if !state.validators.is_empty() {
             state.table_state.select(Some(0));
         }
+    }
+
+    pub fn is_active(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_active()
     }
 
     pub fn set_active(&self, active: bool) {

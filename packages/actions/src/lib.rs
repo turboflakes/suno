@@ -46,6 +46,7 @@ pub enum NavigationAction {
     SectionDown,
     NextTab,
     PrevTab,
+    Reset,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

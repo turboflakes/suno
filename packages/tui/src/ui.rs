@@ -24,7 +24,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let container = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(vec![Constraint::Fill(1), Constraint::Length(2)])
+        .constraints(vec![Constraint::Fill(1), Constraint::Length(3)])
         .split(area);
 
     let outer_layout = Layout::default()
@@ -186,26 +186,50 @@ fn render_logs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block = Block::default()
         .style(THEME.block.footer_right)
-        .padding(Padding::new(0, 2, 0, 1));
-    let footer = if app.popup.is_visible() {
-        Paragraph::new(format!(": run | ↑ ↓: navigate | x: close"))
-            .block(block)
-            .right_aligned()
-    } else {
-        let mut legend = vec![];
+        .padding(Padding::new(0, 2, 1, 1));
+
+    let mut legend = vec![];
+
+    // show how to open popup with extrinsics/commands
+    if app.validators.is_active() && !app.popup.is_visible() {
+        legend.push(Span::styled(format!("ctrl+e"), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
         legend.push(Span::styled(
-            format!("tab or alt+tab or ↑ ↓"),
+            format!("show extrinsics"),
             THEME.paragraph.label,
         ));
-        legend.push(Span::styled(format!("navigate"), THEME.paragraph.base));
-        legend.push(Span::styled(format!("/"), THEME.paragraph.label));
-        legend.push(Span::styled(format!("extrinsics"), THEME.paragraph.base));
-        legend.push(Span::styled(format!("ctrl+c"), THEME.paragraph.label));
-        legend.push(Span::styled(format!("quit"), THEME.paragraph.base));
-        Paragraph::new(Line::from(legend))
-            .block(block)
-            .right_aligned()
     };
+
+    if app.popup.is_visible() {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled(format!("tab"), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled(format!("autocomplete"), THEME.paragraph.label));
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled(format!("esc"), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled(format!("close"), THEME.paragraph.label));
+    } else if app.chains.is_active() || app.validators.is_active() {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled(format!("tab or ↑ ↓"), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled(format!("navigate"), THEME.paragraph.label));
+    };
+
+    // Always visible
+    legend.push(Span::raw("   "));
+    legend.push(Span::styled(format!("ctrl+t"), THEME.paragraph.base));
+    legend.push(Span::raw(" "));
+    legend.push(Span::styled(format!("switch tab"), THEME.paragraph.label));
+    legend.push(Span::raw("   "));
+    legend.push(Span::styled(format!("ctrl+c"), THEME.paragraph.base));
+    legend.push(Span::raw(" "));
+    legend.push(Span::styled(format!("quit"), THEME.paragraph.label));
+
+    let footer = Paragraph::new(Line::from(legend))
+        .block(block)
+        .right_aligned();
+
     frame.render_widget(footer, area);
 }
 
