@@ -1,4 +1,4 @@
-use crate::call::Call;
+use crate::call::{Call, CallError};
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
@@ -25,6 +25,12 @@ pub struct InputField {
     /// Track the calculated screen position for the cursor
     #[zeroize(skip)]
     cursor_position: Option<Position>,
+    /// Track the calculated screen position for the cursor
+    #[zeroize(skip)]
+    status: Status,
+    /// Set input metadata useful to validate input
+    #[zeroize(skip)]
+    metadata: Option<Metadata>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -37,8 +43,32 @@ pub enum Mode {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum Type {
     #[default]
-    Text,
+    Command,
     Password,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum Status {
+    #[default]
+    None, // No text yet
+    Valid,           // Input text is valid either password or command
+    Invalid(String), // Some invalid text found
+}
+
+impl std::fmt::Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "none"),
+            Self::Valid => write!(f, "valid"),
+            Self::Invalid(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Metadata {
+    unit: String,
+    decimals: u8,
 }
 
 impl InputField {
@@ -51,6 +81,8 @@ impl InputField {
             r#type: Type::default(),
             character_index: 0,
             cursor_position: None,
+            status: Status::default(),
+            metadata: None,
         }
     }
 
@@ -78,12 +110,24 @@ impl InputField {
         self.character_index
     }
 
+    pub fn status(&self) -> String {
+        self.status.to_string()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.input.is_empty()
     }
 
     pub fn is_editing(&self) -> bool {
         self.mode == Mode::Editing
+    }
+
+    pub fn is_password(&self) -> bool {
+        self.r#type == Type::Password
+    }
+
+    pub fn is_command(&self) -> bool {
+        self.r#type == Type::Command
     }
 
     fn move_cursor_left(&mut self) {
@@ -100,6 +144,10 @@ impl InputField {
         let index = self.byte_index();
         self.input.insert(index, new_char);
         self.move_cursor_right();
+        // validate input text
+        if self.is_command() {
+            self.validate();
+        }
     }
 
     /// Returns the byte index based on the character position.
@@ -124,11 +172,34 @@ impl InputField {
                 self.input.remove(byte_idx);
                 self.move_cursor_left();
             }
+
+            // validate input text
+            if self.is_command() {
+                self.validate();
+            }
         }
     }
 
     fn clamp_cursor(&self, new_pos: usize) -> usize {
         new_pos.clamp(0, self.input.chars().count())
+    }
+
+    fn validate(&mut self) {
+        let value = self.value();
+        let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
+        match Call::parse(&value, decimals) {
+            Ok(_) => self.status = Status::Valid,
+            Err(e) => match e {
+                CallError::InvalidAddress(_)
+                | CallError::InvalidAmount(_)
+                | CallError::InvalidArgument(_)
+                | CallError::UnknownArgument(_)
+                | CallError::UnknownCommand(_)
+                | CallError::UnknownOptional(_)
+                | CallError::MissingArguments(_) => self.status = Status::Invalid(e.to_string()),
+                _ => self.status = Status::None,
+            },
+        }
     }
 
     pub fn set_cursor_position(&mut self, position: Position) {
@@ -161,6 +232,17 @@ impl InputField {
         self.input = Zeroizing::new(value);
     }
 
+    pub fn is_valid(&self) -> bool {
+        self.status == Status::Valid
+    }
+
+    pub fn is_invalid(&self) -> bool {
+        match self.status {
+            Status::Invalid(_) => true,
+            _ => false,
+        }
+    }
+
     const fn _reset_cursor(&mut self) {
         self.character_index = 0;
     }
@@ -174,6 +256,7 @@ impl InputField {
         self.input.zeroize();
         self.input.clear();
         self.character_index = 0;
+        self.status = Status::None;
         self.clear_focus();
     }
 }
@@ -216,6 +299,13 @@ impl InputFieldWidget {
         let state = self.state.read().unwrap();
         state.cursor_position()
     }
+
+    pub fn is_command(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_command()
+    }
+
+    //
 
     pub fn set_value(&mut self, value: String) {
         let mut state = self.state.write().unwrap();

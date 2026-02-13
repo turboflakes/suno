@@ -6,6 +6,7 @@ use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
     style::{Color, Style},
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph},
     Frame,
 };
@@ -109,7 +110,7 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame) {
             area
         }
     };
-    frame.render_widget(Clear, area); //this clears out the background
+    // frame.render_widget(Clear, area); //this clears out the background
     frame.render_widget(&app.popup, area);
     // Apply the cursor if it was set during render
     let state = app.popup.state.read().unwrap();
@@ -120,6 +121,7 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame) {
 
 fn popup_area(area: Rect, percent_x: u16, percent_y: u16, flex: Flex) -> Rect {
     let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(flex);
+    // let vertical = Layout::vertical([Constraint::Fill(1)]).flex(flex);
     let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(flex);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
@@ -190,11 +192,19 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             .block(block)
             .right_aligned()
     } else {
-        Paragraph::new(format!(
-            "tab or alt+tab or ↑ ↓: navigate | x: menu | q: quit"
-        ))
-        .block(block)
-        .right_aligned()
+        let mut legend = vec![];
+        legend.push(Span::styled(
+            format!("tab or alt+tab or ↑ ↓"),
+            THEME.paragraph.label,
+        ));
+        legend.push(Span::styled(format!("navigate"), THEME.paragraph.base));
+        legend.push(Span::styled(format!("/"), THEME.paragraph.label));
+        legend.push(Span::styled(format!("extrinsics"), THEME.paragraph.base));
+        legend.push(Span::styled(format!("ctrl+c"), THEME.paragraph.label));
+        legend.push(Span::styled(format!("quit"), THEME.paragraph.base));
+        Paragraph::new(Line::from(legend))
+            .block(block)
+            .right_aligned()
     };
     frame.render_widget(footer, area);
 }

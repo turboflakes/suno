@@ -610,7 +610,7 @@ impl App {
                                 _ => {}
                             },
                             Command::Instruction(call) => match call {
-                                Call::Chill(_) => self.chill_attempt(),
+                                Call::Chill => self.chill_attempt(),
                                 _ => {}
                             },
                         }
@@ -709,31 +709,31 @@ impl App {
                 Command::Instruction(call) => {
                     if let Some(validator) = self.validators.get_selected() {
                         match call {
-                            Call::Chill(bytes) => {
-                                let runtime = validator.runtime().asset_hub_runtime();
-                                if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
-                                    let api = chain.client();
-                                    // let account_key = validator.key();
-                                    // TODO: Implement spawn_call_chill
+                            // Call::Chill(bytes) => {
+                            //     let runtime = validator.runtime().asset_hub_runtime();
+                            //     if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
+                            //         let api = chain.client();
+                            //         // let account_key = validator.key();
+                            //         // TODO: Implement spawn_call_chill
 
-                                    let result = self.popup.execute_with_password(
-                                        |password| -> Result<(), TuiError> {
-                                            let signer = suno_signer::load_keypair(password)?;
-                                            sync::spawn_call_remark(
-                                                &api, &runtime, &signer, &bytes, &self.tx,
-                                            );
+                            //         let result = self.popup.execute_with_password(
+                            //             |password| -> Result<(), TuiError> {
+                            //                 let signer = suno_signer::load_keypair(password)?;
+                            //                 sync::spawn_call_remark(
+                            //                     &api, &runtime, &signer, &bytes, &self.tx,
+                            //                 );
 
-                                            Ok(())
-                                        },
-                                    );
+                            //                 Ok(())
+                            //             },
+                            //         );
 
-                                    if let Err(e) = result {
-                                        let _ = self.tx.send(Action::System(SystemAction::Error(
-                                            e.to_string(),
-                                        )));
-                                    }
-                                }
-                            }
+                            //         if let Err(e) = result {
+                            //             let _ = self.tx.send(Action::System(SystemAction::Error(
+                            //                 e.to_string(),
+                            //             )));
+                            //         }
+                            //     }
+                            // }
                             _ => {}
                         }
                     }

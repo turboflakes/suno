@@ -40,3 +40,10 @@ pub fn remark_with_event(value: Vec<u8>) -> Call {
 pub fn chill() -> Call {
     Call::Staking(StakingCall::chill {})
 }
+
+// pub fn bond() -> Call {
+//     Call::Staking(StakingCall::bond {
+//         value: Default::default(),
+//         payee: Default::default(),
+//     })
+// }

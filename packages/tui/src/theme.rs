@@ -158,6 +158,9 @@ pub struct Input {
     pub placeholder: Style,
     pub prefix: Style,
     pub prefix_active: Style,
+    pub suffix: Style,
+    pub suffix_active: Style,
+    pub error: Style,
 }
 
 impl Input {
@@ -174,6 +177,14 @@ impl Input {
             self.prefix_active
         } else {
             self.prefix
+        }
+    }
+
+    pub fn suffix(&self, active: bool) -> Style {
+        if active {
+            self.suffix_active
+        } else {
+            self.suffix
         }
     }
 }
@@ -215,5 +226,8 @@ pub const THEME: Theme = Theme {
         placeholder: Style::new().fg(GRAY_50),
         prefix: Style::new().fg(YELLOW_90),
         prefix_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
+        suffix: Style::new().fg(GRAY_80),
+        suffix_active: Style::new().fg(GRAY_40).add_modifier(Modifier::BOLD),
+        error: Style::new().fg(YELLOW_90).add_modifier(Modifier::ITALIC),
     },
 };

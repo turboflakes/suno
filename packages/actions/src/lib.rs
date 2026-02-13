@@ -58,9 +58,9 @@ pub enum PopupAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputAction {
-    Submit,
-    AutoComplete,
     Char(char),
+    AutoComplete,
+    Submit,
     Delete,
     CursorLeft,
     CursorRight,

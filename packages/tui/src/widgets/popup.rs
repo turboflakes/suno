@@ -1,4 +1,4 @@
-use crate::call::Call;
+use crate::call::{Call, CallError};
 use crate::entry::{AsChar, Command, Entry, ToDescription, ToHex, ToPlaceholder};
 use crate::theme::THEME;
 use crate::widgets::input_field::InputFieldWidget;
@@ -155,7 +155,10 @@ impl PopupWidget {
     fn init_menu(&self, state: &mut ListState) {
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::Bond)));
+            .push(Entry::new(Command::Instruction(Call::Bond {
+                amount: 0,
+                payee: None,
+            })));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::ChangeCommission)));
@@ -164,23 +167,26 @@ impl PopupWidget {
             .push(Entry::new(Command::Instruction(Call::ChangePayee)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::Chill(Bytes::new()))));
+            .push(Entry::new(Command::Instruction(Call::Chill)));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::KickNominators)));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::SetSessionKey)));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
     }
 
     fn update_details(&self, state: &mut ListState, call: Call) {
         match call {
-            Call::Chill(bytes) => {
-                // self.init_chill(state)
-                state
-                    .options
-                    .push(Entry::new(Command::Instruction(Call::Chill(bytes))));
-            }
+            // Call::Chill(bytes) => {
+            //     // self.init_chill(state)
+            //     state
+            //         .options
+            //         .push(Entry::new(Command::Instruction(Call::Chill(bytes))));
+            // }
             // Call::Bond => self.init_bond(state),
             // Call::Unbond => self.init_unbond(state),
             // Call::ChangeRewardDestination => self.init_change_reward_destination(state),
@@ -303,7 +309,8 @@ impl PopupWidget {
     }
 
     pub fn show_chill_details(&self, bytes: Vec<u8>) {
-        self.on_init(Mode::Details, Some(Call::Chill(bytes)));
+        // self.on_init(Mode::Details, Some(Call::Chill(bytes)));
+        self.on_init(Mode::Details, Some(Call::Chill));
     }
 
     // Input actions
@@ -320,11 +327,49 @@ impl PopupWidget {
     pub fn insert_input_char(&self, new_char: char) {
         let mut state = self.state.write().unwrap();
         state.input.insert_char(new_char);
+
+        // // Set input status
+        // if state.input.is_command() {
+        //     let raw_value = state.input.value();
+        //     match Call::parse(&raw_value) {
+        //         Ok(_) => state.input.as_valid(),
+        //         Err(e) => match e {
+        //             CallError::InvalidAddress(_address) => {
+        //                 state.input.as_invalid("Invalid address".to_string());
+        //             }
+        //             CallError::InvalidAmount(_amount) => {
+        //                 state.input.as_invalid("Invalid amount".to_string());
+        //             }
+        //             _ => {
+        //                 state.input.as_none();
+        //             }
+        //         },
+        //     }
+        // }
     }
 
     pub fn delete_input_char(&self) {
         let mut state = self.state.write().unwrap();
         state.input.delete_char();
+
+        // // Set input status
+        // if state.input.is_command() {
+        //     let raw_value = state.input.value();
+        //     match Call::parse(&raw_value) {
+        //         Ok(_) => state.input.as_valid(),
+        //         Err(e) => match e {
+        //             CallError::InvalidAddress(_address) => {
+        //                 state.input.as_invalid("Invalid address".to_string());
+        //             }
+        //             CallError::InvalidAmount(_amount) => {
+        //                 state.input.as_invalid("Invalid amount".to_string());
+        //             }
+        //             _ => {
+        //                 state.input.as_none();
+        //             }
+        //         },
+        //     }
+        // }
     }
 
     pub fn move_cursor_left(&self) {
@@ -352,13 +397,6 @@ impl PopupWidget {
 
         state.input.execute_with_password(f)
     }
-
-    // pub fn execute_with_password(&self) -> String {
-    //     let state = self.state.read().unwrap();
-    //     state
-    //         .input
-    //         .execute_with_password(|password| password.to_string())
-    // }
 }
 
 impl Widget for &PopupWidget {
@@ -379,7 +417,6 @@ impl Widget for &PopupWidget {
 }
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
-    
     let block = Block::new()
         .set_style(THEME.block.active)
         .padding(Padding::symmetric(0, 1));
@@ -388,13 +425,13 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let rows = options.iter().map(|e| e.to_row(state.mode.clone(), None));
 
     // Split the area into top header to show all options, a small central box to show the input field
-    // TODO: And a bottom footer to show the extrinsic encoded data
+    // and a bottom footer to show the error message
     let top_len = (options.len() as u16 + 3).clamp(4, 10);
     let area = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Max(top_len), // Top header
-            Constraint::Length(3),    // InputField as command mode (label + input)
+            Constraint::Length(5),    // InputField as command mode (label + input)
         ])
         .flex(Flex::End)
         .split(area);
@@ -406,7 +443,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         Constraint::Length(2),
     ];
 
-    let header_labels = vec!["", "command", "description", ""];
+    let header_labels = vec!["", "extrinsic", "description", ""];
 
     let table = Table::new(rows, widths)
         .block(block)
@@ -419,9 +456,8 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
 
     StatefulWidget::render(table, area[0], buf, &mut state.table_state);
 
-    let call = state.get_selected_call();
-
     // Render input area
+    let call = state.get_selected_call();
     state.input.as_command(call).render(area[1], buf);
 }
 
