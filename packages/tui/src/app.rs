@@ -4,7 +4,10 @@ use crate::entry::Command;
 use crate::error::{self, TuiError};
 use crate::section::Section;
 use crate::widgets::{
-    chains::ChainsListWidget, collators::CollatorsListWidget, popup, popup::PopupWidget,
+    chains::ChainsListWidget,
+    collators::CollatorsListWidget,
+    popup,
+    popup::{Mode as PopupMode, PopupWidget},
     validators::ValidatorsListWidget,
 };
 use crate::window::Window;
@@ -130,8 +133,9 @@ impl App {
         let runtime = validator.runtime().asset_hub_runtime();
         let chain = self.chains.get_chain_by_runtime(&runtime)?;
         let api = chain.client();
+        let call = self.popup.get_input_parsed_call();
 
-        Some(Context::new(api.clone(), runtime, validator))
+        Some(Context::new(api.clone(), runtime, validator, call))
     }
 
     fn handle_events(&mut self, event: Event) -> AppResult<()> {
@@ -211,7 +215,7 @@ impl App {
             InputAction::Delete => self.popup.delete_input_char(),
             InputAction::CursorLeft => self.popup.move_cursor_left(),
             InputAction::CursorRight => self.popup.move_cursor_right(),
-            InputAction::Submit => self.submit_transaction(),
+            InputAction::Enter => self.handle_input_enter(),
             _ => {}
         }
     }
@@ -578,7 +582,7 @@ impl App {
 
         match self.section {
             Section::Validators => {
-                self.popup.show();
+                self.popup.show_extrinsics();
                 // Dispatch focus to the input field
                 let _ = self.tx.send(Action::Input(InputAction::Editing));
             }
@@ -595,9 +599,35 @@ impl App {
         self.focus = Focus::Main;
     }
 
-    /// Confirm popup/list entry
+    /// TODO: Handle input enter depending on the context
+    pub fn handle_input_enter(&mut self) {
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        if let Some(ctx) = self.context() {
+            match self.popup.get_mode() {
+                PopupMode::Menu => {
+                    let stash = ctx.validator.key().stash();
+                    if let Some(call) = ctx.call {
+                        let result = ctx.runtime.build_call_data(&ctx.api, &stash, call.clone());
+                        match result {
+                            Ok(bytes) => {
+                                self.popup.show_call_details(call, bytes);
+                            }
+                            Err(err) => {
+                                self.error(err);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// DEPRECATED: Confirm popup/list entry
     pub fn confirm(&mut self) {
-        warn!("__confirm_entry");
         if !self.popup.is_visible() {
             return;
         }
@@ -614,6 +644,7 @@ impl App {
                                 Call::Chill => self.chill_attempt(),
                                 _ => {}
                             },
+                            _ => {}
                         }
                     }
                 }
@@ -673,16 +704,16 @@ impl App {
         };
     }
 
-    /// Reset selection instruction.
+    /// Cancel instruction.
+    pub fn cancel(&mut self) {
+        self.close_popup();
+    }
+
+    /// Reset active selection
     pub fn reset_selection(&mut self) {
         self.chains.set_active(false);
         self.validators.set_active(false);
         self.collators.set_active(false);
-    }
-
-    /// Cancel instruction.
-    pub fn cancel(&mut self) {
-        self.close_popup();
     }
 
     /// Try chill instruction
@@ -690,16 +721,16 @@ impl App {
         info!("__chill_attempt");
         if let Some(ctx) = self.context() {
             let stash = ctx.validator.key().stash();
-            let result = ctx.runtime.remark_with_event(&ctx.api, &stash);
-            match result {
-                Ok(bytes) => {
-                    self.popup.show_chill_details(bytes);
-                }
-                //
-                Err(err) => {
-                    self.error(err);
-                }
-            }
+            // let result = ctx.runtime.remark_with_event(&ctx.api, &stash);
+            // match result {
+            //     Ok(bytes) => {
+            //         self.popup.show_chill_details(bytes);
+            //     }
+            //     //
+            //     Err(err) => {
+            //         self.error(err);
+            //     }
+            // }
         }
     }
 
@@ -757,6 +788,7 @@ struct Context {
     api: OnlineClient<SubstrateConfig>,
     runtime: SupportedRuntime,
     validator: Validator,
+    call: Option<Call>,
 }
 
 impl Context {
@@ -764,11 +796,13 @@ impl Context {
         api: OnlineClient<SubstrateConfig>,
         runtime: SupportedRuntime,
         validator: Validator,
+        call: Option<Call>,
     ) -> Self {
         Self {
             api,
             runtime,
             validator,
+            call,
         }
     }
 }

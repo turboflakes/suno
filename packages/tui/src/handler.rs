@@ -94,7 +94,7 @@ fn handle_editing_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
         KeyCode::Tab => Action::Input(InputAction::AutoComplete),
         KeyCode::Char(c) => Action::Input(InputAction::Char(c)),
-        KeyCode::Enter => Action::Input(InputAction::Submit),
+        KeyCode::Enter => Action::Input(InputAction::Enter),
         KeyCode::Backspace => Action::Input(InputAction::Delete),
         KeyCode::Left => Action::Input(InputAction::CursorLeft),
         KeyCode::Right => Action::Input(InputAction::CursorRight),

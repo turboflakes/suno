@@ -1,49 +1,13 @@
+use crate::entry::{ToDescription, ToJson, ToMethod, ToPlaceholder};
+use serde::Serialize;
 use std::str::FromStr;
+use suno_primitives::staking::{Payee, PayeeError};
 
-use crate::entry::{ToDescription, ToHex, ToPlaceholder};
-use log::info;
-use ratatui::widgets::{Cell, Row};
-use subxt::utils::{to_hex, AccountId32};
-use suno_primitives::tx::Bytes;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Payee {
-    Staked,
-    Stash,
-    Controller,
-    Account(AccountId32),
-}
-
-/// Convert &str to Payee
-impl Payee {
-    fn from_str(value: &str) -> Result<Self, CallError> {
-        match value.split_once(' ') {
-            None => match value {
-                "staked" => Ok(Payee::Staked),
-                "stash" => Ok(Payee::Stash),
-                "controller" => Ok(Payee::Controller),
-                _ => Err(CallError::UnknownArgument(
-                    "staked|stash|controller|account <address>".to_string(),
-                )),
-            },
-            Some((argument, account)) => match argument {
-                "account" => {
-                    let acc = AccountId32::from_str(account)
-                        .map_err(|_| CallError::InvalidAddress(account.to_string()))?;
-                    Ok(Payee::Account(acc))
-                }
-                _ => Err(CallError::UnknownArgument(
-                    "staked|stash|controller|account <address>".to_string(),
-                )),
-            },
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Call {
     Chill,
-    Bond { amount: u128, payee: Option<Payee> },
+    Bond { amount: u128, payee: Payee },
     Unbond { amount: u128 },
     ChangePayee,
     ChangeCommission,
@@ -69,6 +33,8 @@ pub enum CallError {
     MissingArguments(String),
     #[error("No extrinsic provided")]
     MissingExtrinsic,
+    #[error("Invalid payee: {0}")]
+    InvalidPayee(#[from] PayeeError),
 }
 
 impl Call {
@@ -84,7 +50,7 @@ impl Call {
                         let amount = parse_standard_unit(args, decimals)?;
                         Ok(Self::Bond {
                             amount,
-                            payee: None,
+                            payee: Payee::None,
                         })
                     }
                     Some((value, args)) => {
@@ -96,10 +62,7 @@ impl Call {
                             Some((payee, args)) => match payee {
                                 "payee" => {
                                     let payee = Payee::from_str(args)?;
-                                    Ok(Self::Bond {
-                                        amount,
-                                        payee: Some(payee),
-                                    })
+                                    Ok(Self::Bond { amount, payee })
                                 }
                                 _ => Err(CallError::UnknownOptional(
                                     "payee <staked|stash|controller|account <address>>".to_string(),
@@ -203,18 +166,19 @@ impl ToPlaceholder for Call {
     }
 }
 
-impl ToHex for Call {
-    // TODO: Implement to_hex method for Call enum
-    fn to_hex(&self) -> String {
+impl ToMethod for Call {
+    fn to_method(&self) -> String {
         match self {
-            // Self::Chill(bytes) => to_hex(bytes),
-            Self::Chill => "Chill".to_string(),
-            Self::Bond { .. } => "Bond more funds".to_string(),
-            Self::Unbond { .. } => "Unbond funds".to_string(),
-            Self::ChangePayee => "Change reward destination".to_string(),
-            Self::ChangeCommission => "Change commission".to_string(),
-            Self::KickNominators => "Kick nominators".to_string(),
-            Self::SetSessionKey => "Change session keys".to_string(),
+            Self::Chill => "chill".to_string(),
+            Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
+            Self::Unbond { amount } => format!("unbond {amount}"),
+            _ => "TODO".to_string(),
         }
+    }
+}
+
+impl ToJson for Call {
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self).unwrap_or_default()
     }
 }

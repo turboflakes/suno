@@ -1,5 +1,5 @@
 use crate::call::{Call, CallError};
-use crate::entry::{AsChar, Command, Entry, ToDescription, ToHex, ToPlaceholder};
+use crate::entry::{AsChar, Command, Entry, ToDescription, ToJson, ToMethod, ToPlaceholder};
 use crate::theme::THEME;
 use crate::widgets::input_field::InputFieldWidget;
 use log::{info, warn};
@@ -15,7 +15,7 @@ use ratatui::{
 };
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use suno_primitives::tx::Bytes;
+use suno_primitives::{staking::Payee, tx::Bytes};
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -42,6 +42,7 @@ pub struct ListState {
     spinner_start_time: Instant,
     spinner_counter: usize,
     input: InputFieldWidget,
+    call_data: Option<Bytes>,
 }
 
 impl Default for ListState {
@@ -55,6 +56,7 @@ impl Default for ListState {
             spinner_start_time: Instant::now(),
             spinner_counter: 0,
             input: InputFieldWidget::new(),
+            call_data: None,
         }
     }
 }
@@ -73,6 +75,10 @@ impl ListState {
 
     pub fn get_input_cursor_position(&self) -> Option<Position> {
         self.input.get_cursor_position()
+    }
+
+    pub fn get_input_parsed_call(&self) -> Option<Call> {
+        self.input.get_parsed_call()
     }
 
     pub fn get_selected(&self) -> Option<Entry<Call>> {
@@ -107,18 +113,18 @@ impl ListState {
 }
 
 impl PopupWidget {
-    pub fn on_init(&self, mode: Mode, call: Option<Call>) {
+    pub fn on_init(&self, mode: Mode, call: Option<Call>, bytes: Option<Bytes>) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
         state.mode = mode.clone();
         match mode {
             Mode::Menu => self.init_menu(&mut state),
             Mode::Details => {
-                if call.is_none() {
-                    self.on_err("No call provided for details mode".into());
+                if call.is_none() || bytes.is_none() {
+                    self.on_err("No call or bytes provided for details mode".into());
                     return;
                 }
-                self.update_details(&mut state, call.unwrap())
+                self.init_details(&mut state, call.unwrap(), bytes.unwrap());
             }
             Mode::Confirm => {
                 if call.is_none() {
@@ -144,20 +150,13 @@ impl PopupWidget {
         // TODO: Set chain state to error
     }
 
-    fn init_transaction(&self, state: &mut ListState) {
-        state.spinner_start_time = Instant::now();
-        state.spinner_counter = 0;
-        state.options.push(Entry::new(Command::Text(
-            "processing transaction".to_string(),
-        )));
-    }
-
     fn init_menu(&self, state: &mut ListState) {
+        // Push supported instructions
         state
             .options
             .push(Entry::new(Command::Instruction(Call::Bond {
                 amount: 0,
-                payee: None,
+                payee: Payee::default(),
             })));
         state
             .options
@@ -179,25 +178,11 @@ impl PopupWidget {
             .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
     }
 
-    fn update_details(&self, state: &mut ListState, call: Call) {
-        match call {
-            // Call::Chill(bytes) => {
-            //     // self.init_chill(state)
-            //     state
-            //         .options
-            //         .push(Entry::new(Command::Instruction(Call::Chill(bytes))));
-            // }
-            // Call::Bond => self.init_bond(state),
-            // Call::Unbond => self.init_unbond(state),
-            // Call::ChangeRewardDestination => self.init_change_reward_destination(state),
-            // Call::ChangeCommission => self.init_change_commission(state),
-            // Call::KickNominators => self.init_kick_nominators(state),
-            // Call::SetSessionKey => self.init_set_session_key(state),
-            _ => {
-                warn!("Unsupported call: {:?}", call);
-                return;
-            }
-        }
+    fn init_details(&self, state: &mut ListState, call: Call, bytes: Bytes) {
+        // Push selected instruction and respective call data
+        state.options.push(Entry::new(Command::Instruction(call)));
+        state.options.push(Entry::new(Command::Bytes(bytes)));
+        state.input.reset();
     }
 
     // DEPRECATE
@@ -217,14 +202,13 @@ impl PopupWidget {
         }
     }
 
-    // fn init_chill(&self, state: &mut ListState) {
-    //     state
-    //         .options
-    //         .push(Entry::new(Command::Instruction(Call::Chill)));
-    //     state
-    //         .options
-    //         .push(Entry::new(Command::Text("cancel".to_string())));
-    // }
+    fn init_transaction(&self, state: &mut ListState) {
+        state.spinner_start_time = Instant::now();
+        state.spinner_counter = 0;
+        state.options.push(Entry::new(Command::Text(
+            "processing transaction".to_string(),
+        )));
+    }
 
     pub fn move_down(&self) -> Option<Entry<Call>> {
         let mut state = self.state.write().unwrap();
@@ -266,8 +250,8 @@ impl PopupWidget {
         state.is_visible
     }
 
-    pub fn show(&self) {
-        self.on_init(Mode::Menu, None);
+    pub fn show_extrinsics(&self) {
+        self.on_init(Mode::Menu, None, None);
     }
 
     pub fn close(&self) {
@@ -290,13 +274,18 @@ impl PopupWidget {
         state.get_selected_call()
     }
 
+    pub fn get_input_parsed_call(&self) -> Option<Call> {
+        let state = self.state.read().unwrap();
+        state.get_input_parsed_call()
+    }
+
     pub fn get_mode(&self) -> Mode {
         let state = self.state.read().unwrap();
         state.mode.clone()
     }
 
     pub fn show_transaction_status(&self) {
-        self.on_init(Mode::Transaction, None);
+        self.on_init(Mode::Transaction, None, None);
     }
 
     pub fn update_transaction_status(&self, message: &str) {
@@ -308,9 +297,8 @@ impl PopupWidget {
             .push(Entry::new(Command::Text(message.to_string())));
     }
 
-    pub fn show_chill_details(&self, bytes: Vec<u8>) {
-        // self.on_init(Mode::Details, Some(Call::Chill(bytes)));
-        self.on_init(Mode::Details, Some(Call::Chill));
+    pub fn show_call_details(&self, call: Call, bytes: Bytes) {
+        self.on_init(Mode::Details, Some(call), Some(bytes));
     }
 
     // Input actions
@@ -327,49 +315,11 @@ impl PopupWidget {
     pub fn insert_input_char(&self, new_char: char) {
         let mut state = self.state.write().unwrap();
         state.input.insert_char(new_char);
-
-        // // Set input status
-        // if state.input.is_command() {
-        //     let raw_value = state.input.value();
-        //     match Call::parse(&raw_value) {
-        //         Ok(_) => state.input.as_valid(),
-        //         Err(e) => match e {
-        //             CallError::InvalidAddress(_address) => {
-        //                 state.input.as_invalid("Invalid address".to_string());
-        //             }
-        //             CallError::InvalidAmount(_amount) => {
-        //                 state.input.as_invalid("Invalid amount".to_string());
-        //             }
-        //             _ => {
-        //                 state.input.as_none();
-        //             }
-        //         },
-        //     }
-        // }
     }
 
     pub fn delete_input_char(&self) {
         let mut state = self.state.write().unwrap();
         state.input.delete_char();
-
-        // // Set input status
-        // if state.input.is_command() {
-        //     let raw_value = state.input.value();
-        //     match Call::parse(&raw_value) {
-        //         Ok(_) => state.input.as_valid(),
-        //         Err(e) => match e {
-        //             CallError::InvalidAddress(_address) => {
-        //                 state.input.as_invalid("Invalid address".to_string());
-        //             }
-        //             CallError::InvalidAmount(_amount) => {
-        //                 state.input.as_invalid("Invalid amount".to_string());
-        //             }
-        //             _ => {
-        //                 state.input.as_none();
-        //             }
-        //         },
-        //     }
-        // }
     }
 
     pub fn move_cursor_left(&self) {
@@ -462,6 +412,10 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
 }
 
 fn render_details(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+    let block = Block::new()
+        .style(THEME.block.active)
+        .padding(Padding::proportional(1));
+
     // Split the area into header to show transaction details and password input area
     let area = Layout::default()
         .direction(Direction::Vertical)
@@ -471,37 +425,41 @@ fn render_details(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         ])
         .split(area);
 
-    // NOTE: Should only be one entry when rendering details
+    // NOTE: Should state.options should hold the original parsed call on the first position
+    // and the call data bytes on the second position
     if let Some(entry) = state.options.get(0) {
-        let extrinsic = Line::from(vec![
-            Span::styled(
-                "extrinsic ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(format!("<{}>", entry.command())),
+        // TODO: Implement proxied identity display
+        // let proxied = Line::from(vec![
+        //     Span::styled("proxied ", THEME.paragraph.header),
+        //     Span::raw(format!("identity (xx..aa)")),
+        // ]);
+
+        let method = Line::from(vec![
+            Span::styled("method ", THEME.paragraph.header),
+            Span::raw(format!("{}", entry.to_method())),
         ]);
 
-        let call_data_label = Line::from(vec![
-            Span::styled(
-                "call data ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("ctrl+y copy", Style::default().fg(Color::Yellow)),
-        ]);
-        let call_data = Line::from(entry.to_hex());
+        if let Some(entry) = state.options.get(1) {
+            let available_width = area[0].width.saturating_sub(4);
+            let left_text = "proxy call data";
+            let spaces = available_width.saturating_sub((left_text.len() + 11) as u16);
 
-        let details = Paragraph::new(vec![extrinsic, call_data_label, call_data])
-            .block(
-                Block::new()
-                    .padding(Padding::proportional(1))
-                    .style(Style::default().bg(Color::Rgb(52, 50, 51))),
-            )
-            .wrap(Wrap { trim: false });
-        details.render(area[0], buf);
+            let call_data_label = Line::from(vec![
+                Span::styled(left_text, THEME.paragraph.header),
+                Span::raw(" ".repeat(spaces as usize)),
+                Span::styled("ctrl+y", THEME.paragraph.base),
+                Span::raw(" "),
+                Span::styled("copy", THEME.paragraph.label),
+            ]);
+
+            let cmd = entry.get_command();
+            let call_data = Line::from(cmd.to_string());
+
+            let details = Paragraph::new(vec![method, call_data_label, call_data])
+                .block(block)
+                .wrap(Wrap { trim: false });
+            details.render(area[0], buf);
+        }
     }
 
     // Render input area
@@ -569,7 +527,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
-impl<T: std::fmt::Display + ToDescription + ToPlaceholder + ToHex + Clone> Entry<T> {
+impl<T: std::fmt::Display + ToDescription + ToPlaceholder + ToJson + ToMethod + Clone> Entry<T> {
     pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
         let command = self.get_command();
         match command {
@@ -606,6 +564,7 @@ impl<T: std::fmt::Display + ToDescription + ToPlaceholder + ToHex + Clone> Entry
                 }
                 _ => Row::new(vec![t.to_string()]),
             },
+            _ => Row::new(vec!["".to_string()]),
         }
     }
 }

@@ -27,6 +27,8 @@ pub enum Error {
     SignerError(#[from] SignerError),
     #[error("Genesis hash does not match the expected hash from the configured chain.")]
     GenesisError,
+    #[error("Unsupported call: {0}")]
+    UnsupportedCall(String),
     #[error("Unsupported runtime: {0}")]
     UnsupportedRuntime(SupportedRuntime),
     #[error("Other error: {0}")]

@@ -1,22 +1,25 @@
 use crate::node_runtime;
-use node_runtime::runtime_types::asset_hub_paseo_runtime::ProxyType;
+use node_runtime::runtime_types::{
+    asset_hub_paseo_runtime::ProxyType, pallet_staking_async::RewardDestination,
+};
+
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::Error;
-use suno_primitives::tx::Bytes;
+use suno_primitives::{staking::Payee, tx::Bytes};
 
-type Call = node_runtime::runtime_types::asset_hub_paseo_runtime::RuntimeCall;
+type RuntimeCall = node_runtime::runtime_types::asset_hub_paseo_runtime::RuntimeCall;
 type ProxyCall = node_runtime::runtime_types::pallet_proxy::pallet::Call;
 type SystemCall = node_runtime::runtime_types::frame_system::pallet::Call;
 type StakingCall = node_runtime::runtime_types::pallet_staking_async::pallet::pallet::Call;
 
 pub fn wrap_call_into_proxy(
     api: &OnlineClient<SubstrateConfig>,
-    call: Call,
+    call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {
     let proxy_call = node_runtime::tx().proxy().proxy(
         proxied_account.clone().into(),
-        Some(ProxyType::NonTransfer),
+        Some(ProxyType::Staking),
         call,
     );
 
@@ -25,25 +28,36 @@ pub fn wrap_call_into_proxy(
     Ok(payload)
 }
 
-pub fn proxy(call: Call, proxied_account: &AccountId32) -> Call {
-    Call::Proxy(ProxyCall::proxy {
+pub fn proxy(call: RuntimeCall, proxied_account: &AccountId32) -> RuntimeCall {
+    RuntimeCall::Proxy(ProxyCall::proxy {
         real: proxied_account.clone().into(),
-        force_proxy_type: Some(ProxyType::NonTransfer),
+        force_proxy_type: Some(ProxyType::Staking),
         call: Box::new(call),
     })
 }
 
-pub fn remark_with_event(value: Vec<u8>) -> Call {
-    Call::System(SystemCall::remark_with_event { remark: value })
+pub fn remark_with_event(value: Vec<u8>) -> RuntimeCall {
+    RuntimeCall::System(SystemCall::remark_with_event { remark: value })
 }
 
-pub fn chill() -> Call {
-    Call::Staking(StakingCall::chill {})
+pub fn staking_chill() -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::chill {})
 }
 
-// pub fn bond() -> Call {
-//     Call::Staking(StakingCall::bond {
-//         value: Default::default(),
-//         payee: Default::default(),
-//     })
-// }
+pub fn staking_bond(value: u128, payee: Payee) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::bond {
+        value,
+        payee: map_payee(payee),
+    })
+}
+
+// Helper function to map Payee to RewardDestination
+fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
+    match payee {
+        Payee::None => RewardDestination::None,
+        Payee::Account(account) => RewardDestination::Account(account),
+        Payee::Stash => RewardDestination::Stash,
+        Payee::Controller => RewardDestination::Controller,
+        Payee::Staked => RewardDestination::Staked,
+    }
+}

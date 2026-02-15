@@ -62,6 +62,7 @@ pub enum InputAction {
     Char(char),
     AutoComplete,
     Submit,
+    Enter,
     Delete,
     CursorLeft,
     CursorRight,

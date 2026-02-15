@@ -41,7 +41,7 @@ impl Widget for &InputPasswordWidget {
         field.render(area, buf);
 
         // Calculate and save the cursor position into the state
-        if state.is_editing() {
+        if state.is_active() {
             let position = Position::new(area.x + 2 + state.character_index() as u16, area.y + 1);
             state.set_cursor_position(position);
         } else {

@@ -1,3 +1,4 @@
+use crate::call::Call;
 use async_trait::async_trait;
 use subxt::{
     utils::{AccountId32, H256},
@@ -16,6 +17,13 @@ pub trait RuntimeCaller {
         signer: &Keypair,
         call_data: Vec<u8>,
     ) -> Result<Response, Error>;
+
+    fn build_call_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        stash: &AccountId32,
+        call: Call,
+    ) -> Result<Vec<u8>, Error>;
 
     fn remark_with_event(
         &self,
@@ -43,6 +51,24 @@ impl RuntimeCaller for Runtime {
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::sign_and_submit_call_data(&api, signer, call_data).await
             }
+            _ => Err(Error::UnsupportedRuntime(self.clone())),
+        }
+    }
+
+    fn build_call_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        stash: &AccountId32,
+        call: Call,
+    ) -> Result<Vec<u8>, Error> {
+        match &self {
+            Runtime::AssetHubPaseo => match call {
+                Call::Bond { amount, payee } => {
+                    let rc = suno_asset_hub_paseo::extrinsics::staking_bond(amount, payee);
+                    suno_asset_hub_paseo::wrap_call_into_proxy(&api, rc, stash)
+                }
+                _ => Err(Error::UnsupportedCall(call.to_string())),
+            },
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }

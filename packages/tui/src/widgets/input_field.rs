@@ -118,7 +118,7 @@ impl InputField {
         self.input.is_empty()
     }
 
-    pub fn is_editing(&self) -> bool {
+    pub fn is_active(&self) -> bool {
         self.mode == Mode::Editing
     }
 
@@ -128,6 +128,38 @@ impl InputField {
 
     pub fn is_command(&self) -> bool {
         self.r#type == Type::Command
+    }
+
+    fn validate(&mut self) {
+        if self.is_command() {
+            let value = self.value();
+            let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
+            match Call::parse(&value, decimals) {
+                Ok(_) => self.status = Status::Valid,
+                Err(e) => match e {
+                    CallError::InvalidAddress(_)
+                    | CallError::InvalidAmount(_)
+                    | CallError::InvalidArgument(_)
+                    | CallError::UnknownArgument(_)
+                    | CallError::UnknownCommand(_)
+                    | CallError::UnknownOptional(_)
+                    | CallError::MissingArguments(_) => {
+                        self.status = Status::Invalid(e.to_string())
+                    }
+                    _ => self.status = Status::None,
+                },
+            }
+        }
+    }
+
+    pub fn parsed_call(&self) -> Option<Call> {
+        if self.is_command() {
+            let value = self.value();
+            let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
+            Call::parse(&value, decimals).ok()
+        } else {
+            None
+        }
     }
 
     fn move_cursor_left(&mut self) {
@@ -144,10 +176,7 @@ impl InputField {
         let index = self.byte_index();
         self.input.insert(index, new_char);
         self.move_cursor_right();
-        // validate input text
-        if self.is_command() {
-            self.validate();
-        }
+        self.validate();
     }
 
     /// Returns the byte index based on the character position.
@@ -174,32 +203,12 @@ impl InputField {
             }
 
             // validate input text
-            if self.is_command() {
-                self.validate();
-            }
+            self.validate();
         }
     }
 
     fn clamp_cursor(&self, new_pos: usize) -> usize {
         new_pos.clamp(0, self.input.chars().count())
-    }
-
-    fn validate(&mut self) {
-        let value = self.value();
-        let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-        match Call::parse(&value, decimals) {
-            Ok(_) => self.status = Status::Valid,
-            Err(e) => match e {
-                CallError::InvalidAddress(_)
-                | CallError::InvalidAmount(_)
-                | CallError::InvalidArgument(_)
-                | CallError::UnknownArgument(_)
-                | CallError::UnknownCommand(_)
-                | CallError::UnknownOptional(_)
-                | CallError::MissingArguments(_) => self.status = Status::Invalid(e.to_string()),
-                _ => self.status = Status::None,
-            },
-        }
     }
 
     pub fn set_cursor_position(&mut self, position: Position) {
@@ -208,10 +217,6 @@ impl InputField {
 
     pub fn reset_cursor_position(&mut self) {
         self.cursor_position = None;
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.mode == Mode::Editing
     }
 
     const fn set_focus(&mut self) {
@@ -243,16 +248,11 @@ impl InputField {
         }
     }
 
-    const fn _reset_cursor(&mut self) {
-        self.character_index = 0;
-    }
-
     const fn as_password(&mut self) {
         self.r#type = Type::Password;
     }
 
-    /// Wipes the string content immediately.
-    pub fn cleanup(&mut self) {
+    pub fn reset(&mut self) {
         self.input.zeroize();
         self.input.clear();
         self.character_index = 0;
@@ -300,12 +300,17 @@ impl InputFieldWidget {
         state.cursor_position()
     }
 
-    pub fn is_command(&self) -> bool {
+    pub fn get_parsed_call(&self) -> Option<Call> {
         let state = self.state.read().unwrap();
-        state.is_command()
+        state.parsed_call()
     }
 
     //
+
+    pub fn reset(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.reset();
+    }
 
     pub fn set_value(&mut self, value: String) {
         let mut state = self.state.write().unwrap();
@@ -348,7 +353,7 @@ impl InputFieldWidget {
     {
         let mut state = self.state.write().unwrap();
         let result = action(&state.input);
-        state.cleanup();
+        state.reset();
 
         result
     }

@@ -13,3 +13,4 @@ serde = { workspace = true }
 sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
+thiserror = { workspace = true }

@@ -1,5 +1,10 @@
 use crate::display::format_millis;
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::Serialize;
+use std::{
+    str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use subxt::utils::AccountId32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Era {
@@ -121,5 +126,65 @@ impl StakeLedger {
 
     pub fn total(&self) -> u128 {
         self.total
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Payee {
+    #[default]
+    None,
+    Staked,
+    Stash,
+    Controller,
+    Account(AccountId32),
+}
+
+impl std::fmt::Display for Payee {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "none"),
+            Self::Staked => write!(f, "staked"),
+            Self::Stash { .. } => write!(f, "stash"),
+            Self::Controller { .. } => write!(f, "controller"),
+            Self::Account(account) => write!(f, "account {}", account),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum PayeeError {
+    #[error("Command must be: {0}")]
+    UnknownArgument(String),
+    #[error("Command must be: {0}")]
+    InvalidAddress(String),
+}
+
+impl FromStr for Payee {
+    type Err = PayeeError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Ok(Payee::None);
+        }
+        match s.split_once(' ') {
+            None => match s {
+                "staked" => Ok(Payee::Staked),
+                "stash" => Ok(Payee::Stash),
+                "controller" => Ok(Payee::Controller),
+                _ => Err(PayeeError::UnknownArgument(
+                    "staked|stash|controller|account <address>".to_string(),
+                )),
+            },
+            Some((argument, account)) => match argument {
+                "account" => {
+                    let acc = AccountId32::from_str(account)
+                        .map_err(|_| PayeeError::InvalidAddress(account.to_string()))?;
+                    Ok(Payee::Account(acc))
+                }
+                _ => Err(PayeeError::UnknownArgument(
+                    "staked|stash|controller|account <address>".to_string(),
+                )),
+            },
+        }
     }
 }

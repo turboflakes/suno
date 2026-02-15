@@ -207,9 +207,9 @@ pub const THEME: Theme = Theme {
         row_highlight_active: Style::new().bg(GRAY_10).fg(GRAY_100),
     },
     paragraph: Paragraph {
-        base: Style::new().bg(GRAY_100).fg(GRAY_20),
+        base: Style::new().fg(GRAY_20),
         base_active: Style::new().fg(GRAY_10),
-        header: Style::new().fg(YELLOW_60).add_modifier(Modifier::BOLD),
+        header: Style::new().fg(YELLOW_60),
         header_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
         label: Style::new().fg(GRAY_50).add_modifier(Modifier::BOLD),
     },

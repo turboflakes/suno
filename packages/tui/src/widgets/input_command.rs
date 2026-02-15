@@ -89,7 +89,7 @@ impl Widget for &InputCommandWidget {
         field.render(input_area[1], buf);
 
         // Calculate and save the cursor position into the state
-        if state.is_editing() {
+        if state.is_active() {
             let position = Position::new(
                 input_area[1].x + state.character_index() as u16,
                 input_area[1].y + 1,
