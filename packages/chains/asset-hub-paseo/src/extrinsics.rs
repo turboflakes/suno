@@ -51,6 +51,12 @@ pub fn staking_bond(value: u128, payee: Payee) -> RuntimeCall {
     })
 }
 
+pub fn staking_bond_extra(value: u128) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::bond_extra {
+        max_additional: value,
+    })
+}
+
 // Helper function to map Payee to RewardDestination
 fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
     match payee {

@@ -149,6 +149,11 @@ impl PopupWidget {
             })));
         state
             .options
+            .push(Entry::new(Command::Instruction(Call::BondExtra {
+                amount: 0,
+            })));
+        state
+            .options
             .push(Entry::new(Command::Instruction(Call::ChangeCommission)));
         state
             .options

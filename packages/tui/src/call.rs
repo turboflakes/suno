@@ -9,6 +9,7 @@ use suno_primitives::staking::{Payee, PayeeError};
 pub enum Call {
     Chill,
     Bond { amount: u128, payee: Payee },
+    BondExtra { amount: u128 },
     Unbond { amount: u128 },
     ChangePayee,
     ChangeCommission,
@@ -72,6 +73,13 @@ impl Call {
                         }
                     }
                 },
+                "bond_extra" => match args.split_once(' ') {
+                    None => {
+                        let amount = parse_standard_unit(args, decimals)?;
+                        Ok(Self::BondExtra { amount })
+                    }
+                    _ => Err(CallError::InvalidArgument(input.to_string())),
+                },
                 "unbond" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
@@ -121,6 +129,7 @@ impl std::fmt::Display for Call {
         match self {
             Self::Chill => write!(f, "chill"),
             Self::Bond { .. } => write!(f, "bond"),
+            Self::BondExtra { .. } => write!(f, "bond_extra"),
             Self::Unbond { .. } => write!(f, "unbond"),
             Self::ChangePayee => write!(f, "change_payee"),
             Self::ChangeCommission => write!(f, "change_commission"),
@@ -134,7 +143,8 @@ impl ToDescription for Call {
     fn description(&self) -> String {
         match self {
             Self::Chill => "Declare no intention to validate".to_string(),
-            Self::Bond { .. } => "Bond more funds".to_string(),
+            Self::Bond { .. } => "Bond funds".to_string(),
+            Self::BondExtra { .. } => "Bond more funds".to_string(),
             Self::Unbond { .. } => "Unbond funds".to_string(),
             Self::ChangePayee => "Change reward destination".to_string(),
             Self::ChangeCommission => {
@@ -154,6 +164,7 @@ impl ToPlaceholder for Call {
                 "bond <value-in-standard-units> [payee <staked|stash|controller|account <address>>]"
                     .to_string()
             }
+            Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
             Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
             Self::ChangePayee => {
                 "change_payee <staked|stash|controller|account <address>>".to_string()
@@ -172,6 +183,7 @@ impl ToMethod for Call {
         match self {
             Self::Chill => "chill".to_string(),
             Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
+            Self::BondExtra { amount } => format!("bond_extra {amount}"),
             Self::Unbond { amount } => format!("unbond {amount}"),
             _ => "TODO".to_string(),
         }
