@@ -53,7 +53,6 @@ pub enum NavigationAction {
 pub enum PopupAction {
     Open,
     Close,
-    Confirm,
     Cancel,
 }
 

@@ -102,8 +102,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let area = match &app.popup.get_mode() {
         Mode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
-        Mode::Details => popup_area(frame.area(), 40, 16, Flex::Center),
-        Mode::Confirm => popup_area(frame.area(), 40, 16, Flex::Center),
+        Mode::ConfirmAndSign => popup_area(frame.area(), 40, 16, Flex::Center),
         Mode::Transaction => {
             let mut area = popup_area(frame.area(), 20, 6, Flex::End);
             area.height = 3;

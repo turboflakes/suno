@@ -84,7 +84,6 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
         KeyCode::Tab => Action::Input(InputAction::Editing),
-        KeyCode::Enter => Action::Popup(PopupAction::Confirm),
         KeyCode::Esc => Action::Popup(PopupAction::Cancel),
         _ => Action::System(SystemAction::Noop),
     }

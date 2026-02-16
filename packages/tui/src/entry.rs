@@ -22,6 +22,14 @@ pub trait ToMethod {
     fn to_method(&self) -> String;
 }
 
+pub trait ToHex {
+    fn to_hex(&self) -> String;
+}
+
+pub trait AsBytes {
+    fn into_bytes(&self) -> Vec<u8>;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum Command<T> {
     Text(String),
@@ -72,9 +80,29 @@ impl<T: Display + ToJson> Command<T> {
 impl<T: Display + ToMethod> Command<T> {
     pub fn to_method(&self) -> String {
         match self {
-            Self::Text(s) => String::new(),
-            Self::Bytes(s) => String::new(),
+            Self::Text(_) => String::new(),
+            Self::Bytes(_) => String::new(),
             Self::Instruction(s) => s.to_method(),
+        }
+    }
+}
+
+impl<T: Display + ToHex> Command<T> {
+    pub fn to_hex(&self) -> String {
+        match self {
+            Self::Text(s) => to_hex(s.as_bytes()),
+            Self::Bytes(s) => to_hex(s),
+            Self::Instruction(s) => s.to_hex(),
+        }
+    }
+}
+
+impl<T: Display + AsBytes> Command<T> {
+    pub fn into_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Text(s) => s.as_bytes().to_vec(),
+            Self::Bytes(s) => s.clone(),
+            Self::Instruction(s) => s.into_bytes(),
         }
     }
 }
@@ -93,7 +121,9 @@ pub struct Entry<T> {
     command: Command<T>,
 }
 
-impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + Clone> Entry<T> {
+impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + ToHex + AsBytes + Clone>
+    Entry<T>
+{
     pub fn new(command: Command<T>) -> Self {
         Self { command }
     }
@@ -120,6 +150,14 @@ impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + Clone> Ent
 
     pub fn to_method(&self) -> String {
         self.command.to_method()
+    }
+
+    pub fn to_hex(&self) -> String {
+        self.command.to_hex()
+    }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        self.command.into_bytes()
     }
 }
 
@@ -180,6 +218,18 @@ mod tests {
     impl ToMethod for Call {
         fn to_method(&self) -> String {
             self.to_string()
+        }
+    }
+
+    impl ToHex for Call {
+        fn to_hex(&self) -> String {
+            self.to_string()
+        }
+    }
+
+    impl AsBytes for Call {
+        fn into_bytes(&self) -> Vec<u8> {
+            self.to_string().as_bytes().to_vec()
         }
     }
 

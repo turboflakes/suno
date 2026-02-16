@@ -1,9 +1,6 @@
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
-use subxt::{
-    ext::subxt_core::storage::{address::StaticAddress, StorageKeyValue},
-    utils::AccountId32,
-};
+use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
 /// Common trait for account-related functionality

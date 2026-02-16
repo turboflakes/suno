@@ -93,11 +93,11 @@ impl Validator {
         self.account.identity()
     }
 
-    pub fn display_name(&self) -> String {
-        if let Some(display_name) = self.identity() {
-            display_name.to_string()
+    pub fn display_name(&self, size: usize) -> String {
+        if let Some(identity) = self.identity() {
+            format!("{} ({})", identity, self.to_compact_string(size))
         } else {
-            self.to_compact_string(6)
+            self.to_compact_string(size)
         }
     }
 
@@ -158,7 +158,7 @@ impl From<&Validator> for Row<'_> {
         let v = v.clone();
         Row::new(vec![
             Text::from(""),
-            Text::from(format!("{}/{}", v.runtime(), v.display_name(),)),
+            Text::from(format!("{}/{}", v.runtime(), v.display_name(3),)),
             Text::from(status).alignment(Alignment::Right),
             Text::from(""),
         ])

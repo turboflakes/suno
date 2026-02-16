@@ -131,23 +131,33 @@ impl InputField {
     }
 
     fn validate(&mut self) {
-        if self.is_command() {
-            let value = self.value();
-            let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-            match Call::parse(&value, decimals) {
-                Ok(_) => self.status = Status::Valid,
-                Err(e) => match e {
-                    CallError::InvalidAddress(_)
-                    | CallError::InvalidAmount(_)
-                    | CallError::InvalidArgument(_)
-                    | CallError::UnknownArgument(_)
-                    | CallError::UnknownCommand(_)
-                    | CallError::UnknownOptional(_)
-                    | CallError::MissingArguments(_) => {
-                        self.status = Status::Invalid(e.to_string())
-                    }
-                    _ => self.status = Status::None,
-                },
+        match self.r#type {
+            Type::Command => {
+                let value = self.value();
+                let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
+                match Call::parse(&value, decimals) {
+                    Ok(_) => self.status = Status::Valid,
+                    Err(e) => match e {
+                        CallError::InvalidAddress(_)
+                        | CallError::InvalidAmount(_)
+                        | CallError::InvalidArgument(_)
+                        | CallError::UnknownArgument(_)
+                        | CallError::UnknownCommand(_)
+                        | CallError::UnknownOptional(_)
+                        | CallError::MissingArguments(_) => {
+                            self.status = Status::Invalid(e.to_string())
+                        }
+                        _ => self.status = Status::None,
+                    },
+                }
+            }
+            Type::Password => {
+                let value = self.value();
+                if !value.is_empty() {
+                    self.status = Status::Valid;
+                } else {
+                    self.status = Status::None
+                }
             }
         }
     }
@@ -252,6 +262,20 @@ impl InputField {
         self.r#type = Type::Password;
     }
 
+    const fn as_command(&mut self) {
+        self.r#type = Type::Command;
+    }
+
+    pub fn reset_as_password(&mut self) {
+        self.reset();
+        self.as_password();
+    }
+
+    pub fn reset_as_command(&mut self) {
+        self.reset();
+        self.as_command();
+    }
+
     pub fn reset(&mut self) {
         self.input.zeroize();
         self.input.clear();
@@ -306,10 +330,14 @@ impl InputFieldWidget {
     }
 
     //
-
-    pub fn reset(&mut self) {
+    pub fn reset_as_command(&mut self) {
         let mut state = self.state.write().unwrap();
-        state.reset();
+        state.reset_as_command();
+    }
+
+    pub fn reset_as_password(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.reset_as_password();
     }
 
     pub fn set_value(&mut self, value: String) {

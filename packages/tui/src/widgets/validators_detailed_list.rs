@@ -43,7 +43,7 @@ impl Widget for &ValidatorsDetailedListWidget {
 
             let decimals = v.account.token_decimals();
             Row::new(vec![
-                Text::from(v.display_name()).alignment(Alignment::Left),
+                Text::from(v.display_name(3)).alignment(Alignment::Left),
                 Text::from(points).alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.total(), decimals, 4)).alignment(Alignment::Right),
                 Text::from(format_planks(v.stake.own(), decimals, 4)).alignment(Alignment::Right),

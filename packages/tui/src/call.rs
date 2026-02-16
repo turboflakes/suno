@@ -1,6 +1,7 @@
-use crate::entry::{ToDescription, ToJson, ToMethod, ToPlaceholder};
+use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
 use serde::Serialize;
 use std::str::FromStr;
+use subxt::utils::to_hex;
 use suno_primitives::staking::{Payee, PayeeError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -180,5 +181,17 @@ impl ToMethod for Call {
 impl ToJson for Call {
     fn to_json(&self) -> String {
         serde_json::to_string(&self).unwrap_or_default()
+    }
+}
+
+impl ToHex for Call {
+    fn to_hex(&self) -> String {
+        to_hex(self.to_string().as_bytes())
+    }
+}
+
+impl AsBytes for Call {
+    fn into_bytes(&self) -> Vec<u8> {
+        self.to_string().as_bytes().to_vec()
     }
 }

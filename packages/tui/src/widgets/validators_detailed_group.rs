@@ -312,7 +312,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
             let validator_cells = vec![
                 Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
-                Cell::from(Text::from(format!("{}", v.display_name())).alignment(Alignment::Left))
+                Cell::from(Text::from(format!("{}", v.display_name(3))).alignment(Alignment::Left))
                     .style(cell_style),
                 Cell::from(text_points.alignment(Alignment::Right)),
                 Cell::from(
