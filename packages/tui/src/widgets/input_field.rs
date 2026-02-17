@@ -229,6 +229,10 @@ impl InputField {
         self.cursor_position = None;
     }
 
+    pub fn set_label(&mut self, label: String) {
+        self.label = Some(label);
+    }
+
     const fn set_focus(&mut self) {
         self.mode = Mode::Editing;
     }
@@ -343,6 +347,11 @@ impl InputFieldWidget {
     pub fn set_value(&mut self, value: String) {
         let mut state = self.state.write().unwrap();
         state.set_value(value);
+    }
+
+    pub fn set_label(&mut self, label: String) {
+        let mut state = self.state.write().unwrap();
+        state.set_label(label);
     }
 
     pub fn set_focus(&mut self) {

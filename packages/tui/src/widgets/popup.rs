@@ -271,7 +271,8 @@ impl PopupWidget {
         &self,
         runtime: &SupportedRuntime,
         spec_version: u32,
-        identity: String,
+        proxy_identity: String,
+        proxied_identity: String,
         call: Call,
         bytes: Bytes,
     ) {
@@ -284,13 +285,18 @@ impl PopupWidget {
         state
             .options
             .push(Entry::new(Command::Text(spec_version.to_string())));
-        state.options.push(Entry::new(Command::Text(identity)));
+        state
+            .options
+            .push(Entry::new(Command::Text(proxy_identity)));
+        state
+            .options
+            .push(Entry::new(Command::Text(proxied_identity)));
         state.options.push(Entry::new(Command::Instruction(call)));
         state.options.push(Entry::new(Command::Bytes(bytes)));
         // NOTE: Rather than having a specific field to hold the call data bytes,
-        // we just select the last option which makes it easier to retrieve the
-        // selected option later on;
-        state.table_state.select(Some(4));
+        // we just select the option in position the 5th which is where it was added.
+        // Makes it easier to retrieve the selected option later on to copy it to clipboard;
+        state.table_state.select(Some(5));
         // Reset the input field as a password field
         state.input.reset_as_password();
     }
@@ -414,7 +420,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(6),    // Details
-            Constraint::Length(3), // InputField as password mode (label + input)
+            Constraint::Length(3), // InputField as password mode
         ])
         .split(area);
 
@@ -426,16 +432,20 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     let Some(spec_version_entry) = state.options.get(1) else {
         return;
     };
-    // Get identity from the third position in the list
-    let Some(identity_entry) = state.options.get(2) else {
+    // Get proxy identity from the third position in the list
+    let Some(proxy_identity_entry) = state.options.get(2) else {
+        return;
+    };
+    // Get proxied identity from the third position in the list
+    let Some(proxied_identity_entry) = state.options.get(3) else {
         return;
     };
     // Get call from the fourth position in the list
-    let Some(call_entry) = state.options.get(3) else {
+    let Some(call_entry) = state.options.get(4) else {
         return;
     };
     // Get bytes from the fifth position in the list
-    let Some(bytes_entry) = state.options.get(4) else {
+    let Some(bytes_entry) = state.options.get(5) else {
         return;
     };
 
@@ -447,10 +457,9 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
             spec_version_entry.command()
         )),
     ]);
-    // TODO: Implement proxied identity display
     let proxied = Line::from(vec![
-        Span::styled("proxied ", THEME.paragraph.header),
-        Span::raw(identity_entry.command()),
+        Span::styled("proxied account ", THEME.paragraph.header),
+        Span::raw(proxied_identity_entry.command()),
     ]);
 
     let method = Line::from(vec![
@@ -473,9 +482,21 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
 
     let call_data = Line::from(bytes_entry.to_hex());
 
-    let details = Paragraph::new(vec![network, method, proxied, call_data_label, call_data])
-        .block(block)
-        .wrap(Wrap { trim: false });
+    let proxy = Line::from(vec![
+        Span::styled("proxy signer account ", THEME.paragraph.header),
+        Span::raw(proxy_identity_entry.command()),
+    ]);
+
+    let details = Paragraph::new(vec![
+        network,
+        method,
+        proxied,
+        call_data_label,
+        call_data,
+        proxy,
+    ])
+    .block(block)
+    .wrap(Wrap { trim: false });
     details.render(area[0], buf);
 
     // Render input area

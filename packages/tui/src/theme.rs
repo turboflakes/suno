@@ -226,8 +226,8 @@ pub const THEME: Theme = Theme {
         placeholder: Style::new().fg(GRAY_50),
         prefix: Style::new().fg(YELLOW_90),
         prefix_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
-        suffix: Style::new().fg(GRAY_80),
-        suffix_active: Style::new().fg(GRAY_40).add_modifier(Modifier::BOLD),
+        suffix: Style::new().fg(YELLOW_90),
+        suffix_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
         error: Style::new().fg(YELLOW_90).add_modifier(Modifier::ITALIC),
     },
 };

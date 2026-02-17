@@ -1,6 +1,6 @@
 use crate::section::Section;
 use crate::theme::THEME;
-use crate::widgets::{logo::Logo, popup::Mode};
+use crate::widgets::{logo::Logo, popup::Mode as PopupMode};
 use crate::{app::App, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -101,9 +101,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
 fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     let area = match &app.popup.get_mode() {
-        Mode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
-        Mode::ConfirmAndSign => popup_area(frame.area(), 40, 16, Flex::Center),
-        Mode::Transaction => {
+        PopupMode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
+        PopupMode::ConfirmAndSign => popup_area(frame.area(), 40, 16, Flex::Center),
+        PopupMode::Transaction => {
             let mut area = popup_area(frame.area(), 20, 6, Flex::End);
             area.height = 3;
             area
@@ -201,10 +201,28 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     if app.popup.is_visible() {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled(format!("tab"), THEME.paragraph.base));
-        legend.push(Span::raw(" "));
-        legend.push(Span::styled(format!("autocomplete"), THEME.paragraph.label));
-        legend.push(Span::raw("   "));
+        match app.popup.get_mode() {
+            PopupMode::Menu => {
+                legend.push(Span::styled(format!("tab"), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(format!("autocomplete"), THEME.paragraph.label));
+                legend.push(Span::raw("   "));
+                legend.push(Span::styled(format!("enter"), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(format!("confirm"), THEME.paragraph.label));
+                legend.push(Span::raw("   "));
+            }
+            PopupMode::ConfirmAndSign => {
+                legend.push(Span::styled(format!("enter"), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(
+                    format!("sign and submit"),
+                    THEME.paragraph.label,
+                ));
+                legend.push(Span::raw("   "));
+            }
+            _ => {}
+        }
         legend.push(Span::styled(format!("esc"), THEME.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled(format!("close"), THEME.paragraph.label));
