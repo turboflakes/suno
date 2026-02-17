@@ -32,6 +32,7 @@ description = "Just another way of managing Substrate node operations in the Pol
 edition = "2021"
 
 [workspace.dependencies]
+arboard = "3.6.1"
 async-recursion = "1.0"
 async-trait = "0.1.89"
 color-eyre = "0.6.3"

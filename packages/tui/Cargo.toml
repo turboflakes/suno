@@ -9,6 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
+arboard = { workspace = true }
 async-trait = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }

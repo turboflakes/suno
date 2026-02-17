@@ -7,8 +7,6 @@ use suno_actions::{
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
-    info!("Key event: {:?}", key_event);
-
     // Check for pressed ctrl + shift + key combination first
     if key_event
         .modifiers
@@ -17,6 +15,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
         return match key_event.code {
             // Select previous main window/tab
             KeyCode::Char('t') => Action::Navigation(NavigationAction::PrevTab),
+            KeyCode::Char('c') => Action::Navigation(NavigationAction::Copy),
             _ => Action::System(SystemAction::Noop),
         };
     }

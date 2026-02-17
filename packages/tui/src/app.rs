@@ -14,6 +14,7 @@ use crate::{
     handler::handle_key_events,
     tui::Tui,
 };
+use arboard::Clipboard;
 use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
@@ -179,6 +180,7 @@ impl App {
             NavigationAction::NextTab => self.next_tab(),
             NavigationAction::PrevTab => self.prev_tab(),
             NavigationAction::Reset => self.reset_selection(),
+            NavigationAction::Copy => self.copy_to_clipboard(),
         }
     }
 
@@ -660,5 +662,34 @@ impl App {
         self.chains.set_active(false);
         self.validators.set_active(false);
         self.collators.set_active(false);
+    }
+
+    /// Copy to clipboard
+    pub fn copy_to_clipboard(&self) {
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        match self.popup.get_mode() {
+            PopupMode::ConfirmAndSign => {
+                let Some(bytes_entry) = self.popup.get_selected() else {
+                    return;
+                };
+                let hex_bytes = bytes_entry.to_hex();
+
+                let mut clipboard = match Clipboard::new() {
+                    Ok(cb) => cb,
+                    Err(e) => {
+                        self.error(e.into());
+                        return;
+                    }
+                };
+
+                if let Err(e) = clipboard.set_text(hex_bytes) {
+                    self.error(e.into());
+                }
+            }
+            _ => {}
+        }
     }
 }

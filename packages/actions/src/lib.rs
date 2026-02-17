@@ -1,5 +1,4 @@
 pub mod network;
-
 use crate::network::ConnectionState;
 use sp_arithmetic::Permill;
 use subxt::utils::H256;
@@ -8,7 +7,6 @@ use suno_primitives::{
     babe::Epoch,
     identity::Identity,
     staking::{Era, StakeLedger, StakeOverview},
-    tx::Bytes,
     validator::ValidatorStatus,
     AccountKey,
 };
@@ -47,6 +45,7 @@ pub enum NavigationAction {
     NextTab,
     PrevTab,
     Reset,
+    Copy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

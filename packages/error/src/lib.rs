@@ -29,6 +29,8 @@ pub enum Error {
     GenesisError,
     #[error("Unsupported call: {0}")]
     UnsupportedCall(String),
+    #[error("Clipboard error: {0}")]
+    ClipboardError(#[from] arboard::Error),
     #[error("Unsupported runtime: {0}")]
     UnsupportedRuntime(SupportedRuntime),
     #[error("Other error: {0}")]
