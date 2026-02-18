@@ -281,7 +281,7 @@ impl PopupWidget {
         state.options.clear();
         state
             .options
-            .push(Entry::new(Command::Text(runtime.to_string())));
+            .push(Entry::new(Command::Text(runtime.as_str_long().to_string())));
         state
             .options
             .push(Entry::new(Command::Text(spec_version.to_string())));
@@ -449,28 +449,28 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         return;
     };
 
-    let network = Line::from(vec![
-        Span::styled("chain ", THEME.paragraph.header_active),
-        Span::raw(format!(
+    let network = Line::from(vec![Span::styled(
+        format!(
             "{} ({})",
             network_entry.command(),
             spec_version_entry.command()
-        )),
-    ])
+        ),
+        THEME.paragraph.header_active,
+    )])
     .alignment(Alignment::Right);
 
     let stash = Line::from(vec![
-        Span::styled("stash ", THEME.paragraph.header),
+        Span::styled("stash ", THEME.paragraph.label),
         Span::raw(stash_identity_entry.command()),
     ]);
 
     let method = Line::from(vec![
-        Span::styled("method ", THEME.paragraph.header),
+        Span::styled("method ", THEME.paragraph.label),
         Span::raw(format!("{}", call_entry.to_method())),
     ]);
 
     let proxy = Line::from(vec![
-        Span::styled("proxy account ", THEME.paragraph.header),
+        Span::styled("proxy account ", THEME.paragraph.label),
         Span::raw(proxy_identity_entry.command()),
     ]);
 
@@ -480,7 +480,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     let spaces = available_width.saturating_sub((left_text.len() + 17) as u16);
 
     let call_data_label = Line::from(vec![
-        Span::styled(left_text, THEME.paragraph.header),
+        Span::styled(left_text, THEME.paragraph.label),
         Span::raw(" ".repeat(spaces as usize)),
         Span::styled("ctrl+shift+c", THEME.paragraph.base),
         Span::raw(" "),

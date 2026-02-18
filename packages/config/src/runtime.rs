@@ -224,6 +224,27 @@ impl SupportedRuntime {
             Self::PeopleWestend => "People Westend",
         }
     }
+    pub fn as_str_long(&self) -> &'static str {
+        match self {
+            Self::Local => "Local",
+            Self::Polkadot => "Polkadot",
+            Self::Kusama => "Kusama",
+            Self::Westend => "Westend",
+            Self::Paseo => "Paseo",
+            Self::AssetHubPolkadot => "Asset Hub Polkadot",
+            Self::BridgeHubPolkadot => "Bridge Hub Polkadot",
+            Self::PeoplePolkadot => "People Polkadot",
+            Self::AssetHubKusama => "Asset Hub Kusama",
+            Self::BridgeHubKusama => "Bridge Hub Kusama",
+            Self::PeopleKusama => "People Kusama",
+            Self::AssetHubPaseo => "Asset Hub Paseo",
+            Self::BridgeHubPaseo => "Bridge Hub Paseo",
+            Self::PeoplePaseo => "People Paseo",
+            Self::AssetHubWestend => "Asset Hub Westend",
+            Self::BridgeHubWestend => "Bridge Hub Westend",
+            Self::PeopleWestend => "People Westend",
+        }
+    }
 }
 
 impl std::fmt::Display for SupportedRuntime {
