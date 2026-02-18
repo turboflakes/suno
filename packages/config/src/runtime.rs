@@ -142,7 +142,7 @@ impl SupportedRuntime {
         }
     }
 
-    pub fn account_format(&self) -> u32 {
+    pub fn account_format(&self) -> u16 {
         match &self {
             Self::Polkadot => get_ss58_format(POLKADOT_SPEC),
             Self::Kusama => get_ss58_format(KUSAMA_SPEC),
@@ -245,14 +245,14 @@ fn get_state_root_hash(chain_specs: &str) -> H256 {
     }
 }
 
-fn get_ss58_format(chain_specs: &str) -> u32 {
+fn get_ss58_format(chain_specs: &str) -> u16 {
     let spec: Result<Value> = serde_json::from_str(chain_specs);
     match spec {
         Ok(json) => {
             let value = json["properties"]["ss58Format"]
                 .as_u64()
                 .expect("chain spec does not contain ss58Format");
-            value as u32
+            value as u16
         }
         Err(err) => panic!("Failed to parse JSON: {}", err),
     }

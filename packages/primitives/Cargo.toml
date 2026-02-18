@@ -11,6 +11,7 @@ edition.workspace = true
 ratatui = { workspace = true }
 serde = { workspace = true }
 sp-arithmetic = { workspace = true }
+sp-core = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
 thiserror = { workspace = true }

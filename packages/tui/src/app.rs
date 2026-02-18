@@ -620,7 +620,7 @@ impl App {
                 let stash = validator.key().stash();
                 let stash_identity = validator.display_name(3);
                 let proxy_identity = match get_address_from_json_file() {
-                    Ok(address) => to_compact_string(&address, 6),
+                    Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
                     Err(e) => {
                         self.error(e.into());
                         return;

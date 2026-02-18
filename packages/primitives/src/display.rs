@@ -1,3 +1,5 @@
+use sp_core::crypto::{Ss58AddressFormat, Ss58Codec};
+use sp_core::sr25519::Public;
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::utils::AccountId32;
 
@@ -85,11 +87,9 @@ pub fn create_progress_bar_by_blocks(progress: f64, bar_width: usize) -> String 
     format!("{}{}", filled, empty)
 }
 
-pub fn to_compact_string(account: &AccountId32, size: usize) -> String {
-    let account_id = account.to_string();
-    format!(
-        "{}...{}",
-        &account_id[..size],
-        &account_id[account_id.len() - size..]
-    )
+pub fn to_compact_string(account: &AccountId32, format: u16, size: usize) -> String {
+    let account_id = Public::from_raw(account.0);
+    let prefix = Ss58AddressFormat::custom(format);
+    let address = account_id.to_ss58check_with_version(prefix);
+    format!("{}..{}", &address[..size], &address[address.len() - size..])
 }

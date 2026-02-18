@@ -7,9 +7,10 @@ use suno_config::SupportedRuntime;
 /// Common trait for account-related functionality
 pub trait AccountDisplay {
     fn stash(&self) -> AccountId32;
+    fn account_format(&self) -> u16;
 
     fn to_compact_string(&self, size: usize) -> String {
-        to_compact_string(&self.stash(), size)
+        to_compact_string(&self.stash(), self.account_format(), size)
     }
 }
 
@@ -48,7 +49,7 @@ impl NodeAccount {
         self.identity = identity;
     }
 
-    pub fn account_format(&self) -> u32 {
+    pub fn account_format(&self) -> u16 {
         self.runtime().account_format()
     }
 
@@ -64,6 +65,10 @@ impl NodeAccount {
 impl AccountDisplay for NodeAccount {
     fn stash(&self) -> AccountId32 {
         self.stash()
+    }
+
+    fn account_format(&self) -> u16 {
+        self.account_format()
     }
 }
 
@@ -93,6 +98,10 @@ impl Collator {
 impl AccountDisplay for Collator {
     fn stash(&self) -> AccountId32 {
         self.account.stash()
+    }
+
+    fn account_format(&self) -> u16 {
+        self.account.account_format()
     }
 }
 

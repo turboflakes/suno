@@ -148,6 +148,10 @@ impl AccountDisplay for Validator {
     fn stash(&self) -> AccountId32 {
         self.account.stash()
     }
+
+    fn account_format(&self) -> u16 {
+        self.account.account_format()
+    }
 }
 
 impl From<&Validator> for Row<'_> {
