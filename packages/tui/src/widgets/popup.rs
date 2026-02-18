@@ -1,9 +1,9 @@
 use crate::call::{Call, CallError};
 use crate::entry::{
-    AsBytes, AsChar, Command, Entry, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder,
+    AsBytes, Command, Entry, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder,
 };
 use crate::theme::THEME;
-use crate::widgets::input_field::InputFieldWidget;
+use crate::widgets::{input_field::InputFieldWidget, spinner::Spinner};
 use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
@@ -16,7 +16,6 @@ use ratatui::{
     },
 };
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 use suno_config::SupportedRuntime;
 use suno_primitives::{staking::Payee, tx::Bytes};
 
@@ -40,10 +39,8 @@ pub struct ListState {
     table_state: TableState,
     is_visible: bool,
     mode: Mode,
-    spinner_frames: Vec<&'static str>,
-    spinner_start_time: Instant,
-    spinner_counter: usize,
     input: InputFieldWidget,
+    spinner: Spinner,
 }
 
 impl Default for ListState {
@@ -53,26 +50,13 @@ impl Default for ListState {
             table_state: TableState::default(),
             is_visible: false,
             mode: Mode::default(),
-            spinner_frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
-            spinner_start_time: Instant::now(),
-            spinner_counter: 0,
             input: InputFieldWidget::new(),
+            spinner: Spinner::default(),
         }
     }
 }
 
 impl ListState {
-    fn spinner_frame(&self) -> &str {
-        let elapsed = self.spinner_start_time.elapsed().as_millis() as u64;
-        let frame_index = (elapsed / 250) as usize % self.spinner_frames.len();
-        self.spinner_frames[frame_index]
-    }
-
-    fn spinner_progress(&self) -> String {
-        let full = "⣿".repeat(self.spinner_counter);
-        format!("{}{}⣿", self.spinner_frame(), full)
-    }
-
     pub fn get_input_cursor_position(&self) -> Option<Position> {
         self.input.get_cursor_position()
     }
@@ -173,8 +157,7 @@ impl PopupWidget {
     }
 
     fn init_transaction(&self, state: &mut ListState) {
-        state.spinner_start_time = Instant::now();
-        state.spinner_counter = 0;
+        state.spinner.increment();
         state.options.push(Entry::new(Command::Text(
             "processing transaction".to_string(),
         )));
@@ -260,7 +243,7 @@ impl PopupWidget {
 
     pub fn update_transaction_status(&self, message: &str) {
         let mut state = self.state.write().unwrap();
-        state.spinner_counter += 1;
+        state.spinner.increment();
         state.options.clear();
         state
             .options
@@ -519,7 +502,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let spinner_progress = state.spinner_progress();
+    let spinner_progress = state.spinner.progress();
     let rows = state
         .options
         .iter()

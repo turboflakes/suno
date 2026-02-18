@@ -38,6 +38,10 @@ impl Spinner {
         let full = "⣿".repeat(self.counter);
         format!("{}{}", self.frame(), full)
     }
+
+    pub fn increment(&mut self) {
+        self.counter += 1;
+    }
 }
 
 impl Widget for &Spinner {
