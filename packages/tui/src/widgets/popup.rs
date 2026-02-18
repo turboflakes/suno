@@ -272,7 +272,7 @@ impl PopupWidget {
         runtime: &SupportedRuntime,
         spec_version: u32,
         proxy_identity: String,
-        proxied_identity: String,
+        stash_identity: String,
         call: Call,
         bytes: Bytes,
     ) {
@@ -290,7 +290,7 @@ impl PopupWidget {
             .push(Entry::new(Command::Text(proxy_identity)));
         state
             .options
-            .push(Entry::new(Command::Text(proxied_identity)));
+            .push(Entry::new(Command::Text(stash_identity)));
         state.options.push(Entry::new(Command::Instruction(call)));
         state.options.push(Entry::new(Command::Bytes(bytes)));
         // NOTE: Rather than having a specific field to hold the call data bytes,
@@ -437,7 +437,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         return;
     };
     // Get proxied identity from the third position in the list
-    let Some(proxied_identity_entry) = state.options.get(3) else {
+    let Some(stash_identity_entry) = state.options.get(3) else {
         return;
     };
     // Get call from the fourth position in the list
@@ -450,21 +450,28 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     };
 
     let network = Line::from(vec![
-        Span::styled("network ", THEME.paragraph.header),
+        Span::styled("chain ", THEME.paragraph.header_active),
         Span::raw(format!(
             "{} ({})",
             network_entry.command(),
             spec_version_entry.command()
         )),
-    ]);
-    let proxied = Line::from(vec![
-        Span::styled("proxied account ", THEME.paragraph.header),
-        Span::raw(proxied_identity_entry.command()),
+    ])
+    .alignment(Alignment::Right);
+
+    let stash = Line::from(vec![
+        Span::styled("stash ", THEME.paragraph.header),
+        Span::raw(stash_identity_entry.command()),
     ]);
 
     let method = Line::from(vec![
         Span::styled("method ", THEME.paragraph.header),
         Span::raw(format!("{}", call_entry.to_method())),
+    ]);
+
+    let proxy = Line::from(vec![
+        Span::styled("proxy account ", THEME.paragraph.header),
+        Span::raw(proxy_identity_entry.command()),
     ]);
 
     // Calculate spaces needed to show the `ctrl+shift+c copy on the right`
@@ -482,18 +489,13 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
 
     let call_data = Line::from(bytes_entry.to_hex());
 
-    let proxy = Line::from(vec![
-        Span::styled("proxy signer account ", THEME.paragraph.header),
-        Span::raw(proxy_identity_entry.command()),
-    ]);
-
     let details = Paragraph::new(vec![
         network,
+        stash,
         method,
-        proxied,
+        proxy,
         call_data_label,
         call_data,
-        proxy,
     ])
     .block(block)
     .wrap(Wrap { trim: false });

@@ -25,6 +25,7 @@ use suno_actions::{
 };
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_error::Error;
+use suno_primitives::display::to_compact_string;
 use suno_signer::get_address_from_json_file;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -617,9 +618,9 @@ impl App {
                 let api = chain.client();
                 let spec_version = api.runtime_version().spec_version;
                 let stash = validator.key().stash();
-                let proxied_identity = validator.display_name(3);
+                let stash_identity = validator.display_name(3);
                 let proxy_identity = match get_address_from_json_file() {
-                    Ok(address) => address,
+                    Ok(address) => to_compact_string(&address, 6),
                     Err(e) => {
                         self.error(e.into());
                         return;
@@ -630,8 +631,8 @@ impl App {
                         self.popup.confirm_and_sign(
                             &runtime,
                             spec_version,
-                            proxy_identity.to_string(),
-                            proxied_identity,
+                            proxy_identity,
+                            stash_identity,
                             call,
                             bytes,
                         );

@@ -1,3 +1,4 @@
+use crate::display::to_compact_string;
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
 use subxt::utils::AccountId32;
@@ -8,12 +9,7 @@ pub trait AccountDisplay {
     fn stash(&self) -> AccountId32;
 
     fn to_compact_string(&self, size: usize) -> String {
-        let account_id = self.stash().to_string();
-        format!(
-            "{}...{}",
-            &account_id[..size],
-            &account_id[account_id.len() - size..]
-        )
+        to_compact_string(&self.stash(), size)
     }
 }
 

@@ -45,8 +45,7 @@ impl Widget for &InputPasswordWidget {
 
         // Placeholder
         if state.is_empty() {
-            input_spans
-                .push(Span::raw("password for the signer account").style(THEME.input.placeholder));
+            input_spans.push(Span::raw("proxy password").style(THEME.input.placeholder));
         }
 
         // Input value

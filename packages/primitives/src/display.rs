@@ -1,4 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
+use subxt::utils::AccountId32;
 
 /// Format milliseconds to human-readable string (e.g., "6.5s")
 pub fn format_millis(millis: u64) -> String {
@@ -82,4 +83,13 @@ pub fn create_progress_bar_by_blocks(progress: f64, bar_width: usize) -> String 
     let empty = "░".repeat(empty_chars);
 
     format!("{}{}", filled, empty)
+}
+
+pub fn to_compact_string(account: &AccountId32, size: usize) -> String {
+    let account_id = account.to_string();
+    format!(
+        "{}...{}",
+        &account_id[..size],
+        &account_id[account_id.len() - size..]
+    )
 }
