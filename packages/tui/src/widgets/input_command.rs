@@ -112,6 +112,7 @@ impl Widget for &InputCommandWidget {
             hotkey.render(input_area[2], buf);
         }
 
+        // show invalid message when input is invalid
         if state.is_invalid() {
             let block = Block::new()
                 .set_style(THEME.input.base(state.is_active()))

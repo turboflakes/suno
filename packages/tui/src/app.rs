@@ -200,11 +200,16 @@ impl App {
         }
         match action {
             InputAction::Editing => {
-                self.popup.set_input_focus();
-                self.focus = Focus::Input;
+                if self.popup.set_input_focus() {
+                    self.focus = Focus::Input;
+                }
             }
             InputAction::Unfocus => {
                 self.popup.clear_input_focus();
+                self.focus = Focus::Popup;
+            }
+            InputAction::Lock => {
+                self.popup.lock_input();
                 self.focus = Focus::Popup;
             }
             InputAction::AutoComplete => {
@@ -215,7 +220,11 @@ impl App {
             InputAction::CursorLeft => self.popup.move_cursor_left(),
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.handle_input_enter(),
-            _ => {}
+            InputAction::Error(msg) => {
+                if self.popup.invalidate_input(&msg) {
+                    self.focus = Focus::Input;
+                }
+            }
         }
     }
 
@@ -646,21 +655,60 @@ impl App {
                 let Some(bytes_entry) = self.popup.get_selected() else {
                     return;
                 };
+                // Remove focus from the input field and start verification password spinner
                 let bytes = bytes_entry.as_bytes();
-                let api = chain.client();
-                let result = self
-                    .popup
-                    .execute_with_password(|password| -> Result<(), TuiError> {
-                        let signer = suno_signer::load_keypair(password)?;
-                        sync::spawn_sign_and_submit(&api, &runtime, &signer, &bytes, &self.tx);
+                let api = chain.client().clone();
+                let runtime = runtime.clone();
+                let tx = self.tx.clone();
+                // Lock input so it can't be changed unless there's an error
+                let _ = self.tx.send(Action::Input(InputAction::Lock));
 
-                        Ok(())
-                    });
+                let result =
+                    self.popup
+                        .execute_with_password(|password| -> Result<(), TuiError> {
+                            let password = password.to_string();
+                            tokio::spawn(async move {
+                                // Use spawn_blocking for CPU-intensive decrypt_json operation
+                                let signer_result = tokio::task::spawn_blocking(move || {
+                                    suno_signer::load_keypair(&password)
+                                })
+                                .await;
 
+                                match signer_result {
+                                    Ok(Ok(signer)) => {
+                                        sync::spawn_sign_and_submit(
+                                            &api, &runtime, &signer, &bytes, &tx,
+                                        );
+                                    }
+                                    Ok(Err(e)) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to load keypair: {}", e),
+                                        )));
+                                        let _ = tx.send(Action::Input(InputAction::Error(
+                                            "Invalid password".to_string(),
+                                        )));
+                                    }
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Task failed: {}", e),
+                                        )));
+                                        let _ = tx.send(Action::Input(InputAction::Error(
+                                            "Something went wrong, check errors and try again"
+                                                .to_string(),
+                                        )));
+                                    }
+                                }
+                            });
+
+                            Ok(())
+                        });
                 if let Err(e) = result {
                     let _ = self
                         .tx
                         .send(Action::System(SystemAction::Error(e.to_string())));
+                    let _ = self.tx.send(Action::Input(InputAction::Error(
+                        "Something went wrong, check errors and try again".to_string(),
+                    )));
                 }
             }
             _ => {}

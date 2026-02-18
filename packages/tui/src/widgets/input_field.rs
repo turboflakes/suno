@@ -1,4 +1,5 @@
 use crate::call::{Call, CallError};
+use crate::widgets::spinner::Spinner;
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
@@ -31,6 +32,9 @@ pub struct InputField {
     /// Set input metadata useful to validate input
     #[zeroize(skip)]
     metadata: Option<Metadata>,
+    /// Hold spinner widget state
+    #[zeroize(skip)]
+    spinner: Spinner,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -38,6 +42,7 @@ pub enum Mode {
     #[default]
     Normal,
     Editing,
+    Locked,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -51,7 +56,8 @@ pub enum Type {
 pub enum Status {
     #[default]
     None, // No text yet
-    Valid,           // Input text is valid either password or command
+    Busy,            // Input is being processed
+    Valid,           // Input text is present/valid either password or command
     Invalid(String), // Some invalid text found
 }
 
@@ -59,6 +65,7 @@ impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::None => write!(f, "none"),
+            Self::Busy => write!(f, "busy"),
             Self::Valid => write!(f, "valid"),
             Self::Invalid(msg) => write!(f, "{}", msg),
         }
@@ -83,6 +90,7 @@ impl InputField {
             cursor_position: None,
             status: Status::default(),
             metadata: None,
+            spinner: Spinner::default(),
         }
     }
 
@@ -114,20 +122,28 @@ impl InputField {
         self.status.to_string()
     }
 
+    pub fn spinner(&self) -> &Spinner {
+        &self.spinner
+    }
+
     pub fn is_empty(&self) -> bool {
         self.input.is_empty()
     }
 
     pub fn is_active(&self) -> bool {
-        self.mode == Mode::Editing
+        matches!(self.mode, Mode::Editing)
+    }
+
+    pub fn is_locked(&self) -> bool {
+        matches!(self.mode, Mode::Locked)
     }
 
     pub fn is_password(&self) -> bool {
-        self.r#type == Type::Password
+        matches!(self.r#type, Type::Password)
     }
 
     pub fn is_command(&self) -> bool {
-        self.r#type == Type::Command
+        matches!(self.r#type, Type::Command)
     }
 
     fn validate(&mut self) {
@@ -160,6 +176,12 @@ impl InputField {
                 }
             }
         }
+    }
+
+    fn invalidate(&mut self, msg: &str) -> bool {
+        self.status = Status::Invalid(msg.to_string());
+        self.mode = Mode::Editing;
+        true
     }
 
     pub fn parsed_call(&self) -> Option<Call> {
@@ -233,11 +255,20 @@ impl InputField {
         self.label = Some(label);
     }
 
-    const fn set_focus(&mut self) {
-        self.mode = Mode::Editing;
+    pub fn lock_input(&mut self) {
+        self.mode = Mode::Locked;
+        self.status = Status::Busy;
     }
 
-    const fn clear_focus(&mut self) {
+    fn set_focus(&mut self) -> bool {
+        if self.is_locked() {
+            return false;
+        }
+        self.mode = Mode::Editing;
+        true
+    }
+
+    const fn clear_mode(&mut self) {
         self.mode = Mode::Normal;
     }
 
@@ -251,15 +282,16 @@ impl InputField {
         self.input = Zeroizing::new(value);
     }
 
+    pub fn is_busy(&self) -> bool {
+        matches!(self.status, Status::Busy)
+    }
+
     pub fn is_valid(&self) -> bool {
-        self.status == Status::Valid
+        matches!(self.status, Status::Valid)
     }
 
     pub fn is_invalid(&self) -> bool {
-        match self.status {
-            Status::Invalid(_) => true,
-            _ => false,
-        }
+        matches!(self.status, Status::Invalid(_))
     }
 
     const fn as_password(&mut self) {
@@ -285,7 +317,7 @@ impl InputField {
         self.input.clear();
         self.character_index = 0;
         self.status = Status::None;
-        self.clear_focus();
+        self.clear_mode();
     }
 }
 
@@ -354,14 +386,24 @@ impl InputFieldWidget {
         state.set_label(label);
     }
 
-    pub fn set_focus(&mut self) {
+    pub fn set_focus(&mut self) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_focus();
+        state.set_focus()
     }
 
     pub fn clear_focus(&mut self) {
         let mut state = self.state.write().unwrap();
-        state.clear_focus();
+        state.clear_mode();
+    }
+
+    pub fn lock_input(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.lock_input();
+    }
+
+    pub fn invalidate(&mut self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.invalidate(msg)
     }
 
     pub fn insert_char(&mut self, new_char: char) {

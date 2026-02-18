@@ -6,6 +6,7 @@ pub mod input_password;
 pub mod logo;
 pub mod popup;
 pub mod scrollbar;
+pub mod spinner;
 pub mod validators;
 pub mod validators_compact;
 pub mod validators_detailed_group;

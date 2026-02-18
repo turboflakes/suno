@@ -302,14 +302,24 @@ impl PopupWidget {
     }
 
     // Input actions
-    pub fn set_input_focus(&self) {
+    pub fn set_input_focus(&self) -> bool {
         let mut state = self.state.write().unwrap();
-        state.input.set_focus();
+        state.input.set_focus()
     }
 
     pub fn clear_input_focus(&self) {
         let mut state = self.state.write().unwrap();
         state.input.clear_focus();
+    }
+
+    pub fn lock_input(&self) {
+        let mut state = self.state.write().unwrap();
+        state.input.lock_input();
+    }
+
+    pub fn invalidate_input(&self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.input.invalidate(msg)
     }
 
     pub fn insert_input_char(&self, new_char: char) {
@@ -344,7 +354,6 @@ impl PopupWidget {
         F: FnOnce(&str) -> Result<R, E>,
     {
         let state = self.state.read().unwrap();
-
         state.input.execute_with_password(f)
     }
 }
@@ -380,7 +389,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Max(top_len), // Top header
-            Constraint::Length(5),    // InputField as command mode (label + input)
+            Constraint::Length(5),    // InputField as command mode (input (3) + invalid msg (2))
         ])
         .flex(Flex::End)
         .split(area);
@@ -420,7 +429,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(6),    // Details
-            Constraint::Length(3), // InputField as password mode
+            Constraint::Length(5), // InputField as password mode (input (3) + invalid msg (2))
         ])
         .split(area);
 

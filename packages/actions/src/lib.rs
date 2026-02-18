@@ -59,13 +59,14 @@ pub enum PopupAction {
 pub enum InputAction {
     Char(char),
     AutoComplete,
-    Submit,
     Enter,
     Delete,
     CursorLeft,
     CursorRight,
     Editing,
     Unfocus,
+    Lock,
+    Error(String),
 }
 
 type ValidatorKey = AccountKey;
