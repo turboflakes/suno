@@ -67,7 +67,7 @@ impl Widget for &InputPasswordWidget {
         if state.is_empty() && state.is_active() {
             input_spans.push(Span::raw("proxy password").style(THEME.input.placeholder));
         } else if state.is_locked() {
-            input_spans.push(Span::raw("verifying password..").style(THEME.input.placeholder));
+            input_spans.push(Span::raw("unlocking proxy account..").style(THEME.input.placeholder));
         }
 
         // Input value
