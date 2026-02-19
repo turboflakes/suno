@@ -92,13 +92,6 @@ pub enum ChainAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
-    SubmitChill,
-    SubmitBond,
-    SubmitUnbond,
-    SubmitChangeRewardDestination,
-    SubmitChangeCommission,
-    SubmitKickNominators,
-    SubmitSetSessionKey,
     UpdateCommission(ValidatorKey, Commission),
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),

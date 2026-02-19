@@ -428,13 +428,6 @@ impl App {
 
     fn handle_validator_actions(&mut self, action: ValidatorAction) {
         match action {
-            ValidatorAction::SubmitChill => {}
-            ValidatorAction::SubmitBond => {}
-            ValidatorAction::SubmitUnbond => {}
-            ValidatorAction::SubmitChangeRewardDestination => {}
-            ValidatorAction::SubmitChangeCommission => {}
-            ValidatorAction::SubmitKickNominators => {}
-            ValidatorAction::SubmitSetSessionKey => {}
             ValidatorAction::UpdateCommission(validator_key, commission) => {
                 self.validators
                     .update_commission(&validator_key, commission);
