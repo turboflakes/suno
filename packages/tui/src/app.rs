@@ -473,7 +473,7 @@ impl App {
                 self.popup.update_transaction_status(&message);
             }
             TxAction::InFinalizedBlock(block_hash) => {
-                let message = format!("finalized in block {block_hash}");
+                let message = format!("transaction finalized in block {block_hash}");
                 self.popup.update_transaction_status(&message);
             }
             TxAction::Success => {

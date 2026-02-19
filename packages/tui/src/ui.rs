@@ -7,7 +7,7 @@ use ratatui::{
     prelude::Margin,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph},
+    widgets::{Block, BorderType, Borders, Padding, Paragraph},
     Frame,
 };
 use suno_config::CONFIG;
@@ -92,24 +92,34 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if app.popup.is_visible() {
         match app.section {
             Section::Validators => {
-                render_validators_popup(app, frame);
+                render_validators_popup(app, frame, container[0]);
             }
             _ => {}
         }
     }
 }
 
-fn render_validators_popup(app: &mut App, frame: &mut Frame) {
+fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     let area = match &app.popup.get_mode() {
-        PopupMode::Menu => popup_area(frame.area(), 40, 30, Flex::Center),
-        PopupMode::ConfirmAndSign => popup_area(frame.area(), 40, 20, Flex::Center),
-        PopupMode::Transaction => {
-            let mut area = popup_area(frame.area(), 20, 6, Flex::End);
-            area.height = 3;
-            area
-        }
+        PopupMode::Menu => popup_area(
+            frame.area(),
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+            Flex::Center,
+        ),
+        PopupMode::ConfirmAndSign => popup_area(
+            frame.area(),
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+            Flex::Center,
+        ),
+        PopupMode::Transaction => popup_area(
+            area,
+            Constraint::Percentage(100),
+            Constraint::Length(3),
+            Flex::End,
+        ),
     };
-    // frame.render_widget(Clear, area); //this clears out the background
     frame.render_widget(&app.popup, area);
     // Apply the cursor if it was set during render
     let state = app.popup.state.read().unwrap();
@@ -118,10 +128,9 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame) {
     }
 }
 
-fn popup_area(area: Rect, percent_x: u16, percent_y: u16, flex: Flex) -> Rect {
-    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(flex);
-    // let vertical = Layout::vertical([Constraint::Fill(1)]).flex(flex);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(flex);
+fn popup_area(area: Rect, x: Constraint, y: Constraint, flex: Flex) -> Rect {
+    let horizontal = Layout::horizontal([x]).flex(flex);
+    let vertical = Layout::vertical([y]).flex(flex);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
     area

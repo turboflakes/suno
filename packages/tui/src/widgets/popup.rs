@@ -1,4 +1,4 @@
-use crate::call::{Call, CallError};
+use crate::call::Call;
 use crate::entry::{
     AsBytes, Command, Entry, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder,
 };
@@ -8,11 +8,10 @@ use log::{info, warn};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
-    style::{Color, Modifier, Style, Styled},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
-        TableState, Widget, Wrap,
+        Block, Cell, Clear, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget,
+        Wrap,
     },
 };
 use std::sync::{Arc, RwLock};
@@ -359,7 +358,7 @@ impl Widget for &PopupWidget {
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let block = Block::new()
-        .set_style(THEME.block.active)
+        .style(THEME.block.active)
         .padding(Padding::symmetric(0, 1));
 
     let options = state.get_options_filtered();
@@ -377,6 +376,10 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .flex(Flex::End)
         .split(area);
 
+    // NOTE: Clear top header background and skip the inputfield, since is better
+    // to be managed in the input widget
+    Clear.render(area[0], buf);
+
     let widths = [
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -388,7 +391,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
 
     let table = Table::new(rows, widths)
         .block(block)
-        .header(Row::new(header_labels).set_style(THEME.table.header))
+        .header(Row::new(header_labels).style(THEME.table.header))
         .style(THEME.table.base)
         .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
@@ -498,16 +501,21 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+    let horizontal = Layout::horizontal([Constraint::Max(56)]);
+    let [area] = horizontal.areas(area);
+
+    Clear.render(area, buf);
+
     let block = Block::new()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain);
+        .style(THEME.block.main)
+        .padding(Padding::proportional(1));
 
     let spinner_progress = state.spinner.progress();
     let rows = state
         .options
         .iter()
         .map(|f| f.to_row(state.mode.clone(), Some(&spinner_progress)));
-    let widths = [Constraint::Length(7), Constraint::Fill(1)];
+    let widths = [Constraint::Fill(1), Constraint::Length(7)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base)
         .block(block);
@@ -549,9 +557,9 @@ impl<
             Command::Text(t) => match mode {
                 Mode::Transaction => {
                     let mut cols = Vec::new();
-                    cols.push(Cell::from(msg.unwrap_or("").to_string()));
+                    cols.push(Cell::from(Line::from(format!("{t}"))));
                     cols.push(Cell::from(
-                        Line::from(format!("[{t}]")).alignment(Alignment::Right),
+                        Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
                     ));
 
                     Row::new(cols)

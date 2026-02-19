@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Position, Rect},
     style::Styled,
     text::{Line, Span},
-    widgets::{Block, Padding, Paragraph, Widget},
+    widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
 
@@ -31,16 +31,18 @@ impl Widget for &InputPasswordWidget {
             .constraints(v_constraints)
             .split(area);
 
+        Clear.render(area[0], buf);
+
         let mut h_constraints = vec![
             Constraint::Fill(1), // InputField
         ];
 
-        // set area to show hotkey when input is valid
+        // Set area to show hotkey when input is valid
         if state.is_valid() {
             h_constraints.push(Constraint::Length(7))
         }
 
-        // set area to show spinner when input is busy
+        // Set area to show spinner when input is busy
         if state.is_busy() {
             h_constraints.push(Constraint::Length(4))
         }
@@ -85,7 +87,7 @@ impl Widget for &InputPasswordWidget {
             state.reset_cursor_position();
         }
 
-        // show hotkey when input is valid
+        // Show hotkey when input is valid
         if state.is_valid() {
             let block = Block::new()
                 .set_style(THEME.input.base(state.is_active()))
@@ -104,8 +106,9 @@ impl Widget for &InputPasswordWidget {
             spinner.render(input_area[1], buf);
         }
 
-        // show invalid message when input is invalid
+        // Show invalid message when input is invalid
         if state.is_invalid() {
+            Clear.render(area[1], buf);
             let block = Block::new()
                 .set_style(THEME.input.base(state.is_active()))
                 .padding(Padding::new(2, 0, 0, 1));

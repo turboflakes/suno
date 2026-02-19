@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Position, Rect},
     style::Styled,
     text::{Line, Span},
-    widgets::{Block, Padding, Paragraph, Widget},
+    widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
 
@@ -32,12 +32,14 @@ impl Widget for &InputCommandWidget {
             .constraints(v_constraints)
             .split(area);
 
+        Clear.render(area[0], buf);
+
         let mut h_constraints = vec![
             Constraint::Length(3), // prefix_marker '/'
             Constraint::Fill(1),   // InputField
         ];
 
-        // set area to show hotkey when input is valid
+        // Set area to show hotkey when input is valid
         if state.is_valid() {
             h_constraints.push(Constraint::Length(7))
         }
@@ -47,9 +49,8 @@ impl Widget for &InputCommandWidget {
             .constraints(h_constraints)
             .split(area[0]);
 
-        //
         let block = Block::new()
-            .set_style(THEME.input.base(state.is_active()))
+            .style(THEME.input.base(state.is_active()))
             .padding(Padding::new(2, 0, 1, 1));
 
         let marker = Paragraph::new(Line::from(vec![
@@ -59,7 +60,7 @@ impl Widget for &InputCommandWidget {
         marker.render(input_area[0], buf);
 
         let block = Block::new()
-            .set_style(THEME.input.base(state.is_active()))
+            .style(THEME.input.base(state.is_active()))
             .padding(Padding::new(0, 2, 1, 1));
 
         let mut input_spans = vec![];
@@ -99,10 +100,10 @@ impl Widget for &InputCommandWidget {
             state.reset_cursor_position();
         }
 
-        // show hotkey when input is valid
+        // Show hotkey when input is valid
         if state.is_valid() {
             let block = Block::new()
-                .set_style(THEME.input.base(state.is_active()))
+                .style(THEME.input.base(state.is_active()))
                 .padding(Padding::new(0, 2, 1, 1));
 
             let hotkey = Paragraph::new(Line::from(vec![
@@ -112,10 +113,11 @@ impl Widget for &InputCommandWidget {
             hotkey.render(input_area[2], buf);
         }
 
-        // show invalid message when input is invalid
+        // Show invalid message when input is invalid
         if state.is_invalid() {
+            Clear.render(area[1], buf);
             let block = Block::new()
-                .set_style(THEME.input.base(state.is_active()))
+                .style(THEME.input.base(state.is_active()))
                 .padding(Padding::new(2, 0, 0, 1));
 
             let error = Paragraph::new(Line::from(vec![
