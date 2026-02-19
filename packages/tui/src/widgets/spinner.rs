@@ -36,7 +36,7 @@ impl Spinner {
 
     pub fn progress(&self) -> String {
         let full = "⣿".repeat(self.counter);
-        format!("{}{}", self.frame(), full)
+        format!("{}{}", full, self.frame())
     }
 
     pub fn increment(&mut self) {

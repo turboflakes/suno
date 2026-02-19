@@ -17,6 +17,7 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
 use suno_primitives::{staking::Payee, tx::Bytes};
+use unicode_width::UnicodeWidthStr;
 
 /// Popup modes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -367,18 +368,18 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     // Split the area into top header to show all options, a small central box to show the input field
     // and a bottom footer to show the error message
     let top_len = (options.len() as u16 + 3).clamp(4, 10);
-    let area = Layout::default()
+    let [details_area, input_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Max(top_len), // Top header
             Constraint::Length(5),    // InputField as command mode (input (3) + invalid msg (2))
         ])
         .flex(Flex::End)
-        .split(area);
+        .areas(area);
 
     // NOTE: Clear top header background and skip the inputfield, since is better
     // to be managed in the input widget
-    Clear.render(area[0], buf);
+    Clear.render(details_area, buf);
 
     let widths = [
         Constraint::Length(2),
@@ -398,11 +399,11 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     // NOTE: ensure that the selected entry is always the first one on the list
     state.table_state.select(Some(0));
 
-    StatefulWidget::render(table, area[0], buf, &mut state.table_state);
+    StatefulWidget::render(table, details_area, buf, &mut state.table_state);
 
     // Render input area
     let call = state.get_selected_call();
-    state.input.as_command(call).render(area[1], buf);
+    state.input.as_command(call).render(input_area, buf);
 }
 
 fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) {
@@ -410,36 +411,24 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         .style(THEME.block.active)
         .padding(Padding::proportional(1));
 
-    // Split the area into header to show transaction details and password input area
-    let area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(6),    // Details
-            Constraint::Length(5), // InputField as password mode (input (3) + invalid msg (2))
-        ])
-        .split(area);
-
-    // Get network from the first position in the list
+    // Get all required data from 'state.options' based on the indices established
+    // in `init_menu`.
     let Some(network_entry) = state.options.get(0) else {
         return;
     };
-    // Get spec_version from the second position in the list
     let Some(spec_version_entry) = state.options.get(1) else {
         return;
     };
-    // Get proxy identity from the third position in the list
     let Some(proxy_identity_entry) = state.options.get(2) else {
         return;
     };
-    // Get proxied identity from the third position in the list
     let Some(stash_identity_entry) = state.options.get(3) else {
         return;
     };
-    // Get call from the fourth position in the list
     let Some(call_entry) = state.options.get(4) else {
         return;
     };
-    // Get bytes from the fifth position in the list
+
     let Some(bytes_entry) = state.options.get(5) else {
         return;
     };
@@ -470,7 +459,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     ]);
 
     // Calculate spaces needed to show the `ctrl+shift+c copy on the right`
-    let available_width = area[0].width.saturating_sub(4);
+    let available_width = area.width.saturating_sub(4);
     let left_text = "call data";
     let spaces = available_width.saturating_sub((left_text.len() + 17) as u16);
 
@@ -483,6 +472,17 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     ]);
 
     let call_data = Line::from(bytes_entry.to_hex());
+    let call_data_lines = calculate_text_wrapped_lines(&bytes_entry.to_hex(), area.width);
+
+    // Split the area into header to show transaction details and password input area
+    let [details_area, input_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(7 + call_data_lines), // Details
+            Constraint::Length(5), // InputField as password mode (input (3) + invalid msg (2))
+        ])
+        .flex(Flex::End)
+        .areas(area);
 
     let details = Paragraph::new(vec![
         network,
@@ -494,10 +494,10 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     ])
     .block(block)
     .wrap(Wrap { trim: false });
-    details.render(area[0], buf);
+    details.render(details_area, buf);
 
     // Render input area
-    state.input.as_password().render(area[1], buf);
+    state.input.as_password().render(input_area, buf);
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
@@ -569,4 +569,23 @@ impl<
             _ => Row::new(vec!["".to_string()]),
         }
     }
+}
+
+fn calculate_text_wrapped_lines(text: &str, area_width: u16) -> u16 {
+    let mut total_lines = 0;
+
+    for line in text.lines() {
+        let line_width = line.width();
+        let area_width = area_width as usize;
+
+        if line_width == 0 {
+            total_lines += 1;
+        } else {
+            // Calculate how many lines this single line will wrap into
+            let wrapped = (line_width + area_width - 1) / area_width;
+            total_lines += wrapped as u16;
+        }
+    }
+
+    total_lines.max(1)
 }

@@ -63,4 +63,5 @@ tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
 tui-logger = "0.14"
+unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }
