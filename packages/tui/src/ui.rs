@@ -107,7 +107,7 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
             Constraint::Percentage(40),
             Flex::Center,
         ),
-        PopupMode::ConfirmAndSign => popup_area(
+        PopupMode::Confirm | PopupMode::Locked => popup_area(
             frame.area(),
             Constraint::Percentage(40),
             Constraint::Percentage(40),
@@ -220,8 +220,11 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled(format!("confirm"), THEME.paragraph.label));
                 legend.push(Span::raw("   "));
+                legend.push(Span::styled(format!("esc"), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(format!("close"), THEME.paragraph.label));
             }
-            PopupMode::ConfirmAndSign => {
+            PopupMode::Confirm => {
                 legend.push(Span::styled(format!("enter"), THEME.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled(
@@ -229,12 +232,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                     THEME.paragraph.label,
                 ));
                 legend.push(Span::raw("   "));
+                legend.push(Span::styled(format!("esc"), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(format!("close"), THEME.paragraph.label));
             }
             _ => {}
         }
-        legend.push(Span::styled(format!("esc"), THEME.paragraph.base));
-        legend.push(Span::raw(" "));
-        legend.push(Span::styled(format!("close"), THEME.paragraph.label));
     } else if app.chains.is_active() || app.validators.is_active() {
         legend.push(Span::raw("   "));
         legend.push(Span::styled(format!("tab or ↑ ↓"), THEME.paragraph.base));

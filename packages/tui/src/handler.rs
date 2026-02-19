@@ -37,6 +37,11 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                         KeyCode::Char('l') => Action::Navigation(NavigationAction::SectionDown),
                         _ => Action::System(SystemAction::Noop),
                     },
+                    Focus::Input => match key_event.code {
+                        KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
+                        KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
+                        _ => Action::System(SystemAction::Noop),
+                    },
                     _ => Action::System(SystemAction::Noop),
                 },
             }
@@ -97,6 +102,8 @@ fn handle_editing_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Left => Action::Input(InputAction::CursorLeft),
         KeyCode::Right => Action::Input(InputAction::CursorRight),
         KeyCode::Esc => Action::Input(InputAction::Unfocus),
+        KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
+        KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
         _ => Action::System(SystemAction::Noop),
     }
 }

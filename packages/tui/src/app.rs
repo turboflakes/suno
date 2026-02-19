@@ -127,7 +127,7 @@ impl App {
         Ok(())
     }
 
-    fn context(&self) -> Option<Context> {
+    fn _context(&self) -> Option<Context> {
         let validator = self.validators.get_selected()?;
         let runtime = validator.runtime().asset_hub_runtime();
         let chain = self.chains.get_chain_by_runtime(&runtime)?;
@@ -209,7 +209,7 @@ impl App {
                 self.focus = Focus::Popup;
             }
             InputAction::Lock => {
-                self.popup.lock_input();
+                self.popup.lock();
                 self.focus = Focus::Popup;
             }
             InputAction::AutoComplete => {
@@ -464,6 +464,8 @@ impl App {
         match action {
             TxAction::Processing => {
                 self.popup.show_transaction_status();
+                // Switch app focus to main while rendering transaction status
+                self.focus = Focus::Main;
             }
             TxAction::Sent => {
                 self.popup.update_transaction_status("transaction sent");
@@ -481,6 +483,7 @@ impl App {
             }
             TxAction::Error(err) => {
                 error!("Transaction error: {}", err);
+                self.close_popup();
             }
         }
     }
@@ -543,9 +546,6 @@ impl App {
 
     /// Moves the active section up.
     pub fn section_up(&mut self) {
-        if self.popup.is_visible() {
-            return;
-        }
         let config = CONFIG.clone();
         self.section = self.section.up(&config.features);
         self.chains.set_active(self.section == Section::Chains);
@@ -557,9 +557,6 @@ impl App {
 
     /// Moves the active section down.
     pub fn section_down(&mut self) {
-        if self.popup.is_visible() {
-            return;
-        }
         let config = CONFIG.clone();
         self.section = self.section.down(&config.features);
         self.chains.set_active(self.section == Section::Chains);
@@ -651,22 +648,20 @@ impl App {
                     Err(err) => self.error(err),
                 }
             }
-            PopupMode::ConfirmAndSign => {
+            PopupMode::Confirm => {
                 let Some(bytes_entry) = self.popup.get_selected() else {
                     return;
                 };
-                // Remove focus from the input field and start verification password spinner
                 let bytes = bytes_entry.as_bytes();
                 let api = chain.client().clone();
                 let runtime = runtime.clone();
                 let tx = self.tx.clone();
-                // Lock input so it can't be changed unless there's an error
-                let _ = self.tx.send(Action::Input(InputAction::Lock));
 
                 let result =
                     self.popup
                         .execute_with_password(|password| -> Result<(), TuiError> {
                             let password = password.to_string();
+
                             tokio::spawn(async move {
                                 // Use spawn_blocking for CPU-intensive decrypt_json operation
                                 let signer_result = tokio::task::spawn_blocking(move || {
@@ -700,6 +695,10 @@ impl App {
                                 }
                             });
 
+                            // Lock input so it can't be changed unless there's an error
+                            // and remove focus from the input field and start verification password spinner
+                            let _ = self.tx.send(Action::Input(InputAction::Lock));
+
                             Ok(())
                         });
                 if let Err(e) = result {
@@ -717,7 +716,12 @@ impl App {
 
     /// Cancel instruction.
     pub fn cancel(&mut self) {
-        self.close_popup();
+        match self.popup.get_mode() {
+            PopupMode::Menu | PopupMode::Confirm => {
+                self.close_popup();
+            }
+            _ => {}
+        }
     }
 
     /// Reset active selection
@@ -734,7 +738,7 @@ impl App {
         }
 
         match self.popup.get_mode() {
-            PopupMode::ConfirmAndSign => {
+            PopupMode::Confirm | PopupMode::Locked => {
                 let Some(bytes_entry) = self.popup.get_selected() else {
                     return;
                 };

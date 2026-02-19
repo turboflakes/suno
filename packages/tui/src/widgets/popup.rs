@@ -24,7 +24,8 @@ use unicode_width::UnicodeWidthStr;
 pub enum Mode {
     #[default]
     Menu,
-    ConfirmAndSign,
+    Confirm,
+    Locked,
     Transaction,
 }
 
@@ -57,16 +58,16 @@ impl Default for ListState {
 }
 
 impl ListState {
+    pub fn set_lock(&mut self) {
+        self.mode = Mode::Locked;
+    }
+
     pub fn get_input_cursor_position(&self) -> Option<Position> {
         self.input.get_cursor_position()
     }
 
     pub fn get_input_parsed_call(&self) -> Option<Call> {
         self.input.get_parsed_call()
-    }
-
-    pub fn get_selected(&self) -> Option<Entry<Call>> {
-        self.table_state.selected().map(|i| self.options[i].clone())
     }
 
     pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
@@ -83,16 +84,28 @@ impl ListState {
             .collect()
     }
 
+    pub fn get_selected(&self) -> Option<Entry<Call>> {
+        match self.mode {
+            Mode::Menu => {
+                let options = self.get_options_filtered();
+                if options.is_empty() {
+                    return None;
+                }
+                self.table_state.selected().map(|i| options[i].clone())
+            }
+            _ => self.table_state.selected().map(|i| self.options[i].clone()),
+        }
+    }
+
     pub fn get_selected_call(&self) -> Option<Call> {
-        let options = self.get_options_filtered();
-        options
-            .iter()
-            .next()
-            .map(|e| match e.get_command() {
+        if let Some(selected) = self.get_selected() {
+            match selected.get_command() {
                 Command::Instruction(call) => Some(call),
                 _ => None,
-            })
-            .flatten()
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -165,16 +178,17 @@ impl PopupWidget {
 
     pub fn move_down(&self) -> Option<Entry<Call>> {
         let mut state = self.state.write().unwrap();
+        let options = state.get_options_filtered();
+        if options.is_empty() {
+            return None;
+        }
         if let Some(selected) = state.table_state.selected() {
-            if selected == state.options.len() - 1 {
+            if selected == options.len() - 1 {
                 state.table_state.select_first();
             } else {
-                state.table_state.scroll_down_by(1);
+                state.table_state.select(Some(selected + 1));
             }
-            state
-                .table_state
-                .selected()
-                .map(|i| state.options[i].clone())
+            state.table_state.selected().map(|i| options[i].clone())
         } else {
             None
         }
@@ -182,17 +196,19 @@ impl PopupWidget {
 
     pub fn move_up(&self) -> Option<Entry<Call>> {
         let mut state = self.state.write().unwrap();
+        let options = state.get_options_filtered();
+        if options.is_empty() {
+            return None;
+        }
         if let Some(selected) = state.table_state.selected() {
             if selected == 0 {
-                let i = state.options.len() - 1;
+                let i = options.len() - 1;
                 state.table_state.select(Some(i));
             } else {
-                state.table_state.scroll_up_by(1);
+                state.table_state.select(Some(selected - 1));
             }
-            state
-                .table_state
-                .selected()
-                .map(|i| state.options[i].clone())
+
+            state.table_state.selected().map(|i| options[i].clone())
         } else {
             None
         }
@@ -201,6 +217,16 @@ impl PopupWidget {
     pub fn is_visible(&self) -> bool {
         let state = self.state.read().unwrap();
         state.is_visible
+    }
+
+    pub fn is_menu_visible(&self) -> bool {
+        let state = self.state.read().unwrap();
+        matches!(state.mode, Mode::Menu)
+    }
+
+    pub fn is_transaction_visible(&self) -> bool {
+        let state = self.state.read().unwrap();
+        matches!(state.mode, Mode::Transaction)
     }
 
     pub fn show_extrinsics(&self) {
@@ -260,7 +286,7 @@ impl PopupWidget {
         bytes: Bytes,
     ) {
         let mut state = self.state.write().unwrap();
-        state.mode = Mode::ConfirmAndSign;
+        state.mode = Mode::Confirm;
         state.options.clear();
         state
             .options
@@ -295,8 +321,9 @@ impl PopupWidget {
         state.input.clear_focus();
     }
 
-    pub fn lock_input(&self) {
+    pub fn lock(&self) {
         let mut state = self.state.write().unwrap();
+        state.set_lock();
         state.input.lock_input();
     }
 
@@ -313,6 +340,18 @@ impl PopupWidget {
     pub fn delete_input_char(&self) {
         let mut state = self.state.write().unwrap();
         state.input.delete_char();
+
+        match state.mode {
+            Mode::Menu => {
+                let options = state.get_options_filtered();
+                if options.is_empty() {
+                    return;
+                }
+                // NOTE: ensure to select the first entry as soon as options are not filtered out
+                state.table_state.select(Some(0));
+            }
+            _ => {}
+        }
     }
 
     pub fn move_cursor_left(&self) {
@@ -351,7 +390,7 @@ impl Widget for &PopupWidget {
 
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
-            Mode::ConfirmAndSign => render_confirm_and_sign(area, buf, &mut state),
+            Mode::Confirm | Mode::Locked => render_confirm_and_sign(area, buf, &mut state),
             Mode::Transaction => render_transaction(area, buf, &mut state),
         }
     }
@@ -395,9 +434,6 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .header(Row::new(header_labels).style(THEME.table.header))
         .style(THEME.table.base)
         .row_highlight_style(THEME.table.row_highlight(state.is_visible));
-
-    // NOTE: ensure that the selected entry is always the first one on the list
-    state.table_state.select(Some(0));
 
     StatefulWidget::render(table, details_area, buf, &mut state.table_state);
 
