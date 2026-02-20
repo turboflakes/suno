@@ -71,6 +71,14 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond_extra(amount);
                     suno_asset_hub_paseo::wrap_call_into_proxy(&api, rc, stash)
                 }
+                Call::Unbond { amount } => {
+                    let rc = suno_asset_hub_paseo::extrinsics::staking_unbond(amount);
+                    suno_asset_hub_paseo::wrap_call_into_proxy(&api, rc, stash)
+                }
+                Call::SetPayee { payee } => {
+                    let rc = suno_asset_hub_paseo::extrinsics::staking_set_payee(payee);
+                    suno_asset_hub_paseo::wrap_call_into_proxy(&api, rc, stash)
+                }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             _ => Err(Error::UnsupportedRuntime(self.clone())),

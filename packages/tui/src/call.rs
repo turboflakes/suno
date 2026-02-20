@@ -11,7 +11,7 @@ pub enum Call {
     Bond { amount: u128, payee: Payee },
     BondExtra { amount: u128 },
     Unbond { amount: u128 },
-    ChangePayee,
+    SetPayee { payee: Payee },
     ChangeCommission,
     KickNominators,
     SetSessionKey,
@@ -87,6 +87,11 @@ impl Call {
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
+                "set_payee" => {
+                    let payee = Payee::from_str(args)?;
+                    Ok(Self::SetPayee { payee })
+                }
+
                 // TODO: implement missing calls..
                 _ => Err(CallError::InvalidArgument(input.to_string())),
             },
@@ -131,7 +136,7 @@ impl std::fmt::Display for Call {
             Self::Bond { .. } => write!(f, "bond"),
             Self::BondExtra { .. } => write!(f, "bond_extra"),
             Self::Unbond { .. } => write!(f, "unbond"),
-            Self::ChangePayee => write!(f, "change_payee"),
+            Self::SetPayee { .. } => write!(f, "set_payee"),
             Self::ChangeCommission => write!(f, "change_commission"),
             Self::KickNominators => write!(f, "kick"),
             Self::SetSessionKey => write!(f, "set_keys"),
@@ -146,7 +151,7 @@ impl ToDescription for Call {
             Self::Bond { .. } => "Bond funds".to_string(),
             Self::BondExtra { .. } => "Bond more funds".to_string(),
             Self::Unbond { .. } => "Unbond funds".to_string(),
-            Self::ChangePayee => "Change reward destination".to_string(),
+            Self::SetPayee { .. } => "Set reward destination".to_string(),
             Self::ChangeCommission => {
                 "Change commission and Allow new nominations by default".to_string()
             }
@@ -166,8 +171,8 @@ impl ToPlaceholder for Call {
             }
             Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
             Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
-            Self::ChangePayee => {
-                "change_payee <staked|stash|controller|account <address>>".to_string()
+            Self::SetPayee { .. } => {
+                "set_payee <staked|stash|controller|account <address>>".to_string()
             }
             Self::ChangeCommission => {
                 "change_commission <value-in-percentage> [yes|no]".to_string()
@@ -185,6 +190,7 @@ impl ToMethod for Call {
             Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
             Self::BondExtra { amount } => format!("bond_extra {amount}"),
             Self::Unbond { amount } => format!("unbond {amount}"),
+            Self::SetPayee { payee } => format!("set_payee {payee}"),
             _ => "TODO".to_string(),
         }
     }

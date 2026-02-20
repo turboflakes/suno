@@ -154,13 +154,15 @@ impl PopupWidget {
             .push(Entry::new(Command::Instruction(Call::ChangeCommission)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::ChangePayee)));
-        state
-            .options
             .push(Entry::new(Command::Instruction(Call::Chill)));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::KickNominators)));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::SetPayee {
+                payee: Payee::default(),
+            })));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::SetSessionKey)));

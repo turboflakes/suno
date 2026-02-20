@@ -57,6 +57,16 @@ pub fn staking_bond_extra(value: u128) -> RuntimeCall {
     })
 }
 
+pub fn staking_unbond(value: u128) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::unbond { value })
+}
+
+pub fn staking_set_payee(payee: Payee) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::set_payee {
+        payee: map_payee(payee),
+    })
+}
+
 // Helper function to map Payee to RewardDestination
 fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
     match payee {
