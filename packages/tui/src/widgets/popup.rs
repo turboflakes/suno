@@ -66,6 +66,10 @@ impl ListState {
         self.mode = Mode::Locked;
     }
 
+    pub fn set_confirm(&mut self) {
+        self.mode = Mode::Confirm;
+    }
+
     pub fn get_input_cursor_position(&self) -> Option<Position> {
         self.input.get_cursor_position()
     }
@@ -301,7 +305,6 @@ impl PopupWidget {
         bytes: Bytes,
     ) {
         let mut state = self.state.write().unwrap();
-        state.mode = Mode::Confirm;
         state.options.clear();
         state
             .options
@@ -323,6 +326,8 @@ impl PopupWidget {
         state.table_state.select(Some(5));
         // Reset the input field as a password field
         state.input.reset_as_password();
+        // Change popup mode to confirmation mode
+        state.set_confirm();
     }
 
     // Input actions
@@ -336,10 +341,15 @@ impl PopupWidget {
         state.input.clear_focus();
     }
 
-    pub fn lock(&self) {
+    pub fn set_lock_mode(&self) {
         let mut state = self.state.write().unwrap();
         state.set_lock();
         state.input.lock_input();
+    }
+
+    pub fn set_confirm_mode(&self) {
+        let mut state = self.state.write().unwrap();
+        state.set_confirm();
     }
 
     pub fn invalidate_input(&self, msg: &str) -> bool {

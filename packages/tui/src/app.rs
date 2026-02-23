@@ -209,7 +209,7 @@ impl App {
                 self.focus = Focus::Popup;
             }
             InputAction::Lock => {
-                self.popup.lock();
+                self.popup.set_lock_mode();
                 self.focus = Focus::Popup;
             }
             InputAction::AutoComplete => {
@@ -220,11 +220,15 @@ impl App {
             InputAction::CursorLeft => self.popup.move_cursor_left(),
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.handle_input_enter(),
-            InputAction::Error(msg) => {
-                if self.popup.invalidate_input(&msg) {
-                    self.focus = Focus::Input;
+            InputAction::Error(msg) => match self.popup.get_mode() {
+                PopupMode::Locked => {
+                    if self.popup.invalidate_input(&msg) {
+                        self.popup.set_confirm_mode();
+                        self.focus = Focus::Input;
+                    }
                 }
-            }
+                _ => {}
+            },
         }
     }
 
