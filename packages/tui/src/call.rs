@@ -1,6 +1,7 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
 use log::info;
 use serde::Serialize;
+use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
 use suno_primitives::staking::{Payee, PayeeError};
@@ -13,7 +14,7 @@ pub enum Call {
     BondExtra { amount: u128 },
     Unbond { amount: u128 },
     SetPayee { payee: Payee },
-    ChangeCommission,
+    Validate { commission: Perbill, blocked: bool },
     KickNominators,
     SetSessionKey,
 }
@@ -28,6 +29,10 @@ pub enum CallError {
     UnknownArgument(String),
     #[error("Invalid amount: {0}")]
     InvalidAmount(String),
+    #[error("Invalid percentage: {0}")]
+    InvalidPercentage(String),
+    #[error("Invalid percentage {0}, value must be between 0 and 100")]
+    InvalidPercentageRange(String),
     #[error("Invalid address: {0}")]
     InvalidAddress(String),
     #[error("Invalid argument: {0}")]
@@ -93,6 +98,33 @@ impl Call {
                     let payee = Payee::from_str(args)?;
                     Ok(Self::SetPayee { payee })
                 }
+                "validate" => match args.split_once(' ') {
+                    None => {
+                        let commission = parse_percentage(args)?;
+                        Ok(Self::Validate {
+                            commission,
+                            blocked: false,
+                        })
+                    }
+                    Some((value, args)) => {
+                        let commission = parse_percentage(value)?;
+                        match args.split_once(' ') {
+                            None => Err(CallError::UnknownOptional("blocked <yes|no>".to_string())),
+                            Some((blocked, args)) => match blocked {
+                                "blocked" => {
+                                    let blocked = parse_boolean(args)?;
+                                    Ok(Self::Validate {
+                                        commission,
+                                        blocked,
+                                    })
+                                }
+                                _ => {
+                                    Err(CallError::UnknownOptional("blocked <yes|no>".to_string()))
+                                }
+                            },
+                        }
+                    }
+                },
 
                 // TODO: implement missing calls..
                 _ => Err(CallError::InvalidArgument(input.to_string())),
@@ -134,6 +166,34 @@ fn parse_standard_unit(value: &str, decimals: u32) -> Result<u128, CallError> {
     }
 }
 
+fn parse_percentage(value: &str) -> Result<Perbill, CallError> {
+    let percent_value = value
+        .trim()
+        .parse::<f64>()
+        .map_err(|_| CallError::InvalidPercentage(value.to_string()))?;
+
+    // Validate range
+    if percent_value < 0.0 || percent_value > 100.0 {
+        return Err(CallError::InvalidPercentageRange(percent_value.to_string()));
+    }
+
+    // Convert percentage to fraction of 1 billion (Perbill's base)
+    // 22.5% = 0.225 = 225_000_000 / 1_000_000_000
+    let parts = (percent_value * 10_000_000.0).round() as u32;
+
+    Ok(Perbill::from_parts(parts))
+}
+
+fn parse_boolean(value: &str) -> Result<bool, CallError> {
+    match value.trim().to_lowercase().as_str() {
+        "yes" => Ok(true),
+        "no" => Ok(false),
+        _ => Err(CallError::InvalidArgument(format!(
+            "expected 'yes' or 'no'",
+        ))),
+    }
+}
+
 impl std::fmt::Display for Call {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -142,7 +202,7 @@ impl std::fmt::Display for Call {
             Self::BondExtra { .. } => write!(f, "bond_extra"),
             Self::Unbond { .. } => write!(f, "unbond"),
             Self::SetPayee { .. } => write!(f, "set_payee"),
-            Self::ChangeCommission => write!(f, "change_commission"),
+            Self::Validate { .. } => write!(f, "validate"),
             Self::KickNominators => write!(f, "kick"),
             Self::SetSessionKey => write!(f, "set_keys"),
         }
@@ -157,8 +217,8 @@ impl ToDescription for Call {
             Self::BondExtra { .. } => "Bond more funds".to_string(),
             Self::Unbond { .. } => "Unbond funds".to_string(),
             Self::SetPayee { .. } => "Set reward destination".to_string(),
-            Self::ChangeCommission => {
-                "Change commission and Allow new nominations by default".to_string()
+            Self::Validate { .. } => {
+                "Validate/Change commission or enable/disable nominations".to_string()
             }
             Self::KickNominators => "Remove nominators".to_string(),
             Self::SetSessionKey => "Set session keys".to_string(),
@@ -179,8 +239,8 @@ impl ToPlaceholder for Call {
             Self::SetPayee { .. } => {
                 "set_payee <staked|stash|controller|account <address>>".to_string()
             }
-            Self::ChangeCommission => {
-                "change_commission <value-in-percentage> [yes|no]".to_string()
+            Self::Validate { .. } => {
+                "validate <value-in-percentage> [blocked <yes|no>]".to_string()
             }
             Self::KickNominators => "kick <address_0, address_1, ...>".to_string(),
             Self::SetSessionKey => "set_keys <session_key>".to_string(),
@@ -196,6 +256,10 @@ impl ToMethod for Call {
             Self::BondExtra { amount } => format!("bond_extra {amount}"),
             Self::Unbond { amount } => format!("unbond {amount}"),
             Self::SetPayee { payee } => format!("set_payee {payee}"),
+            Self::Validate {
+                commission,
+                blocked,
+            } => format!("validate {} blocked {blocked}", commission.deconstruct()),
             _ => "TODO".to_string(),
         }
     }
@@ -242,6 +306,18 @@ mod tests {
         assert_eq!(
             parse_standard_unit("100.123", 10).unwrap(),
             1_001_230_000_000
+        );
+    }
+
+    #[test]
+    fn test_parse_percentage() {
+        assert_eq!(parse_percentage("0").unwrap().deconstruct(), 0);
+        assert_eq!(parse_percentage("1").unwrap().deconstruct(), 10_000_000);
+        assert_eq!(parse_percentage("22.5").unwrap().deconstruct(), 225_000_000);
+        assert_eq!(parse_percentage("50").unwrap().deconstruct(), 500_000_000);
+        assert_eq!(
+            parse_percentage("100").unwrap().deconstruct(),
+            1_000_000_000
         );
     }
 }

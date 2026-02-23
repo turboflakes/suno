@@ -17,6 +17,7 @@ use ratatui::{
         Wrap,
     },
 };
+use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
 use suno_primitives::{staking::Payee, tx::Bytes};
@@ -160,9 +161,6 @@ impl PopupWidget {
             })));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::ChangeCommission)));
-        state
-            .options
             .push(Entry::new(Command::Instruction(Call::Chill)));
         state
             .options
@@ -178,6 +176,12 @@ impl PopupWidget {
         state
             .options
             .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::Validate {
+                commission: Perbill::from_percent(0),
+                blocked: false,
+            })));
     }
 
     fn init_transaction(&self, state: &mut ListState) {

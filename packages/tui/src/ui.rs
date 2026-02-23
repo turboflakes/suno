@@ -103,13 +103,13 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     let area = match &app.popup.get_mode() {
         PopupMode::Menu => popup_area(
             frame.area(),
-            Constraint::Percentage(40),
+            Constraint::Percentage(45),
             Constraint::Percentage(40),
             Flex::Center,
         ),
         PopupMode::Confirm | PopupMode::Locked => popup_area(
             frame.area(),
-            Constraint::Percentage(40),
+            Constraint::Percentage(45),
             Constraint::Percentage(40),
             Flex::Center,
         ),

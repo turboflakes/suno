@@ -1,8 +1,8 @@
-use crate::node_runtime;
+use crate::node_runtime::{self, runtime_types::pallet_staking_async::ValidatorPrefs};
 use node_runtime::runtime_types::{
     asset_hub_paseo_runtime::ProxyType, pallet_staking_async::RewardDestination,
+    sp_arithmetic::per_things::Perbill,
 };
-
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::Error;
 use suno_primitives::{staking::Payee, tx::Bytes};
@@ -64,6 +64,15 @@ pub fn staking_unbond(value: u128) -> RuntimeCall {
 pub fn staking_set_payee(payee: Payee) -> RuntimeCall {
     RuntimeCall::Staking(StakingCall::set_payee {
         payee: map_payee(payee),
+    })
+}
+
+pub fn staking_validate(commission: u32, blocked: bool) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::validate {
+        prefs: ValidatorPrefs {
+            commission: Perbill(commission),
+            blocked,
+        },
     })
 }
 
