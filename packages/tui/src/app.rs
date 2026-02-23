@@ -577,7 +577,12 @@ impl App {
 
         match self.section {
             Section::Validators => {
-                self.popup.show_extrinsics();
+                let Some(validator) = self.validators.get_selected() else {
+                    return;
+                };
+
+                let runtime = validator.runtime().asset_hub_runtime();
+                self.popup.show_extrinsics(Some(runtime));
                 // Dispatch focus to the input field
                 let _ = self.tx.send(Action::Input(InputAction::Editing));
             }

@@ -3,8 +3,11 @@ use crate::entry::{
     AsBytes, Command, Entry, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder,
 };
 use crate::theme::THEME;
-use crate::widgets::{input_field::InputFieldWidget, spinner::Spinner};
-use log::{info, warn};
+use crate::widgets::{
+    input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
+    spinner::Spinner,
+};
+use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
@@ -110,7 +113,7 @@ impl ListState {
 }
 
 impl PopupWidget {
-    pub fn on_init(&self, mode: Mode) {
+    pub fn on_init(&self, mode: Mode, runtime: Option<SupportedRuntime>) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
         match mode {
@@ -125,8 +128,14 @@ impl PopupWidget {
             state.table_state.select(Some(0));
         }
 
-        // Reset the input field to command mode.
-        state.input.reset_as_command();
+        // Reset the input field to command mode and set metadata.
+        if let Some(runtime) = runtime {
+            let unit = runtime.token_symbol();
+            let decimals = runtime.token_decimals();
+            let metadata = InputFieldMetadata::new(unit, decimals);
+            state.input.reset_as_command(Some(metadata));
+        }
+
         // Make popup visible.
         state.is_visible = true;
     }
@@ -231,8 +240,8 @@ impl PopupWidget {
         matches!(state.mode, Mode::Transaction)
     }
 
-    pub fn show_extrinsics(&self) {
-        self.on_init(Mode::Menu);
+    pub fn show_extrinsics(&self, runtime: Option<SupportedRuntime>) {
+        self.on_init(Mode::Menu, runtime);
     }
 
     pub fn close(&self) {
@@ -266,7 +275,7 @@ impl PopupWidget {
     }
 
     pub fn show_transaction_status(&self) {
-        self.on_init(Mode::Transaction);
+        self.on_init(Mode::Transaction, None);
     }
 
     pub fn update_transaction_status(&self, message: &str) {

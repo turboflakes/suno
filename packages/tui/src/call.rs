@@ -1,4 +1,5 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
+use log::info;
 use serde::Serialize;
 use std::str::FromStr;
 use subxt::utils::to_hex;
@@ -40,7 +41,7 @@ pub enum CallError {
 }
 
 impl Call {
-    pub fn parse(input: &str, decimals: u8) -> Result<Self, CallError> {
+    pub fn parse(input: &str, decimals: u32) -> Result<Self, CallError> {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
@@ -76,6 +77,7 @@ impl Call {
                 "bond_extra" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
+                        info!("Bonding extra amount: {} {}  {}", amount, args, decimals);
                         Ok(Self::BondExtra { amount })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
@@ -100,11 +102,14 @@ impl Call {
 }
 
 // Helper functions
-fn parse_standard_unit(value: &str, decimals: u8) -> Result<u128, CallError> {
+fn parse_standard_unit(value: &str, decimals: u32) -> Result<u128, CallError> {
     match value.split_once('.') {
-        None => value
-            .parse::<u128>()
-            .map_err(|_| CallError::InvalidAmount(value.to_string())),
+        None => {
+            let value = value
+                .parse::<u128>()
+                .map_err(|_| CallError::InvalidAmount(value.to_string()))?;
+            Ok(value * 10u128.pow(decimals))
+        }
         Some((integer, fractional)) => {
             let integer_part = integer
                 .parse::<u128>()
@@ -124,7 +129,7 @@ fn parse_standard_unit(value: &str, decimals: u8) -> Result<u128, CallError> {
                 .parse::<u128>()
                 .map_err(|e| CallError::InvalidAmount(format!("Invalid fractional part {}", e)))?;
 
-            Ok(integer_part * 10u128.pow(decimals as u32) + fractional_part)
+            Ok(integer_part * 10u128.pow(decimals) + fractional_part)
         }
     }
 }
@@ -211,5 +216,32 @@ impl ToHex for Call {
 impl AsBytes for Call {
     fn into_bytes(&self) -> Vec<u8> {
         self.to_string().as_bytes().to_vec()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_standard_unit_integer_only() {
+        // Test whole numbers without decimal points
+        assert_eq!(parse_standard_unit("1", 10).unwrap(), 10_000_000_000);
+        assert_eq!(parse_standard_unit("100", 10).unwrap(), 1_000_000_000_000);
+        assert_eq!(parse_standard_unit("0", 10).unwrap(), 0);
+        assert_eq!(parse_standard_unit("999", 12).unwrap(), 999_000_000_000_000);
+        assert_eq!(parse_standard_unit("100", 0).unwrap(), 100);
+    }
+
+    #[test]
+    fn test_parse_standard_unit_with_decimals() {
+        // Test with decimal points - standard cases
+        assert_eq!(parse_standard_unit("1.5", 10).unwrap(), 15_000_000_000);
+        assert_eq!(parse_standard_unit("0.1", 10).unwrap(), 1_000_000_000);
+        assert_eq!(parse_standard_unit("10.25", 10).unwrap(), 102_500_000_000);
+        assert_eq!(
+            parse_standard_unit("100.123", 10).unwrap(),
+            1_001_230_000_000
+        );
     }
 }

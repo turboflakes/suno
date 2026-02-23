@@ -75,7 +75,13 @@ impl std::fmt::Display for Status {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Metadata {
     unit: String,
-    decimals: u8,
+    decimals: u32,
+}
+
+impl Metadata {
+    pub fn new(unit: String, decimals: u32) -> Self {
+        Self { unit, decimals }
+    }
 }
 
 impl InputField {
@@ -298,8 +304,9 @@ impl InputField {
         self.r#type = Type::Password;
     }
 
-    const fn as_command(&mut self) {
+    fn as_command(&mut self, metadata: Option<Metadata>) {
         self.r#type = Type::Command;
+        self.metadata = metadata;
     }
 
     pub fn reset_as_password(&mut self) {
@@ -307,9 +314,9 @@ impl InputField {
         self.as_password();
     }
 
-    pub fn reset_as_command(&mut self) {
+    pub fn reset_as_command(&mut self, metadata: Option<Metadata>) {
         self.reset();
-        self.as_command();
+        self.as_command(metadata);
     }
 
     pub fn reset(&mut self) {
@@ -366,9 +373,9 @@ impl InputFieldWidget {
     }
 
     //
-    pub fn reset_as_command(&mut self) {
+    pub fn reset_as_command(&mut self, metadata: Option<Metadata>) {
         let mut state = self.state.write().unwrap();
-        state.reset_as_command();
+        state.reset_as_command(metadata);
     }
 
     pub fn reset_as_password(&mut self) {
