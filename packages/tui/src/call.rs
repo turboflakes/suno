@@ -9,12 +9,14 @@ use suno_primitives::staking::{Payee, PayeeError};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Call {
-    Chill,
     Bond { amount: u128, payee: Payee },
     BondExtra { amount: u128 },
     Unbond { amount: u128 },
+    Rebond { amount: u128 },
+    WithdrawUnbonded,
     SetPayee { payee: Payee },
     Validate { commission: Perbill, blocked: bool },
+    Chill,
     KickNominators,
     SetSessionKey,
 }
@@ -50,6 +52,7 @@ impl Call {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
+                "withdraw_unbonded" => Ok(Self::WithdrawUnbonded),
                 _ => Err(CallError::MissingExtrinsic),
             },
             Some((extrinsic, args)) => match extrinsic {
@@ -94,6 +97,13 @@ impl Call {
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
+                "rebond" => match args.split_once(' ') {
+                    None => {
+                        let amount = parse_standard_unit(args, decimals)?;
+                        Ok(Self::Rebond { amount })
+                    }
+                    _ => Err(CallError::InvalidArgument(input.to_string())),
+                },
                 "set_payee" => {
                     let payee = Payee::from_str(args)?;
                     Ok(Self::SetPayee { payee })
@@ -130,6 +140,103 @@ impl Call {
                 _ => Err(CallError::InvalidArgument(input.to_string())),
             },
         }
+    }
+}
+
+impl std::fmt::Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bond { .. } => write!(f, "bond"),
+            Self::BondExtra { .. } => write!(f, "bond_extra"),
+            Self::Unbond { .. } => write!(f, "unbond"),
+            Self::Rebond { .. } => write!(f, "rebond"),
+            Self::WithdrawUnbonded => write!(f, "withdraw_unbonded"),
+            Self::SetPayee { .. } => write!(f, "set_payee"),
+            Self::Validate { .. } => write!(f, "validate"),
+            Self::Chill => write!(f, "chill"),
+            Self::KickNominators => write!(f, "kick"),
+            Self::SetSessionKey => write!(f, "set_keys"),
+        }
+    }
+}
+
+impl ToDescription for Call {
+    fn description(&self) -> String {
+        match self {
+            Self::Bond { .. } => "Bond funds".to_string(),
+            Self::BondExtra { .. } => "Bond some of the available funds".to_string(),
+            Self::Unbond { .. } => "Unbond some of the funds currently locked".to_string(),
+            Self::Rebond { .. } => "Rebond some of the funds due to be unlocked".to_string(),
+            Self::WithdrawUnbonded => "Withdraw any funds that has been fully unbonded".to_string(),
+            Self::SetPayee { .. } => "Set reward destination".to_string(),
+            Self::Validate { .. } => {
+                "Validate/Change commission or enable/disable nominations".to_string()
+            }
+            Self::Chill => "Declare no intention to validate".to_string(),
+            Self::KickNominators => "Remove nominators".to_string(),
+            Self::SetSessionKey => "Set session keys".to_string(),
+        }
+    }
+}
+
+impl ToPlaceholder for Call {
+    fn placeholder(&self) -> String {
+        match self {
+            Self::Bond { .. } => {
+                "bond <value-in-standard-units> [payee <staked|stash|controller|account <address>>]"
+                    .to_string()
+            }
+            Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
+            Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
+            Self::Rebond { .. } => "rebond <value-in-standard-units>".to_string(),
+            Self::WithdrawUnbonded => "withdraw_unbonded".to_string(),
+            Self::SetPayee { .. } => {
+                "set_payee <staked|stash|controller|account <address>>".to_string()
+            }
+            Self::Validate { .. } => {
+                "validate <value-in-percentage> [blocked <yes|no>]".to_string()
+            }
+            Self::Chill => "chill".to_string(),
+            Self::KickNominators => "kick <address_0, address_1, ...>".to_string(),
+            Self::SetSessionKey => "set_keys <session_key>".to_string(),
+        }
+    }
+}
+
+impl ToMethod for Call {
+    fn to_method(&self) -> String {
+        match self {
+            Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
+            Self::BondExtra { amount } => format!("bond_extra {amount}"),
+            Self::Unbond { amount } => format!("unbond {amount}"),
+            Self::Rebond { amount } => format!("rebond {amount}"),
+            Self::WithdrawUnbonded => format!("withdraw_unbonded"),
+            Self::SetPayee { payee } => format!("set_payee {payee}"),
+            Self::Validate {
+                commission,
+                blocked,
+            } => format!("validate {} blocked {blocked}", commission.deconstruct()),
+            Self::Chill => "chill".to_string(),
+            _ => "TODO".to_string(),
+        }
+    }
+}
+
+impl ToJson for Call {
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self).unwrap_or_default()
+    }
+}
+
+impl ToHex for Call {
+    fn to_hex(&self) -> String {
+        to_hex(self.to_string().as_bytes())
+    }
+}
+
+impl AsBytes for Call {
+    fn into_bytes(&self) -> Vec<u8> {
+        self.to_string().as_bytes().to_vec()
     }
 }
 
@@ -191,95 +298,6 @@ fn parse_boolean(value: &str) -> Result<bool, CallError> {
         _ => Err(CallError::InvalidArgument(format!(
             "expected 'yes' or 'no'",
         ))),
-    }
-}
-
-impl std::fmt::Display for Call {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Chill => write!(f, "chill"),
-            Self::Bond { .. } => write!(f, "bond"),
-            Self::BondExtra { .. } => write!(f, "bond_extra"),
-            Self::Unbond { .. } => write!(f, "unbond"),
-            Self::SetPayee { .. } => write!(f, "set_payee"),
-            Self::Validate { .. } => write!(f, "validate"),
-            Self::KickNominators => write!(f, "kick"),
-            Self::SetSessionKey => write!(f, "set_keys"),
-        }
-    }
-}
-
-impl ToDescription for Call {
-    fn description(&self) -> String {
-        match self {
-            Self::Chill => "Declare no intention to validate".to_string(),
-            Self::Bond { .. } => "Bond funds".to_string(),
-            Self::BondExtra { .. } => "Bond more funds".to_string(),
-            Self::Unbond { .. } => "Unbond funds".to_string(),
-            Self::SetPayee { .. } => "Set reward destination".to_string(),
-            Self::Validate { .. } => {
-                "Validate/Change commission or enable/disable nominations".to_string()
-            }
-            Self::KickNominators => "Remove nominators".to_string(),
-            Self::SetSessionKey => "Set session keys".to_string(),
-        }
-    }
-}
-
-impl ToPlaceholder for Call {
-    fn placeholder(&self) -> String {
-        match self {
-            Self::Chill => "chill".to_string(),
-            Self::Bond { .. } => {
-                "bond <value-in-standard-units> [payee <staked|stash|controller|account <address>>]"
-                    .to_string()
-            }
-            Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
-            Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
-            Self::SetPayee { .. } => {
-                "set_payee <staked|stash|controller|account <address>>".to_string()
-            }
-            Self::Validate { .. } => {
-                "validate <value-in-percentage> [blocked <yes|no>]".to_string()
-            }
-            Self::KickNominators => "kick <address_0, address_1, ...>".to_string(),
-            Self::SetSessionKey => "set_keys <session_key>".to_string(),
-        }
-    }
-}
-
-impl ToMethod for Call {
-    fn to_method(&self) -> String {
-        match self {
-            Self::Chill => "chill".to_string(),
-            Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
-            Self::BondExtra { amount } => format!("bond_extra {amount}"),
-            Self::Unbond { amount } => format!("unbond {amount}"),
-            Self::SetPayee { payee } => format!("set_payee {payee}"),
-            Self::Validate {
-                commission,
-                blocked,
-            } => format!("validate {} blocked {blocked}", commission.deconstruct()),
-            _ => "TODO".to_string(),
-        }
-    }
-}
-
-impl ToJson for Call {
-    fn to_json(&self) -> String {
-        serde_json::to_string(&self).unwrap_or_default()
-    }
-}
-
-impl ToHex for Call {
-    fn to_hex(&self) -> String {
-        to_hex(self.to_string().as_bytes())
-    }
-}
-
-impl AsBytes for Call {
-    fn into_bytes(&self) -> Vec<u8> {
-        self.to_string().as_bytes().to_vec()
     }
 }
 

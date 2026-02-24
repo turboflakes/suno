@@ -61,6 +61,16 @@ pub fn staking_unbond(value: u128) -> RuntimeCall {
     RuntimeCall::Staking(StakingCall::unbond { value })
 }
 
+pub fn staking_rebond(value: u128) -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::rebond { value })
+}
+
+pub fn staking_withdraw_unbonded() -> RuntimeCall {
+    RuntimeCall::Staking(StakingCall::withdraw_unbonded {
+        num_slashing_spans: 0,
+    })
+}
+
 pub fn staking_set_payee(payee: Payee) -> RuntimeCall {
     RuntimeCall::Staking(StakingCall::set_payee {
         payee: map_payee(payee),

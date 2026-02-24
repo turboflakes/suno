@@ -165,10 +165,13 @@ impl PopupWidget {
             })));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::Chill)));
+            .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::KickNominators)));
+            .push(Entry::new(Command::Instruction(Call::Rebond { amount: 0 })));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::WithdrawUnbonded)));
         state
             .options
             .push(Entry::new(Command::Instruction(Call::SetPayee {
@@ -176,16 +179,19 @@ impl PopupWidget {
             })));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::SetSessionKey)));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
-        state
-            .options
             .push(Entry::new(Command::Instruction(Call::Validate {
                 commission: Perbill::from_percent(0),
                 blocked: false,
             })));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::Chill)));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::KickNominators)));
+        state
+            .options
+            .push(Entry::new(Command::Instruction(Call::SetSessionKey)));
     }
 
     fn init_transaction(&self, state: &mut ListState) {
