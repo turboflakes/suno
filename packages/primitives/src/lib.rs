@@ -3,6 +3,7 @@ pub mod display;
 pub mod identity;
 pub mod key;
 pub mod node_account;
+pub mod session;
 pub mod staking;
 pub mod storage;
 pub mod tx;

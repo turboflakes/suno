@@ -8,6 +8,7 @@ description.workspace = true
 edition.workspace = true
 
 [dependencies]
+hex = { workspace = true }
 subxt = { workspace = true }
 suno-error = { path = "../../error" }
 suno-primitives = { path = "../../primitives" }

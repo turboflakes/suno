@@ -1,8 +1,5 @@
 use log::{error, info, warn};
-use subxt::{
-    blocks::ExtrinsicEvents, error::TransactionStatusError, tx::TxProgress, tx::TxStatus,
-    OnlineClient, SubstrateConfig,
-};
+use subxt::{blocks::ExtrinsicEvents, tx::TxProgress, tx::TxStatus, OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
 use suno_error::Error;
@@ -137,10 +134,9 @@ pub fn dispatch_response_action(
         }
         Response::TxError(err) => {
             let _ = tx.send(Action::Transaction(TxAction::Error(err)));
-        }
-        _ => {
-            error!("Unhandled response type: {:?}", response);
-        }
+        } // _ => {
+          //     error!("Unhandled response type: {:?}", response);
+          // }
     }
     Ok(())
 }

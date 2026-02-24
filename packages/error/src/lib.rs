@@ -11,6 +11,8 @@ pub enum Error {
     EventsError(#[from] subxt::error::EventsError),
     #[error("Extrinsic error: {0}")]
     ExtrinsicError(#[from] subxt::error::ExtrinsicError),
+    #[error("RuntimeApi error: {0}")]
+    RuntimeApiError(#[from] subxt::error::RuntimeApiError),
     #[error("Transaction progress error: {0}")]
     TransactionProgressError(#[from] subxt::error::TransactionProgressError),
     #[error("Transaction status error: {0}")]

@@ -2,7 +2,7 @@ pub mod error;
 
 use crate::error::Error;
 use regex::Regex;
-use serde_json::{Result as ResultJson, Value};
+use serde_json::Value;
 use std::str::FromStr;
 use subxt::utils::AccountId32;
 use subxt_signer::{polkadot_js_compat::decrypt_json, sr25519::Keypair, SecretUri};

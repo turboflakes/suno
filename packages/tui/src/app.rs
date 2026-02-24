@@ -636,7 +636,7 @@ impl App {
                 };
                 match runtime.build_call_data(api, &stash, call.clone()) {
                     Ok(bytes) => {
-                        self.popup.confirm_and_sign(
+                        self.popup.init_confirm_and_sign(
                             &runtime,
                             spec_version,
                             proxy_identity,

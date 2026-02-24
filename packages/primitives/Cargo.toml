@@ -8,6 +8,7 @@ description.workspace = true
 edition.workspace = true
 
 [dependencies]
+hex = { workspace = true }
 ratatui = { workspace = true }
 serde = { workspace = true }
 sp-arithmetic = { workspace = true }

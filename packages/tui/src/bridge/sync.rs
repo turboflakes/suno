@@ -589,39 +589,3 @@ pub fn spawn_sign_and_submit(
         }
     });
 }
-
-pub fn spawn_call_remark(
-    api: &OnlineClient<SubstrateConfig>,
-    runtime: &SupportedRuntime,
-    signer: &Keypair,
-    call_data: &Vec<u8>,
-    tx: &UnboundedSender<Action>,
-) {
-    let api = api.clone();
-    let runtime = runtime.clone();
-    let tx = tx.clone();
-    let signer = signer.clone();
-    let call_data = call_data.clone();
-
-    let _ = tx.send(Action::Transaction(TxAction::Processing));
-
-    tokio::spawn(async move {
-        let result = runtime.sign_and_submit(&api, &signer, call_data).await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
-}

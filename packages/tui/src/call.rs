@@ -4,7 +4,10 @@ use serde::Serialize;
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
-use suno_primitives::staking::{Payee, PayeeError};
+use suno_primitives::{
+    session::{Keys, KeysError},
+    staking::{Payee, PayeeError},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -17,8 +20,7 @@ pub enum Call {
     SetPayee { payee: Payee },
     Validate { commission: Perbill, blocked: bool },
     Chill,
-    KickNominators,
-    SetSessionKey,
+    SetSessionKeys { keys: Keys },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -45,6 +47,8 @@ pub enum CallError {
     MissingExtrinsic,
     #[error("Invalid payee: {0}")]
     InvalidPayee(#[from] PayeeError),
+    #[error("Invalid keys: {0}")]
+    InvalidKeys(#[from] KeysError),
 }
 
 impl Call {
@@ -108,6 +112,10 @@ impl Call {
                     let payee = Payee::from_str(args)?;
                     Ok(Self::SetPayee { payee })
                 }
+                "set_keys" => {
+                    let keys = Keys::from_str(args)?;
+                    Ok(Self::SetSessionKeys { keys })
+                }
                 "validate" => match args.split_once(' ') {
                     None => {
                         let commission = parse_percentage(args)?;
@@ -135,8 +143,6 @@ impl Call {
                         }
                     }
                 },
-
-                // TODO: implement missing calls..
                 _ => Err(CallError::InvalidArgument(input.to_string())),
             },
         }
@@ -154,8 +160,7 @@ impl std::fmt::Display for Call {
             Self::SetPayee { .. } => write!(f, "set_payee"),
             Self::Validate { .. } => write!(f, "validate"),
             Self::Chill => write!(f, "chill"),
-            Self::KickNominators => write!(f, "kick"),
-            Self::SetSessionKey => write!(f, "set_keys"),
+            Self::SetSessionKeys { .. } => write!(f, "set_keys"),
         }
     }
 }
@@ -173,8 +178,9 @@ impl ToDescription for Call {
                 "Validate/Change commission or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
-            Self::KickNominators => "Remove nominators".to_string(),
-            Self::SetSessionKey => "Set session keys".to_string(),
+            Self::SetSessionKeys { .. } => {
+                "Set session keys from the output of 'author_rotateKeys' call".to_string()
+            }
         }
     }
 }
@@ -197,8 +203,9 @@ impl ToPlaceholder for Call {
                 "validate <value-in-percentage> [blocked <yes|no>]".to_string()
             }
             Self::Chill => "chill".to_string(),
-            Self::KickNominators => "kick <address_0, address_1, ...>".to_string(),
-            Self::SetSessionKey => "set_keys <session_key>".to_string(),
+            Self::SetSessionKeys { .. } => {
+                "set_keys <hex-session-keys-from-author-rotate-keys>".to_string()
+            }
         }
     }
 }
@@ -217,7 +224,7 @@ impl ToMethod for Call {
                 blocked,
             } => format!("validate {} blocked {blocked}", commission.deconstruct()),
             Self::Chill => "chill".to_string(),
-            _ => "TODO".to_string(),
+            Self::SetSessionKeys { keys } => format!("set_keys {keys}"),
         }
     }
 }

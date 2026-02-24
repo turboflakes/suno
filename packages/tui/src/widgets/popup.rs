@@ -20,7 +20,7 @@ use ratatui::{
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
-use suno_primitives::{staking::Payee, tx::Bytes};
+use suno_primitives::{session::Keys, staking::Payee, tx::Bytes};
 use unicode_width::UnicodeWidthStr;
 
 /// Popup modes.
@@ -188,10 +188,46 @@ impl PopupWidget {
             .push(Entry::new(Command::Instruction(Call::Chill)));
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::KickNominators)));
+            .push(Entry::new(Command::Instruction(Call::SetSessionKeys {
+                keys: Keys::default(),
+            })));
+    }
+
+    pub fn init_confirm_and_sign(
+        &self,
+        runtime: &SupportedRuntime,
+        spec_version: u32,
+        proxy_identity: String,
+        stash_identity: String,
+        call: Call,
+        bytes: Bytes,
+    ) {
+        let mut state = self.state.write().unwrap();
+        state.options.clear();
         state
             .options
-            .push(Entry::new(Command::Instruction(Call::SetSessionKey)));
+            .push(Entry::new(Command::Text(runtime.as_str_long().to_string())));
+        state
+            .options
+            .push(Entry::new(Command::Text(spec_version.to_string())));
+        state
+            .options
+            .push(Entry::new(Command::Text(proxy_identity)));
+        state
+            .options
+            .push(Entry::new(Command::Text(stash_identity)));
+        // NOTE: Instruction(call) and Bytes(bytes) should be added sequencial.
+        // This will be be helpful to
+        state.options.push(Entry::new(Command::Instruction(call)));
+        state.options.push(Entry::new(Command::Bytes(bytes)));
+        // NOTE: Rather than having a specific field to hold the call data bytes,
+        // we just select the option in position 5th which is where it is being added.
+        // Makes it easier to retrieve the selected option later to copy it to the clipboard;
+        state.table_state.select(Some(5));
+        // Reset the input field as a password field
+        state.input.reset_as_password();
+        // Change popup mode to confirmation mode
+        state.set_confirm();
     }
 
     fn init_transaction(&self, state: &mut ListState) {
@@ -299,41 +335,6 @@ impl PopupWidget {
         state
             .options
             .push(Entry::new(Command::Text(message.to_string())));
-    }
-
-    pub fn confirm_and_sign(
-        &self,
-        runtime: &SupportedRuntime,
-        spec_version: u32,
-        proxy_identity: String,
-        stash_identity: String,
-        call: Call,
-        bytes: Bytes,
-    ) {
-        let mut state = self.state.write().unwrap();
-        state.options.clear();
-        state
-            .options
-            .push(Entry::new(Command::Text(runtime.as_str_long().to_string())));
-        state
-            .options
-            .push(Entry::new(Command::Text(spec_version.to_string())));
-        state
-            .options
-            .push(Entry::new(Command::Text(proxy_identity)));
-        state
-            .options
-            .push(Entry::new(Command::Text(stash_identity)));
-        state.options.push(Entry::new(Command::Instruction(call)));
-        state.options.push(Entry::new(Command::Bytes(bytes)));
-        // NOTE: Rather than having a specific field to hold the call data bytes,
-        // we just select the option in position the 5th which is where it was added.
-        // Makes it easier to retrieve the selected option later on to copy it to clipboard;
-        state.table_state.select(Some(5));
-        // Reset the input field as a password field
-        state.input.reset_as_password();
-        // Change popup mode to confirmation mode
-        state.set_confirm();
     }
 
     // Input actions

@@ -1,13 +1,10 @@
 use crate::call::Call;
 use async_trait::async_trait;
-use subxt::{
-    utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
-};
+use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use subxt_signer::sr25519::Keypair;
 use suno_config::Runtime;
 use suno_error::Error;
-use suno_primitives::{AccountKey, Response};
+use suno_primitives::Response;
 
 #[async_trait]
 pub trait RuntimeCaller {
@@ -24,19 +21,6 @@ pub trait RuntimeCaller {
         stash: &AccountId32,
         call: Call,
     ) -> Result<Vec<u8>, Error>;
-
-    fn remark_with_event(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        stash: &AccountId32,
-    ) -> Result<Vec<u8>, Error>;
-
-    // async fn staking_chill(
-    //     &self,
-    //     api: &OnlineClient<SubstrateConfig>,
-    //     stash: &AccountId32,
-    //     signer: &Keypair,
-    // ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -99,36 +83,14 @@ impl RuntimeCaller for Runtime {
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
+            Runtime::Paseo => match call {
+                Call::SetSessionKeys { keys } => {
+                    let rc = suno_paseo::extrinsics::session_set_keys(keys);
+                    suno_paseo::wrap_call_into_proxy(&api, rc, stash)
+                }
+                _ => Err(Error::UnsupportedCall(call.to_string())),
+            },
             _ => Err(Error::UnsupportedRuntime(self.clone())),
         }
     }
-
-    fn remark_with_event(
-        &self,
-        api: &OnlineClient<SubstrateConfig>,
-        stash: &AccountId32,
-    ) -> Result<Vec<u8>, Error> {
-        match &self {
-            Runtime::AssetHubPaseo => {
-                let call = suno_asset_hub_paseo::extrinsics::remark_with_event("some_test".into());
-                suno_asset_hub_paseo::wrap_call_into_proxy(&api, call, stash)
-            }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
-        }
-    }
-
-    // async fn staking_chill(
-    //     &self,
-    //     api: &OnlineClient<SubstrateConfig>,
-    //     stash: &AccountId32,
-    //     signer: &Keypair,
-    // ) -> Result<Response, Error> {
-    //     match &self {
-    //         Runtime::AssetHubPaseo => {
-    //             let call = suno_asset_hub_paseo::extrinsics::chill();
-    //             suno_asset_hub_paseo::submit_as_proxy(&api, call, stash, signer).await
-    //         }
-    //         _ => Err(Error::UnsupportedRuntime(self.clone())),
-    //     }
-    // }
 }
