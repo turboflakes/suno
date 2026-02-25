@@ -25,7 +25,7 @@ pub fn wrap_call_into_proxy(
 ) -> Result<Bytes, Error> {
     let proxy_call = node_runtime::tx().proxy().proxy(
         proxied_account.clone().into(),
-        Some(ProxyType::Staking),
+        Some(ProxyType::NonTransfer),
         call,
     );
 
