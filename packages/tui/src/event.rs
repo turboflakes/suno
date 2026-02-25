@@ -16,6 +16,8 @@ pub enum Event {
     Mouse(MouseEvent),
     /// Terminal resize.
     Resize(u16, u16),
+    /// Ctrl+v paste some data.
+    Paste(String),
 }
 
 /// Terminal event handler.
@@ -65,7 +67,8 @@ impl EventHandler {
                       },
                       CrosstermEvent::FocusGained => {
                       },
-                      CrosstermEvent::Paste(_) => {
+                      CrosstermEvent::Paste(content) => {
+                          _sender.send(Event::Paste(content)).unwrap();
                       },
                     }
                   }

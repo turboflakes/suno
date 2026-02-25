@@ -4,7 +4,6 @@ use crate::{call::Call, entry::ToPlaceholder};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Position, Rect},
-    style::Styled,
     text::{Line, Span},
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };

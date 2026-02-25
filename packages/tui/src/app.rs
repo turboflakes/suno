@@ -1,4 +1,5 @@
 use crate::bridge::{sync, RuntimeCaller};
+use crate::call::Call;
 use crate::context::Context;
 use crate::error::TuiError;
 use crate::section::Section;
@@ -141,6 +142,7 @@ impl App {
         let action = match event {
             Event::Tick => Action::System(SystemAction::Tick),
             Event::Key(key_event) => handle_key_events(key_event, self.focus.clone()),
+            Event::Paste(data) => Action::Input(InputAction::Paste(data)),
             Event::Mouse(_) => Action::System(SystemAction::Noop),
             Event::Resize(_, _) => Action::System(SystemAction::Noop),
             // _ => Action::System(SystemAction::Noop),
@@ -220,6 +222,7 @@ impl App {
             InputAction::CursorLeft => self.popup.move_cursor_left(),
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.handle_input_enter(),
+            InputAction::Paste(data) => self.handle_input_paste(data),
             InputAction::Error(msg) => match self.popup.get_mode() {
                 PopupMode::Locked => {
                     if self.popup.invalidate_input(&msg) {
@@ -609,111 +612,157 @@ impl App {
             return;
         }
 
-        let Some(validator) = self.validators.get_selected() else {
-            return;
-        };
-
-        let runtime = validator.runtime().asset_hub_runtime();
-        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
-            return;
-        };
-
-        match self.popup.get_mode() {
-            PopupMode::Menu => {
-                let Some(call) = self.popup.get_input_parsed_call() else {
+        match self.section {
+            Section::Validators => {
+                let Some(validator) = self.validators.get_selected() else {
                     return;
                 };
-                let api = chain.client();
-                let spec_version = api.runtime_version().spec_version;
-                let stash = validator.key().stash();
-                let stash_identity = validator.display_name(3);
-                let proxy_identity = match get_address_from_json_file() {
-                    Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
-                    Err(e) => {
-                        self.error(e.into());
-                        return;
+
+                match self.popup.get_mode() {
+                    PopupMode::Menu => {
+                        let Some(call) = self.popup.get_input_parsed_call() else {
+                            return;
+                        };
+                        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
+                        let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                            validator.runtime().relay_chain()
+                        } else {
+                            validator.runtime().asset_hub_runtime()
+                        };
+
+                        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+                            return;
+                        };
+                        let api = chain.client();
+                        let spec_version = api.runtime_version().spec_version;
+                        let stash = validator.key().stash();
+                        let stash_identity = validator.display_name(3);
+                        let proxy_identity = match get_address_from_json_file() {
+                            Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
+                            Err(e) => {
+                                self.error(e.into());
+                                return;
+                            }
+                        };
+                        match runtime.build_call_data(api, &stash, call.clone()) {
+                            Ok(bytes) => {
+                                self.popup.init_confirm_and_sign(
+                                    &runtime,
+                                    spec_version,
+                                    proxy_identity,
+                                    stash_identity,
+                                    call,
+                                    bytes,
+                                );
+                                // Dispatch focus to the input field
+                                let _ = self.tx.send(Action::Input(InputAction::Editing));
+                            }
+                            Err(err) => self.error(err),
+                        }
                     }
-                };
-                match runtime.build_call_data(api, &stash, call.clone()) {
-                    Ok(bytes) => {
-                        self.popup.init_confirm_and_sign(
-                            &runtime,
-                            spec_version,
-                            proxy_identity,
-                            stash_identity,
-                            call,
-                            bytes,
-                        );
-                        // Dispatch focus to the input field
-                        let _ = self.tx.send(Action::Input(InputAction::Editing));
+                    PopupMode::Confirm => {
+                        let Some(call) = self.popup.get_selected_call() else {
+                            return;
+                        };
+                        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
+                        let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                            validator.runtime().relay_chain()
+                        } else {
+                            validator.runtime().asset_hub_runtime()
+                        };
+
+                        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+                            return;
+                        };
+
+                        let Some(entry) = self.popup.get_selected() else {
+                            return;
+                        };
+
+                        let bytes = entry.as_bytes();
+                        let api = chain.client().clone();
+                        let runtime = runtime.clone();
+                        let tx = self.tx.clone();
+
+                        let result =
+                            self.popup
+                                .execute_with_password(|password| -> Result<(), TuiError> {
+                                    let password = password.to_string();
+
+                                    tokio::spawn(async move {
+                                        // Use spawn_blocking for CPU-intensive decrypt_json operation
+                                        let signer_result =
+                                            tokio::task::spawn_blocking(move || {
+                                                suno_signer::load_keypair(&password)
+                                            })
+                                            .await;
+
+                                        match signer_result {
+                                            Ok(Ok(signer)) => {
+                                                sync::spawn_sign_and_submit(
+                                                    &api, &runtime, &signer, &bytes, &tx,
+                                                );
+                                            }
+                                            Ok(Err(e)) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to load keypair: {}", e),
+                                                    )));
+                                                let _ = tx.send(Action::Input(InputAction::Error(
+                                                    "Invalid password".to_string(),
+                                                )));
+                                            }
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Task failed: {}", e),
+                                                    )));
+                                                let _ = tx.send(Action::Input(InputAction::Error(
+                                                "Something went wrong, check errors and try again"
+                                                    .to_string(),
+                                            )));
+                                            }
+                                        }
+                                    });
+
+                                    // Lock input so it can't be changed unless there's an error
+                                    // and remove focus from the input field and start verification password spinner
+                                    let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+                                    Ok(())
+                                });
+                        if let Err(e) = result {
+                            let _ = self
+                                .tx
+                                .send(Action::System(SystemAction::Error(e.to_string())));
+                            let _ = self.tx.send(Action::Input(InputAction::Error(
+                                "Something went wrong, check errors and try again".to_string(),
+                            )));
+                        }
                     }
-                    Err(err) => self.error(err),
-                }
-            }
-            PopupMode::Confirm => {
-                let Some(bytes_entry) = self.popup.get_selected() else {
-                    return;
-                };
-                let bytes = bytes_entry.as_bytes();
-                let api = chain.client().clone();
-                let runtime = runtime.clone();
-                let tx = self.tx.clone();
-
-                let result =
-                    self.popup
-                        .execute_with_password(|password| -> Result<(), TuiError> {
-                            let password = password.to_string();
-
-                            tokio::spawn(async move {
-                                // Use spawn_blocking for CPU-intensive decrypt_json operation
-                                let signer_result = tokio::task::spawn_blocking(move || {
-                                    suno_signer::load_keypair(&password)
-                                })
-                                .await;
-
-                                match signer_result {
-                                    Ok(Ok(signer)) => {
-                                        sync::spawn_sign_and_submit(
-                                            &api, &runtime, &signer, &bytes, &tx,
-                                        );
-                                    }
-                                    Ok(Err(e)) => {
-                                        let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Failed to load keypair: {}", e),
-                                        )));
-                                        let _ = tx.send(Action::Input(InputAction::Error(
-                                            "Invalid password".to_string(),
-                                        )));
-                                    }
-                                    Err(e) => {
-                                        let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Task failed: {}", e),
-                                        )));
-                                        let _ = tx.send(Action::Input(InputAction::Error(
-                                            "Something went wrong, check errors and try again"
-                                                .to_string(),
-                                        )));
-                                    }
-                                }
-                            });
-
-                            // Lock input so it can't be changed unless there's an error
-                            // and remove focus from the input field and start verification password spinner
-                            let _ = self.tx.send(Action::Input(InputAction::Lock));
-
-                            Ok(())
-                        });
-                if let Err(e) = result {
-                    let _ = self
-                        .tx
-                        .send(Action::System(SystemAction::Error(e.to_string())));
-                    let _ = self.tx.send(Action::Input(InputAction::Error(
-                        "Something went wrong, check errors and try again".to_string(),
-                    )));
+                    _ => {}
                 }
             }
             _ => {}
+        };
+    }
+
+    // Handle input paste depending on the context
+    pub fn handle_input_paste(&mut self, data: String) {
+        if !self.popup.is_visible() {
+            return;
         }
+
+        match self.section {
+            Section::Validators => match self.popup.get_mode() {
+                PopupMode::Menu => {
+                    self.popup.insert_input_paste_data(data);
+                }
+
+                _ => {}
+            },
+            _ => {}
+        };
     }
 
     /// Cancel instruction.

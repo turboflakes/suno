@@ -93,3 +93,7 @@ pub fn to_compact_string(account: &AccountId32, format: u16, size: usize) -> Str
     let address = account_id.to_ss58check_with_version(prefix);
     format!("{}..{}", &address[..size], &address[address.len() - size..])
 }
+
+pub fn pasted_string_info(data: &str) -> String {
+    format!("[pasted -> {}..{}]", &data[..4], &data[data.len() - 4..])
+}

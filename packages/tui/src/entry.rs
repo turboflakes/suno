@@ -2,6 +2,8 @@ use serde::Serialize;
 use std::fmt::Display;
 use subxt::utils::to_hex;
 
+type Bytes = Vec<u8>;
+
 pub trait ToDescription {
     fn description(&self) -> String;
 }
@@ -33,16 +35,14 @@ pub trait AsBytes {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum Command<T> {
     Text(String),
-    Bytes(Vec<u8>),
-    Instruction(T),
+    Instruction { call: T, bytes: Option<Bytes> },
 }
 
 impl<T: Display> Display for Command<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text(s) => write!(f, "{}", s),
-            Self::Bytes(s) => write!(f, "{}", to_hex(s)),
-            Self::Instruction(s) => write!(f, "{}", s),
+            Self::Instruction { call, .. } => write!(f, "{}", call),
         }
     }
 }
@@ -50,9 +50,8 @@ impl<T: Display> Display for Command<T> {
 impl<T: Display + ToPlaceholder> Command<T> {
     pub fn placeholder(&self) -> String {
         match self {
-            Self::Text(_) => String::new(),
-            Self::Bytes(_) => String::new(),
-            Self::Instruction(s) => s.placeholder(),
+            Self::Text(s) => s.clone(),
+            Self::Instruction { call, .. } => call.placeholder(),
         }
     }
 }
@@ -61,8 +60,7 @@ impl<T: Display + ToDescription> Command<T> {
     pub fn description(&self) -> String {
         match self {
             Self::Text(_) => String::new(),
-            Self::Bytes(_) => String::new(),
-            Self::Instruction(s) => s.description(),
+            Self::Instruction { call, .. } => call.description(),
         }
     }
 }
@@ -71,8 +69,7 @@ impl<T: Display + ToJson> Command<T> {
     pub fn to_json(&self) -> String {
         match self {
             Self::Text(s) => serde_json::to_string_pretty(s).unwrap_or_default(),
-            Self::Bytes(s) => serde_json::to_string_pretty(s).unwrap_or_default(),
-            Self::Instruction(s) => s.to_json(),
+            Self::Instruction { call, .. } => call.to_json(),
         }
     }
 }
@@ -81,8 +78,7 @@ impl<T: Display + ToMethod> Command<T> {
     pub fn to_method(&self) -> String {
         match self {
             Self::Text(_) => String::new(),
-            Self::Bytes(_) => String::new(),
-            Self::Instruction(s) => s.to_method(),
+            Self::Instruction { call, .. } => call.to_method(),
         }
     }
 }
@@ -91,8 +87,7 @@ impl<T: Display + ToHex> Command<T> {
     pub fn to_hex(&self) -> String {
         match self {
             Self::Text(s) => to_hex(s.as_bytes()),
-            Self::Bytes(s) => to_hex(s),
-            Self::Instruction(s) => s.to_hex(),
+            Self::Instruction { bytes, .. } => to_hex(bytes.clone().unwrap_or_default()),
         }
     }
 }
@@ -101,8 +96,7 @@ impl<T: Display + AsBytes> Command<T> {
     pub fn into_bytes(&self) -> Vec<u8> {
         match self {
             Self::Text(s) => s.as_bytes().to_vec(),
-            Self::Bytes(s) => s.clone(),
-            Self::Instruction(s) => s.into_bytes(),
+            Self::Instruction { bytes, .. } => bytes.clone().unwrap_or_default(),
         }
     }
 }
@@ -164,8 +158,6 @@ impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + ToHex + As
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    type Payload = Vec<u8>;
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
     pub enum Call {
@@ -244,7 +236,10 @@ mod tests {
 
     #[test]
     fn test_entry_functionality() {
-        let cmd = Command::Instruction(Call::Chill);
+        let cmd = Command::Instruction {
+            call: Call::Chill,
+            bytes: None,
+        };
         let entry = Entry::new(cmd);
 
         assert_eq!(entry.command(), "/chill");

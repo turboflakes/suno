@@ -7,6 +7,7 @@ use crate::widgets::{
     input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
     spinner::Spinner,
 };
+use log::info;
 use log::warn;
 use ratatui::{
     buffer::Buffer,
@@ -108,7 +109,7 @@ impl ListState {
     pub fn get_selected_call(&self) -> Option<Call> {
         if let Some(selected) = self.get_selected() {
             match selected.get_command() {
-                Command::Instruction(call) => Some(call),
+                Command::Instruction { call, .. } => Some(call),
                 _ => None,
             }
         } else {
@@ -152,45 +153,52 @@ impl PopupWidget {
 
     fn init_menu(&self, state: &mut ListState) {
         // TODO: Define supported calls depending on the context
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Bond {
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Bond {
                 amount: 0,
                 payee: Payee::default(),
-            })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::BondExtra {
-                amount: 0,
-            })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Unbond { amount: 0 })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Rebond { amount: 0 })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::WithdrawUnbonded)));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::SetPayee {
+            },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::BondExtra { amount: 0 },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Unbond { amount: 0 },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Rebond { amount: 0 },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::WithdrawUnbonded,
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::SetPayee {
                 payee: Payee::default(),
-            })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Validate {
+            },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Validate {
                 commission: Perbill::from_percent(0),
                 blocked: false,
-            })));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::Chill)));
-        state
-            .options
-            .push(Entry::new(Command::Instruction(Call::SetSessionKeys {
+            },
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Chill,
+            bytes: None,
+        }));
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::SetSessionKeys {
                 keys: Keys::default(),
-            })));
+            },
+            bytes: None,
+        }));
     }
 
     pub fn init_confirm_and_sign(
@@ -216,18 +224,19 @@ impl PopupWidget {
         state
             .options
             .push(Entry::new(Command::Text(stash_identity)));
-        // NOTE: Instruction(call) and Bytes(bytes) should be added sequencial.
-        // This will be be helpful to
-        state.options.push(Entry::new(Command::Instruction(call)));
-        state.options.push(Entry::new(Command::Bytes(bytes)));
+        // NOTE: Instruction with the previusly selcted call and respective call_data
+        state.options.push(Entry::new(Command::Instruction {
+            call,
+            bytes: Some(bytes),
+        }));
         // NOTE: Rather than having a specific field to hold the call data bytes,
-        // we just select the option in position 5th which is where it is being added.
+        // we just select the option in position 4th which is where it is being added.
         // Makes it easier to retrieve the selected option later to copy it to the clipboard;
-        state.table_state.select(Some(5));
+        state.table_state.select(Some(4));
+        // Change popup mode to confirmation mode
+        state.mode = Mode::Confirm;
         // Reset the input field as a password field
         state.input.reset_as_password();
-        // Change popup mode to confirmation mode
-        state.set_confirm();
     }
 
     fn init_transaction(&self, state: &mut ListState) {
@@ -386,6 +395,11 @@ impl PopupWidget {
         }
     }
 
+    pub fn insert_input_paste_data(&self, data: String) {
+        let mut state = self.state.write().unwrap();
+        state.input.paste_data(data);
+    }
+
     pub fn move_cursor_left(&self) {
         let mut state = self.state.write().unwrap();
         state.input.move_cursor_left();
@@ -484,6 +498,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     let Some(network_entry) = state.options.get(0) else {
         return;
     };
+
     let Some(spec_version_entry) = state.options.get(1) else {
         return;
     };
@@ -494,10 +509,6 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         return;
     };
     let Some(call_entry) = state.options.get(4) else {
-        return;
-    };
-
-    let Some(bytes_entry) = state.options.get(5) else {
         return;
     };
 
@@ -520,6 +531,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         Span::styled("method ", THEME.paragraph.label),
         Span::raw(format!("{}", call_entry.to_method())),
     ]);
+    let method_lines = calculate_text_wrapped_lines(&call_entry.to_method(), area.width);
 
     let proxy = Line::from(vec![
         Span::styled("proxy account ", THEME.paragraph.label),
@@ -539,14 +551,14 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
         Span::styled("copy", THEME.paragraph.label),
     ]);
 
-    let call_data = Line::from(bytes_entry.to_hex());
-    let call_data_lines = calculate_text_wrapped_lines(&bytes_entry.to_hex(), area.width);
+    let call_data = Line::from(call_entry.to_hex());
+    let call_data_lines = calculate_text_wrapped_lines(&call_entry.to_hex(), area.width);
 
     // Split the area into header to show transaction details and password input area
     let [details_area, input_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Max(7 + call_data_lines), // Details
+            Constraint::Max(8 + method_lines + call_data_lines), // Details
             Constraint::Length(5), // InputField as password mode (input (3) + invalid msg (2))
         ])
         .flex(Flex::End)
@@ -562,6 +574,9 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     ])
     .block(block)
     .wrap(Wrap { trim: false });
+
+    Clear.render(details_area, buf);
+
     details.render(details_area, buf);
 
     // Render input area
@@ -606,15 +621,15 @@ impl<
     pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
         let command = self.get_command();
         match command {
-            Command::Instruction(c) => {
+            Command::Instruction { call, .. } => {
                 let mut cols = Vec::new();
 
                 // Add menu-specific formatting
                 match mode {
                     Mode::Menu => {
                         cols.push("".to_string());
-                        cols.push(format!("/{}", c.to_string()));
-                        cols.push(c.description());
+                        cols.push(format!("/{}", call.to_string()));
+                        cols.push(call.description());
                         cols.push("".to_string());
                     }
                     _ => {}

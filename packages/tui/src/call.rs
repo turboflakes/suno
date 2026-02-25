@@ -89,7 +89,6 @@ impl Call {
                 "bond_extra" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
-                        info!("Bonding extra amount: {} {}  {}", amount, args, decimals);
                         Ok(Self::BondExtra { amount })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),

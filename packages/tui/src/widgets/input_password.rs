@@ -1,6 +1,5 @@
 use crate::theme::THEME;
 use crate::widgets::input_field::InputField;
-use crate::widgets::spinner::Spinner;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Position, Rect},

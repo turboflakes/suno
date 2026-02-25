@@ -1,8 +1,10 @@
 use crate::call::{Call, CallError};
 use crate::widgets::spinner::Spinner;
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
+use log::info;
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
+use suno_primitives::display::pasted_string_info;
 use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Zeroize)]
@@ -35,6 +37,9 @@ pub struct InputField {
     /// Hold spinner widget state
     #[zeroize(skip)]
     spinner: Spinner,
+    /// Hold pasted data hidden
+    #[zeroize(skip)]
+    hidden_paste_buffer: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -97,6 +102,7 @@ impl InputField {
             status: Status::default(),
             metadata: None,
             spinner: Spinner::default(),
+            hidden_paste_buffer: Vec::new(),
         }
     }
 
@@ -114,6 +120,16 @@ impl InputField {
         } else {
             self.input.trim().to_string()
         }
+    }
+
+    pub fn raw_value(&self) -> String {
+        let mut value = self.input.to_string();
+        for v in self.hidden_paste_buffer.iter() {
+            let info = pasted_string_info(v);
+            value = value.replace(&info, "");
+            value.push_str(v);
+        }
+        value
     }
 
     pub fn cursor_position(&self) -> Option<Position> {
@@ -155,7 +171,7 @@ impl InputField {
     fn validate(&mut self) {
         match self.r#type {
             Type::Command => {
-                let value = self.value();
+                let value = self.raw_value();
                 let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
                 match Call::parse(&value, decimals) {
                     Ok(_) => self.status = Status::Valid,
@@ -192,7 +208,7 @@ impl InputField {
 
     pub fn parsed_call(&self) -> Option<Call> {
         if self.is_command() {
-            let value = self.value();
+            let value = self.raw_value();
             let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
             Call::parse(&value, decimals).ok()
         } else {
@@ -205,15 +221,15 @@ impl InputField {
         self.character_index = self.clamp_cursor(cursor_moved_left);
     }
 
-    fn move_cursor_right(&mut self) {
-        let cursor_moved_right = self.character_index.saturating_add(1);
+    fn move_cursor_right(&mut self, positions: usize) {
+        let cursor_moved_right = self.character_index.saturating_add(positions);
         self.character_index = self.clamp_cursor(cursor_moved_right);
     }
 
     fn insert_char(&mut self, new_char: char) {
         let index = self.byte_index();
         self.input.insert(index, new_char);
-        self.move_cursor_right();
+        self.move_cursor_right(1);
         self.validate();
     }
 
@@ -235,6 +251,14 @@ impl InputField {
             let target_char_index = self.character_index - 1;
 
             if let Some((byte_idx, _)) = self.input.char_indices().nth(target_char_index) {
+                // check and remove any entry from hidden paste buffer
+                if self.input.ends_with("]") {
+                    self.hidden_paste_buffer.retain(|v| {
+                        let info = pasted_string_info(v);
+                        !self.input.contains(&info)
+                    });
+                }
+
                 // .remove() works on the inner String thanks to DerefMut
                 self.input.remove(byte_idx);
                 self.move_cursor_left();
@@ -247,6 +271,22 @@ impl InputField {
 
     fn clamp_cursor(&self, new_pos: usize) -> usize {
         new_pos.clamp(0, self.input.chars().count())
+    }
+
+    pub fn paste_data(&mut self, data: String) {
+        let line_count = data.lines().count();
+
+        if line_count > 1 || data.len() > 32 {
+            let info = pasted_string_info(&data);
+            self.hidden_paste_buffer.push(data);
+            self.input.push_str(&info);
+            self.move_cursor_right(info.len());
+        } else {
+            self.input.push_str(&data);
+            self.move_cursor_right(data.len());
+        }
+        // validate input text
+        self.validate();
     }
 
     pub fn set_cursor_position(&mut self, position: Position) {
@@ -324,6 +364,7 @@ impl InputField {
         self.input.clear();
         self.character_index = 0;
         self.status = Status::None;
+        self.hidden_paste_buffer = Vec::new();
         self.clear_mode();
     }
 }
@@ -423,6 +464,11 @@ impl InputFieldWidget {
         state.delete_char();
     }
 
+    pub fn paste_data(&mut self, data: String) {
+        let mut state = self.state.write().unwrap();
+        state.paste_data(data);
+    }
+
     pub fn move_cursor_left(&mut self) {
         let mut state = self.state.write().unwrap();
         state.move_cursor_left();
@@ -430,7 +476,7 @@ impl InputFieldWidget {
 
     pub fn move_cursor_right(&mut self) {
         let mut state = self.state.write().unwrap();
-        state.move_cursor_right();
+        state.move_cursor_right(1);
     }
 
     pub fn execute_with_password<F, R, E>(&self, action: F) -> Result<R, E>
