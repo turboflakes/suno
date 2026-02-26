@@ -1,7 +1,7 @@
 use crate::{
     babe::Epoch,
     identity::Identity,
-    staking::{Era, StakeLedger, StakeOverview},
+    staking::{Chunk, Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::{Perbill, Permill};
@@ -72,6 +72,13 @@ pub struct AmountData {
     pub amount: Amount,
 }
 
+/// Chunk data combining account and chunk
+#[derive(Debug)]
+pub struct ChunkData {
+    pub account: AccountBytes,
+    pub chunk: Chunk,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -94,7 +101,7 @@ pub enum Response {
     TxSuccess,
     TxError(String),
     EventBonded(Data<AmountData>),
-    EventUnbonded(Data<AmountData>),
+    EventUnbonded(Data<ChunkData>),
 }
 
 // Some constructors for convenience
@@ -169,7 +176,7 @@ impl Response {
         Response::EventBonded(Data::new(AmountData { account, amount }))
     }
 
-    pub fn event_unbonded(account: AccountBytes, amount: Amount) -> Self {
-        Response::EventUnbonded(Data::new(AmountData { account, amount }))
+    pub fn event_unbonded(account: AccountBytes, chunk: Chunk) -> Self {
+        Response::EventUnbonded(Data::new(ChunkData { account, chunk }))
     }
 }

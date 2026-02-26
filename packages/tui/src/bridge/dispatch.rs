@@ -146,9 +146,9 @@ pub fn dispatch_response_action(
         Response::EventUnbonded(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
-            tx.send(Action::Validator(ValidatorAction::SubAmountToStakeLedger(
+            tx.send(Action::Validator(ValidatorAction::SubChunkFromStakeLedger(
                 account_key,
-                data.value.amount,
+                data.value.chunk,
             )))?;
         }
         _ => {

@@ -461,9 +461,9 @@ impl App {
                 self.validators
                     .add_amount_to_stake_ledger(&validator_key, amount);
             }
-            ValidatorAction::SubAmountToStakeLedger(validator_key, amount) => {
+            ValidatorAction::SubChunkFromStakeLedger(validator_key, chunk) => {
                 self.validators
-                    .sub_amount_to_stake_ledger(&validator_key, amount);
+                    .sub_chunk_from_stake_ledger(&validator_key, chunk);
             }
         }
     }

@@ -15,6 +15,7 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
+use suno_primitives::staking::Chunk;
 use suno_primitives::{
     node_account::get_account_bytes_from_storage_key,
     staking::{Era, StakeLedger, StakeOverview},
@@ -62,7 +63,12 @@ pub async fn fetch_validator_staking_ledger(
     let account_bytes = *stash.as_ref();
 
     if let Some(data) = fetch_staking_ledger(api, block_hash, stash).await? {
-        let stake_ledger = StakeLedger::new(data.active, data.total);
+        let mut unbounding: Vec<Chunk> = Vec::new();
+        let BoundedVec(unlocking) = data.unlocking;
+        for chunk in unlocking {
+            unbounding.push(Chunk::new(chunk.era, chunk.value));
+        }
+        let stake_ledger = StakeLedger::new(data.active, data.total, unbounding);
         return Ok(Response::stake_ledger(account_bytes, Some(stake_ledger)));
     }
     Ok(Response::stake_ledger(account_bytes, None))

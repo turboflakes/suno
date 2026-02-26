@@ -137,11 +137,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .split(group_area);
 
         // Render network header
-        self.render_table_header(runtime, validators.clone(), group_area[0], buf);
+        self.render_table_header(&runtime, &validators, group_area[0], buf);
 
         // Render network validators table
         self.render_table_body(
-            validators,
+            &runtime,
+            &validators,
             selected_validator,
             group_area[1],
             buf,
@@ -151,144 +152,163 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
     fn render_table_header(
         &self,
-        runtime: SupportedRuntime,
-        validators: Vec<&Validator>,
+        runtime: &SupportedRuntime,
+        validators: &[&Validator],
         area: Rect,
         buf: &mut Buffer,
     ) {
-        if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
-            if let Some(ah_chain) = self
-                .chains
-                .get_chain_by_runtime(&runtime.asset_hub_runtime())
-            {
-                let header_layout_cols = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(82), // Network info
-                        Constraint::Fill(1),    // Era / Session progress bar
-                        Constraint::Length(16), // Countdown
-                    ])
-                    .split(area);
-
-                // Draw and render general network stats
-
-                let network_lines = vec![
-                    Line::from(Span::raw(format!("{}", runtime)).style(THEME.paragraph.header)),
-                    Line::from(vec![
-                        Span::raw("total validators: ").style(THEME.paragraph.label),
-                        Span::raw(format!(
-                            "{} active, {} waiting",
-                            ah_chain.active_validators_count(),
-                            ah_chain.waiting_validators_count()
-                        )),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("total nominators: ").style(THEME.paragraph.label),
-                        Span::raw(format!(
-                            "{} active, {} waiting",
-                            ah_chain.active_nominators_count(),
-                            ah_chain.waiting_nominators_count()
-                        )),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("total staked: ").style(THEME.paragraph.label),
-                        Span::raw(format!("{}", ah_chain.total_staked_percentage())),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("displayed: ").style(THEME.paragraph.label),
-                        Span::raw(format!(
-                            "{} active, {} waiting",
-                            validators.iter().filter(|v| v.is_active()).count(),
-                            validators.iter().filter(|v| v.is_waiting()).count(),
-                        )),
-                    ]),
-                ];
-
-                let network_info = Paragraph::new(network_lines)
-                    .block(Block::new().set_style(THEME.block.main))
-                    .style(THEME.paragraph.base);
-
-                network_info.render(header_layout_cols[0], buf);
-
-                // Draw and render Progress Bars
-
-                let Some(epoch) = chain.epoch() else {
-                    // TODO: Handle epoch not available, maybe render loading indicator
-                    return;
-                };
-
-                let epoch_progress = epoch.progress(chain.finalized_block());
-                let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
-
-                let Some(era) = ah_chain.era() else {
-                    // TODO: Handle era not available, maybe render loading indicator
-                    return;
-                };
-
-                let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
-                let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
-
-                let progress_lines = vec![
-                    Line::from(""),
-                    Line::from(format!(
-                        "era {} {:.0}% {}",
-                        era.index(),
-                        era_progress * 100 as f64,
-                        era_progress_bar
-                    ))
-                    .alignment(Alignment::Right),
-                    Line::from(format!(
-                        "epoch {} {:.0}% {}",
-                        epoch.index(),
-                        epoch_progress * 100 as f64,
-                        epoch_progress_bar,
-                    ))
-                    .alignment(Alignment::Right),
-                ];
-
-                let progress_info = Paragraph::new(progress_lines)
-                    .block(Block::new().set_style(THEME.block.main))
-                    .style(THEME.paragraph.base);
-
-                progress_info.render(header_layout_cols[1], buf);
-
-                // Draw and render Countdowns
-
-                let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
-                let era_countdown_time =
-                    era.countdown_time(epoch.duration(), epoch.block_time_ms());
-
-                let countdown_lines = vec![
-                    Line::from(""),
-                    Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
-                    Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
-                ];
-
-                let countdown_info = Paragraph::new(countdown_lines)
-                    .block(Block::new().set_style(THEME.block.main))
-                    .style(THEME.paragraph.base);
-
-                countdown_info.render(header_layout_cols[2], buf);
-
-                return;
-            };
+        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+            return;
         };
+
+        let Some(ah_chain) = self
+            .chains
+            .get_chain_by_runtime(&runtime.asset_hub_runtime())
+        else {
+            return;
+        };
+
+        let header_layout_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(82), // Network info
+                Constraint::Fill(1),    // Era / Session progress bar
+                Constraint::Length(16), // Countdown
+            ])
+            .split(area);
+
+        // Draw and render general network stats
+
+        let network_lines = vec![
+            Line::from(Span::raw(format!("{}", runtime)).style(THEME.paragraph.header)),
+            Line::from(vec![
+                Span::raw("total validators: ").style(THEME.paragraph.label),
+                Span::raw(format!(
+                    "{} active, {} waiting",
+                    ah_chain.active_validators_count(),
+                    ah_chain.waiting_validators_count()
+                )),
+            ]),
+            Line::from(vec![
+                Span::raw("total nominators: ").style(THEME.paragraph.label),
+                Span::raw(format!(
+                    "{} active, {} waiting",
+                    ah_chain.active_nominators_count(),
+                    ah_chain.waiting_nominators_count()
+                )),
+            ]),
+            Line::from(vec![
+                Span::raw("total staked: ").style(THEME.paragraph.label),
+                Span::raw(format!("{}", ah_chain.total_staked_percentage())),
+            ]),
+            Line::from(vec![
+                Span::raw("displayed: ").style(THEME.paragraph.label),
+                Span::raw(format!(
+                    "{} active, {} waiting",
+                    validators.iter().filter(|v| v.is_active()).count(),
+                    validators.iter().filter(|v| v.is_waiting()).count(),
+                )),
+            ]),
+        ];
+
+        let network_info = Paragraph::new(network_lines)
+            .block(Block::new().set_style(THEME.block.main))
+            .style(THEME.paragraph.base);
+
+        network_info.render(header_layout_cols[0], buf);
+
+        // Draw and render Progress Bars
+
+        let Some(epoch) = chain.epoch() else {
+            // TODO: Handle epoch not available, maybe render loading indicator
+            return;
+        };
+
+        let epoch_progress = epoch.progress(chain.finalized_block());
+        let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
+
+        let Some(era) = ah_chain.era() else {
+            // TODO: Handle era not available, maybe render loading indicator
+            return;
+        };
+
+        let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
+        let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
+
+        let progress_lines = vec![
+            Line::from(""),
+            Line::from(format!(
+                "era {} {:.0}% {}",
+                era.index(),
+                era_progress * 100 as f64,
+                era_progress_bar
+            ))
+            .alignment(Alignment::Right),
+            Line::from(format!(
+                "epoch {} {:.0}% {}",
+                epoch.index(),
+                epoch_progress * 100 as f64,
+                epoch_progress_bar,
+            ))
+            .alignment(Alignment::Right),
+        ];
+
+        let progress_info = Paragraph::new(progress_lines)
+            .block(Block::new().set_style(THEME.block.main))
+            .style(THEME.paragraph.base);
+
+        progress_info.render(header_layout_cols[1], buf);
+
+        // Draw and render Countdowns
+
+        let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
+        let era_countdown_time = era.countdown_time(epoch.duration(), epoch.block_time_ms());
+
+        let countdown_lines = vec![
+            Line::from(""),
+            Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
+            Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
+        ];
+
+        let countdown_info = Paragraph::new(countdown_lines)
+            .block(Block::new().set_style(THEME.block.main))
+            .style(THEME.paragraph.base);
+
+        countdown_info.render(header_layout_cols[2], buf);
     }
 
     fn render_table_body(
         &self,
-        validators: Vec<&Validator>,
+        runtime: &SupportedRuntime,
+        validators: &[&Validator],
         selected_validator: Option<&Validator>,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
     ) {
+        let Some(ah_chain) = self
+            .chains
+            .get_chain_by_runtime(&runtime.asset_hub_runtime())
+        else {
+            return;
+        };
+
+        let Some(active_era) = ah_chain.era() else {
+            return;
+        };
+
         let block = Block::new()
             .set_style(THEME.block.main)
             .padding(Padding::symmetric(0, 1));
 
-        let mut rows = Vec::new();
         let mut show_bonded = false;
+        let mut show_unlocking = false;
+        let mut show_unlocked = false;
+
+        let mut rows = Vec::new();
+
+        let span_symbol = Span::raw(runtime.token_symbol()).style(THEME.paragraph.label);
+
         for v in validators {
             let text_points = match v.delta_points() {
                 Some(d) => Text::from(format!("+{}", d)).style(Style::default().fg(Color::White)),
@@ -297,39 +317,99 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
             let decimals = v.runtime().token_decimals();
             let staked_total = if v.is_active() { v.stake.total() } else { 0 };
-            let staked_own = if v.stake.own() == v.ledger.active() {
-                format_planks(v.stake.own(), decimals, 4)
-            } else {
-                show_bonded = true;
-                format!(
-                    "{} ({})",
-                    format_planks(v.stake.own(), decimals, 4),
-                    format_planks(v.ledger.active(), decimals, 4)
-                )
-            };
 
             let (cell_style, _highlight_symbol) = match selected_validator {
-                Some(ref selected) if &v == selected => {
+                Some(ref selected) if v == selected => {
                     (Style::default().fg(Color::Black).bg(Color::White), "❯")
                 }
                 _ => (Style::default(), ""),
             };
 
-            let validator_cells = vec![
+            let mut validator_cells = vec![
                 Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
                 Cell::from(Text::from(format!("{}", v.display_name(3))).alignment(Alignment::Left))
                     .style(cell_style),
                 Cell::from(text_points.alignment(Alignment::Right)),
                 Cell::from(
-                    Text::from(format_planks(staked_total, decimals, 4))
-                        .alignment(Alignment::Right),
+                    Line::from(vec![
+                        Span::raw(format_planks(staked_total, decimals, 4)),
+                        span_symbol.clone(),
+                    ])
+                    .alignment(Alignment::Right),
                 ),
-                Cell::from(Text::from(staked_own).alignment(Alignment::Right)),
                 Cell::from(
-                    Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
+                    Line::from(vec![
+                        Span::raw(format_planks(v.stake.own(), decimals, 4)),
+                        span_symbol.clone(),
+                    ])
+                    .alignment(Alignment::Right),
                 ),
-                Cell::from(Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right)),
             ];
+
+            if v.stake.own() != v.ledger.active() {
+                show_bonded = true;
+                validator_cells.push(Cell::from(
+                    Line::from(vec![
+                        Span::raw("("),
+                        Span::raw(format_planks(v.ledger.active(), decimals, 4)),
+                        span_symbol.clone(),
+                        Span::raw(")"),
+                    ])
+                    .alignment(Alignment::Left),
+                ));
+            } else {
+                validator_cells.push(Cell::from(Text::from("")));
+            }
+
+            let unlocking: u128 = v
+                .ledger
+                .unlocking()
+                .iter()
+                .filter(|c| c.era > 2840)
+                .map(|c| c.value)
+                .sum();
+
+            if unlocking > 0 {
+                show_unlocking = true;
+                validator_cells.push(Cell::from(
+                    Line::from(vec![
+                        Span::raw(format_planks(unlocking, decimals, 4)),
+                        span_symbol.clone(),
+                    ])
+                    .alignment(Alignment::Right),
+                ));
+            } else {
+                validator_cells.push(Cell::from(Text::from("")));
+            }
+
+            let unlocked: u128 = v
+                .ledger
+                .unlocking()
+                .iter()
+                .filter(|c| c.era <= active_era.index())
+                .map(|c| c.value)
+                .sum();
+
+            if unlocked > 0 {
+                show_unlocked = true;
+                validator_cells.push(Cell::from(
+                    Line::from(vec![
+                        Span::raw(format_planks(unlocked, decimals, 4)),
+                        span_symbol.clone(),
+                    ])
+                    .alignment(Alignment::Right),
+                ));
+            } else {
+                validator_cells.push(Cell::from(Text::from("")));
+            }
+
+            validator_cells.push(Cell::from(
+                Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
+            ));
+            validator_cells.push(Cell::from(
+                Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
+            ));
+
             // if selected_validator.is_some() {
             //     validator_cells.insert(
             //         1,
@@ -342,7 +422,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             rows.push(Row::new(validator_cells));
         }
 
-        let widths = vec![
+        let mut widths = vec![
             Constraint::Length(3),
             Constraint::Length(28),
             Constraint::Fill(1),
@@ -352,21 +432,50 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Constraint::Fill(1),
         ];
 
-        let own_header = if show_bonded {
-            "own-stake (bonded)"
-        } else {
-            "own-stake"
-        };
+        if show_bonded {
+            widths.push(Constraint::Fill(1));
+        }
 
-        let header_cells = vec![
+        if show_unlocking {
+            widths.push(Constraint::Fill(1));
+        }
+
+        if show_unlocked {
+            widths.push(Constraint::Fill(1));
+        }
+
+        let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("points").alignment(Alignment::Right)),
             Cell::from(Text::from("total").alignment(Alignment::Right)),
-            Cell::from(Text::from(own_header).alignment(Alignment::Right)),
-            Cell::from(Text::from("nominators").alignment(Alignment::Right)),
-            Cell::from(Text::from("commission").alignment(Alignment::Right)),
+            Cell::from(Text::from("own-stake").alignment(Alignment::Right)),
         ];
+
+        if show_bonded {
+            header_cells.push(Cell::from(
+                Text::from("(bonded)").alignment(Alignment::Left),
+            ));
+        }
+
+        if show_unlocking {
+            header_cells.push(Cell::from(
+                Text::from("unlocking").alignment(Alignment::Right),
+            ));
+        }
+
+        if show_unlocked {
+            header_cells.push(Cell::from(
+                Text::from("unlocked").alignment(Alignment::Right),
+            ));
+        }
+
+        header_cells.push(Cell::from(
+            Text::from("nominators").alignment(Alignment::Right),
+        ));
+        header_cells.push(Cell::from(
+            Text::from("commission").alignment(Alignment::Right),
+        ));
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {

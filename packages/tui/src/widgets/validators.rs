@@ -4,6 +4,7 @@ use crate::widgets::validators_detailed_group::{
     ValidatorsDetailedGroupWidget, GROUP_HEADER_HEIGHT, PADDING,
 };
 use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
+use log::info;
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
@@ -11,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::identity::Identity;
 use suno_primitives::{
-    staking::{StakeLedger, StakeOverview},
+    staking::{Chunk, StakeLedger, StakeOverview},
     validator::{Validator, ValidatorStatus},
     AccountKey,
 };
@@ -105,12 +106,30 @@ impl ValidatorsListState {
         }
     }
 
-    pub fn sub_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
+    pub fn sub_chunk_from_stake_ledger(&mut self, validator_key: &AccountKey, chunk: Chunk) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
+            let unlocking: Vec<Chunk> = validator
+                .ledger
+                .unlocking()
+                .iter()
+                .map(|c| {
+                    if c.era == chunk.era {
+                        Chunk {
+                            era: c.era,
+                            value: c.value.saturating_add(chunk.value),
+                        }
+                    } else {
+                        c.clone()
+                    }
+                })
+                .collect();
+
+            info!("Unlocking chunks: {:?}", unlocking);
+
             validator.ledger = StakeLedger {
-                active: validator.ledger.active().saturating_sub(amount),
-                total: validator.ledger.total().saturating_sub(amount),
-                unlocking: validator.ledger.unlocking().to_vec(),
+                active: validator.ledger.active().saturating_sub(chunk.value),
+                total: validator.ledger.total().saturating_sub(chunk.value),
+                unlocking,
             };
         }
     }
@@ -433,8 +452,8 @@ impl ValidatorsListWidget {
         state.add_amount_to_stake_ledger(validator_key, amount);
     }
 
-    pub fn sub_amount_to_stake_ledger(&self, validator_key: &AccountKey, amount: Amount) {
+    pub fn sub_chunk_from_stake_ledger(&self, validator_key: &AccountKey, chunk: Chunk) {
         let mut state = self.state.write().unwrap();
-        state.sub_amount_to_stake_ledger(validator_key, amount);
+        state.sub_chunk_from_stake_ledger(validator_key, chunk);
     }
 }

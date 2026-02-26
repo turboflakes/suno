@@ -98,25 +98,30 @@ impl StakeOverview {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct Unlocking {
+pub struct Chunk {
     pub era: u32,
     pub value: u128,
+}
+
+impl Chunk {
+    pub fn new(era: u32, value: u128) -> Self {
+        Self { era, value }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct StakeLedger {
     pub active: u128,
     pub total: u128,
-    pub unlocking: Vec<Unlocking>,
+    pub unlocking: Vec<Chunk>,
 }
 
 impl StakeLedger {
-    // TODO: add unlocking: Vec<Unlocking>
-    pub fn new(active: u128, total: u128) -> Self {
+    pub fn new(active: u128, total: u128, unlocking: Vec<Chunk>) -> Self {
         Self {
             active,
             total,
-            unlocking: Vec::new(),
+            unlocking,
         }
     }
 
@@ -128,7 +133,7 @@ impl StakeLedger {
         self.total
     }
 
-    pub fn unlocking(&self) -> &[Unlocking] {
+    pub fn unlocking(&self) -> &[Chunk] {
         &self.unlocking
     }
 }

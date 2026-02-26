@@ -1,4 +1,5 @@
 pub mod network;
+
 use crate::network::ConnectionState;
 use sp_arithmetic::Permill;
 use subxt::utils::H256;
@@ -6,11 +7,16 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
     identity::Identity,
-    staking::{Era, StakeLedger, StakeOverview},
+    staking::{Chunk, Era, StakeLedger, StakeOverview},
     validator::ValidatorStatus,
     AccountKey,
 };
 
+type ValidatorKey = AccountKey;
+type ChainKey = SupportedRuntime;
+type BlockNumber = u64;
+type BlockHash = H256;
+type Amount = u128;
 type Commission = u32;
 type Points = u32;
 type Counter = u32;
@@ -70,12 +76,6 @@ pub enum InputAction {
     Error(String),
 }
 
-type ValidatorKey = AccountKey;
-type ChainKey = SupportedRuntime;
-type BlockNumber = u64;
-type BlockHash = H256;
-type Amount = u128;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChainAction {
     UpdateConnectionState(ChainKey, ConnectionState),
@@ -101,7 +101,7 @@ pub enum ValidatorAction {
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
     AddAmountToStakeLedger(ValidatorKey, Amount),
-    SubAmountToStakeLedger(ValidatorKey, Amount),
+    SubChunkFromStakeLedger(ValidatorKey, Chunk),
     UpdateStatus(ValidatorKey, ValidatorStatus),
 }
 

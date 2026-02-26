@@ -1,12 +1,16 @@
-use crate::node_runtime::{
-    proxy::events::ProxyExecuted,
-    staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet},
-};
 use crate::storage::fetch_era_data;
+use crate::{
+    constants::fetch_bonding_duration,
+    node_runtime::{
+        proxy::events::ProxyExecuted,
+        staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet},
+    },
+    storage::fetch_active_era_info,
+};
 use log::info;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
-use suno_primitives::Response;
+use suno_primitives::{staking::Chunk, Response};
 
 pub async fn handle_events(
     api: &OnlineClient<SubstrateConfig>,
@@ -25,8 +29,11 @@ pub async fn handle_events(
             let response = Response::event_bonded(account_bytes, ev.amount);
             processed_events.push(response);
         } else if let Some(ev) = event.as_event::<Unbonded>()? {
+            let era_info = fetch_active_era_info(api, block_hash).await?;
+            let duration = fetch_bonding_duration(api)?;
+            let chunk = Chunk::new(era_info.index + duration, ev.amount);
             let account_bytes = *(ev.stash).as_ref();
-            let response = Response::event_unbonded(account_bytes, ev.amount);
+            let response = Response::event_unbonded(account_bytes, chunk);
             processed_events.push(response);
         } else if let Some(_ev) = event.as_event::<Chilled>()? {
         } else if let Some(_ev) = event.as_event::<ValidatorPrefsSet>()? {
