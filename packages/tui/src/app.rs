@@ -457,6 +457,10 @@ impl App {
             ValidatorAction::UpdateStatus(validator_key, status) => {
                 self.validators.update_status(&validator_key, status);
             }
+            ValidatorAction::AddAmountToStakeLedger(validator_key, amount) => {
+                self.validators
+                    .add_amount_to_stake_ledger(&validator_key, amount);
+            }
         }
     }
 

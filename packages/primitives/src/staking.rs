@@ -127,6 +127,10 @@ impl StakeLedger {
     pub fn total(&self) -> u128 {
         self.total
     }
+
+    pub fn unlocking(&self) -> &[Unlocking] {
+        &self.unlocking
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]

@@ -18,6 +18,7 @@ use suno_primitives::{
 
 type Commission = u32;
 type Points = u32;
+type Amount = u128;
 type ValidatorKey = AccountKey;
 
 #[derive(Debug, Default)]
@@ -91,6 +92,16 @@ impl ValidatorsListState {
     pub fn set_stake_ledger(&mut self, validator_key: &AccountKey, data: StakeLedger) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.ledger = data;
+        }
+    }
+
+    pub fn add_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.ledger = StakeLedger {
+                active: validator.ledger.active() + amount,
+                total: validator.ledger.total() + amount,
+                unlocking: validator.ledger.unlocking().to_vec(),
+            };
         }
     }
 
@@ -407,54 +418,8 @@ impl ValidatorsListWidget {
         state.set_status(validator_key, status);
     }
 
-    // // DEPRECATED
-    // fn fetch_validator_data(&self, validator: &Validator) {
-    //     self.tx
-    //         .send(Action::Chain(ChainAction::FetchValidatorData(
-    //             validator.key().clone(),
-    //         )))
-    //         .unwrap_or_else(|err| self.on_error(err.into()));
-    // }
-
-    // // DEPRECATED
-    // fn fetch_all_validators_data(&self) {
-    //     let state = self.state.read().unwrap();
-    //     let keys_grouped = state.get_keys_grouped_by_runtime_cloned();
-    //     keys_grouped.into_iter().for_each(|(runtime, keys)| {
-    //         self.tx
-    //             .send(Action::Chain(ChainAction::FetchValidatorsData(
-    //                 runtime, keys,
-    //             )))
-    //             .unwrap_or_else(|err| self.on_error(err.into()));
-    //     });
-    // }
-
-    //     // TODO
-    //     pub fn chill(&self, chain: &Chain, tx: UnboundedSender<Action>) {
-    //         if chain.is_offline() {
-    //             warn!("TODO: Chain {} not ready", chain.runtime());
-    //             return;
-    //         }
-
-    //         let api = chain.client().clone();
-    //         let runtime = self.runtime().clone();
-    //         let tx = tx.clone();
-    //         let stash = self.account.stash().clone();
-    //         tokio::spawn(async move {
-    //             // let response = match runtime {
-    //             //     SupportedRuntime::Westend => {
-    //             //         // TODO: Implement password input for proxy signing
-    //             //         let chill_xt = suno_westend::staking::chill();
-    //             //         suno_westend::submit_as_proxy(&api, chill_xt, stash, None, tx).await
-    //             //     }
-    //             //     _ => unimplemented!("Chill not implemented for {:?}", runtime),
-    //             // };
-    //             // match response {
-    //             //     Err(e) => {
-    //             //         warn!("TODO: error: {:?}", e);
-    //             //     }
-    //             //     _ => (),
-    //             // }
-    //         });
-    //     }
+    pub fn add_amount_to_stake_ledger(&self, validator_key: &AccountKey, amount: Amount) {
+        let mut state = self.state.write().unwrap();
+        state.add_amount_to_stake_ledger(validator_key, amount);
+    }
 }

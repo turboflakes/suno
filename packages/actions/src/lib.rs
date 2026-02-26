@@ -74,6 +74,7 @@ type ValidatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
 type BlockNumber = u64;
 type BlockHash = H256;
+type Amount = u128;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChainAction {
@@ -99,6 +100,7 @@ pub enum ValidatorAction {
     UpdateIdentity(ValidatorKey, Identity),
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
+    AddAmountToStakeLedger(ValidatorKey, Amount),
     UpdateStatus(ValidatorKey, ValidatorStatus),
 }
 

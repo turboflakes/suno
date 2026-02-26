@@ -10,6 +10,7 @@ use subxt::{tx::TxProgress, OnlineClient, SubstrateConfig};
 
 type AccountBytes = [u8; 32];
 type Points = u32;
+type Amount = u128;
 
 /// Generic data structure for chain responses
 #[derive(Debug)]
@@ -64,6 +65,13 @@ pub struct IdentityData {
     pub identity: Option<Identity>,
 }
 
+/// Amount data combining account and amount
+#[derive(Debug)]
+pub struct AmountData {
+    pub account: AccountBytes,
+    pub amount: Amount,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -85,6 +93,7 @@ pub enum Response {
     TxProgress(Data<TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>>),
     TxSuccess,
     TxError(String),
+    EventBonded(Data<AmountData>),
 }
 
 // Some constructors for convenience
@@ -153,5 +162,9 @@ impl Response {
         progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     ) -> Self {
         Response::TxProgress(Data::new(progress))
+    }
+
+    pub fn event_bonded(account: AccountBytes, amount: Amount) -> Self {
+        Response::EventBonded(Data::new(AmountData { account, amount }))
     }
 }

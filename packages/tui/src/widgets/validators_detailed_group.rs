@@ -288,7 +288,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .padding(Padding::symmetric(0, 1));
 
         let mut rows = Vec::new();
-
+        let mut show_bonded = false;
         for v in validators {
             let text_points = match v.delta_points() {
                 Some(d) => Text::from(format!("+{}", d)).style(Style::default().fg(Color::White)),
@@ -297,10 +297,15 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
             let decimals = v.runtime().token_decimals();
             let staked_total = if v.is_active() { v.stake.total() } else { 0 };
-            let staked_own = if v.is_active() {
-                v.stake.own()
+            let staked_own = if v.stake.own() == v.ledger.active() {
+                format_planks(v.stake.own(), decimals, 4)
             } else {
-                v.ledger.active()
+                show_bonded = true;
+                format!(
+                    "{} ({})",
+                    format_planks(v.stake.own(), decimals, 4),
+                    format_planks(v.ledger.active(), decimals, 4)
+                )
             };
 
             let (cell_style, _highlight_symbol) = match selected_validator {
@@ -319,9 +324,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                     Text::from(format_planks(staked_total, decimals, 4))
                         .alignment(Alignment::Right),
                 ),
-                Cell::from(
-                    Text::from(format_planks(staked_own, decimals, 4)).alignment(Alignment::Right),
-                ),
+                Cell::from(Text::from(staked_own).alignment(Alignment::Right)),
                 Cell::from(
                     Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
                 ),
@@ -349,12 +352,18 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Constraint::Fill(1),
         ];
 
+        let own_header = if show_bonded {
+            "own-stake (bonded)"
+        } else {
+            "own-stake"
+        };
+
         let header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("points").alignment(Alignment::Right)),
             Cell::from(Text::from("total").alignment(Alignment::Right)),
-            Cell::from(Text::from("own").alignment(Alignment::Right)),
+            Cell::from(Text::from(own_header).alignment(Alignment::Right)),
             Cell::from(Text::from("nominators").alignment(Alignment::Right)),
             Cell::from(Text::from("commission").alignment(Alignment::Right)),
         ];

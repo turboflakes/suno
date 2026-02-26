@@ -2,7 +2,6 @@ pub mod constants;
 pub mod events;
 pub mod extrinsics;
 pub mod storage;
-pub mod submit;
 pub use events::{handle_events, handle_extrinsic_events};
 pub use extrinsics::wrap_call_into_proxy;
 pub use storage::{
@@ -11,7 +10,6 @@ pub use storage::{
     fetch_validator_commission, fetch_validator_stake_overview, fetch_validator_staking_ledger,
     fetch_validators_era_points,
 };
-pub use submit::sign_and_submit_call_data;
 
 #[subxt::subxt(
     runtime_metadata_path = "artifacts/metadata/asset_hub_paseo_metadata_small.scale",

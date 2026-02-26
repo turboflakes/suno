@@ -1,8 +1,9 @@
 use crate::node_runtime::{
     proxy::events::ProxyExecuted,
-    staking::events::{Chilled, EraPaid, ValidatorPrefsSet},
+    staking::events::{Bonded, Chilled, EraPaid, ValidatorPrefsSet},
 };
 use crate::storage::fetch_era_data;
+use log::info;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
 use suno_primitives::Response;
@@ -17,8 +18,12 @@ pub async fn handle_events(
         let event = event?;
 
         if let Some(_ev) = event.as_event::<EraPaid>()? {
-            let res = fetch_era_data(api, block_hash).await?;
-            processed_events.push(res);
+            let response = fetch_era_data(api, block_hash).await?;
+            processed_events.push(response);
+        } else if let Some(ev) = event.as_event::<Bonded>()? {
+            let account_bytes = *(ev.stash).as_ref();
+            let response = Response::event_bonded(account_bytes, ev.amount);
+            processed_events.push(response);
         } else if let Some(_ev) = event.as_event::<Chilled>()? {
         } else if let Some(_ev) = event.as_event::<ValidatorPrefsSet>()? {
         }
