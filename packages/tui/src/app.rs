@@ -461,6 +461,10 @@ impl App {
                 self.validators
                     .add_amount_to_stake_ledger(&validator_key, amount);
             }
+            ValidatorAction::SubAmountToStakeLedger(validator_key, amount) => {
+                self.validators
+                    .sub_amount_to_stake_ledger(&validator_key, amount);
+            }
         }
     }
 

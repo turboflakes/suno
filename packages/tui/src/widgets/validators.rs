@@ -98,8 +98,18 @@ impl ValidatorsListState {
     pub fn add_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.ledger = StakeLedger {
-                active: validator.ledger.active() + amount,
-                total: validator.ledger.total() + amount,
+                active: validator.ledger.active().saturating_add(amount),
+                total: validator.ledger.total().saturating_add(amount),
+                unlocking: validator.ledger.unlocking().to_vec(),
+            };
+        }
+    }
+
+    pub fn sub_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.ledger = StakeLedger {
+                active: validator.ledger.active().saturating_sub(amount),
+                total: validator.ledger.total().saturating_sub(amount),
                 unlocking: validator.ledger.unlocking().to_vec(),
             };
         }
@@ -421,5 +431,10 @@ impl ValidatorsListWidget {
     pub fn add_amount_to_stake_ledger(&self, validator_key: &AccountKey, amount: Amount) {
         let mut state = self.state.write().unwrap();
         state.add_amount_to_stake_ledger(validator_key, amount);
+    }
+
+    pub fn sub_amount_to_stake_ledger(&self, validator_key: &AccountKey, amount: Amount) {
+        let mut state = self.state.write().unwrap();
+        state.sub_amount_to_stake_ledger(validator_key, amount);
     }
 }

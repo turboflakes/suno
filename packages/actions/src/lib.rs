@@ -101,6 +101,7 @@ pub enum ValidatorAction {
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
     AddAmountToStakeLedger(ValidatorKey, Amount),
+    SubAmountToStakeLedger(ValidatorKey, Amount),
     UpdateStatus(ValidatorKey, ValidatorStatus),
 }
 

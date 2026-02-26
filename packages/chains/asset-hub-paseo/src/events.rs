@@ -1,6 +1,6 @@
 use crate::node_runtime::{
     proxy::events::ProxyExecuted,
-    staking::events::{Bonded, Chilled, EraPaid, ValidatorPrefsSet},
+    staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet},
 };
 use crate::storage::fetch_era_data;
 use log::info;
@@ -23,6 +23,10 @@ pub async fn handle_events(
         } else if let Some(ev) = event.as_event::<Bonded>()? {
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_bonded(account_bytes, ev.amount);
+            processed_events.push(response);
+        } else if let Some(ev) = event.as_event::<Unbonded>()? {
+            let account_bytes = *(ev.stash).as_ref();
+            let response = Response::event_unbonded(account_bytes, ev.amount);
             processed_events.push(response);
         } else if let Some(_ev) = event.as_event::<Chilled>()? {
         } else if let Some(_ev) = event.as_event::<ValidatorPrefsSet>()? {

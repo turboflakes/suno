@@ -94,6 +94,7 @@ pub enum Response {
     TxSuccess,
     TxError(String),
     EventBonded(Data<AmountData>),
+    EventUnbonded(Data<AmountData>),
 }
 
 // Some constructors for convenience
@@ -166,5 +167,9 @@ impl Response {
 
     pub fn event_bonded(account: AccountBytes, amount: Amount) -> Self {
         Response::EventBonded(Data::new(AmountData { account, amount }))
+    }
+
+    pub fn event_unbonded(account: AccountBytes, amount: Amount) -> Self {
+        Response::EventUnbonded(Data::new(AmountData { account, amount }))
     }
 }
