@@ -1,9 +1,8 @@
-use super::node_runtime;
-use crate::storage::fetch_era_data;
-use node_runtime::{
+use crate::node_runtime::{
     proxy::events::ProxyExecuted,
     staking::events::{Chilled, EraPaid, ValidatorPrefsSet},
 };
+use crate::storage::fetch_era_data;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
 use suno_primitives::Response;

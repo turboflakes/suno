@@ -1,10 +1,11 @@
-use crate::bridge::{dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher};
+use crate::bridge::{dispatch::dispatch_response_action, RuntimeFetcher};
 use futures::{stream, stream::StreamExt};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
 use suno_config::SupportedRuntime;
-use suno_primitives::AccountKey;
+use suno_error::Error;
+use suno_primitives::{tx::payload_from_bytes, AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
 const CONCURRENT_REQUESTS: usize = 3;
@@ -570,7 +571,7 @@ pub fn spawn_sign_and_submit(
     let _ = tx.send(Action::Transaction(TxAction::Processing));
 
     tokio::spawn(async move {
-        let result = runtime.sign_and_submit(&api, &signer, call_data).await;
+        let result = sign_and_submit_call_data(&api, &signer, call_data).await;
         match result {
             Ok(response) => {
                 if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
@@ -582,10 +583,25 @@ pub fn spawn_sign_and_submit(
             }
             Err(e) => {
                 let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
+                    "Signing error: {}",
                     e
                 ))));
             }
         }
     });
+}
+
+async fn sign_and_submit_call_data(
+    api: &OnlineClient<SubstrateConfig>,
+    proxy_signer: &Keypair,
+    call_data: Vec<u8>,
+) -> Result<Response, Error> {
+    let payload = payload_from_bytes(call_data);
+
+    let response = api
+        .tx()
+        .sign_and_submit_then_watch_default(&payload, proxy_signer)
+        .await?;
+
+    Ok(Response::transaction_progress(response))
 }

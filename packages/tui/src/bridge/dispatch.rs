@@ -218,6 +218,12 @@ fn process_extrinsic_events(
     runtime: &SupportedRuntime,
 ) -> Vec<Response> {
     match runtime {
+        SupportedRuntime::Paseo => {
+            suno_paseo::handle_extrinsic_events(events).unwrap_or_else(|e| {
+                error!("Error processing Paseo extrinsic events: {}", e);
+                vec![]
+            })
+        }
         //  SupportedRuntime::AssetHubPolkadot => {
         //     suno_asset_hub_polkadot::handle_events(api, block_hash, events)
         //         .await
