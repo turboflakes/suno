@@ -3,13 +3,12 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
-    staking::{StakeLedger, StakeOverview},
+    staking::{StakeLedger, StakeOverview, ValidatorPrefs},
 };
 use ratatui::{layout::Alignment, text::Text, widgets::Row};
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
-type Commission = u32;
 type Points = u32;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -46,7 +45,7 @@ pub struct Nominators {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     pub account: NodeAccount,
-    pub commission: Commission,
+    pub prefs: ValidatorPrefs,
     pub stake: StakeOverview,
     pub ledger: StakeLedger,
     pub nominators: Vec<Nominators>,
@@ -67,7 +66,7 @@ impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
-            commission: 0,
+            prefs: ValidatorPrefs::default(),
             stake: StakeOverview::default(),
             ledger: StakeLedger::default(),
             nominators: Vec::new(),
@@ -102,10 +101,7 @@ impl Validator {
     }
 
     pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
-        let percentage = self.commission as f64 / 10_000_000.0;
-        let formatted = format!("{:.prec$}", percentage, prec = decimal_places);
-        let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-        format!("{}%", trimmed)
+        self.prefs.commission_as_percentage(decimal_places)
     }
 
     pub fn points(&self) -> Points {

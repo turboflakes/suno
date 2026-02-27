@@ -1,5 +1,6 @@
 use crate::display::format_millis;
 use serde::Serialize;
+use sp_arithmetic::Perbill;
 use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
@@ -65,6 +66,36 @@ impl Era {
         let diff = duration - (now - self.start_ts as u128) as u64;
 
         format_millis(diff)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub struct ValidatorPrefs {
+    pub commission: Perbill,
+    pub blocked: bool,
+}
+
+impl ValidatorPrefs {
+    pub fn new(commission: Perbill, blocked: bool) -> Self {
+        Self {
+            commission,
+            blocked,
+        }
+    }
+
+    pub fn commission(&self) -> u32 {
+        self.commission.deconstruct()
+    }
+
+    pub fn blocked(&self) -> bool {
+        self.blocked
+    }
+
+    pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
+        let percentage = self.commission() as f64 / 10_000_000.0;
+        let formatted = format!("{:.prec$}", percentage, prec = decimal_places);
+        let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+        format!("{}%", trimmed)
     }
 }
 

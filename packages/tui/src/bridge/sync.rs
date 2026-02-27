@@ -456,10 +456,11 @@ pub fn spawn_fetch_validators_points(
     });
 }
 
-pub fn spawn_fetch_validators_commission(
+pub fn spawn_fetch_validators_prefs(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: &SupportedRuntime,
+    era_index: u32,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -477,7 +478,7 @@ pub fn spawn_fetch_validators_commission(
 
                 async move {
                     runtime
-                        .fetch_validator_commission(&api, block_hash, &stash)
+                        .fetch_validator_prefs(&api, block_hash, era_index, &stash)
                         .await
                 }
             })

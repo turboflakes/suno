@@ -1,7 +1,7 @@
 use crate::{
     babe::Epoch,
     identity::Identity,
-    staking::{Chunk, Era, StakeLedger, StakeOverview},
+    staking::{Chunk, Era, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::{Perbill, Permill};
@@ -51,11 +51,11 @@ pub struct StakeLedgerData {
     pub ledger: Option<StakeLedger>,
 }
 
-/// Commission data combining account and commission
+/// Validator prefs data combining account and prefs
 #[derive(Debug)]
-pub struct CommissionData {
+pub struct ValidatorPrefsData {
     pub account: AccountBytes,
-    pub commission: Perbill,
+    pub prefs: Option<ValidatorPrefs>,
 }
 
 /// Stake ledger data combining account and ledger
@@ -91,7 +91,7 @@ pub enum Response {
     AuthorityPoints(Data<AuthorityPoints>),
     StakeOverview(Data<StakeOverviewData>),
     StakeLedger(Data<StakeLedgerData>),
-    Commission(Data<CommissionData>),
+    ValidatorPrefs(Data<ValidatorPrefsData>),
     Identity(Data<IdentityData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
@@ -155,11 +155,8 @@ impl Response {
         Response::TotalNominators(Data::new(value))
     }
 
-    pub fn validator_commission(account: AccountBytes, commission: Perbill) -> Self {
-        Response::Commission(Data::new(CommissionData {
-            account,
-            commission,
-        }))
+    pub fn validator_prefs(account: AccountBytes, prefs: Option<ValidatorPrefs>) -> Self {
+        Response::ValidatorPrefs(Data::new(ValidatorPrefsData { account, prefs }))
     }
 
     pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {

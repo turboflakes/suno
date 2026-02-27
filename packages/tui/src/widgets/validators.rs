@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::identity::Identity;
 use suno_primitives::{
-    staking::{Chunk, StakeLedger, StakeOverview},
+    staking::{Chunk, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::{Validator, ValidatorStatus},
     AccountKey,
 };
@@ -41,10 +41,10 @@ impl ValidatorsListState {
         self.validators.insert(key.clone(), validator);
     }
 
-    pub fn set_commission(&mut self, validator_key: &AccountKey, commission: Commission) -> bool {
+    pub fn set_prefs(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            if validator.commission != commission {
-                validator.commission = commission;
+            if validator.prefs != prefs {
+                validator.prefs = prefs;
                 return true;
             }
         }
@@ -416,9 +416,9 @@ impl ValidatorsListWidget {
         state.get_keys_by_runtime(&runtime.relay_chain())
     }
 
-    pub fn update_commission(&self, validator_key: &AccountKey, commission: Commission) -> bool {
+    pub fn update_prefs(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_commission(validator_key, commission)
+        state.set_prefs(validator_key, prefs)
     }
 
     pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> bool {

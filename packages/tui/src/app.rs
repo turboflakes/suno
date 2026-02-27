@@ -280,14 +280,6 @@ impl App {
                                     &api, block_hash, &runtime, &self.tx,
                                 );
 
-                                sync::spawn_fetch_validators_commission(
-                                    &api,
-                                    block_hash,
-                                    &runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
                                 sync::spawn_fetch_validators_staking_ledger(
                                     &api,
                                     block_hash,
@@ -337,7 +329,7 @@ impl App {
                                 self.validators.get_validator_keys_by_runtime(&runtime);
 
                             sync::spawn_fetch_validators_points(
-                                api,
+                                &api,
                                 block_hash,
                                 &runtime,
                                 &validator_keys,
@@ -388,6 +380,15 @@ impl App {
                             let validator_keys =
                                 self.validators.get_validator_keys_by_runtime(&runtime);
 
+                            sync::spawn_fetch_validators_prefs(
+                                &api,
+                                block_hash,
+                                &runtime,
+                                era.index(),
+                                &validator_keys,
+                                &self.tx,
+                            );
+
                             sync::spawn_fetch_validators_era_points(
                                 &api,
                                 block_hash,
@@ -435,9 +436,8 @@ impl App {
 
     fn handle_validator_actions(&mut self, action: ValidatorAction) {
         match action {
-            ValidatorAction::UpdateCommission(validator_key, commission) => {
-                self.validators
-                    .update_commission(&validator_key, commission);
+            ValidatorAction::UpdateValidatorPrefs(validator_key, prefs) => {
+                self.validators.update_prefs(&validator_key, prefs);
             }
             ValidatorAction::UpdatePoints(validator_key, points) => {
                 self.validators.update_points(&validator_key, points);

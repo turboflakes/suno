@@ -17,24 +17,24 @@ use subxt::{
 use suno_error::Error;
 use suno_primitives::staking::Chunk;
 use suno_primitives::{
-    node_account::get_account_bytes_from_storage_key,
-    staking::{Era, StakeLedger, StakeOverview},
-    AccountKey, Response,
+    node_account::get_account_bytes_from_storage_key, staking, AccountKey, Response,
 };
 
-/// Fetch validator commission
-pub async fn fetch_validator_commission(
+/// Fetch validator prefs
+pub async fn fetch_validator_prefs(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
+    era: u32,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let prefs = fetch_validator_prefs(api, block_hash, stash).await?;
+    if let Some(data) = fetch_eras_validator_prefs(api, block_hash, era, stash).await? {
+        let prefs =
+            staking::ValidatorPrefs::new(Perbill::from_parts(data.commission.0), data.blocked);
+        return Ok(Response::validator_prefs(account_bytes, Some(prefs)));
+    }
 
-    Ok(Response::validator_commission(
-        account_bytes,
-        Perbill::from_parts(prefs.commission.0),
-    ))
+    Ok(Response::validator_prefs(account_bytes, None))
 }
 
 /// Fetch validator stake overview
@@ -46,7 +46,8 @@ pub async fn fetch_validator_stake_overview(
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
     if let Some(data) = fetch_eras_stakers_overview(api, block_hash, era, stash).await? {
-        let stake_overview = StakeOverview::new(data.own, data.total, data.nominator_count);
+        let stake_overview =
+            staking::StakeOverview::new(data.own, data.total, data.nominator_count);
         return Ok(Response::stake_overview(
             account_bytes,
             Some(stake_overview),
@@ -68,7 +69,7 @@ pub async fn fetch_validator_staking_ledger(
         for chunk in unlocking {
             unbounding.push(Chunk::new(chunk.era, chunk.value));
         }
-        let stake_ledger = StakeLedger::new(data.active, data.total, unbounding);
+        let stake_ledger = staking::StakeLedger::new(data.active, data.total, unbounding);
         return Ok(Response::stake_ledger(account_bytes, Some(stake_ledger)));
     }
     Ok(Response::stake_ledger(account_bytes, None))
@@ -112,13 +113,13 @@ pub async fn fetch_era_data(
         .find(|b| b.0 == era_info.index)
         .map(|c| c.1 as u64)
         .unwrap_or(0);
-
-    Ok(Response::era(Era::new(
+    let era = staking::Era::new(
         era_info.index,
         era_info.start.unwrap_or(0),
         start_session,
         sessions_per_era,
-    )))
+    );
+    Ok(Response::era(era))
 }
 
 /// Fetch active validators and nominators at the specified block hash
@@ -273,7 +274,7 @@ async fn fetch_inactive_issuance(
 }
 
 /// Fetch validator prefs at the specified block hash
-async fn fetch_validator_prefs(
+async fn _fetch_validators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
@@ -286,6 +287,26 @@ async fn fetch_validator_prefs(
         .fetch((stash.clone(),))
         .await?
         .decode()?;
+
+    Ok(value)
+}
+
+/// Fetch validator prefs at the specified block hash and era
+async fn fetch_eras_validator_prefs(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    era: u32,
+    stash: &AccountId32,
+) -> Result<Option<ValidatorPrefs>, Error> {
+    let addr = node_runtime::storage().staking().eras_validator_prefs();
+
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .try_fetch((era, stash.clone()))
+        .await?
+        .map(|entry| entry.decode())
+        .transpose()?;
 
     Ok(value)
 }

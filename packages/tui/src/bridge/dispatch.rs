@@ -105,13 +105,17 @@ pub fn dispatch_response_action(
                 warn!("No stake ledger data found for {}", account_key.to_string(),);
             }
         }
-        Response::Commission(data) => {
+        Response::ValidatorPrefs(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
-            tx.send(Action::Validator(ValidatorAction::UpdateCommission(
-                account_key,
-                data.value.commission.deconstruct(),
-            )))?;
+            if let Some(prefs) = data.value.prefs {
+                tx.send(Action::Validator(ValidatorAction::UpdateValidatorPrefs(
+                    account_key,
+                    prefs,
+                )))?;
+            } else {
+                warn!("No stake ledger data found for {}", account_key.to_string(),);
+            }
         }
         Response::Identity(data) => {
             let rc_runtime = runtime.relay_chain();

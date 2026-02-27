@@ -7,7 +7,7 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
     identity::Identity,
-    staking::{Chunk, Era, StakeLedger, StakeOverview},
+    staking::{Chunk, Era, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
     AccountKey,
 };
@@ -94,7 +94,7 @@ pub enum ChainAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
-    UpdateCommission(ValidatorKey, Commission),
+    UpdateValidatorPrefs(ValidatorKey, ValidatorPrefs),
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),
     UpdateIdentity(ValidatorKey, Identity),
