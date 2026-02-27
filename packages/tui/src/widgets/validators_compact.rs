@@ -29,7 +29,7 @@ impl Widget for &ValidatorsCompactWidget {
         let widths = [
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(14),
+            Constraint::Length(3),
             Constraint::Length(1),
         ];
 

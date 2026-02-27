@@ -543,13 +543,13 @@ impl Widget for &ChainsListWidget {
 
         let rows = state.chains_iter();
         let widths = [
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Fill(1),
             Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(6),
             Constraint::Length(4),
-            Constraint::Length(2),
+            Constraint::Length(1),
         ];
 
         let header_cells = vec![

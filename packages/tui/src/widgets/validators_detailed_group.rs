@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Styled},
     text::{Line, Span, Text},
-    widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
@@ -123,28 +123,28 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        group_area: Rect,
+        area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
     ) {
         // Split area into header and body
-        let group_area = Layout::default()
+        let [header_area, body_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(GROUP_HEADER_HEIGHT), // Header height
                 Constraint::Min(0),                      // Body takes remaining
             ])
-            .split(group_area);
+            .areas(area);
 
         // Render network header
-        self.render_table_header(runtime, &validators, group_area[0], buf);
+        self.render_table_header(runtime, &validators, header_area, buf);
 
         // Render network validators table
         self.render_table_body(
             runtime,
             validators,
             selected_validator,
-            group_area[1],
+            body_area,
             buf,
             table_state,
         );
@@ -168,14 +168,14 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let header_layout_cols = Layout::default()
+        let [network_area, progress_area, countdown_area] = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Length(82), // Network info
                 Constraint::Fill(1),    // Era / Session progress bar
                 Constraint::Length(16), // Countdown
             ])
-            .split(area);
+            .areas(area);
 
         // Draw and render general network stats
 
@@ -211,11 +211,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ]),
         ];
 
+        let block = Block::new().set_style(THEME.block.main);
         let network_info = Paragraph::new(network_lines)
-            .block(Block::new().set_style(THEME.block.main))
+            .block(block)
             .style(THEME.paragraph.base);
 
-        network_info.render(header_layout_cols[0], buf);
+        network_info.render(network_area, buf);
 
         // Draw and render Progress Bars
 
@@ -253,11 +254,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .alignment(Alignment::Right),
         ];
 
+        let block = Block::new().set_style(THEME.block.main);
         let progress_info = Paragraph::new(progress_lines)
-            .block(Block::new().set_style(THEME.block.main))
+            .block(block)
             .style(THEME.paragraph.base);
 
-        progress_info.render(header_layout_cols[1], buf);
+        progress_info.render(progress_area, buf);
 
         // Draw and render Countdowns
 
@@ -270,11 +272,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
         ];
 
+        let block = Block::new().set_style(THEME.block.main);
         let countdown_info = Paragraph::new(countdown_lines)
-            .block(Block::new().set_style(THEME.block.main))
+            .block(block)
             .style(THEME.paragraph.base);
 
-        countdown_info.render(header_layout_cols[2], buf);
+        countdown_info.render(countdown_area, buf);
     }
 
     fn render_table_body(
@@ -296,10 +299,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let Some(active_era) = ah_chain.era() else {
             return;
         };
-
-        let block = Block::new()
-            .set_style(THEME.block.main)
-            .padding(Padding::symmetric(0, 1));
 
         let show_bonded = validators
             .iter()
@@ -513,6 +512,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
         *table_state.offset_mut() = 0;
 
+        let block = Block::new().set_style(THEME.block.main);
         let table = Table::new(rows, widths)
             .block(block)
             .header(Row::new(header_cells).set_style(THEME.table.header))
