@@ -108,21 +108,25 @@ impl ValidatorsListState {
 
     pub fn sub_chunk_from_stake_ledger(&mut self, validator_key: &AccountKey, chunk: Chunk) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let unlocking: Vec<Chunk> = validator
-                .ledger
-                .unlocking()
-                .iter()
-                .map(|c| {
-                    if c.era == chunk.era {
-                        Chunk {
-                            era: c.era,
-                            value: c.value.saturating_add(chunk.value),
+            let unlocking: Vec<Chunk> = if validator.ledger.unlocking().is_empty() {
+                vec![chunk.clone()]
+            } else {
+                validator
+                    .ledger
+                    .unlocking()
+                    .iter()
+                    .map(|c| {
+                        if c.era == chunk.era {
+                            Chunk {
+                                era: c.era,
+                                value: c.value.saturating_add(chunk.value),
+                            }
+                        } else {
+                            c.clone()
                         }
-                    } else {
-                        c.clone()
-                    }
-                })
-                .collect();
+                    })
+                    .collect()
+            };
 
             info!("Unlocking chunks: {:?}", unlocking);
 

@@ -301,9 +301,31 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .set_style(THEME.block.main)
             .padding(Padding::symmetric(0, 1));
 
-        let mut show_bonded = false;
-        let mut show_unlocking = false;
-        let mut show_unlocked = false;
+        let mut show_bonded = validators
+            .iter()
+            .any(|v| v.stake.own() != v.ledger.active());
+
+        let mut show_unlocking = validators.iter().any(|v| {
+            let unlocking: u128 = v
+                .ledger
+                .unlocking()
+                .iter()
+                .filter(|c| c.era > active_era.index())
+                .map(|c| c.value)
+                .sum();
+            unlocking > 0
+        });
+
+        let mut show_unlocked = validators.iter().any(|v| {
+            let unlocking: u128 = v
+                .ledger
+                .unlocking()
+                .iter()
+                .filter(|c| c.era <= active_era.index())
+                .map(|c| c.value)
+                .sum();
+            unlocking > 0
+        });
 
         let mut rows = Vec::new();
 
@@ -346,61 +368,64 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 ),
             ];
 
-            if v.stake.own() != v.ledger.active() {
-                show_bonded = true;
-                validator_cells.push(Cell::from(
-                    Line::from(vec![
-                        Span::raw("("),
-                        Span::raw(format_planks(v.ledger.active(), decimals, 4)),
-                        span_symbol.clone(),
-                        Span::raw(")"),
-                    ])
-                    .alignment(Alignment::Left),
-                ));
-            } else {
-                validator_cells.push(Cell::from(Text::from("")));
+            if show_bonded {
+                if v.stake.own() != v.ledger.active() {
+                    validator_cells.push(Cell::from(
+                        Line::from(vec![
+                            Span::raw("("),
+                            Span::raw(format_planks(v.ledger.active(), decimals, 4)),
+                            span_symbol.clone(),
+                            Span::raw(")"),
+                        ])
+                        .alignment(Alignment::Left),
+                    ));
+                } else {
+                    validator_cells.push(Cell::from(Text::from("")));
+                }
             }
 
-            let unlocking: u128 = v
-                .ledger
-                .unlocking()
-                .iter()
-                .filter(|c| c.era > 2840)
-                .map(|c| c.value)
-                .sum();
+            if show_unlocking {
+                let unlocking: u128 = v
+                    .ledger
+                    .unlocking()
+                    .iter()
+                    .filter(|c| c.era > active_era.index())
+                    .map(|c| c.value)
+                    .sum();
 
-            if unlocking > 0 {
-                show_unlocking = true;
-                validator_cells.push(Cell::from(
-                    Line::from(vec![
-                        Span::raw(format_planks(unlocking, decimals, 4)),
-                        span_symbol.clone(),
-                    ])
-                    .alignment(Alignment::Right),
-                ));
-            } else {
-                validator_cells.push(Cell::from(Text::from("")));
+                if unlocking > 0 {
+                    validator_cells.push(Cell::from(
+                        Line::from(vec![
+                            Span::raw(format_planks(unlocking, decimals, 4)),
+                            span_symbol.clone(),
+                        ])
+                        .alignment(Alignment::Right),
+                    ));
+                } else {
+                    validator_cells.push(Cell::from(Text::from("")));
+                }
             }
 
-            let unlocked: u128 = v
-                .ledger
-                .unlocking()
-                .iter()
-                .filter(|c| c.era <= active_era.index())
-                .map(|c| c.value)
-                .sum();
+            if show_unlocked {
+                let unlocked: u128 = v
+                    .ledger
+                    .unlocking()
+                    .iter()
+                    .filter(|c| c.era <= active_era.index())
+                    .map(|c| c.value)
+                    .sum();
 
-            if unlocked > 0 {
-                show_unlocked = true;
-                validator_cells.push(Cell::from(
-                    Line::from(vec![
-                        Span::raw(format_planks(unlocked, decimals, 4)),
-                        span_symbol.clone(),
-                    ])
-                    .alignment(Alignment::Right),
-                ));
-            } else {
-                validator_cells.push(Cell::from(Text::from("")));
+                if unlocked > 0 {
+                    validator_cells.push(Cell::from(
+                        Line::from(vec![
+                            Span::raw(format_planks(unlocked, decimals, 4)),
+                            span_symbol.clone(),
+                        ])
+                        .alignment(Alignment::Right),
+                    ));
+                } else {
+                    validator_cells.push(Cell::from(Text::from("")));
+                }
             }
 
             validator_cells.push(Cell::from(
