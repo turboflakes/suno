@@ -79,12 +79,12 @@ impl std::fmt::Display for Status {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Metadata {
-    unit: String,
+    unit: &'static str,
     decimals: u32,
 }
 
 impl Metadata {
-    pub fn new(unit: String, decimals: u32) -> Self {
+    pub fn new(unit: &'static str, decimals: u32) -> Self {
         Self { unit, decimals }
     }
 }

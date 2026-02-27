@@ -21,7 +21,7 @@ pub const PEOPLE_WESTEND_SPEC: &str = include_str!("../chain-specs/people-westen
 
 pub type Runtime = SupportedRuntime;
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {
     Local,
@@ -144,6 +144,16 @@ impl SupportedRuntime {
 
     pub fn account_format(&self) -> u16 {
         match &self {
+            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => 0,
+            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => 2,
+            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => 42,
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 0,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    pub fn _account_format(&self) -> u16 {
+        match &self {
             Self::Polkadot => get_ss58_format(POLKADOT_SPEC),
             Self::Kusama => get_ss58_format(KUSAMA_SPEC),
             Self::Westend => get_ss58_format(WESTEND_SPEC),
@@ -160,7 +170,17 @@ impl SupportedRuntime {
         }
     }
 
-    pub fn token_symbol(&self) -> String {
+    pub fn token_symbol(&self) -> &'static str {
+        match &self {
+            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => "DOT",
+            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => "KSM",
+            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => "WND",
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => "PAS",
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    pub fn _token_symbol(&self) -> String {
         match &self {
             Self::Polkadot => get_symbol(POLKADOT_SPEC),
             Self::Kusama => get_symbol(KUSAMA_SPEC),
@@ -179,6 +199,16 @@ impl SupportedRuntime {
     }
 
     pub fn token_decimals(&self) -> u32 {
+        match &self {
+            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => 10,
+            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => 12,
+            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => 12,
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 10,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    pub fn _token_decimals(&self) -> u32 {
         match &self {
             Self::Polkadot => get_decimals(POLKADOT_SPEC),
             Self::Kusama => get_decimals(KUSAMA_SPEC),

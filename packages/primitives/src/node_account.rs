@@ -33,8 +33,8 @@ impl NodeAccount {
         &self.account_key
     }
 
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account_key.runtime()
+    pub fn runtime(&self) -> SupportedRuntime {
+        self.account_key.runtime()
     }
 
     pub fn stash(&self) -> AccountId32 {
@@ -57,7 +57,7 @@ impl NodeAccount {
         self.runtime().token_decimals()
     }
 
-    pub fn token_symbol(&self) -> String {
+    pub fn token_symbol(&self) -> &'static str {
         self.runtime().token_symbol()
     }
 }
@@ -86,8 +86,8 @@ impl Collator {
     }
 
     // Getter methods if needed
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime()
+    pub fn runtime(&self) -> SupportedRuntime {
+        self.account.runtime()
     }
 
     pub fn identity(&self) -> Option<&Identity> {

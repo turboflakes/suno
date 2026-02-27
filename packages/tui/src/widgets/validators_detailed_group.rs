@@ -60,7 +60,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
 
             self.render_group(
                 runtime,
-                validators,
+                &validators,
                 selected_validator,
                 group_area,
                 &mut full_content_buf,
@@ -121,7 +121,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn render_group(
         &self,
         runtime: SupportedRuntime,
-        validators: Vec<&Validator>,
+        validators: &[&Validator],
         selected_validator: Option<&Validator>,
         group_area: Rect,
         buf: &mut Buffer,
@@ -137,12 +137,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .split(group_area);
 
         // Render network header
-        self.render_table_header(&runtime, &validators, group_area[0], buf);
+        self.render_table_header(runtime, &validators, group_area[0], buf);
 
         // Render network validators table
         self.render_table_body(
-            &runtime,
-            &validators,
+            runtime,
+            validators,
             selected_validator,
             group_area[1],
             buf,
@@ -152,7 +152,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
     fn render_table_header(
         &self,
-        runtime: &SupportedRuntime,
+        runtime: SupportedRuntime,
         validators: &[&Validator],
         area: Rect,
         buf: &mut Buffer,
@@ -279,7 +279,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
     fn render_table_body(
         &self,
-        runtime: &SupportedRuntime,
+        runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
         area: Rect,
@@ -301,11 +301,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .set_style(THEME.block.main)
             .padding(Padding::symmetric(0, 1));
 
-        let mut show_bonded = validators
+        let show_bonded = validators
             .iter()
             .any(|v| v.stake.own() != v.ledger.active());
 
-        let mut show_unlocking = validators.iter().any(|v| {
+        let show_unlocking = validators.iter().any(|v| {
             let unlocking: u128 = v
                 .ledger
                 .unlocking()
@@ -316,7 +316,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             unlocking > 0
         });
 
-        let mut show_unlocked = validators.iter().any(|v| {
+        let show_unlocked = validators.iter().any(|v| {
             let unlocking: u128 = v
                 .ledger
                 .unlocking()
@@ -449,7 +449,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let mut widths = vec![
             Constraint::Length(3),
-            Constraint::Length(28),
+            Constraint::Length(30),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),

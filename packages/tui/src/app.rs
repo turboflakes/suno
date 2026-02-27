@@ -34,7 +34,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 pub type AppResult<T> = std::result::Result<T, TuiError>;
 
 // Constants
-const TICK_RATE: u64 = 100;
+const TICK_RATE: u64 = 250;
 
 /// Application active focus.
 #[derive(Debug, Clone, Default)]

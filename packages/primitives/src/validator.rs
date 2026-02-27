@@ -85,8 +85,8 @@ impl Validator {
         &self.account.account_key()
     }
 
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.account.runtime()
+    pub fn runtime(&self) -> SupportedRuntime {
+        self.account.runtime()
     }
 
     pub fn identity(&self) -> &Option<Identity> {

@@ -206,7 +206,7 @@ impl ValidatorsListState {
         for key in &self.validators_order {
             if let Some(validator) = self.get_validator_by_key(key) {
                 grouped
-                    .entry(key.runtime.clone())
+                    .entry(key.runtime)
                     .or_insert_with(Vec::new)
                     .push(validator);
             }

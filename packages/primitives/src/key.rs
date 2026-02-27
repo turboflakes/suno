@@ -19,8 +19,8 @@ impl AccountKey {
         Self { runtime, bytes }
     }
 
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.runtime
+    pub fn runtime(&self) -> SupportedRuntime {
+        self.runtime
     }
 
     pub fn bytes(&self) -> [u8; 32] {
