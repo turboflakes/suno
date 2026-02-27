@@ -4,7 +4,7 @@ use crate::{
     staking::{Chunk, Era, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
-use sp_arithmetic::{Perbill, Permill};
+use sp_arithmetic::Permill;
 use std::fmt::Debug;
 use subxt::{tx::TxProgress, OnlineClient, SubstrateConfig};
 
@@ -92,6 +92,7 @@ pub enum Response {
     StakeOverview(Data<StakeOverviewData>),
     StakeLedger(Data<StakeLedgerData>),
     ValidatorPrefs(Data<ValidatorPrefsData>),
+    ValidatorPrefsNext(Data<ValidatorPrefsData>),
     Identity(Data<IdentityData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
@@ -157,6 +158,10 @@ impl Response {
 
     pub fn validator_prefs(account: AccountBytes, prefs: Option<ValidatorPrefs>) -> Self {
         Response::ValidatorPrefs(Data::new(ValidatorPrefsData { account, prefs }))
+    }
+
+    pub fn validator_prefs_next(account: AccountBytes, prefs: Option<ValidatorPrefs>) -> Self {
+        Response::ValidatorPrefsNext(Data::new(ValidatorPrefsData { account, prefs }))
     }
 
     pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {

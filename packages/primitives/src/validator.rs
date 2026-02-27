@@ -46,6 +46,7 @@ pub struct Nominators {
 pub struct Validator {
     pub account: NodeAccount,
     pub prefs: ValidatorPrefs,
+    pub prefs_next: ValidatorPrefs,
     pub stake: StakeOverview,
     pub ledger: StakeLedger,
     pub nominators: Vec<Nominators>,
@@ -67,6 +68,7 @@ impl Validator {
         Self {
             account: NodeAccount::new(runtime, stash),
             prefs: ValidatorPrefs::default(),
+            prefs_next: ValidatorPrefs::default(),
             stake: StakeOverview::default(),
             ledger: StakeLedger::default(),
             nominators: Vec::new(),
@@ -102,6 +104,14 @@ impl Validator {
 
     pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
         self.prefs.commission_as_percentage(decimal_places)
+    }
+
+    pub fn next_commission_as_percentage(&self, decimal_places: usize) -> String {
+        self.prefs_next.commission_as_percentage(decimal_places)
+    }
+
+    pub fn is_commission_changed(&self) -> bool {
+        self.prefs_next.commission() != self.prefs.commission()
     }
 
     pub fn points(&self) -> Points {

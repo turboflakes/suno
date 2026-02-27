@@ -17,7 +17,6 @@ use suno_primitives::{
     AccountKey,
 };
 
-type Commission = u32;
 type Points = u32;
 type Amount = u128;
 type ValidatorKey = AccountKey;
@@ -45,6 +44,16 @@ impl ValidatorsListState {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             if validator.prefs != prefs {
                 validator.prefs = prefs;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn set_prefs_next(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            if validator.prefs_next != prefs {
+                validator.prefs_next = prefs;
                 return true;
             }
         }
@@ -419,6 +428,11 @@ impl ValidatorsListWidget {
     pub fn update_prefs(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_prefs(validator_key, prefs)
+    }
+
+    pub fn update_prefs_next(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_prefs_next(validator_key, prefs)
     }
 
     pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> bool {

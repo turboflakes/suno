@@ -326,6 +326,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             unlocking > 0
         });
 
+        let show_next_commission = validators.iter().any(|v| v.is_commission_changed());
+
         let mut rows = Vec::new();
 
         let span_symbol = Span::raw(runtime.token_symbol()).style(THEME.paragraph.label);
@@ -434,6 +436,16 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
             ));
 
+            if show_next_commission {
+                if v.is_commission_changed() {
+                    validator_cells.push(Cell::from(
+                        Text::from(v.next_commission_as_percentage(2)).alignment(Alignment::Left),
+                    ));
+                } else {
+                    validator_cells.push(Cell::from(Text::from("")));
+                }
+            }
+
             // if selected_validator.is_some() {
             //     validator_cells.insert(
             //         1,
@@ -449,22 +461,26 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let mut widths = vec![
             Constraint::Length(3),
             Constraint::Length(30),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
+            Constraint::Fill(2),
+            Constraint::Fill(2),
+            Constraint::Fill(2),
+            Constraint::Fill(2),
+            Constraint::Fill(2),
         ];
 
         if show_bonded {
-            widths.push(Constraint::Fill(1));
+            widths.push(Constraint::Fill(2));
         }
 
         if show_unlocking {
-            widths.push(Constraint::Fill(1));
+            widths.push(Constraint::Fill(2));
         }
 
         if show_unlocked {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if show_next_commission {
             widths.push(Constraint::Fill(1));
         }
 
@@ -500,6 +516,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         header_cells.push(Cell::from(
             Text::from("commission").alignment(Alignment::Right),
         ));
+
+        if show_next_commission {
+            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
+        }
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {

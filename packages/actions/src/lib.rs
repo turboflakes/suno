@@ -17,7 +17,6 @@ type ChainKey = SupportedRuntime;
 type BlockNumber = u64;
 type BlockHash = H256;
 type Amount = u128;
-type Commission = u32;
 type Points = u32;
 type Counter = u32;
 
@@ -95,6 +94,7 @@ pub enum ChainAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
     UpdateValidatorPrefs(ValidatorKey, ValidatorPrefs),
+    UpdateValidatorPrefsNext(ValidatorKey, ValidatorPrefs),
     UpdatePoints(ValidatorKey, Points),
     UpdateEraPoints(ValidatorKey, Points),
     UpdateIdentity(ValidatorKey, Identity),

@@ -37,6 +37,18 @@ pub async fn fetch_validator_prefs(
     Ok(Response::validator_prefs(account_bytes, None))
 }
 
+/// Fetch validator next prefs
+pub async fn fetch_validator_prefs_next(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    let data = fetch_validators(api, block_hash, stash).await?;
+    let prefs = staking::ValidatorPrefs::new(Perbill::from_parts(data.commission.0), data.blocked);
+    Ok(Response::validator_prefs_next(account_bytes, Some(prefs)))
+}
+
 /// Fetch validator stake overview
 pub async fn fetch_validator_stake_overview(
     api: &OnlineClient<SubstrateConfig>,
@@ -274,7 +286,7 @@ async fn fetch_inactive_issuance(
 }
 
 /// Fetch validator prefs at the specified block hash
-async fn _fetch_validators(
+async fn fetch_validators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,

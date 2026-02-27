@@ -8,9 +8,13 @@ use crate::{
     storage::fetch_active_era_info,
 };
 use log::info;
+use sp_arithmetic::Perbill;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;
-use suno_primitives::{staking::Chunk, Response};
+use suno_primitives::{
+    staking::{Chunk, ValidatorPrefs},
+    Response,
+};
 
 pub async fn handle_events(
     api: &OnlineClient<SubstrateConfig>,
@@ -36,7 +40,12 @@ pub async fn handle_events(
             let response = Response::event_unbonded(account_bytes, chunk);
             processed_events.push(response);
         } else if let Some(_ev) = event.as_event::<Chilled>()? {
-        } else if let Some(_ev) = event.as_event::<ValidatorPrefsSet>()? {
+        } else if let Some(ev) = event.as_event::<ValidatorPrefsSet>()? {
+            let account_bytes = *(ev.stash).as_ref();
+            let prefs =
+                ValidatorPrefs::new(Perbill::from_parts(ev.prefs.commission.0), ev.prefs.blocked);
+            let response = Response::validator_prefs_next(account_bytes, Some(prefs));
+            processed_events.push(response);
         }
     }
     Ok(processed_events)

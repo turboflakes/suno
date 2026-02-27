@@ -280,6 +280,14 @@ impl App {
                                     &api, block_hash, &runtime, &self.tx,
                                 );
 
+                                sync::spawn_fetch_validators_prefs_next(
+                                    &api,
+                                    block_hash,
+                                    &runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
+
                                 sync::spawn_fetch_validators_staking_ledger(
                                     &api,
                                     block_hash,
@@ -438,6 +446,9 @@ impl App {
         match action {
             ValidatorAction::UpdateValidatorPrefs(validator_key, prefs) => {
                 self.validators.update_prefs(&validator_key, prefs);
+            }
+            ValidatorAction::UpdateValidatorPrefsNext(validator_key, prefs) => {
+                self.validators.update_prefs_next(&validator_key, prefs);
             }
             ValidatorAction::UpdatePoints(validator_key, points) => {
                 self.validators.update_points(&validator_key, points);

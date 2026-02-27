@@ -114,7 +114,24 @@ pub fn dispatch_response_action(
                     prefs,
                 )))?;
             } else {
-                warn!("No stake ledger data found for {}", account_key.to_string(),);
+                warn!(
+                    "No validator prefs data found for {}",
+                    account_key.to_string(),
+                );
+            }
+        }
+        Response::ValidatorPrefsNext(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            if let Some(prefs) = data.value.prefs {
+                tx.send(Action::Validator(
+                    ValidatorAction::UpdateValidatorPrefsNext(account_key, prefs),
+                ))?;
+            } else {
+                warn!(
+                    "No validator prefs data found for {}",
+                    account_key.to_string(),
+                );
             }
         }
         Response::Identity(data) => {
