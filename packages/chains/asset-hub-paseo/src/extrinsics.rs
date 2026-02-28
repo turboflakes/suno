@@ -92,7 +92,6 @@ fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
         Payee::None => RewardDestination::None,
         Payee::Account(account) => RewardDestination::Account(account),
         Payee::Stash => RewardDestination::Stash,
-        Payee::Controller => RewardDestination::Controller,
         Payee::Staked => RewardDestination::Staked,
     }
 }

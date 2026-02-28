@@ -72,7 +72,7 @@ impl Call {
                         let amount = parse_standard_unit(value, decimals)?;
                         match args.split_once(' ') {
                             None => Err(CallError::UnknownOptional(
-                                "payee <staked|stash|controller|account <address>>".to_string(),
+                                "payee <staked|stash|account <address>>".to_string(),
                             )),
                             Some((payee, args)) => match payee {
                                 "payee" => {
@@ -80,7 +80,7 @@ impl Call {
                                     Ok(Self::Bond { amount, payee })
                                 }
                                 _ => Err(CallError::UnknownOptional(
-                                    "payee <staked|stash|controller|account <address>>".to_string(),
+                                    "payee <staked|stash|account <address>>".to_string(),
                                 )),
                             },
                         }
@@ -188,16 +188,14 @@ impl ToPlaceholder for Call {
     fn placeholder(&self) -> String {
         match self {
             Self::Bond { .. } => {
-                "bond <value-in-standard-units> [payee <staked|stash|controller|account <address>>]"
+                "bond <value-in-standard-units> [payee <staked|stash|account <address>>]"
                     .to_string()
             }
             Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
             Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
             Self::Rebond { .. } => "rebond <value-in-standard-units>".to_string(),
             Self::WithdrawUnbonded => "withdraw_unbonded".to_string(),
-            Self::SetPayee { .. } => {
-                "set_payee <staked|stash|controller|account <address>>".to_string()
-            }
+            Self::SetPayee { .. } => "set_payee <staked|stash|account <address>>".to_string(),
             Self::Validate { .. } => {
                 "validate <value-in-percentage> [blocked <yes|no>]".to_string()
             }

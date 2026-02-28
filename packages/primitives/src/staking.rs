@@ -176,7 +176,6 @@ pub enum Payee {
     None,
     Staked,
     Stash,
-    Controller,
     Account(AccountId32),
 }
 
@@ -186,7 +185,6 @@ impl std::fmt::Display for Payee {
             Self::None => write!(f, "none"),
             Self::Staked => write!(f, "staked"),
             Self::Stash { .. } => write!(f, "stash"),
-            Self::Controller { .. } => write!(f, "controller"),
             Self::Account(account) => write!(f, "account {}", account),
         }
     }
@@ -210,9 +208,8 @@ impl FromStr for Payee {
             None => match s {
                 "staked" => Ok(Payee::Staked),
                 "stash" => Ok(Payee::Stash),
-                "controller" => Ok(Payee::Controller),
                 _ => Err(PayeeError::UnknownArgument(
-                    "staked|stash|controller|account <address>".to_string(),
+                    "staked|stash|account <address>".to_string(),
                 )),
             },
             Some((argument, account)) => match argument {
@@ -222,7 +219,7 @@ impl FromStr for Payee {
                     Ok(Payee::Account(acc))
                 }
                 _ => Err(PayeeError::UnknownArgument(
-                    "staked|stash|controller|account <address>".to_string(),
+                    "staked|stash|account <address>".to_string(),
                 )),
             },
         }
