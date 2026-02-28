@@ -131,7 +131,7 @@ impl App {
     fn _context(&self) -> Option<Context> {
         let validator = self.validators.get_selected()?;
         let runtime = validator.runtime().asset_hub_runtime();
-        let chain = self.chains.get_chain_by_runtime(&runtime)?;
+        let chain = self.chains.get_chain_by_runtime(runtime)?;
         let api = chain.client();
         let call = self.popup.get_input_parsed_call();
 
@@ -244,21 +244,21 @@ impl App {
 
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
-                    let validator_keys = self.validators.get_validator_keys_by_runtime(&runtime);
+                    let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
                     match runtime {
                         SupportedRuntime::Polkadot
                         | SupportedRuntime::Kusama
                         | SupportedRuntime::Paseo
                         | SupportedRuntime::Westend => {
                             if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(&runtime)
+                                self.chains.get_api_and_block_hash(runtime)
                             {
-                                sync::spawn_fetch_epoch_data(&api, block_hash, &runtime, &self.tx);
+                                sync::spawn_fetch_epoch_data(&api, block_hash, runtime, &self.tx);
 
                                 sync::spawn_fetch_validators_authority_status(
                                     &api,
                                     block_hash,
-                                    &runtime,
+                                    runtime,
                                     &validator_keys,
                                     &self.tx,
                                 );
@@ -269,21 +269,21 @@ impl App {
                         | SupportedRuntime::AssetHubPaseo
                         | SupportedRuntime::AssetHubWestend => {
                             if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(&runtime)
+                                self.chains.get_api_and_block_hash(runtime)
                             {
-                                sync::spawn_fetch_era_data(&api, block_hash, &runtime, &self.tx);
+                                sync::spawn_fetch_era_data(&api, block_hash, runtime, &self.tx);
 
                                 sync::spawn_fetch_total_validators_count(
-                                    &api, block_hash, &runtime, &self.tx,
+                                    &api, block_hash, runtime, &self.tx,
                                 );
                                 sync::spawn_fetch_total_nominators_count(
-                                    &api, block_hash, &runtime, &self.tx,
+                                    &api, block_hash, runtime, &self.tx,
                                 );
 
                                 sync::spawn_fetch_validators_prefs_next(
                                     &api,
                                     block_hash,
-                                    &runtime,
+                                    runtime,
                                     &validator_keys,
                                     &self.tx,
                                 );
@@ -291,7 +291,7 @@ impl App {
                                 sync::spawn_fetch_validators_staking_ledger(
                                     &api,
                                     block_hash,
-                                    &runtime,
+                                    runtime,
                                     &validator_keys,
                                     &self.tx,
                                 );
@@ -302,12 +302,12 @@ impl App {
                         | SupportedRuntime::PeoplePaseo
                         | SupportedRuntime::PeopleWestend => {
                             if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(&runtime)
+                                self.chains.get_api_and_block_hash(runtime)
                             {
                                 sync::spawn_fetch_validators_identity(
                                     &api,
                                     block_hash,
-                                    &runtime,
+                                    runtime,
                                     &validator_keys,
                                     &self.tx,
                                 )
@@ -331,15 +331,15 @@ impl App {
                     | SupportedRuntime::Kusama
                     | SupportedRuntime::Paseo
                     | SupportedRuntime::Westend => {
-                        if let Some(chain) = self.chains.get_chain_by_runtime(&runtime) {
+                        if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                             let api = chain.client();
                             let validator_keys =
-                                self.validators.get_validator_keys_by_runtime(&runtime);
+                                self.validators.get_validator_keys_by_runtime(runtime);
 
                             sync::spawn_fetch_validators_points(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 &validator_keys,
                                 &self.tx,
                             )
@@ -358,13 +358,12 @@ impl App {
                     | SupportedRuntime::AssetHubKusama
                     | SupportedRuntime::AssetHubPaseo
                     | SupportedRuntime::AssetHubWestend => {
-                        if let Some((api, block_hash)) =
-                            self.chains.get_api_and_block_hash(&runtime)
+                        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
                             sync::spawn_fetch_active_validators_count(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &self.tx,
                             );
@@ -372,7 +371,7 @@ impl App {
                             sync::spawn_fetch_active_nominators_count(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &self.tx,
                             );
@@ -380,18 +379,18 @@ impl App {
                             sync::spawn_fetch_total_staked(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &self.tx,
                             );
 
                             let validator_keys =
-                                self.validators.get_validator_keys_by_runtime(&runtime);
+                                self.validators.get_validator_keys_by_runtime(runtime);
 
                             sync::spawn_fetch_validators_prefs(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &validator_keys,
                                 &self.tx,
@@ -400,7 +399,7 @@ impl App {
                             sync::spawn_fetch_validators_era_points(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &validator_keys,
                                 &self.tx,
@@ -409,7 +408,7 @@ impl App {
                             sync::spawn_fetch_validators_stake_overview(
                                 &api,
                                 block_hash,
-                                &runtime,
+                                runtime,
                                 era.index(),
                                 &validator_keys,
                                 &self.tx,
@@ -477,12 +476,12 @@ impl App {
                 // subtracted from unlocking vec.
                 // To keep things in sync, a fetch for this respective stash is being called here.
                 let runtime = validator_key.runtime().asset_hub_runtime();
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(&runtime) {
+                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
                     sync::spawn_fetch_validators_staking_ledger(
                         &api,
                         block_hash,
-                        &runtime,
+                        runtime,
                         &validator_keys,
                         &self.tx,
                     );
@@ -665,7 +664,7 @@ impl App {
                             validator.runtime().asset_hub_runtime()
                         };
 
-                        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+                        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                             return;
                         };
                         let api = chain.client();
@@ -682,7 +681,7 @@ impl App {
                         match runtime.build_call_data(api, &stash, call.clone()) {
                             Ok(bytes) => {
                                 self.popup.init_confirm_and_sign(
-                                    &runtime,
+                                    runtime,
                                     spec_version,
                                     proxy_identity,
                                     stash_identity,
@@ -706,7 +705,7 @@ impl App {
                             validator.runtime().asset_hub_runtime()
                         };
 
-                        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+                        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                             return;
                         };
 
@@ -735,7 +734,7 @@ impl App {
                                         match signer_result {
                                             Ok(Ok(signer)) => {
                                                 sync::spawn_sign_and_submit(
-                                                    &api, &runtime, &signer, &bytes, &tx,
+                                                    &api, runtime, &signer, &bytes, &tx,
                                                 );
                                             }
                                             Ok(Err(e)) => {

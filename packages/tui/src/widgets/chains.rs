@@ -79,16 +79,16 @@ impl Chain {
         }
     }
 
-    pub fn key(&self) -> &SupportedRuntime {
-        &self.runtime
+    pub fn key(&self) -> SupportedRuntime {
+        self.runtime
     }
 
     pub fn name(&self) -> &str {
         &self.runtime.as_str()
     }
 
-    pub fn runtime(&self) -> &SupportedRuntime {
-        &self.runtime
+    pub fn runtime(&self) -> SupportedRuntime {
+        self.runtime
     }
 
     pub fn client(&self) -> &OnlineClient<SubstrateConfig> {
@@ -301,12 +301,12 @@ impl ChainsListState {
         self.is_active
     }
 
-    pub fn _get_chain_by_key(&self, chain_key: &ChainKey) -> Option<&Chain> {
-        self.chains.get(chain_key)
+    pub fn _get_chain_by_key(&self, chain_key: ChainKey) -> Option<&Chain> {
+        self.chains.get(&chain_key)
     }
 
-    pub fn get_chain_by_key_cloned(&self, chain_key: &ChainKey) -> Option<Chain> {
-        self.chains.get(chain_key).cloned()
+    pub fn get_chain_by_key_cloned(&self, chain_key: ChainKey) -> Option<Chain> {
+        self.chains.get(&chain_key).cloned()
     }
 
     // Helper method to get chain by table index
@@ -453,14 +453,14 @@ impl ChainsListWidget {
             .and_then(|i| state.get_chain_by_index_cloned(i))
     }
 
-    pub fn get_chain_by_runtime(&self, runtime: &SupportedRuntime) -> Option<Chain> {
+    pub fn get_chain_by_runtime(&self, runtime: SupportedRuntime) -> Option<Chain> {
         let state = self.state.read().unwrap();
         state.get_chain_by_key_cloned(runtime)
     }
 
     pub fn get_api_and_block_hash(
         &self,
-        runtime: &SupportedRuntime,
+        runtime: SupportedRuntime,
     ) -> Option<(OnlineClient<SubstrateConfig>, H256)> {
         let chain = self.get_chain_by_runtime(runtime)?;
 

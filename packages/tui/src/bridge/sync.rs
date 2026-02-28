@@ -17,7 +17,7 @@ const CONCURRENT_REQUESTS: usize = 3;
 pub fn spawn_fetch_era_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -28,7 +28,7 @@ pub fn spawn_fetch_era_data(
         let result = runtime.fetch_era_data(&api, block_hash).await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -48,7 +48,7 @@ pub fn spawn_fetch_era_data(
 pub fn spawn_fetch_epoch_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -59,7 +59,7 @@ pub fn spawn_fetch_epoch_data(
         let result = runtime.fetch_epoch_data(&api, block_hash).await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -79,7 +79,7 @@ pub fn spawn_fetch_epoch_data(
 pub fn spawn_fetch_total_staked(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
@@ -93,7 +93,7 @@ pub fn spawn_fetch_total_staked(
             .await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -113,7 +113,7 @@ pub fn spawn_fetch_total_staked(
 pub fn spawn_fetch_active_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
@@ -127,7 +127,7 @@ pub fn spawn_fetch_active_validators_count(
             .await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -147,7 +147,7 @@ pub fn spawn_fetch_active_validators_count(
 pub fn spawn_fetch_active_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
@@ -161,7 +161,7 @@ pub fn spawn_fetch_active_nominators_count(
             .await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -181,7 +181,7 @@ pub fn spawn_fetch_active_nominators_count(
 pub fn spawn_fetch_total_validators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -192,7 +192,7 @@ pub fn spawn_fetch_total_validators_count(
         let result = runtime.fetch_total_validators_count(&api, block_hash).await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -212,7 +212,7 @@ pub fn spawn_fetch_total_validators_count(
 pub fn spawn_fetch_total_nominators_count(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -223,7 +223,7 @@ pub fn spawn_fetch_total_nominators_count(
         let result = runtime.fetch_total_nominators_count(&api, block_hash).await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e
@@ -243,7 +243,7 @@ pub fn spawn_fetch_total_nominators_count(
 pub fn spawn_fetch_validators_era_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
@@ -260,7 +260,7 @@ pub fn spawn_fetch_validators_era_points(
         match result {
             Ok(responses) => {
                 for response in responses {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -281,7 +281,7 @@ pub fn spawn_fetch_validators_era_points(
 pub fn spawn_fetch_validators_authority_status(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -297,7 +297,7 @@ pub fn spawn_fetch_validators_authority_status(
         match result {
             Ok(responses) => {
                 for response in responses {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -318,7 +318,7 @@ pub fn spawn_fetch_validators_authority_status(
 pub fn spawn_fetch_validators_stake_overview(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
@@ -346,7 +346,7 @@ pub fn spawn_fetch_validators_stake_overview(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -367,7 +367,7 @@ pub fn spawn_fetch_validators_stake_overview(
 pub fn spawn_fetch_validators_staking_ledger(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -390,7 +390,7 @@ pub fn spawn_fetch_validators_staking_ledger(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -411,7 +411,7 @@ pub fn spawn_fetch_validators_staking_ledger(
 pub fn spawn_fetch_validators_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -438,7 +438,7 @@ pub fn spawn_fetch_validators_points(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -459,7 +459,7 @@ pub fn spawn_fetch_validators_points(
 pub fn spawn_fetch_validators_prefs(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
@@ -487,7 +487,7 @@ pub fn spawn_fetch_validators_prefs(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -508,7 +508,7 @@ pub fn spawn_fetch_validators_prefs(
 pub fn spawn_fetch_validators_prefs_next(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -535,7 +535,7 @@ pub fn spawn_fetch_validators_prefs_next(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -556,7 +556,7 @@ pub fn spawn_fetch_validators_prefs_next(
 pub fn spawn_fetch_validators_identity(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     validator_keys: &Vec<AccountKey>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -583,7 +583,7 @@ pub fn spawn_fetch_validators_identity(
         while let Some(result) = stream.next().await {
             match result {
                 Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                         let _ = tx.send(Action::System(SystemAction::Error(format!(
                             "Dispatch error: {}",
                             e
@@ -606,7 +606,7 @@ pub fn spawn_fetch_validators_identity(
 // ----
 pub fn spawn_sign_and_submit(
     api: &OnlineClient<SubstrateConfig>,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     signer: &Keypair,
     call_data: &Vec<u8>,
     tx: &UnboundedSender<Action>,
@@ -623,7 +623,7 @@ pub fn spawn_sign_and_submit(
         let result = sign_and_submit_call_data(&api, &signer, call_data).await;
         match result {
             Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, &runtime, &tx) {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
                         "Dispatch error: {}",
                         e

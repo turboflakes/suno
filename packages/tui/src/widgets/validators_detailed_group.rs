@@ -157,13 +157,13 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let Some(chain) = self.chains.get_chain_by_runtime(&runtime) else {
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
         };
 
         let Some(ah_chain) = self
             .chains
-            .get_chain_by_runtime(&runtime.asset_hub_runtime())
+            .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
             return;
         };
@@ -291,7 +291,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) {
         let Some(ah_chain) = self
             .chains
-            .get_chain_by_runtime(&runtime.asset_hub_runtime())
+            .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
             return;
         };

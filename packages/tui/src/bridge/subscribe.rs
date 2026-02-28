@@ -78,7 +78,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             };
 
                             // Process block events in a separate task
-                            spawn_process_runtime_events(&api, block.hash(), events, &runtime, &tx);
+                            spawn_process_runtime_events(&api, block.hash(), events, runtime, &tx);
                         }
                         Err(e) => {
                             if e.is_disconnected_will_reconnect() {
@@ -105,7 +105,7 @@ pub fn spawn_process_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     events: Events<SubstrateConfig>,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -113,7 +113,7 @@ pub fn spawn_process_runtime_events(
     let tx = tx.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = process_runtime_events(&api, block_hash, events, &runtime, &tx).await {
+        if let Err(e) = process_runtime_events(&api, block_hash, events, runtime, &tx).await {
             let _ = tx.send(Action::System(SystemAction::Error(e.to_string())));
         }
     });
@@ -123,7 +123,7 @@ async fn process_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     events: Events<SubstrateConfig>,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     let processed_events = handle_runtime_events(api, block_hash, events, runtime).await;
@@ -139,7 +139,7 @@ async fn handle_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     events: Events<SubstrateConfig>,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
 ) -> Vec<Response> {
     match runtime {
         SupportedRuntime::Polkadot => suno_polkadot::handle_events(api, block_hash, events)

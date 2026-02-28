@@ -188,10 +188,10 @@ impl ValidatorsListState {
     }
 
     /// Get all AccountKeys for a specific runtime
-    pub fn get_keys_by_runtime(&self, runtime: &SupportedRuntime) -> Vec<AccountKey> {
+    pub fn get_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         self.validators_order
             .iter()
-            .filter(|key| &key.runtime == runtime)
+            .filter(|key| key.runtime == runtime)
             .cloned()
             .collect()
     }
@@ -420,9 +420,9 @@ impl ValidatorsListWidget {
         state.get_selected()
     }
 
-    pub fn get_validator_keys_by_runtime(&self, runtime: &SupportedRuntime) -> Vec<AccountKey> {
+    pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         let state = self.state.read().unwrap();
-        state.get_keys_by_runtime(&runtime.relay_chain())
+        state.get_keys_by_runtime(runtime.relay_chain())
     }
 
     pub fn update_prefs(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {

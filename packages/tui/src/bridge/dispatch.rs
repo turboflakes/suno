@@ -8,7 +8,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub fn dispatch_response_action(
     response: Response,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     match response {
@@ -180,7 +180,7 @@ pub fn dispatch_response_action(
 }
 
 fn spawn_process_transaction_progress(
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
@@ -188,7 +188,7 @@ fn spawn_process_transaction_progress(
     let mut progress = progress;
     let tx = tx.clone();
     tokio::spawn(async move {
-        if let Err(e) = process_transaction_progress(&runtime, &mut progress, &tx).await {
+        if let Err(e) = process_transaction_progress(runtime, &mut progress, &tx).await {
             let _ = tx.send(Action::System(SystemAction::Error(format!(
                 "Dispatch error: {}",
                 e
@@ -198,7 +198,7 @@ fn spawn_process_transaction_progress(
 }
 
 async fn process_transaction_progress(
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
     progress: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
@@ -222,7 +222,7 @@ async fn process_transaction_progress(
 
                 match block.wait_for_success().await {
                     Ok(events) => {
-                        let processed_events = process_extrinsic_events(events, &runtime);
+                        let processed_events = process_extrinsic_events(events, runtime);
 
                         for response in processed_events {
                             dispatch_response_action(response, runtime, tx)?;
@@ -253,7 +253,7 @@ async fn process_transaction_progress(
 
 fn process_extrinsic_events(
     events: ExtrinsicEvents<SubstrateConfig>,
-    runtime: &SupportedRuntime,
+    runtime: SupportedRuntime,
 ) -> Vec<Response> {
     match runtime {
         SupportedRuntime::Paseo => {

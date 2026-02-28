@@ -203,7 +203,7 @@ impl PopupWidget {
 
     pub fn init_confirm_and_sign(
         &self,
-        runtime: &SupportedRuntime,
+        runtime: SupportedRuntime,
         spec_version: u32,
         proxy_identity: String,
         stash_identity: String,
