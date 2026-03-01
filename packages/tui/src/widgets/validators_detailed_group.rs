@@ -435,6 +435,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             validator_cells.push(Cell::from(
                 Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
             ));
+
             validator_cells.push(Cell::from(
                 Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
             ));
@@ -448,6 +449,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                     validator_cells.push(Cell::from(Text::from("")));
                 }
             }
+
+            validator_cells.push(Cell::from(
+                Text::from(v.payee_as_compact(3)).alignment(Alignment::Right),
+            ));
 
             // if selected_validator.is_some() {
             //     validator_cells.insert(
@@ -487,6 +492,9 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             widths.push(Constraint::Fill(1));
         }
 
+        // payee
+        widths.push(Constraint::Fill(2));
+
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
@@ -523,6 +531,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         if show_next_commission {
             header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
         }
+
+        header_cells.push(Cell::from(Text::from("payee").alignment(Alignment::Right)));
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {

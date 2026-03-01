@@ -1,4 +1,4 @@
-use crate::display::format_millis;
+use crate::display::{format_millis, to_compact_string};
 use serde::Serialize;
 use sp_arithmetic::Perbill;
 use std::{
@@ -177,6 +177,15 @@ pub enum Payee {
     Staked,
     Stash,
     Account(AccountId32),
+}
+
+impl Payee {
+    pub fn to_compact_string(&self, format: u16, size: usize) -> String {
+        match self {
+            Self::None | Self::Staked | Self::Stash { .. } => self.to_string(),
+            Self::Account(account) => to_compact_string(account, format, size),
+        }
+    }
 }
 
 impl std::fmt::Display for Payee {

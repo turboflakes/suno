@@ -3,7 +3,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
-    staking::{StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
 use ratatui::{layout::Alignment, text::Text, widgets::Row};
 use subxt::utils::AccountId32;
@@ -49,6 +49,7 @@ pub struct Validator {
     pub prefs_next: ValidatorPrefs,
     pub stake: StakeOverview,
     pub ledger: StakeLedger,
+    pub payee: Payee,
     pub nominators: Vec<Nominators>,
     // Track session points from staking_ah_client.validator_points
     pub points: Points,
@@ -71,6 +72,7 @@ impl Validator {
             prefs_next: ValidatorPrefs::default(),
             stake: StakeOverview::default(),
             ledger: StakeLedger::default(),
+            payee: Payee::None,
             nominators: Vec::new(),
             points: 0,
             old_points: 0,
@@ -112,6 +114,10 @@ impl Validator {
 
     pub fn is_commission_changed(&self) -> bool {
         self.prefs_next.commission() != self.prefs.commission()
+    }
+
+    pub fn payee_as_compact(&self, size: usize) -> String {
+        self.payee.to_compact_string(self.account_format(), size)
     }
 
     pub fn points(&self) -> Points {

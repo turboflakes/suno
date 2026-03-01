@@ -3,7 +3,8 @@ use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
     bounded_collections::bounded_vec::BoundedVec,
     pallet_staking_async::{
-        ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, ValidatorPrefs,
+        ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, RewardDestination,
+        ValidatorPrefs,
     },
     sp_staking::PagedExposureMetadata,
 };
@@ -15,9 +16,11 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::Error;
-use suno_primitives::staking::Chunk;
 use suno_primitives::{
-    node_account::get_account_bytes_from_storage_key, staking, AccountKey, Response,
+    node_account::get_account_bytes_from_storage_key,
+    staking,
+    staking::{Chunk, Payee},
+    AccountKey, Response,
 };
 
 /// Fetch validator prefs
@@ -233,6 +236,33 @@ pub async fn fetch_total_staked(
     )))
 }
 
+/// Fetch validator payee for a specific stash at the specified block hash
+pub async fn fetch_validator_payee(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    let destination = fetch_payee(api, block_hash, stash).await?;
+    let payee = map_reward_destination(destination);
+
+    Ok(Response::validator_payee(account_bytes, payee))
+}
+
+// Helper function to map RewardDestination to Payee
+fn map_reward_destination(dest: RewardDestination<AccountId32>) -> Payee {
+    match dest {
+        RewardDestination::None | RewardDestination::Controller => Payee::None,
+        RewardDestination::Account(account) => Payee::Account(account),
+        RewardDestination::Stash => Payee::Stash,
+        RewardDestination::Staked => Payee::Staked,
+    }
+}
+
+//
+// -----------------------------------------
+//
+
 /// Fetch bonded eras at the specified block hash
 async fn fetch_bonded_eras(
     api: &OnlineClient<SubstrateConfig>,
@@ -401,6 +431,24 @@ async fn _fetch_nominators(
     stash: AccountId32,
 ) -> Result<Nominations, Error> {
     let addr = node_runtime::storage().staking().nominators();
+
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)?
+        .fetch((stash.clone(),))
+        .await?
+        .decode()?;
+
+    Ok(value)
+}
+
+/// Fetch payee at the specified block hash
+pub async fn fetch_payee(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<RewardDestination<AccountId32>, Error> {
+    let addr = node_runtime::storage().staking().payee();
 
     let api_at = api.storage().at(block_hash);
     let value = api_at

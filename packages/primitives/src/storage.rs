@@ -1,7 +1,7 @@
 use crate::{
     babe::Epoch,
     identity::Identity,
-    staking::{Chunk, Era, StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::Permill;
@@ -79,6 +79,13 @@ pub struct ChunkData {
     pub chunk: Chunk,
 }
 
+/// Chunk data combining account and chunk
+#[derive(Debug)]
+pub struct ValidatorPayeeData {
+    pub account: AccountBytes,
+    pub payee: Payee,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -93,6 +100,7 @@ pub enum Response {
     StakeLedger(Data<StakeLedgerData>),
     ValidatorPrefs(Data<ValidatorPrefsData>),
     ValidatorPrefsNext(Data<ValidatorPrefsData>),
+    ValidatorPayee(Data<ValidatorPayeeData>),
     Identity(Data<IdentityData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
@@ -162,6 +170,10 @@ impl Response {
 
     pub fn validator_prefs_next(account: AccountBytes, prefs: Option<ValidatorPrefs>) -> Self {
         Response::ValidatorPrefsNext(Data::new(ValidatorPrefsData { account, prefs }))
+    }
+
+    pub fn validator_payee(account: AccountBytes, payee: Payee) -> Self {
+        Response::ValidatorPayee(Data::new(ValidatorPayeeData { account, payee }))
     }
 
     pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {

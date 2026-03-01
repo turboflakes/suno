@@ -7,7 +7,7 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
     identity::Identity,
-    staking::{Chunk, Era, StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
     AccountKey,
 };
@@ -100,6 +100,7 @@ pub enum ValidatorAction {
     UpdateIdentity(ValidatorKey, Identity),
     UpdateStakeOverview(ValidatorKey, StakeOverview),
     UpdateStakeLedger(ValidatorKey, StakeLedger),
+    UpdatePayee(ValidatorKey, Payee),
     AddAmountToStakeLedger(ValidatorKey, Amount),
     SubChunkFromStakeLedger(ValidatorKey, Chunk),
     UpdateStatus(ValidatorKey, ValidatorStatus),

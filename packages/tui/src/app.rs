@@ -295,6 +295,14 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
+
+                                sync::spawn_fetch_validators_payee(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
                             }
                         }
                         SupportedRuntime::PeoplePolkadot
@@ -463,6 +471,9 @@ impl App {
             }
             ValidatorAction::UpdateStakeLedger(validator_key, data) => {
                 self.validators.update_stake_ledger(&validator_key, data);
+            }
+            ValidatorAction::UpdatePayee(validator_key, data) => {
+                self.validators.update_payee(&validator_key, data);
             }
             ValidatorAction::UpdateStatus(validator_key, status) => {
                 self.validators.update_status(&validator_key, status);

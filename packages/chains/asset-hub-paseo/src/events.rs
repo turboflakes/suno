@@ -46,7 +46,8 @@ pub async fn handle_events(
                 ValidatorPrefs::new(Perbill::from_parts(ev.prefs.commission.0), ev.prefs.blocked);
             let response = Response::validator_prefs_next(account_bytes, Some(prefs));
             processed_events.push(response);
-        }
+        } // TODO: Event PayeeSet is currently not available
+          // else if let Some(ev) = event.as_event::<PayeeSet>()? {}
     }
     Ok(processed_events)
 }
