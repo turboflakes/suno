@@ -40,8 +40,6 @@ jobs:
   clippy:
     name: Cargo clippy
     runs-on: self-hosted
-    permissions:
-      checks: write
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
