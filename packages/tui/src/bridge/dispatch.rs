@@ -13,57 +13,46 @@ pub fn dispatch_response_action(
 ) -> Result<(), Error> {
     match response {
         Response::Era(data) => {
-            tx.send(Action::Chain(ChainAction::UpdateEra(
-                runtime.clone(),
-                data.value,
-            )))
-            .boxed()?;
+            tx.send(Action::Chain(ChainAction::UpdateEra(runtime, data.value)))
+                .boxed()?;
         }
         Response::Epoch(data) => {
-            tx.send(Action::Chain(ChainAction::UpdateEpoch(
-                runtime.clone(),
-                data.value,
-            )))
-            .boxed()?;
+            tx.send(Action::Chain(ChainAction::UpdateEpoch(runtime, data.value)))
+                .boxed()?;
         }
         Response::TotalStaked(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
-                runtime.clone(),
-                data.value,
+                runtime, data.value,
             )))
             .boxed()?;
         }
         Response::ActiveValidators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
-                runtime.clone(),
-                data.value,
+                runtime, data.value,
             )))
             .boxed()?;
         }
         Response::ActiveNominators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateActiveNominators(
-                runtime.clone(),
-                data.value,
+                runtime, data.value,
             )))
             .boxed()?;
         }
         Response::TotalValidators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
-                runtime.clone(),
-                data.value,
+                runtime, data.value,
             )))
             .boxed()?;
         }
         Response::TotalNominators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
-                runtime.clone(),
-                data.value,
+                runtime, data.value,
             )))
             .boxed()?;
         }
         Response::AuthorityStatus(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdateStatus(
                 account_key,
                 data.value.status,
@@ -72,7 +61,7 @@ pub fn dispatch_response_action(
         }
         Response::AuthorityEraPoints(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
                 account_key,
                 data.value.points,
@@ -81,7 +70,7 @@ pub fn dispatch_response_action(
         }
         Response::AuthorityPoints(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdatePoints(
                 account_key,
                 data.value.points,
@@ -90,7 +79,7 @@ pub fn dispatch_response_action(
         }
         Response::StakeOverview(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             if let Some(overview) = data.value.overview {
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
                     account_key,
@@ -98,15 +87,12 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!(
-                    "No stake overview data found for {}",
-                    account_key.to_string(),
-                );
+                warn!("No stake overview data found for {}", account_key,);
             }
         }
         Response::StakeLedger(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             if let Some(ledger) = data.value.ledger {
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
                     account_key,
@@ -114,12 +100,12 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!("No stake ledger data found for {}", account_key.to_string(),);
+                warn!("No stake ledger data found for {}", account_key,);
             }
         }
         Response::ValidatorPrefs(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             if let Some(prefs) = data.value.prefs {
                 tx.send(Action::Validator(ValidatorAction::UpdateValidatorPrefs(
                     account_key,
@@ -127,30 +113,24 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!(
-                    "No validator prefs data found for {}",
-                    account_key.to_string(),
-                );
+                warn!("No validator prefs data found for {}", account_key,);
             }
         }
         Response::ValidatorPrefsNext(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             if let Some(prefs) = data.value.prefs {
                 tx.send(Action::Validator(
                     ValidatorAction::UpdateValidatorPrefsNext(account_key, prefs),
                 ))
                 .boxed()?;
             } else {
-                warn!(
-                    "No validator prefs data found for {}",
-                    account_key.to_string(),
-                );
+                warn!("No validator prefs data found for {}", account_key,);
             }
         }
         Response::ValidatorPayee(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdatePayee(
                 account_key,
                 data.value.payee,
@@ -159,7 +139,7 @@ pub fn dispatch_response_action(
         }
         Response::Identity(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             if let Some(identity) = data.value.identity {
                 tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
                     account_key,
@@ -167,7 +147,7 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!("No identity data found for {}", account_key.to_string(),);
+                warn!("No identity data found for {}", account_key,);
             }
         }
         Response::TxProgress(data) => {
@@ -182,7 +162,7 @@ pub fn dispatch_response_action(
         }
         Response::EventBonded(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::AddAmountToStakeLedger(
                 account_key,
                 data.value.amount,
@@ -191,7 +171,7 @@ pub fn dispatch_response_action(
         }
         Response::EventUnbonded(data) => {
             let rc_runtime = runtime.relay_chain();
-            let account_key = AccountKey::from_bytes(rc_runtime.clone(), data.value.account);
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::SubChunkFromStakeLedger(
                 account_key,
                 data.value.chunk,
@@ -209,7 +189,6 @@ fn spawn_process_transaction_progress(
     progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
-    let runtime = runtime.clone();
     let mut progress = progress;
     let tx = tx.clone();
     tokio::spawn(async move {

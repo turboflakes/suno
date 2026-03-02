@@ -56,7 +56,6 @@ impl Widget for &ValidatorsCompactWidget {
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
-                ..area
             };
             if let Some(row_index) = state.table_state.selected() {
                 render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);

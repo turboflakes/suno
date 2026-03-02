@@ -137,7 +137,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_era_data(api, block_hash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -151,7 +151,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::Kusama => suno_kusama::fetch_epoch_data(api, block_hash).await,
             Runtime::Paseo => suno_paseo::fetch_epoch_data(api, block_hash).await,
             Runtime::Westend => suno_westend::fetch_epoch_data(api, block_hash).await,
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -174,7 +174,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_staked(api, block_hash, era_index).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -201,7 +201,7 @@ impl RuntimeFetcher for Runtime {
                 suno_asset_hub_westend::fetch_active_validators_count(api, block_hash, era_index)
                     .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -228,7 +228,7 @@ impl RuntimeFetcher for Runtime {
                 suno_asset_hub_westend::fetch_active_nominators_count(api, block_hash, era_index)
                     .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -250,7 +250,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_validators_count(api, block_hash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -272,7 +272,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_nominators_count(api, block_hash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -320,7 +320,7 @@ impl RuntimeFetcher for Runtime {
                 )
                 .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -337,7 +337,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::Kusama => suno_kusama::fetch_validator_points(api, block_hash, stash).await,
             Runtime::Paseo => suno_paseo::fetch_validator_points(api, block_hash, stash).await,
             Runtime::Westend => suno_westend::fetch_validator_points(api, block_hash, stash).await,
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -363,7 +363,7 @@ impl RuntimeFetcher for Runtime {
                 suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys)
                     .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -399,7 +399,7 @@ impl RuntimeFetcher for Runtime {
                 )
                 .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -423,7 +423,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -450,7 +450,7 @@ impl RuntimeFetcher for Runtime {
                 suno_asset_hub_westend::fetch_validator_prefs(api, block_hash, era_index, stash)
                     .await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -473,7 +473,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_prefs_next(api, block_hash, stash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -496,7 +496,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_payee(api, block_hash, stash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 
@@ -517,7 +517,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleWestend => {
                 suno_people_westend::fetch_identity(api, block_hash, stash).await
             }
-            _ => Err(Error::UnsupportedRuntime(self.clone())),
+            _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
 }

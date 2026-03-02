@@ -11,7 +11,7 @@ use subxt::{
 pub async fn _create_substrate_rpc_client_from_url(
     url: &str,
 ) -> Result<RpcClient, Box<dyn std::error::Error>> {
-    if let Err(_) = validate_url_is_secure(url) {
+    if validate_url_is_secure(url).is_err() {
         warn!("Insecure URL provided: {}", url);
     };
     let rpc = RpcClient::from_insecure_url(url).await?;
@@ -22,7 +22,7 @@ pub async fn _create_substrate_rpc_client_from_url(
 pub async fn create_substrate_rpc_client_from_url(
     url: &str,
 ) -> Result<ReconnectingRpcClient, Box<dyn std::error::Error>> {
-    if let Err(_) = validate_url_is_secure(url) {
+    if validate_url_is_secure(url).is_err() {
         warn!("Insecure URL provided: {}", url);
     };
     let ping_config = PingConfig::new();

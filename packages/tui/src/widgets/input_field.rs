@@ -1,7 +1,6 @@
 use crate::call::{Call, CallError};
 use crate::widgets::spinner::Spinner;
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
-use log::info;
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
 use suno_primitives::display::pasted_string_info;
@@ -433,7 +432,7 @@ impl InputFieldWidget {
         state.set_value(value);
     }
 
-    pub fn set_label(&mut self, label: String) {
+    pub fn _set_label(&mut self, label: String) {
         let mut state = self.state.write().unwrap();
         state.set_label(label);
     }

@@ -89,7 +89,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
                 // Safety check to stay within buffer bounds
                 if dest_x < buf.area.width && dest_y < buf.area.height {
                     let target_cell = &mut buf[(dest_x, dest_y)];
-                    target_cell.set_symbol(&source_cell.symbol());
+                    target_cell.set_symbol(source_cell.symbol());
                     target_cell.set_style(source_cell.style());
                 }
             }
@@ -104,7 +104,6 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
-                ..area
             };
 
             render_scrollbar(
@@ -137,7 +136,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .areas(area);
 
         // Render network header
-        self.render_table_header(runtime, &validators, header_area, buf);
+        self.render_table_header(runtime, validators, header_area, buf);
 
         // Render network validators table
         self.render_table_body(
@@ -180,10 +179,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         // Draw and render general network stats
 
         let network_lines = vec![
-            Line::from(
-                Span::raw(format!("{}", runtime.to_string().to_uppercase()))
-                    .style(THEME.paragraph.header),
-            ),
+            Line::from(Span::raw(runtime.to_string().to_uppercase()).style(THEME.paragraph.header)),
             Line::from(vec![
                 Span::raw("total validators: ").style(THEME.paragraph.label),
                 Span::raw(format!(
@@ -202,7 +198,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ]),
             Line::from(vec![
                 Span::raw("total staked: ").style(THEME.paragraph.label),
-                Span::raw(format!("{}", ah_chain.total_staked_percentage())),
+                Span::raw(ah_chain.total_staked_percentage()),
             ]),
             Line::from(vec![
                 Span::raw("displayed: ").style(THEME.paragraph.label),
@@ -244,14 +240,14 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(format!(
                 "era {} {:.0}% {}",
                 era.index(),
-                era_progress * 100 as f64,
+                era_progress * 100_f64,
                 era_progress_bar
             ))
             .alignment(Alignment::Right),
             Line::from(format!(
                 "epoch {} {:.0}% {}",
                 epoch.index(),
-                epoch_progress * 100 as f64,
+                epoch_progress * 100_f64,
                 epoch_progress_bar,
             ))
             .alignment(Alignment::Right),
@@ -353,7 +349,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
             let mut validator_cells = vec![
                 Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
-                Cell::from(Text::from(format!("{}", v.display_name(3))).alignment(Alignment::Left))
+                Cell::from(Text::from(v.display_name(3)).alignment(Alignment::Left))
                     .style(cell_style),
                 Cell::from(text_points.alignment(Alignment::Right)),
                 Cell::from(

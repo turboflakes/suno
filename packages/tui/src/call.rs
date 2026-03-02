@@ -1,5 +1,4 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
-use log::info;
 use serde::Serialize;
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
@@ -74,15 +73,13 @@ impl Call {
                             None => Err(CallError::UnknownOptional(
                                 "payee <staked|stash|account <address>>".to_string(),
                             )),
-                            Some((payee, args)) => match payee {
-                                "payee" => {
-                                    let payee = Payee::from_str(args)?;
-                                    Ok(Self::Bond { amount, payee })
-                                }
-                                _ => Err(CallError::UnknownOptional(
-                                    "payee <staked|stash|account <address>>".to_string(),
-                                )),
-                            },
+                            Some(("payee", args)) => {
+                                let payee = Payee::from_str(args)?;
+                                Ok(Self::Bond { amount, payee })
+                            }
+                            Some((_other, _)) => Err(CallError::UnknownOptional(
+                                "payee <staked|stash|account <address>>".to_string(),
+                            )),
                         }
                     }
                 },
@@ -214,7 +211,7 @@ impl ToMethod for Call {
             Self::BondExtra { amount } => format!("bond_extra {amount}"),
             Self::Unbond { amount } => format!("unbond {amount}"),
             Self::Rebond { amount } => format!("rebond {amount}"),
-            Self::WithdrawUnbonded => format!("withdraw_unbonded"),
+            Self::WithdrawUnbonded => "withdraw_unbonded".to_string(),
             Self::SetPayee { payee } => format!("set_payee {payee}"),
             Self::Validate {
                 commission,
@@ -239,7 +236,7 @@ impl ToHex for Call {
 }
 
 impl AsBytes for Call {
-    fn into_bytes(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         self.to_string().as_bytes().to_vec()
     }
 }
@@ -284,7 +281,7 @@ fn parse_percentage(value: &str) -> Result<Perbill, CallError> {
         .map_err(|_| CallError::InvalidPercentage(value.to_string()))?;
 
     // Validate range
-    if percent_value < 0.0 || percent_value > 100.0 {
+    if !(0.0..=100.0).contains(&percent_value) {
         return Err(CallError::InvalidPercentageRange(percent_value.to_string()));
     }
 
@@ -299,9 +296,9 @@ fn parse_boolean(value: &str) -> Result<bool, CallError> {
     match value.trim().to_lowercase().as_str() {
         "yes" => Ok(true),
         "no" => Ok(false),
-        _ => Err(CallError::InvalidArgument(format!(
-            "expected 'yes' or 'no'",
-        ))),
+        _ => Err(CallError::InvalidArgument(
+            "expected 'yes' or 'no'".to_string(),
+        )),
     }
 }
 

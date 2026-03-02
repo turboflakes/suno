@@ -34,7 +34,7 @@ pub struct ValidatorsListState {
 impl ValidatorsListState {
     pub fn add_validator(&mut self, validator: Validator) {
         let key = validator.key();
-        if !self.validators.contains_key(&key) {
+        if !self.validators.contains_key(key) {
             self.validators_order.push(key.clone());
         }
         self.validators.insert(key.clone(), validator);
@@ -205,11 +205,8 @@ impl ValidatorsListState {
     pub fn get_keys_grouped_by_runtime_cloned(&self) -> HashMap<SupportedRuntime, Vec<AccountKey>> {
         let mut grouped: HashMap<SupportedRuntime, Vec<AccountKey>> = HashMap::new();
 
-        for (key, _) in &self.validators {
-            grouped
-                .entry(key.runtime.clone())
-                .or_insert_with(Vec::new)
-                .push(key.clone());
+        for key in self.validators.keys() {
+            grouped.entry(key.runtime).or_default().push(key.clone());
         }
 
         grouped
@@ -220,10 +217,7 @@ impl ValidatorsListState {
 
         for key in &self.validators_order {
             if let Some(validator) = self.get_validator_by_key(key) {
-                grouped
-                    .entry(key.runtime)
-                    .or_insert_with(Vec::new)
-                    .push(validator);
+                grouped.entry(key.runtime).or_default().push(validator);
             }
         }
 
@@ -248,8 +242,8 @@ impl ValidatorsListState {
         let validators_grouped = self.get_validators_grouped_by_runtime();
 
         validators_grouped
-            .iter()
-            .map(|(_, v)| GROUP_HEADER_HEIGHT + v.len() as u16 + PADDING)
+            .values()
+            .map(|v| GROUP_HEADER_HEIGHT + v.len() as u16 + PADDING)
             .sum()
     }
 
@@ -339,11 +333,11 @@ impl ValidatorsListWidget {
                 for validator in &chain_config.validators {
                     match validator {
                         NodeConfig::Address(stash) => {
-                            let validator = Validator::new(chain_name.clone(), stash.clone());
+                            let validator = Validator::new(*chain_name, stash.clone());
                             self.add_validator(&validator);
                         }
                         NodeConfig::Detailed { stash, .. } => {
-                            let validator = Validator::new(chain_name.clone(), stash.clone());
+                            let validator = Validator::new(*chain_name, stash.clone());
                             self.add_validator(&validator);
 
                             // TODO: Implement command handling

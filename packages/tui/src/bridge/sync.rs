@@ -21,7 +21,6 @@ pub fn spawn_fetch_era_data(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -52,7 +51,6 @@ pub fn spawn_fetch_epoch_data(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -84,7 +82,6 @@ pub fn spawn_fetch_total_staked(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -118,7 +115,6 @@ pub fn spawn_fetch_active_validators_count(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -152,7 +148,6 @@ pub fn spawn_fetch_active_nominators_count(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -185,7 +180,6 @@ pub fn spawn_fetch_total_validators_count(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -216,7 +210,6 @@ pub fn spawn_fetch_total_nominators_count(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -249,7 +242,6 @@ pub fn spawn_fetch_validators_era_points(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let validator_keys = validator_keys.to_vec();
     let tx = tx.clone();
 
@@ -286,7 +278,6 @@ pub fn spawn_fetch_validators_authority_status(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let validator_keys = validator_keys.to_vec();
     let tx = tx.clone();
 
@@ -325,14 +316,12 @@ pub fn spawn_fetch_validators_stake_overview(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -373,14 +362,12 @@ pub fn spawn_fetch_validators_staking_ledger(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move { runtime.fetch_stake_ledger(&api, block_hash, &stash).await }
@@ -417,14 +404,12 @@ pub fn spawn_fetch_validators_points(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -466,14 +451,12 @@ pub fn spawn_fetch_validators_prefs(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -514,14 +497,12 @@ pub fn spawn_fetch_validators_prefs_next(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -562,14 +543,12 @@ pub fn spawn_fetch_validators_payee(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -610,14 +589,12 @@ pub fn spawn_fetch_validators_identity(
 ) {
     let validator_keys = validator_keys.to_vec();
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
         let mut stream = stream::iter(validator_keys)
             .map(|key| {
                 let api = api.clone();
-                let runtime = runtime.clone();
                 let stash = key.stash();
 
                 async move {
@@ -656,14 +633,13 @@ pub fn spawn_sign_and_submit(
     api: &OnlineClient<SubstrateConfig>,
     runtime: SupportedRuntime,
     signer: &Keypair,
-    call_data: &Vec<u8>,
+    call_data: &[u8],
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
     let signer = signer.clone();
-    let call_data = call_data.clone();
+    let call_data = call_data.to_owned();
 
     let _ = tx.send(Action::Transaction(TxAction::Processing));
 
@@ -697,7 +673,9 @@ async fn sign_and_submit_call_data(
 
     let response = api
         .tx()
-        .sign_and_submit_then_watch_default(&payload, proxy_signer).await.boxed()?;
+        .sign_and_submit_then_watch_default(&payload, proxy_signer)
+        .await
+        .boxed()?;
 
     Ok(Response::transaction_progress(response))
 }

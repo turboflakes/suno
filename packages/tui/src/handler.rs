@@ -1,9 +1,6 @@
 use crate::app::Focus;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use log::info;
-use suno_actions::{
-    Action, InputAction, NavigationAction, PopupAction, SystemAction, ValidatorAction,
-};
+use suno_actions::{Action, InputAction, NavigationAction, PopupAction, SystemAction};
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
@@ -55,7 +52,7 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
         Focus::Main => handle_main_key_events(key_event),
         Focus::Popup => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
-        _ => Action::System(SystemAction::Noop),
+        // _ => Action::System(SystemAction::Noop),
     }
 }
 

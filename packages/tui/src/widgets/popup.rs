@@ -7,7 +7,6 @@ use crate::widgets::{
     input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
     spinner::Spinner,
 };
-use log::info;
 use log::warn;
 use ratatui::{
     buffer::Buffer,
@@ -88,7 +87,7 @@ impl ListState {
 
         self.options
             .iter()
-            .filter(|e| e.command().to_lowercase().starts_with(&input_command))
+            .filter(|e| e.command().to_lowercase().starts_with(input_command))
             .cloned()
             .collect()
     }
@@ -146,7 +145,7 @@ impl PopupWidget {
         state.is_visible = true;
     }
 
-    fn on_err(&self, err: Box<dyn std::error::Error>) {
+    fn _on_err(&self, err: Box<dyn std::error::Error>) {
         warn!("Failed with error: {}", err);
         // TODO: Set chain state to error
     }
@@ -382,16 +381,13 @@ impl PopupWidget {
         let mut state = self.state.write().unwrap();
         state.input.delete_char();
 
-        match state.mode {
-            Mode::Menu => {
-                let options = state.get_options_filtered();
-                if options.is_empty() {
-                    return;
-                }
-                // NOTE: ensure to select the first entry as soon as options are not filtered out
-                state.table_state.select(Some(0));
+        if state.mode == Mode::Menu {
+            let options = state.get_options_filtered();
+            if options.is_empty() {
+                return;
             }
-            _ => {}
+            // NOTE: ensure to select the first entry as soon as options are not filtered out
+            state.table_state.select(Some(0));
         }
     }
 
@@ -495,7 +491,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
 
     // Get all required data from 'state.options' based on the indices established
     // in `init_menu`.
-    let Some(network_entry) = state.options.get(0) else {
+    let Some(network_entry) = state.options.first() else {
         return;
     };
 
@@ -529,7 +525,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
 
     let method = Line::from(vec![
         Span::styled("method ", THEME.paragraph.label),
-        Span::raw(format!("{}", call_entry.to_method())),
+        Span::raw(call_entry.to_method()),
     ]);
     let method_lines = calculate_text_wrapped_lines(&call_entry.to_method(), area.width);
 
@@ -625,31 +621,29 @@ impl<
                 let mut cols = Vec::new();
 
                 // Add menu-specific formatting
-                match mode {
-                    Mode::Menu => {
-                        cols.push("".to_string());
-                        cols.push(format!("/{}", call.to_string()));
-                        cols.push(call.description());
-                        cols.push("".to_string());
-                    }
-                    _ => {}
+                if mode == Mode::Menu {
+                    cols.push("".to_string());
+                    cols.push(format!("/{}", call));
+                    cols.push(call.description());
+                    cols.push("".to_string());
                 }
 
                 Row::new(cols)
             }
             Command::Text(t) => match mode {
                 Mode::Transaction => {
-                    let mut cols = Vec::new();
-                    cols.push(Cell::from(Line::from(format!("{t}"))));
-                    cols.push(Cell::from(
-                        Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
-                    ));
+                    let cols = vec![
+                        Cell::from(Line::from(t.to_string())),
+                        Cell::from(
+                            Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
+                        ),
+                    ];
 
                     Row::new(cols)
                 }
                 _ => Row::new(vec![t.to_string()]),
             },
-            _ => Row::new(vec!["".to_string()]),
+            // _ => Row::new(vec!["".to_string()]),
         }
     }
 }
@@ -665,7 +659,7 @@ fn calculate_text_wrapped_lines(text: &str, area_width: u16) -> u16 {
             total_lines += 1;
         } else {
             // Calculate how many lines this single line will wrap into
-            let wrapped = (line_width + area_width - 1) / area_width;
+            let wrapped = line_width.div_ceil(area_width);
             total_lines += wrapped as u16;
         }
     }

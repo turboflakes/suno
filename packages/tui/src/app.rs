@@ -1,6 +1,5 @@
 use crate::bridge::{sync, RuntimeCaller};
 use crate::call::Call;
-use crate::context::Context;
 use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
@@ -16,7 +15,7 @@ use crate::{
     tui::Tui,
 };
 use arboard::Clipboard;
-use log::{error, info, warn};
+use log::error;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::network::ConnectionState;
@@ -68,6 +67,12 @@ pub struct App {
     pub tx: UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
     pub rx: UnboundedReceiver<Action>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl App {
@@ -126,16 +131,6 @@ impl App {
         // Exit the user interface.
         tui.exit()?;
         Ok(())
-    }
-
-    fn _context(&self) -> Option<Context> {
-        let validator = self.validators.get_selected()?;
-        let runtime = validator.runtime().asset_hub_runtime();
-        let chain = self.chains.get_chain_by_runtime(runtime)?;
-        let api = chain.client();
-        let call = self.popup.get_input_parsed_call();
-
-        Some(Context::new(api.clone(), runtime, validator, call))
     }
 
     fn handle_events(&mut self, event: Event) -> AppResult<()> {
@@ -223,15 +218,12 @@ impl App {
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.handle_input_enter(),
             InputAction::Paste(data) => self.handle_input_paste(data),
-            InputAction::Error(msg) => match self.popup.get_mode() {
-                PopupMode::Locked => {
-                    if self.popup.invalidate_input(&msg) {
-                        self.popup.set_confirm_mode();
-                        self.focus = Focus::Input;
-                    }
+            InputAction::Error(msg) => {
+                if self.popup.get_mode() == PopupMode::Locked && self.popup.invalidate_input(&msg) {
+                    self.popup.set_confirm_mode();
+                    self.focus = Focus::Input;
                 }
-                _ => {}
-            },
+            }
         }
     }
 
@@ -345,7 +337,7 @@ impl App {
                                 self.validators.get_validator_keys_by_runtime(runtime);
 
                             sync::spawn_fetch_validators_points(
-                                &api,
+                                api,
                                 block_hash,
                                 runtime,
                                 &validator_keys,
@@ -627,18 +619,15 @@ impl App {
             return;
         }
 
-        match self.section {
-            Section::Validators => {
-                let Some(validator) = self.validators.get_selected() else {
-                    return;
-                };
+        if self.section == Section::Validators {
+            let Some(validator) = self.validators.get_selected() else {
+                return;
+            };
 
-                let runtime = validator.runtime().asset_hub_runtime();
-                self.popup.show_extrinsics(Some(runtime));
-                // Dispatch focus to the input field
-                let _ = self.tx.send(Action::Input(InputAction::Editing));
-            }
-            _ => {}
+            let runtime = validator.runtime().asset_hub_runtime();
+            self.popup.show_extrinsics(Some(runtime));
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
         };
     }
 
@@ -657,138 +646,131 @@ impl App {
             return;
         }
 
-        match self.section {
-            Section::Validators => {
-                let Some(validator) = self.validators.get_selected() else {
-                    return;
-                };
+        if self.section == Section::Validators {
+            let Some(validator) = self.validators.get_selected() else {
+                return;
+            };
 
-                match self.popup.get_mode() {
-                    PopupMode::Menu => {
-                        let Some(call) = self.popup.get_input_parsed_call() else {
-                            return;
-                        };
-                        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                        let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
-                            validator.runtime().relay_chain()
-                        } else {
-                            validator.runtime().asset_hub_runtime()
-                        };
+            match self.popup.get_mode() {
+                PopupMode::Menu => {
+                    let Some(call) = self.popup.get_input_parsed_call() else {
+                        return;
+                    };
+                    // NOTE: Specific case where some calls are meant to be sent to RC and not AH
+                    let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                        validator.runtime().relay_chain()
+                    } else {
+                        validator.runtime().asset_hub_runtime()
+                    };
 
-                        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                    let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                        return;
+                    };
+                    let api = chain.client();
+                    let spec_version = api.runtime_version().spec_version;
+                    let stash = validator.key().stash();
+                    let stash_identity = validator.display_name(3);
+                    let proxy_identity = match get_address_from_json_file() {
+                        Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
+                        Err(e) => {
+                            self.error(e.into());
                             return;
-                        };
-                        let api = chain.client();
-                        let spec_version = api.runtime_version().spec_version;
-                        let stash = validator.key().stash();
-                        let stash_identity = validator.display_name(3);
-                        let proxy_identity = match get_address_from_json_file() {
-                            Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
-                            Err(e) => {
-                                self.error(e.into());
-                                return;
-                            }
-                        };
-                        match runtime.build_call_data(api, &stash, call.clone()) {
-                            Ok(bytes) => {
-                                self.popup.init_confirm_and_sign(
-                                    runtime,
-                                    spec_version,
-                                    proxy_identity,
-                                    stash_identity,
-                                    call,
-                                    bytes,
-                                );
-                                // Dispatch focus to the input field
-                                let _ = self.tx.send(Action::Input(InputAction::Editing));
-                            }
-                            Err(err) => self.error(err),
                         }
+                    };
+                    match runtime.build_call_data(api, &stash, call.clone()) {
+                        Ok(bytes) => {
+                            self.popup.init_confirm_and_sign(
+                                runtime,
+                                spec_version,
+                                proxy_identity,
+                                stash_identity,
+                                call,
+                                bytes,
+                            );
+                            // Dispatch focus to the input field
+                            let _ = self.tx.send(Action::Input(InputAction::Editing));
+                        }
+                        Err(err) => self.error(err),
                     }
-                    PopupMode::Confirm => {
-                        let Some(call) = self.popup.get_selected_call() else {
-                            return;
-                        };
-                        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                        let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
-                            validator.runtime().relay_chain()
-                        } else {
-                            validator.runtime().asset_hub_runtime()
-                        };
+                }
+                PopupMode::Confirm => {
+                    let Some(call) = self.popup.get_selected_call() else {
+                        return;
+                    };
+                    // NOTE: Specific case where some calls are meant to be sent to RC and not AH
+                    let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                        validator.runtime().relay_chain()
+                    } else {
+                        validator.runtime().asset_hub_runtime()
+                    };
 
-                        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                            return;
-                        };
+                    let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                        return;
+                    };
 
-                        let Some(entry) = self.popup.get_selected() else {
-                            return;
-                        };
+                    let Some(entry) = self.popup.get_selected() else {
+                        return;
+                    };
 
-                        let bytes = entry.as_bytes();
-                        let api = chain.client().clone();
-                        let runtime = runtime.clone();
-                        let tx = self.tx.clone();
+                    let bytes = entry.as_bytes();
+                    let api = chain.client().clone();
+                    let tx = self.tx.clone();
 
-                        let result =
-                            self.popup
-                                .execute_with_password(|password| -> Result<(), TuiError> {
-                                    let password = password.to_string();
+                    let result =
+                        self.popup
+                            .execute_with_password(|password| -> Result<(), TuiError> {
+                                let password = password.to_string();
 
-                                    tokio::spawn(async move {
-                                        // Use spawn_blocking for CPU-intensive decrypt_json operation
-                                        let signer_result =
-                                            tokio::task::spawn_blocking(move || {
-                                                suno_signer::load_keypair(&password)
-                                            })
-                                            .await;
+                                tokio::spawn(async move {
+                                    // Use spawn_blocking for CPU-intensive decrypt_json operation
+                                    let signer_result = tokio::task::spawn_blocking(move || {
+                                        suno_signer::load_keypair(&password)
+                                    })
+                                    .await;
 
-                                        match signer_result {
-                                            Ok(Ok(signer)) => {
-                                                sync::spawn_sign_and_submit(
-                                                    &api, runtime, &signer, &bytes, &tx,
-                                                );
-                                            }
-                                            Ok(Err(e)) => {
-                                                let _ =
-                                                    tx.send(Action::System(SystemAction::Error(
-                                                        format!("Failed to load keypair: {}", e),
-                                                    )));
-                                                let _ = tx.send(Action::Input(InputAction::Error(
-                                                    "Invalid password".to_string(),
-                                                )));
-                                            }
-                                            Err(e) => {
-                                                let _ =
-                                                    tx.send(Action::System(SystemAction::Error(
-                                                        format!("Task failed: {}", e),
-                                                    )));
-                                                let _ = tx.send(Action::Input(InputAction::Error(
+                                    match signer_result {
+                                        Ok(Ok(signer)) => {
+                                            sync::spawn_sign_and_submit(
+                                                &api, runtime, &signer, &bytes, &tx,
+                                            );
+                                        }
+                                        Ok(Err(e)) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to load keypair: {}", e),
+                                            )));
+                                            let _ = tx.send(Action::Input(InputAction::Error(
+                                                "Invalid password".to_string(),
+                                            )));
+                                        }
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Task failed: {}", e),
+                                            )));
+                                            let _ = tx.send(Action::Input(InputAction::Error(
                                                 "Something went wrong, check errors and try again"
                                                     .to_string(),
                                             )));
-                                            }
                                         }
-                                    });
-
-                                    // Lock input so it can't be changed unless there's an error
-                                    // and remove focus from the input field and start verification password spinner
-                                    let _ = self.tx.send(Action::Input(InputAction::Lock));
-
-                                    Ok(())
+                                    }
                                 });
-                        if let Err(e) = result {
-                            let _ = self
-                                .tx
-                                .send(Action::System(SystemAction::Error(e.to_string())));
-                            let _ = self.tx.send(Action::Input(InputAction::Error(
-                                "Something went wrong, check errors and try again".to_string(),
-                            )));
-                        }
+
+                                // Lock input so it can't be changed unless there's an error
+                                // and remove focus from the input field and start verification password spinner
+                                let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+                                Ok(())
+                            });
+                    if let Err(e) = result {
+                        let _ = self
+                            .tx
+                            .send(Action::System(SystemAction::Error(e.to_string())));
+                        let _ = self.tx.send(Action::Input(InputAction::Error(
+                            "Something went wrong, check errors and try again".to_string(),
+                        )));
                     }
-                    _ => {}
                 }
+                _ => {}
             }
-            _ => {}
         };
     }
 
@@ -798,15 +780,8 @@ impl App {
             return;
         }
 
-        match self.section {
-            Section::Validators => match self.popup.get_mode() {
-                PopupMode::Menu => {
-                    self.popup.insert_input_paste_data(data);
-                }
-
-                _ => {}
-            },
-            _ => {}
+        if self.section == Section::Validators && self.popup.get_mode() == PopupMode::Menu {
+            self.popup.insert_input_paste_data(data);
         };
     }
 

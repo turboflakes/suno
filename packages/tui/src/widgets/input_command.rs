@@ -70,7 +70,7 @@ impl Widget for &InputCommandWidget {
         };
 
         // Input value
-        input_spans.push(Span::raw(format!("{}", state.value())));
+        input_spans.push(Span::raw(state.value().to_string()));
 
         // Placeholder
         if let Some(call) = &self.call {

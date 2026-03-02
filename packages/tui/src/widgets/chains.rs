@@ -84,7 +84,7 @@ impl Chain {
     }
 
     pub fn name(&self) -> &str {
-        &self.runtime.as_str()
+        self.runtime.as_str()
     }
 
     pub fn runtime(&self) -> SupportedRuntime {
@@ -196,9 +196,9 @@ impl ChainsListState {
     pub fn add_chain(&mut self, chain: Chain) {
         let key = chain.key();
         if !self.chains.contains_key(&key) {
-            self.chains_order.push(key.clone());
+            self.chains_order.push(key);
         }
-        self.chains.insert(key.clone(), chain);
+        self.chains.insert(key, chain);
     }
 
     pub fn set_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
@@ -327,7 +327,7 @@ impl ChainsListState {
             .filter_map(move |key| self.chains.get(key))
     }
 
-    pub fn get_selected_ref(&self) -> Option<&Chain> {
+    pub fn _get_selected_ref(&self) -> Option<&Chain> {
         self.table_state
             .selected()
             .and_then(|i| self.get_chain_by_index(i))
@@ -358,7 +358,7 @@ impl ChainsListWidget {
                     Ok(rpc_client) => {
                         match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
                             Ok(client) => {
-                                let mut chain = Chain::new(chain_name.clone(), client);
+                                let mut chain = Chain::new(*chain_name, client);
                                 if let Err(err) = chain.validate_genesis().await {
                                     self.error(err.into());
                                 }
@@ -578,7 +578,6 @@ impl Widget for &ChainsListWidget {
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
-                ..area
             };
             if let Some(row_index) = state.table_state.selected() {
                 render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
@@ -594,14 +593,9 @@ impl From<&Chain> for Row<'_> {
 
         Row::new(vec![
             Text::from(""),
-            Text::from(format!(
-                "{}{}",
-                chain.state.to_string(),
-                chain.runtime.to_string()
-            )),
-            Text::from(format!("#{}", chain.best_block.to_string())).alignment(Alignment::Right),
-            Text::from(format!("#{}", chain.finalized_block.to_string()))
-                .alignment(Alignment::Right),
+            Text::from(format!("{}{}", chain.state, chain.runtime)),
+            Text::from(format!("#{}", chain.best_block)).alignment(Alignment::Right),
+            Text::from(format!("#{}", chain.finalized_block)).alignment(Alignment::Right),
             Text::from(progress.to_string()).alignment(Alignment::Right),
             Text::from(format_millis(elapsed)).alignment(Alignment::Right),
             Text::from(""),

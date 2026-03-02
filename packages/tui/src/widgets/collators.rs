@@ -1,17 +1,14 @@
 use crate::widgets::scrollbar::render_scrollbar;
-use log::{info, warn};
+use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{
-        Block, BorderType, Borders, HighlightSpacing, Row, StatefulWidget, Table, TableState,
-        Widget,
-    },
+    widgets::{Block, BorderType, Borders, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
-use suno_primitives::{AccountDisplay, Collator};
+use suno_config::{NodeConfig, CONFIG};
+use suno_primitives::Collator;
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {
@@ -36,12 +33,12 @@ impl CollatorsListWidget {
                         NodeConfig::Address(stash) => {
                             state
                                 .collators
-                                .push(Collator::new(chain_name.clone(), stash.clone()));
+                                .push(Collator::new(*chain_name, stash.clone()));
                         }
-                        NodeConfig::Detailed { stash, commands } => {
+                        NodeConfig::Detailed { stash, .. } => {
                             state
                                 .collators
-                                .push(Collator::new(chain_name.clone(), stash.clone()));
+                                .push(Collator::new(*chain_name, stash.clone()));
                             // if let Some(cmds) = commands {
                             //     for cmd in cmds {
                             //         println!("  Command: {} ({})", cmd.name, cmd.run);
@@ -58,7 +55,7 @@ impl CollatorsListWidget {
         }
     }
 
-    fn on_err(&self, err: Box<dyn std::error::Error>) {
+    fn _on_err(&self, err: Box<dyn std::error::Error>) {
         warn!("Failed with error: {}", err);
         // TODO: Set chain state to error
     }

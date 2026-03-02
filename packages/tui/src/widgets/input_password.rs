@@ -70,7 +70,7 @@ impl Widget for &InputPasswordWidget {
         }
 
         // Input value
-        input_spans.push(Span::raw(format!("{}", state.value())));
+        input_spans.push(Span::raw(state.value()));
 
         let field = Paragraph::new(Line::from(input_spans)).block(block);
         field.render(input_area[0], buf);

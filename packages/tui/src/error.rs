@@ -25,6 +25,6 @@ impl From<&str> for TuiError {
 /// Convert String to TuiError
 impl From<String> for TuiError {
     fn from(error: String) -> Self {
-        Self::Other(error.into())
+        Self::Other(error)
     }
 }

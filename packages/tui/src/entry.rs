@@ -12,10 +12,6 @@ pub trait ToPlaceholder {
     fn placeholder(&self) -> String;
 }
 
-pub trait AsChar {
-    fn as_char(&self) -> char;
-}
-
 pub trait ToJson {
     fn to_json(&self) -> String;
 }
@@ -29,7 +25,7 @@ pub trait ToHex {
 }
 
 pub trait AsBytes {
-    fn into_bytes(&self) -> Vec<u8>;
+    fn as_bytes(&self) -> Vec<u8>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -93,7 +89,7 @@ impl<T: Display + ToHex> Command<T> {
 }
 
 impl<T: Display + AsBytes> Command<T> {
-    pub fn into_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         match self {
             Self::Text(s) => s.as_bytes().to_vec(),
             Self::Instruction { bytes, .. } => bytes.clone().unwrap_or_default(),
@@ -151,7 +147,7 @@ impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + ToHex + As
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
-        self.command.into_bytes()
+        self.command.as_bytes()
     }
 }
 
@@ -163,15 +159,6 @@ mod tests {
     pub enum Call {
         Chill,
         Unbond { amount: u128 },
-    }
-
-    impl AsChar for Call {
-        fn as_char(&self) -> char {
-            match self {
-                Self::Chill => 'c',
-                Self::Unbond { .. } => 'b',
-            }
-        }
     }
 
     impl ToDescription for Call {
@@ -220,7 +207,7 @@ mod tests {
     }
 
     impl AsBytes for Call {
-        fn into_bytes(&self) -> Vec<u8> {
+        fn as_bytes(&self) -> Vec<u8> {
             self.to_string().as_bytes().to_vec()
         }
     }

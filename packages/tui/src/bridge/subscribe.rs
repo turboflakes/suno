@@ -12,7 +12,7 @@ use tokio::sync::mpsc::UnboundedSender;
 /// Background task that subscribes head block and sends response over channel.
 pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
     let api = chain.client().clone();
-    let runtime = chain.runtime().clone();
+    let runtime = chain.runtime();
     tokio::spawn(async move {
         match api.blocks().subscribe_best().await {
             Ok(mut blocks_sub) => {
@@ -20,15 +20,15 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
                     match result {
                         Ok(block) => {
                             let _ = tx.send(Action::Chain(ChainAction::UpdateBestBlock(
-                                runtime.clone(),
+                                runtime,
                                 block.number().into(),
                             )));
                         }
                         Err(e) => {
                             if e.is_disconnected_will_reconnect() {
-                                warn!("Lost connection to {} reconnecting...", runtime.clone());
+                                warn!("Lost connection to {} reconnecting...", runtime);
                                 let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                                    runtime.clone(),
+                                    runtime,
                                     ConnectionState::Reconnecting,
                                 )));
                                 continue;
@@ -48,7 +48,7 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
 /// Background task that subscribes finalized block and sends response over channel.
 pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
     let api = chain.client().clone();
-    let runtime = chain.runtime().clone();
+    let runtime = chain.runtime();
     tokio::spawn(async move {
         match api.blocks().subscribe_finalized().await {
             Ok(mut blocks_sub) => {
@@ -56,7 +56,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                     match result {
                         Ok(block) => {
                             let _ = tx.send(Action::Chain(ChainAction::UpdateFinalizedBlock(
-                                runtime.clone(),
+                                runtime,
                                 block.number().into(),
                                 block.hash(),
                             )));
@@ -64,7 +64,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             // Everytime a new block is received, update the connection state to connected.
                             // Used as KEEPALIVE in case of reconnections and initialization
                             let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                                runtime.clone(),
+                                runtime,
                                 ConnectionState::Connected,
                             )));
 
@@ -84,7 +84,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             if e.is_disconnected_will_reconnect() {
                                 info!("Lost connection to {} reconnecting...", runtime.clone());
                                 let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                                    runtime.clone(),
+                                    runtime,
                                     ConnectionState::Reconnecting,
                                 )));
                                 continue;
@@ -109,7 +109,6 @@ pub fn spawn_process_runtime_events(
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
-    let runtime = runtime.clone();
     let tx = tx.clone();
 
     tokio::spawn(async move {
