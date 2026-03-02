@@ -201,9 +201,9 @@ impl std::fmt::Display for Payee {
 
 #[derive(thiserror::Error, Debug)]
 pub enum PayeeError {
-    #[error("Command must be: {0}")]
+    #[error("Argument must be one of: {0}")]
     UnknownArgument(String),
-    #[error("Command must be: {0}")]
+    #[error("Invalid address: {0}")]
     InvalidAddress(String),
 }
 
