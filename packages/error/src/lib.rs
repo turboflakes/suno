@@ -6,33 +6,31 @@ use suno_signer::error::Error as SignerError;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Backend error: {0}")]
-    BackendError(#[from] subxt::error::BackendError),
+    Backend(#[from] Box<subxt::error::BackendError>),
     #[error("Events error: {0}")]
-    EventsError(#[from] subxt::error::EventsError),
+    Events(#[from] Box<subxt::error::EventsError>),
     #[error("Extrinsic error: {0}")]
-    ExtrinsicError(#[from] subxt::error::ExtrinsicError),
-    #[error("RuntimeApi error: {0}")]
-    RuntimeApiError(#[from] subxt::error::RuntimeApiError),
+    Extrinsic(#[from] Box<subxt::error::ExtrinsicError>),
     #[error("Transaction progress error: {0}")]
-    TransactionProgressError(#[from] subxt::error::TransactionProgressError),
+    TransactionProgress(#[from] Box<subxt::error::TransactionProgressError>),
     #[error("Transaction status error: {0}")]
-    TransactionStatusError(#[from] subxt::error::TransactionStatusError),
+    TransactionStatus(#[from] Box<subxt::error::TransactionStatusError>),
     #[error("Storage error: {0}")]
-    StorageError(#[from] subxt::error::StorageError),
+    Storage(#[from] Box<subxt::error::StorageError>),
     #[error("Storage value error: {0}")]
-    StorageValueError(#[from] subxt::ext::subxt_core::error::StorageValueError),
+    StorageValue(#[from] Box<subxt::ext::subxt_core::error::StorageValueError>),
     #[error("Constant error: {0}")]
-    ConstantError(#[from] subxt::ext::subxt_core::error::ConstantError),
+    Constant(#[from] Box<subxt::ext::subxt_core::error::ConstantError>),
     #[error("Send error: {0}")]
-    SendError(#[from] tokio::sync::mpsc::error::SendError<Action>),
+    Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
     #[error("Signer error: {0}")]
-    SignerError(#[from] SignerError),
+    Signer(#[from] SignerError),
     #[error("Genesis hash does not match the expected hash from the configured chain.")]
-    GenesisError,
+    Genesis,
     #[error("Unsupported call: {0}")]
     UnsupportedCall(String),
     #[error("Clipboard error: {0}")]
-    ClipboardError(#[from] arboard::Error),
+    Clipboard(#[from] arboard::Error),
     #[error("Unsupported runtime: {0}")]
     UnsupportedRuntime(SupportedRuntime),
     #[error("Other error: {0}")]
@@ -50,5 +48,17 @@ impl From<&str> for Error {
 impl From<String> for Error {
     fn from(error: String) -> Self {
         Self::Other(error)
+    }
+}
+
+/// Extension trait to box errors in Results
+pub trait ResultExt<T, E> {
+    /// Box the error variant for smaller Result sizes
+    fn boxed(self) -> Result<T, Box<E>>;
+}
+
+impl<T, E> ResultExt<T, E> for Result<T, E> {
+    fn boxed(self) -> Result<T, Box<E>> {
+        self.map_err(Box::new)
     }
 }

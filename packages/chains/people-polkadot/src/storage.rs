@@ -9,7 +9,7 @@ use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{identity::Identity, Response};
 
 pub async fn fetch_identity(
@@ -61,11 +61,11 @@ async fn fetch_identity_of(
 
     let api_at = api.storage().at(block_hash);
     let result = api_at
-        .entry(addr)?
+        .entry(addr).boxed()?
         .try_fetch((stash.clone(),))
-        .await?
+        .await.boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose().boxed()?;
 
     Ok(result)
 }
@@ -79,11 +79,11 @@ async fn fetch_super_of(
 
     let api_at = api.storage().at(block_hash);
     let result = api_at
-        .entry(addr)?
+        .entry(addr).boxed()?
         .try_fetch((stash.clone(),))
-        .await?
+        .await.boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose().boxed()?;
 
     Ok(result)
 }

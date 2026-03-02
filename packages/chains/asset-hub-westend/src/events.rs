@@ -9,7 +9,7 @@ use crate::{
 };
 use sp_arithmetic::Perbill;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{
     staking::{Chunk, ValidatorPrefs},
     Response,
@@ -22,31 +22,31 @@ pub async fn handle_events(
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
     for event in events.iter() {
-        let event = event?;
+        let event = event.boxed()?;
 
-        if let Some(_ev) = event.as_event::<EraPaid>()? {
+        if let Some(_ev) = event.as_event::<EraPaid>().boxed()? {
             let response = fetch_era_data(api, block_hash).await?;
             processed_events.push(response);
-        } else if let Some(ev) = event.as_event::<Bonded>()? {
+        } else if let Some(ev) = event.as_event::<Bonded>().boxed()? {
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_bonded(account_bytes, ev.amount);
             processed_events.push(response);
-        } else if let Some(ev) = event.as_event::<Unbonded>()? {
+        } else if let Some(ev) = event.as_event::<Unbonded>().boxed()? {
             let era_info = fetch_active_era_info(api, block_hash).await?;
             let duration = fetch_bonding_duration(api)?;
             let chunk = Chunk::new(era_info.index + duration, ev.amount);
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_unbonded(account_bytes, chunk);
             processed_events.push(response);
-        } else if let Some(_ev) = event.as_event::<Chilled>()? {
-        } else if let Some(ev) = event.as_event::<ValidatorPrefsSet>()? {
+        } else if let Some(_ev) = event.as_event::<Chilled>().boxed()? {
+        } else if let Some(ev) = event.as_event::<ValidatorPrefsSet>().boxed()? {
             let account_bytes = *(ev.stash).as_ref();
             let prefs =
                 ValidatorPrefs::new(Perbill::from_parts(ev.prefs.commission.0), ev.prefs.blocked);
             let response = Response::validator_prefs_next(account_bytes, Some(prefs));
             processed_events.push(response);
         } // TODO: Event PayeeSet is currently not available
-          // else if let Some(ev) = event.as_event::<PayeeSet>()? {}
+          // else if let Some(ev) = event.as_event::<PayeeSet>().boxed()? {}
     }
     Ok(processed_events)
 }
@@ -56,9 +56,9 @@ pub fn handle_extrinsic_events(
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
     for event in events.iter() {
-        let event = event?;
+        let event = event.boxed()?;
 
-        if let Some(ev) = event.as_event::<ProxyExecuted>()? {
+        if let Some(ev) = event.as_event::<ProxyExecuted>().boxed()? {
             match ev.result {
                 Ok(_) => {
                     processed_events.push(Response::TxSuccess);

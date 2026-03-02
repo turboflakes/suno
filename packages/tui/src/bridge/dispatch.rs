@@ -2,7 +2,7 @@ use log::{error, info, warn};
 use subxt::{blocks::ExtrinsicEvents, tx::TxProgress, tx::TxStatus, OnlineClient, SubstrateConfig};
 use suno_actions::{Action, ChainAction, SystemAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -16,43 +16,50 @@ pub fn dispatch_response_action(
             tx.send(Action::Chain(ChainAction::UpdateEra(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::Epoch(data) => {
             tx.send(Action::Chain(ChainAction::UpdateEpoch(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::TotalStaked(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalStaked(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::ActiveValidators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateActiveValidators(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::ActiveNominators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateActiveNominators(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::TotalValidators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalValidators(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::TotalNominators(data) => {
             tx.send(Action::Chain(ChainAction::UpdateTotalNominators(
                 runtime.clone(),
                 data.value,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::AuthorityStatus(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -60,7 +67,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdateStatus(
                 account_key,
                 data.value.status,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::AuthorityEraPoints(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -68,7 +76,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdateEraPoints(
                 account_key,
                 data.value.points,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::AuthorityPoints(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -76,7 +85,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdatePoints(
                 account_key,
                 data.value.points,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::StakeOverview(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -85,7 +95,8 @@ pub fn dispatch_response_action(
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeOverview(
                     account_key,
                     overview,
-                )))?;
+                )))
+                .boxed()?;
             } else {
                 warn!(
                     "No stake overview data found for {}",
@@ -100,7 +111,8 @@ pub fn dispatch_response_action(
                 tx.send(Action::Validator(ValidatorAction::UpdateStakeLedger(
                     account_key,
                     ledger,
-                )))?;
+                )))
+                .boxed()?;
             } else {
                 warn!("No stake ledger data found for {}", account_key.to_string(),);
             }
@@ -112,7 +124,8 @@ pub fn dispatch_response_action(
                 tx.send(Action::Validator(ValidatorAction::UpdateValidatorPrefs(
                     account_key,
                     prefs,
-                )))?;
+                )))
+                .boxed()?;
             } else {
                 warn!(
                     "No validator prefs data found for {}",
@@ -126,7 +139,8 @@ pub fn dispatch_response_action(
             if let Some(prefs) = data.value.prefs {
                 tx.send(Action::Validator(
                     ValidatorAction::UpdateValidatorPrefsNext(account_key, prefs),
-                ))?;
+                ))
+                .boxed()?;
             } else {
                 warn!(
                     "No validator prefs data found for {}",
@@ -140,7 +154,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdatePayee(
                 account_key,
                 data.value.payee,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::Identity(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -149,7 +164,8 @@ pub fn dispatch_response_action(
                 tx.send(Action::Validator(ValidatorAction::UpdateIdentity(
                     account_key,
                     identity,
-                )))?;
+                )))
+                .boxed()?;
             } else {
                 warn!("No identity data found for {}", account_key.to_string(),);
             }
@@ -170,7 +186,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::AddAmountToStakeLedger(
                 account_key,
                 data.value.amount,
-            )))?;
+            )))
+            .boxed()?;
         }
         Response::EventUnbonded(data) => {
             let rc_runtime = runtime.relay_chain();
@@ -178,7 +195,8 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::SubChunkFromStakeLedger(
                 account_key,
                 data.value.chunk,
-            )))?;
+            )))
+            .boxed()?;
         } // _ => {
           //     error!("Unhandled response type: {:?}", response);
           // }
@@ -210,7 +228,7 @@ async fn process_transaction_progress(
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     while let Some(status) = progress.next().await {
-        match status? {
+        match status.boxed()? {
             TxStatus::Broadcasted => {
                 let _ = tx.send(Action::Transaction(TxAction::Sent));
             }

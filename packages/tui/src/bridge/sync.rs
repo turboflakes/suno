@@ -4,7 +4,7 @@ use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
 use suno_config::SupportedRuntime;
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{tx::payload_from_bytes, AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -697,8 +697,7 @@ async fn sign_and_submit_call_data(
 
     let response = api
         .tx()
-        .sign_and_submit_then_watch_default(&payload, proxy_signer)
-        .await?;
+        .sign_and_submit_then_watch_default(&payload, proxy_signer).await.boxed()?;
 
     Ok(Response::transaction_progress(response))
 }

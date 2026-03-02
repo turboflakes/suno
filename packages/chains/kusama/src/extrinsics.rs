@@ -11,7 +11,7 @@ use node_runtime::runtime_types::{
     staging_kusama_runtime::SessionKeys,
 };
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{session::Keys, tx::Bytes};
 
 type RuntimeCall = node_runtime::runtime_types::staging_kusama_runtime::RuntimeCall;
@@ -29,7 +29,7 @@ pub fn wrap_call_into_proxy(
         call,
     );
 
-    let payload = api.tx().call_data(&proxy_call)?;
+    let payload = api.tx().call_data(&proxy_call).boxed()?;
 
     Ok(payload)
 }

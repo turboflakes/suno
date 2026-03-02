@@ -8,7 +8,7 @@ use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch, Response};
 
 type Index = u64;
@@ -28,10 +28,12 @@ pub async fn fetch_validator_points(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .fetch((stash.clone(),))
-        .await?
-        .decode()?;
+        .await
+        .boxed()?
+        .decode().boxed()?;
 
     Ok(Response::authority_points(account_bytes, value))
 }
@@ -90,7 +92,13 @@ async fn fetch_epoch_index(
     let addr = node_runtime::storage().babe().epoch_index();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode().boxed()?;
 
     Ok(value)
 }
@@ -103,7 +111,13 @@ async fn fetch_epoch_start(
     let addr = node_runtime::storage().babe().epoch_start();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode().boxed()?;
 
     Ok(value)
 }
@@ -116,7 +130,13 @@ async fn fetch_session_validators(
     let addr = node_runtime::storage().session().validators();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode().boxed()?;
 
     Ok(value)
 }
@@ -131,7 +151,13 @@ async fn fetch_active_validator_indices(
         .active_validator_indices();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode().boxed()?;
 
     Ok(value)
 }

@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
     Epoch, Era,
@@ -149,9 +149,9 @@ impl Chain {
         let state_root = self.runtime.chain_state_root_hash();
         let hash = api.genesis_hash();
 
-        if let Some(header) = api.backend().block_header(hash).await? {
+        if let Some(header) = api.backend().block_header(hash).await.boxed()? {
             if header.state_root != state_root {
-                let err = Error::GenesisError;
+                let err = Error::Genesis;
                 self.set_state(ConnectionState::Error(err.to_string()));
                 return Err(err);
             }

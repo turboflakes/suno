@@ -15,7 +15,7 @@ use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{
     node_account::get_account_bytes_from_storage_key,
     staking,
@@ -147,7 +147,7 @@ pub async fn fetch_active_nominators_count(
 
     let mut validators_set = HashSet::<[u8; 32]>::new();
     let api_at = api.storage().at(block_hash);
-    let mut iter = api_at.entry(addr)?.iter((era,)).await?;
+    let mut iter = api_at.entry(addr).boxed()?.iter((era,)).await.boxed()?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         let account_id = get_account_bytes_from_storage_key(storage_kv.key_bytes());
         validators_set.insert(account_id);
@@ -156,10 +156,10 @@ pub async fn fetch_active_nominators_count(
     let mut nominators_count = 0u32;
     let addr = node_runtime::storage().staking().nominators();
     let api_at = api.storage().at(block_hash);
-    let mut iter = api_at.entry(addr)?.iter(()).await?;
+    let mut iter = api_at.entry(addr).boxed()?.iter(()).await.boxed()?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         // Check if any of the nominator's targets is in the validators_set
-        let nominations = storage_kv.value().decode()?;
+        let nominations = storage_kv.value().decode().boxed()?;
         if nominations
             .targets
             .0
@@ -182,7 +182,7 @@ pub async fn fetch_active_validators_count(
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
     let api_at = api.storage().at(block_hash);
-    let iter = api_at.entry(addr)?.iter((era,)).await?;
+    let iter = api_at.entry(addr).boxed()?.iter((era,)).await.boxed()?;
     let count = iter.count().await;
 
     Ok(Response::active_validators(count as u32))
@@ -196,7 +196,14 @@ pub async fn fetch_total_validators_count(
     let addr = node_runtime::storage().staking().counter_for_validators();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(Response::total_validators(value))
 }
@@ -209,7 +216,14 @@ pub async fn fetch_total_nominators_count(
     let addr = node_runtime::storage().staking().counter_for_nominators();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(Response::total_nominators(value))
 }
@@ -271,7 +285,14 @@ async fn fetch_bonded_eras(
     let addr = node_runtime::storage().staking().bonded_eras();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -285,7 +306,15 @@ async fn fetch_eras_total_stake(
     let addr = node_runtime::storage().staking().eras_total_stake();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch((era,)).await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch((era,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
     Ok(value)
 }
 
@@ -297,7 +326,14 @@ async fn fetch_total_issuance(
     let addr = node_runtime::storage().balances().total_issuance();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -310,7 +346,14 @@ async fn fetch_inactive_issuance(
     let addr = node_runtime::storage().balances().inactive_issuance();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -325,10 +368,13 @@ async fn fetch_validators(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .fetch((stash.clone(),))
-        .await?
-        .decode()?;
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -344,11 +390,14 @@ async fn fetch_eras_validator_prefs(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .try_fetch((era, stash.clone()))
-        .await?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose()
+        .boxed()?;
 
     Ok(value)
 }
@@ -363,11 +412,14 @@ async fn fetch_staking_ledger(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .try_fetch((stash.clone(),))
-        .await?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose()
+        .boxed()?;
 
     Ok(value)
 }
@@ -380,7 +432,14 @@ pub async fn fetch_active_era_info(
     let addr = node_runtime::storage().staking().active_era();
 
     let api_at = api.storage().at(block_hash);
-    let value = api_at.entry(addr)?.fetch().await?.decode()?;
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -395,11 +454,14 @@ async fn fetch_era_reward_points(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .try_fetch((era,))
-        .await?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose()
+        .boxed()?;
 
     Ok(value)
 }
@@ -415,11 +477,14 @@ async fn fetch_eras_stakers_overview(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .try_fetch((era, stash.clone()))
-        .await?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose()?;
+        .transpose()
+        .boxed()?;
 
     Ok(value)
 }
@@ -434,10 +499,13 @@ async fn _fetch_nominators(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .fetch((stash.clone(),))
-        .await?
-        .decode()?;
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -452,10 +520,13 @@ pub async fn fetch_payee(
 
     let api_at = api.storage().at(block_hash);
     let value = api_at
-        .entry(addr)?
+        .entry(addr)
+        .boxed()?
         .fetch((stash.clone(),))
-        .await?
-        .decode()?;
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
