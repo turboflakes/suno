@@ -33,7 +33,8 @@ pub async fn fetch_validator_points(
         .fetch((stash.clone(),))
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(Response::authority_points(account_bytes, value))
 }
@@ -98,7 +99,8 @@ async fn fetch_epoch_index(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -117,7 +119,8 @@ async fn fetch_epoch_start(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -136,7 +139,8 @@ async fn fetch_session_validators(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -157,7 +161,8 @@ async fn fetch_active_validator_indices(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }

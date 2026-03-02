@@ -99,7 +99,8 @@ async fn fetch_epoch_index(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }

@@ -67,7 +67,8 @@ async fn fetch_identity_of(
         .await
         .boxed()?
         .map(|entry| entry.decode())
-        .transpose().boxed()?;
+        .transpose()
+        .boxed()?;
 
     Ok(result)
 }
@@ -87,7 +88,8 @@ async fn fetch_super_of(
         .await
         .boxed()?
         .map(|entry| entry.decode())
-        .transpose().boxed()?;
+        .transpose()
+        .boxed()?;
 
     Ok(result)
 }

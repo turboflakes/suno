@@ -139,7 +139,8 @@ async fn fetch_session_validators(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }
@@ -160,7 +161,8 @@ async fn fetch_active_validator_indices(
         .fetch()
         .await
         .boxed()?
-        .decode().boxed()?;
+        .decode()
+        .boxed()?;
 
     Ok(value)
 }

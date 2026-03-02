@@ -61,11 +61,14 @@ async fn fetch_identity_of(
 
     let api_at = api.storage().at(block_hash);
     let result = api_at
-        .entry(addr).boxed()?
+        .entry(addr)
+        .boxed()?
         .try_fetch((stash.clone(),))
-        .await.boxed()?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose().boxed()?;
+        .transpose()
+        .boxed()?;
 
     Ok(result)
 }
@@ -79,11 +82,14 @@ async fn fetch_super_of(
 
     let api_at = api.storage().at(block_hash);
     let result = api_at
-        .entry(addr).boxed()?
+        .entry(addr)
+        .boxed()?
         .try_fetch((stash.clone(),))
-        .await.boxed()?
+        .await
+        .boxed()?
         .map(|entry| entry.decode())
-        .transpose().boxed()?;
+        .transpose()
+        .boxed()?;
 
     Ok(result)
 }
