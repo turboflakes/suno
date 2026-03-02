@@ -263,41 +263,51 @@ fn process_extrinsic_events(
     runtime: SupportedRuntime,
 ) -> Vec<Response> {
     match runtime {
+        SupportedRuntime::Polkadot => suno_polkadot::handle_extrinsic_events(events)
+            .unwrap_or_else(|e| {
+                error!("Error processing Polkadot extrinsic events: {}", e);
+                vec![]
+            }),
+        SupportedRuntime::Kusama => {
+            suno_kusama::handle_extrinsic_events(events).unwrap_or_else(|e| {
+                error!("Error processing Kusama extrinsic events: {}", e);
+                vec![]
+            })
+        }
         SupportedRuntime::Paseo => {
             suno_paseo::handle_extrinsic_events(events).unwrap_or_else(|e| {
                 error!("Error processing Paseo extrinsic events: {}", e);
                 vec![]
             })
         }
-        //  SupportedRuntime::AssetHubPolkadot => {
-        //     suno_asset_hub_polkadot::handle_events(api, block_hash, events)
-        //         .await
-        //         .unwrap_or_else(|e| {
-        //             error!("Error processing AssetHubPolkadot events: {}", e);
-        //             vec![]
-        //         })
-        // }
-        // SupportedRuntime::AssetHubKusama => {
-        //     suno_asset_hub_kusama::handle_events(api, block_hash, events)
-        //         .await
-        //         .unwrap_or_else(|e| {
-        //             error!("Error processing AssetHubKusama events: {}", e);
-        //             vec![]
-        //         })
-        // }
+        SupportedRuntime::Westend => {
+            suno_westend::handle_extrinsic_events(events).unwrap_or_else(|e| {
+                error!("Error processing Westend extrinsic events: {}", e);
+                vec![]
+            })
+        }
+        SupportedRuntime::AssetHubPolkadot => {
+            suno_asset_hub_polkadot::handle_extrinsic_events(events).unwrap_or_else(|e| {
+                error!("Error processing AssetHubPolkadot extrinsic events: {}", e);
+                vec![]
+            })
+        }
+        SupportedRuntime::AssetHubKusama => suno_asset_hub_kusama::handle_extrinsic_events(events)
+            .unwrap_or_else(|e| {
+                error!("Error processing AssetHubKusama extrinsic events: {}", e);
+                vec![]
+            }),
         SupportedRuntime::AssetHubPaseo => suno_asset_hub_paseo::handle_extrinsic_events(events)
             .unwrap_or_else(|e| {
                 error!("Error processing AssetHubPaseo extrinsic events: {}", e);
                 vec![]
             }),
-        // SupportedRuntime::AssetHubWestend => {
-        //     suno_asset_hub_westend::handle_events(api, block_hash, events)
-        //         .await
-        //         .unwrap_or_else(|e| {
-        //             error!("Error processing AssetHubWestend events: {}", e);
-        //             vec![]
-        //         })
-        // }
+        SupportedRuntime::AssetHubWestend => {
+            suno_asset_hub_westend::handle_extrinsic_events(events).unwrap_or_else(|e| {
+                error!("Error processing AssetHubWestend extrinsic events: {}", e);
+                vec![]
+            })
+        }
         _ => {
             vec![]
         }
