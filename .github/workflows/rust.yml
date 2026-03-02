@@ -80,12 +80,12 @@ jobs:
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-        
+
       - name: Run cargo doc
         run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: --cfg docsrs
-          
+
   test:
     runs-on: ${{ matrix.os }}
     name: Cargo test ${{ matrix.os }}
@@ -101,18 +101,18 @@ jobs:
       # - run: vcpkg install openssl:x64-windows-static-md
       #   if: runner.os == 'Windows'
       - name: Checkout sources
-      - uses: actions/checkout@v4
-      
+        uses: actions/checkout@v4
+
       - name: Install Rust stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-          
+
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-      
+
       - name: Run cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
