@@ -6,7 +6,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 /// Terminal events.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+#[allow(dead_code)]
 pub enum Event {
     /// Terminal tick.
     Tick,
@@ -20,11 +21,18 @@ pub enum Event {
     Paste(String),
 }
 
+impl Drop for EventHandler {
+    fn drop(&mut self) {
+        // Abort the handler task when EventHandler is dropped
+        self.handler.abort();
+    }
+}
+
 /// Terminal event handler.
 #[derive(Debug)]
 pub struct EventHandler {
     /// Event sender channel.
-    sender: mpsc::UnboundedSender<Event>,
+    _sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
     /// Event handler thread.
@@ -36,7 +44,7 @@ impl EventHandler {
     pub fn new(tick_rate: u64) -> Self {
         let tick_rate = Duration::from_millis(tick_rate);
         let (sender, receiver) = mpsc::unbounded_channel();
-        let _sender = sender.clone();
+        let sender_cloned = sender.clone();
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
             let mut tick = tokio::time::interval(tick_rate);
@@ -44,31 +52,31 @@ impl EventHandler {
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
-                  _ = _sender.closed() => {
+                  _ = sender_cloned.closed() => {
                     break;
                   }
                   _ = tick_delay => {
-                    _sender.send(Event::Tick).unwrap();
+                    sender_cloned.send(Event::Tick).unwrap();
                   }
                   Some(Ok(evt)) = crossterm_event => {
                     match evt {
                       CrosstermEvent::Key(key) => {
                         if key.kind == crossterm::event::KeyEventKind::Press {
-                          _sender.send(Event::Key(key)).unwrap();
+                          sender_cloned.send(Event::Key(key)).unwrap();
                         }
                       },
                       CrosstermEvent::Mouse(mouse) => {
-                        _sender.send(Event::Mouse(mouse)).unwrap();
+                        sender_cloned.send(Event::Mouse(mouse)).unwrap();
                       },
                       CrosstermEvent::Resize(x, y) => {
-                        _sender.send(Event::Resize(x, y)).unwrap();
+                        sender_cloned.send(Event::Resize(x, y)).unwrap();
                       },
                       CrosstermEvent::FocusLost => {
                       },
                       CrosstermEvent::FocusGained => {
                       },
                       CrosstermEvent::Paste(content) => {
-                          _sender.send(Event::Paste(content)).unwrap();
+                          sender_cloned.send(Event::Paste(content)).unwrap();
                       },
                     }
                   }
@@ -76,7 +84,7 @@ impl EventHandler {
             }
         });
         Self {
-            sender,
+            _sender: sender,
             receiver,
             handler,
         }

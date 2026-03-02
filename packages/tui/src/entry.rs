@@ -158,14 +158,14 @@ mod tests {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
     pub enum Call {
         Chill,
-        Unbond { amount: u128 },
+        Bond { amount: u128 },
     }
 
     impl ToDescription for Call {
         fn description(&self) -> String {
             match self {
                 Self::Chill => "declare no intention to validate".to_string(),
-                Self::Unbond { .. } => "bond more funds".to_string(),
+                Self::Bond { .. } => "bond more funds".to_string(),
             }
         }
     }
@@ -174,7 +174,7 @@ mod tests {
         fn placeholder(&self) -> String {
             match self {
                 Self::Chill => "chill".to_string(),
-                Self::Unbond { .. } => "bond more funds".to_string(),
+                Self::Bond { .. } => "bond more funds".to_string(),
             }
         }
     }
@@ -183,7 +183,7 @@ mod tests {
     //     fn to_hex(&self) -> String {
     //         match self {
     //             Self::Chill => to_hex(bytes),
-    //             Self::Unbond { .. } => to_hex(bytes),
+    //             Self::Bond { .. } => to_hex(bytes),
     //         }
     //     }
     // }
@@ -216,7 +216,7 @@ mod tests {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Self::Chill => write!(f, "/chill"),
-                Self::Unbond { .. } => write!(f, "/bond"),
+                Self::Bond { .. } => write!(f, "/bond"),
             }
         }
     }
@@ -231,6 +231,15 @@ mod tests {
 
         assert_eq!(entry.command(), "/chill");
         assert_eq!(entry.description(), "declare no intention to validate");
+
+        let cmd = Command::Instruction {
+            call: Call::Bond { amount: 100 },
+            bytes: None,
+        };
+        let entry = Entry::new(cmd);
+
+        assert_eq!(entry.command(), "/bond");
+        assert_eq!(entry.description(), "bond more funds");
     }
 
     // #[test]

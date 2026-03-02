@@ -1,4 +1,4 @@
-#![allow(unused_variables)]
+#![allow(dead_code)]
 use ratatui::style::{Color, Modifier, Style};
 
 // Grays
