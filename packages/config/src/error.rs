@@ -2,17 +2,15 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Rpc error: {0}")]
-    SubxtRpcError(#[from] subxt_rpcs::Error),
-    #[error("Subxt error: {0}")]
-    SubxtError(#[from] subxt::error::Error),
+    SubxtRpc(#[from] subxt_rpcs::Error),
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("YAML parsing error: {0}")]
-    YamlError(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_yaml::Error),
     #[error("Genesis error: {0}")]
-    GenesisError(String),
+    Genesis(String),
     #[error("At least one chain has to be enabled [Polkadot, Kusama, Paseo, Westend]")]
-    ChainNotAvailableError,
+    ChainNotAvailable,
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -27,6 +25,6 @@ impl From<&str> for Error {
 /// Convert String to Error
 impl From<String> for Error {
     fn from(error: String) -> Self {
-        Self::Other(error.into())
+        Self::Other(error)
     }
 }

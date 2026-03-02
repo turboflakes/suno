@@ -101,7 +101,7 @@ impl Config {
     pub fn validate(&self) -> Result<(), Error> {
         // Validate that at least one chain is configured
         if self.chains.is_empty() {
-            return Err(Error::ChainNotAvailableError);
+            return Err(Error::ChainNotAvailable);
         }
 
         Ok(())

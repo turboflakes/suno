@@ -64,7 +64,7 @@ impl FromStr for Keys {
         let hex_str = keys.trim_start_matches("0x");
 
         // Decode hex to bytes
-        let bytes = hex::decode(hex_str).map_err(|e| KeysError::InvalidHex(e))?;
+        let bytes = hex::decode(hex_str).map_err(KeysError::InvalidHex)?;
 
         // Validate length: 32+32+32+32+32+33 = 193 bytes
         if bytes.len() != 193 {

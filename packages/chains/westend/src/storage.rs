@@ -55,7 +55,7 @@ pub async fn fetch_epoch_data(
 pub async fn fetch_validators_authority_status(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
     let validators = fetch_session_validators(api, block_hash).await?;

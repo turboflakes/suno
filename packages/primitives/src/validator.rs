@@ -85,7 +85,7 @@ impl Validator {
     }
 
     pub fn key(&self) -> &AccountKey {
-        &self.account.account_key()
+        self.account.account_key()
     }
 
     pub fn runtime(&self) -> SupportedRuntime {
@@ -136,7 +136,7 @@ impl Validator {
         if elapsed >= 2_000 {
             return None;
         }
-        return Some(self.points - self.old_points);
+        Some(self.points - self.old_points)
     }
 
     pub fn status(&self) -> &ValidatorStatus {

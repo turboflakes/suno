@@ -7,7 +7,6 @@ use crate::{
     },
     storage::fetch_active_era_info,
 };
-use log::info;
 use sp_arithmetic::Perbill;
 use subxt::{blocks::ExtrinsicEvents, events::Events, utils::H256, OnlineClient, SubstrateConfig};
 use suno_error::Error;

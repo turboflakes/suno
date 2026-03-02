@@ -95,7 +95,7 @@ pub async fn fetch_validators_era_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     era: u32,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
     if let Some(reward_points) = fetch_era_reward_points(api, block_hash, era).await? {

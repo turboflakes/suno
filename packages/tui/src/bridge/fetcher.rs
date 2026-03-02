@@ -59,7 +59,7 @@ pub trait RuntimeFetcher {
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         era_index: u32,
-        validator_keys: &Vec<AccountKey>,
+        validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
     async fn fetch_validator_points(
@@ -73,7 +73,7 @@ pub trait RuntimeFetcher {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
-        validator_keys: &Vec<AccountKey>,
+        validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
     async fn fetch_stake_overview(
@@ -281,7 +281,7 @@ impl RuntimeFetcher for Runtime {
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         era_index: u32,
-        validator_keys: &Vec<AccountKey>,
+        validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
             Runtime::AssetHubPolkadot => {
@@ -345,7 +345,7 @@ impl RuntimeFetcher for Runtime {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
-        validator_keys: &Vec<AccountKey>,
+        validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
             Runtime::Polkadot => {

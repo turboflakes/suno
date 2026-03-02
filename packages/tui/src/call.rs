@@ -35,7 +35,7 @@ pub enum CallError {
     InvalidAmount(String),
     #[error("Invalid percentage: {0}")]
     InvalidPercentage(String),
-    #[error("Invalid percentage {0}, value must be between 0 and 100")]
+    #[error("Invalid percentage {0}%, value must be between 0 and 100")]
     InvalidPercentageRange(String),
     #[error("Invalid address: {0}")]
     InvalidAddress(String),

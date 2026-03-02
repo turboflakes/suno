@@ -18,7 +18,7 @@ pub async fn fetch_identity(
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let identity = get_identity(api, block_hash, &stash, None).await?;
+    let identity = get_identity(api, block_hash, stash, None).await?;
     Ok(Response::identity(account_bytes, identity))
 }
 
@@ -123,7 +123,7 @@ fn parse_identity_data(data: Data) -> String {
         Data::Raw30(bytes) => bytes_to_str(bytes.to_vec()),
         Data::Raw31(bytes) => bytes_to_str(bytes.to_vec()),
         Data::Raw32(bytes) => bytes_to_str(bytes.to_vec()),
-        _ => format!("???"),
+        _ => "???".to_string(),
     }
 }
 

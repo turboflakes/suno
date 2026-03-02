@@ -227,10 +227,10 @@ impl SupportedRuntime {
     }
 
     pub fn is_relay_chain(&self) -> bool {
-        match &self {
-            Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend
+        )
     }
 
     pub fn as_str(&self) -> &'static str {

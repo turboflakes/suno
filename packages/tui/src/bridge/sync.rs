@@ -245,12 +245,12 @@ pub fn spawn_fetch_validators_era_points(
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
     let runtime = runtime.clone();
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -282,12 +282,12 @@ pub fn spawn_fetch_validators_authority_status(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
     let runtime = runtime.clone();
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let tx = tx.clone();
 
     tokio::spawn(async move {
@@ -320,10 +320,10 @@ pub fn spawn_fetch_validators_stake_overview(
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -368,10 +368,10 @@ pub fn spawn_fetch_validators_staking_ledger(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -412,10 +412,10 @@ pub fn spawn_fetch_validators_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -461,10 +461,10 @@ pub fn spawn_fetch_validators_prefs(
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -509,10 +509,10 @@ pub fn spawn_fetch_validators_prefs_next(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -557,10 +557,10 @@ pub fn spawn_fetch_validators_payee(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();
@@ -605,10 +605,10 @@ pub fn spawn_fetch_validators_identity(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    validator_keys: &Vec<AccountKey>,
+    validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.clone();
+    let validator_keys = validator_keys.to_vec();
     let api = api.clone();
     let runtime = runtime.clone();
     let tx = tx.clone();

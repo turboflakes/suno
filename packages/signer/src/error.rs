@@ -29,6 +29,6 @@ impl From<&str> for Error {
 /// Convert String to Error
 impl From<String> for Error {
     fn from(error: String) -> Self {
-        Self::Other(error.into())
+        Self::Other(error)
     }
 }

@@ -10,7 +10,7 @@ use suno_config::CONFIG;
 
 /// Helper function to generate a keypair from the content of the seed file
 pub fn load_keypair(password: &str) -> Result<Keypair, Error> {
-    return load_keypair_from_json_file(password);
+    load_keypair_from_json_file(password)
 }
 
 /// Helper function to generate a keypair from the content of an exported polkadot-JS account
@@ -68,7 +68,7 @@ fn _load_keypair_from_seed_file(password: Option<String>) -> Result<Keypair, Err
 
     // Clean data - remove whitespace and control characters
     let re = Regex::new(r"[\x00-\x1F]").unwrap();
-    let clean_data = re.replace_all(&raw_data.trim(), "").to_string();
+    let clean_data = re.replace_all(raw_data.trim(), "").to_string();
 
     // Construct the secret URI with optional password
     let uri = match password {
