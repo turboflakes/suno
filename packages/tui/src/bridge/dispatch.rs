@@ -137,6 +137,24 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::ValidatorNextKeys(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdateNextKeys(
+                account_key,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
+        Response::ValidatorQueuedKeys(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdateQueuedKeys(
+                account_key,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
         Response::Identity(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);

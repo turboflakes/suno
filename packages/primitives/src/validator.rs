@@ -3,6 +3,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
+    session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
 use ratatui::{layout::Alignment, text::Text, widgets::Row};
@@ -50,6 +51,8 @@ pub struct Validator {
     pub stake: StakeOverview,
     pub ledger: StakeLedger,
     pub payee: Payee,
+    pub next_keys: Option<Keys>,
+    pub queued_keys: Option<Keys>,
     pub nominators: Vec<Nominators>,
     // Track session points from staking_ah_client.validator_points
     pub points: Points,
@@ -59,7 +62,6 @@ pub struct Validator {
     // Track era points accumulated at every new session from staking.era_reward_points
     // the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
-    pub is_next_authority: bool,
     pub is_chilled: bool,
     pub status: ValidatorStatus,
 }
@@ -73,12 +75,13 @@ impl Validator {
             stake: StakeOverview::default(),
             ledger: StakeLedger::default(),
             payee: Payee::None,
+            next_keys: None,
+            queued_keys: None,
             nominators: Vec::new(),
             points: 0,
             old_points: 0,
             old_points_ts: 0,
             era_points: 0,
-            is_next_authority: false,
             is_chilled: false,
             status: ValidatorStatus::default(),
         }
@@ -114,6 +117,26 @@ impl Validator {
 
     pub fn is_commission_changed(&self) -> bool {
         self.prefs_next.commission() != self.prefs.commission()
+    }
+
+    pub fn is_next_keys_changed(&self) -> bool {
+        self.next_keys != self.queued_keys
+    }
+
+    pub fn is_next_authority(&self) -> bool {
+        self.queued_keys.is_some()
+    }
+
+    pub fn has_keys(&self) -> bool {
+        self.next_keys.is_some()
+    }
+
+    pub fn display_next_keys(&self, size: usize) -> String {
+        if let Some(keys) = &self.next_keys {
+            keys.to_compact_string(size)
+        } else {
+            "".to_string()
+        }
     }
 
     pub fn payee_as_compact(&self, size: usize) -> String {

@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::identity::Identity;
 use suno_primitives::{
+    session::Keys,
     staking::{Chunk, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::{Validator, ValidatorStatus},
     AccountKey,
@@ -108,6 +109,18 @@ impl ValidatorsListState {
     pub fn set_payee(&mut self, validator_key: &AccountKey, data: Payee) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.payee = data;
+        }
+    }
+
+    pub fn set_next_keys(&mut self, validator_key: &AccountKey, data: Option<Keys>) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.next_keys = data;
+        }
+    }
+
+    pub fn set_queued_keys(&mut self, validator_key: &AccountKey, data: Option<Keys>) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.queued_keys = data;
         }
     }
 
@@ -463,6 +476,16 @@ impl ValidatorsListWidget {
     pub fn update_payee(&self, validator_key: &AccountKey, data: Payee) {
         let mut state = self.state.write().unwrap();
         state.set_payee(validator_key, data);
+    }
+
+    pub fn update_next_keys(&self, validator_key: &AccountKey, data: Option<Keys>) {
+        let mut state = self.state.write().unwrap();
+        state.set_next_keys(validator_key, data);
+    }
+
+    pub fn update_queued_keys(&self, validator_key: &AccountKey, data: Option<Keys>) {
+        let mut state = self.state.write().unwrap();
+        state.set_queued_keys(validator_key, data);
     }
 
     pub fn update_status(&self, validator_key: &AccountKey, status: ValidatorStatus) {

@@ -1,6 +1,7 @@
 use crate::{
     babe::Epoch,
     identity::Identity,
+    session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
@@ -79,11 +80,18 @@ pub struct ChunkData {
     pub chunk: Chunk,
 }
 
-/// Chunk data combining account and chunk
+/// Validator payee combining account and payee
 #[derive(Debug)]
 pub struct ValidatorPayeeData {
     pub account: AccountBytes,
     pub payee: Payee,
+}
+
+/// Validator keys combining account and session keys
+#[derive(Debug)]
+pub struct ValidatorKeysData {
+    pub account: AccountBytes,
+    pub keys: Option<Keys>,
 }
 
 /// Response types from chain storage queries
@@ -101,6 +109,8 @@ pub enum Response {
     ValidatorPrefs(Data<ValidatorPrefsData>),
     ValidatorPrefsNext(Data<ValidatorPrefsData>),
     ValidatorPayee(Data<ValidatorPayeeData>),
+    ValidatorNextKeys(Data<ValidatorKeysData>),
+    ValidatorQueuedKeys(Data<ValidatorKeysData>),
     Identity(Data<IdentityData>),
     ActiveValidators(Data<u32>),
     ActiveNominators(Data<u32>),
@@ -174,6 +184,14 @@ impl Response {
 
     pub fn validator_payee(account: AccountBytes, payee: Payee) -> Self {
         Response::ValidatorPayee(Data::new(ValidatorPayeeData { account, payee }))
+    }
+
+    pub fn validator_next_keys(account: AccountBytes, keys: Option<Keys>) -> Self {
+        Response::ValidatorNextKeys(Data::new(ValidatorKeysData { account, keys }))
+    }
+
+    pub fn validator_queued_keys(account: AccountBytes, keys: Option<Keys>) -> Self {
+        Response::ValidatorQueuedKeys(Data::new(ValidatorKeysData { account, keys }))
     }
 
     pub fn identity(account: AccountBytes, identity: Option<Identity>) -> Self {

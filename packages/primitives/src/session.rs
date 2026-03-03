@@ -114,6 +114,31 @@ impl FromStr for Keys {
     }
 }
 
+impl Keys {
+    pub fn new(
+        grandpa_bytes: [u8; 32],
+        babe_bytes: [u8; 32],
+        para_validator_bytes: [u8; 32],
+        para_assignment_bytes: [u8; 32],
+        authority_discovery_bytes: [u8; 32],
+        beefy_bytes: [u8; 33],
+    ) -> Self {
+        Self {
+            grandpa_bytes,
+            babe_bytes,
+            para_validator_bytes,
+            para_assignment_bytes,
+            authority_discovery_bytes,
+            beefy_bytes,
+        }
+    }
+
+    pub fn to_compact_string(&self, size: usize) -> String {
+        let keys = self.to_string();
+        format!("[{}..]", &keys[..size])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

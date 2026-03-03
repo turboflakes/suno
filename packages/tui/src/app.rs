@@ -254,6 +254,22 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
+
+                                sync::spawn_fetch_validators_queued_keys(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
+
+                                sync::spawn_fetch_validators_next_keys(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -420,6 +436,59 @@ impl App {
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
+
+                // Fetch data relevant to be synced whenever session changes
+                //
+                let runtime = chain_key;
+                let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
+                match runtime {
+                    SupportedRuntime::Polkadot
+                    | SupportedRuntime::Kusama
+                    | SupportedRuntime::Paseo
+                    | SupportedRuntime::Westend => {
+                        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
+                        {
+                            sync::spawn_fetch_validators_authority_status(
+                                &api,
+                                block_hash,
+                                runtime,
+                                &validator_keys,
+                                &self.tx,
+                            );
+
+                            sync::spawn_fetch_validators_queued_keys(
+                                &api,
+                                block_hash,
+                                runtime,
+                                &validator_keys,
+                                &self.tx,
+                            );
+
+                            sync::spawn_fetch_validators_next_keys(
+                                &api,
+                                block_hash,
+                                runtime,
+                                &validator_keys,
+                                &self.tx,
+                            );
+                        }
+                    }
+                    SupportedRuntime::AssetHubPolkadot
+                    | SupportedRuntime::AssetHubKusama
+                    | SupportedRuntime::AssetHubPaseo
+                    | SupportedRuntime::AssetHubWestend => {
+                        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
+                        {
+                            sync::spawn_fetch_total_validators_count(
+                                &api, block_hash, runtime, &self.tx,
+                            );
+                            sync::spawn_fetch_total_nominators_count(
+                                &api, block_hash, runtime, &self.tx,
+                            );
+                        }
+                    }
+                    _ => {}
+                }
             }
             ChainAction::UpdateActiveValidators(chain_key, count) => {
                 self.chains.update_active_validators(&chain_key, count);
@@ -466,6 +535,12 @@ impl App {
             }
             ValidatorAction::UpdatePayee(validator_key, data) => {
                 self.validators.update_payee(&validator_key, data);
+            }
+            ValidatorAction::UpdateNextKeys(validator_key, data) => {
+                self.validators.update_next_keys(&validator_key, data);
+            }
+            ValidatorAction::UpdateQueuedKeys(validator_key, data) => {
+                self.validators.update_queued_keys(&validator_key, data);
             }
             ValidatorAction::UpdateStatus(validator_key, status) => {
                 self.validators.update_status(&validator_key, status);

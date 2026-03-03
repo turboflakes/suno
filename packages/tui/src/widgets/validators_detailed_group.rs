@@ -299,6 +299,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
+        let show_next_keys = validators.iter().any(|v| v.is_next_keys_changed());
+
         let show_bonded = validators
             .iter()
             .any(|v| v.stake.own() != v.ledger.active());
@@ -351,6 +353,9 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
                 Cell::from(Text::from(v.display_name(3)).alignment(Alignment::Left))
                     .style(cell_style),
+                Cell::from(
+                    Line::from(vec![Span::raw(v.display_next_keys(6))]).alignment(Alignment::Right),
+                ),
                 Cell::from(text_points.alignment(Alignment::Right)),
                 Cell::from(
                     Line::from(vec![
@@ -470,6 +475,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Constraint::Fill(2),
             Constraint::Fill(2),
             Constraint::Fill(2),
+            Constraint::Fill(2),
         ];
 
         if show_bonded {
@@ -494,6 +500,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
+            Cell::from(Text::from("keys").alignment(Alignment::Right)),
             Cell::from(Text::from("points").alignment(Alignment::Right)),
             Cell::from(Text::from("total").alignment(Alignment::Right)),
             Cell::from(Text::from("own-stake").alignment(Alignment::Right)),

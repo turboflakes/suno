@@ -76,6 +76,20 @@ pub trait RuntimeFetcher {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
+    async fn fetch_validators_queued_keys(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        validator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_validator_next_keys(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_stake_overview(
         &self,
         api: &OnlineClient<SubstrateConfig>,
@@ -363,6 +377,48 @@ impl RuntimeFetcher for Runtime {
                 suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys)
                     .await
             }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_validators_queued_keys(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        validator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error> {
+        match self {
+            // Runtime::Polkadot => {
+            //     suno_polkadot::fetch_validator_queued_keys(api, block_hash, validator_keys).await
+            // }
+            // Runtime::Kusama => {
+            //     suno_kusama::fetch_validator_queued_keys(api, block_hash, validator_keys).await
+            // }
+            Runtime::Paseo => {
+                suno_paseo::fetch_validators_queued_keys(api, block_hash, validator_keys).await
+            }
+            // Runtime::Westend => {
+            //     suno_westend::fetch_validator_queued_keys(api, block_hash, validator_keys).await
+            // }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_validator_next_keys(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            // Runtime::Polkadot => {
+            //     suno_polkadot::fetch_validator_next_keys(api, block_hash, stash).await
+            // }
+            // Runtime::Kusama => suno_kusama::fetch_validator_next_keys(api, block_hash, stash).await,
+            Runtime::Paseo => suno_paseo::fetch_validator_next_keys(api, block_hash, stash).await,
+            // Runtime::Westend => {
+            //     suno_westend::fetch_validator_next_keys(api, block_hash, stash).await
+            // }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
