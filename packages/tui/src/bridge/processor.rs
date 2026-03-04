@@ -38,14 +38,16 @@ impl RuntimeProcessor for Runtime {
         events: ExtrinsicEvents<SubstrateConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
-            Runtime::Polkadot => suno_polkadot::handle_extrinsic_events(events),
-            Runtime::Kusama => suno_kusama::handle_extrinsic_events(events),
+            Runtime::Polkadot => suno_polkadot::process_transaction_events(events),
+            Runtime::Kusama => suno_kusama::process_transaction_events(events),
             Runtime::Paseo => suno_paseo::process_transaction_events(events),
-            Runtime::Westend => suno_westend::handle_extrinsic_events(events),
-            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::handle_extrinsic_events(events),
-            Runtime::AssetHubKusama => suno_asset_hub_kusama::handle_extrinsic_events(events),
-            Runtime::AssetHubPaseo => suno_asset_hub_paseo::handle_extrinsic_events(events),
-            Runtime::AssetHubWestend => suno_asset_hub_westend::handle_extrinsic_events(events),
+            Runtime::Westend => suno_westend::process_transaction_events(events),
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::process_transaction_events(events)
+            }
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::process_transaction_events(events),
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::process_transaction_events(events),
+            Runtime::AssetHubWestend => suno_asset_hub_westend::process_transaction_events(events),
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -57,21 +59,23 @@ impl RuntimeProcessor for Runtime {
         events: Events<SubstrateConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
-            Runtime::Polkadot => suno_polkadot::handle_events(api, block_hash, events).await,
-            Runtime::Kusama => suno_kusama::handle_events(api, block_hash, events).await,
+            Runtime::Polkadot => {
+                suno_polkadot::process_runtime_events(api, block_hash, events).await
+            }
+            Runtime::Kusama => suno_kusama::process_runtime_events(api, block_hash, events).await,
             Runtime::Paseo => suno_paseo::process_runtime_events(api, block_hash, events).await,
-            Runtime::Westend => suno_westend::handle_events(api, block_hash, events).await,
+            Runtime::Westend => suno_westend::process_runtime_events(api, block_hash, events).await,
             Runtime::AssetHubPolkadot => {
-                suno_asset_hub_polkadot::handle_events(api, block_hash, events).await
+                suno_asset_hub_polkadot::process_runtime_events(api, block_hash, events).await
             }
             Runtime::AssetHubKusama => {
-                suno_asset_hub_kusama::handle_events(api, block_hash, events).await
+                suno_asset_hub_kusama::process_runtime_events(api, block_hash, events).await
             }
             Runtime::AssetHubPaseo => {
-                suno_asset_hub_paseo::handle_events(api, block_hash, events).await
+                suno_asset_hub_paseo::process_runtime_events(api, block_hash, events).await
             }
             Runtime::AssetHubWestend => {
-                suno_asset_hub_westend::handle_events(api, block_hash, events).await
+                suno_asset_hub_westend::process_runtime_events(api, block_hash, events).await
             }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -84,24 +88,30 @@ impl RuntimeProcessor for Runtime {
         extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
-            // Runtime::Polkadot => suno_polkadot::handle_events(api, block_hash, events).await,
-            // Runtime::Kusama => suno_kusama::handle_events(api, block_hash, events).await,
+            Runtime::Polkadot => {
+                suno_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
+            Runtime::Kusama => {
+                suno_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
             Runtime::Paseo => {
                 suno_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
             }
-            // Runtime::Westend => suno_westend::handle_events(api, block_hash, events).await,
-            // Runtime::AssetHubPolkadot => {
-            //     suno_asset_hub_polkadot::handle_events(api, block_hash, events).await
-            // }
-            // Runtime::AssetHubKusama => {
-            //     suno_asset_hub_kusama::handle_events(api, block_hash, events).await
-            // }
-            // Runtime::AssetHubPaseo => {
-            //     suno_asset_hub_paseo::handle_events(api, block_hash, events).await
-            // }
-            // Runtime::AssetHubWestend => {
-            //     suno_asset_hub_westend::handle_events(api, block_hash, events).await
-            // }
+            Runtime::Westend => {
+                suno_westend::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::process_block_extrinsics(api, block_hash, extrinsics).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

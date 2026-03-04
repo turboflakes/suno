@@ -2,8 +2,7 @@ use crate::node_runtime;
 use node_runtime::runtime_types::{
     pallet_proxy::pallet::Call as ProxyCall,
     pallet_session::pallet::Call as SessionCall,
-    paseo_runtime::RuntimeCall,
-    paseo_runtime::SessionKeys,
+    paseo_runtime::{RuntimeCall, SessionKeys},
     paseo_runtime_constants::proxy::ProxyType,
     polkadot_primitives::v8::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,

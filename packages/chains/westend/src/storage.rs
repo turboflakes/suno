@@ -1,15 +1,25 @@
 use super::node_runtime;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
-    node_runtime::runtime_types::polkadot_primitives::v9::ValidatorIndex,
+    node_runtime::runtime_types::{
+        polkadot_primitives::v9::ValidatorIndex,
+        polkadot_primitives::v9::{
+            assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
+        },
+        sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
+        sp_consensus_babe::app::Public as BabePublic,
+        sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
+        sp_consensus_grandpa::app::Public as GrandpaPublic,
+        westend_runtime::SessionKeys,
+    },
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use subxt::{
     utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{validator::ValidatorStatus, AccountKey, Epoch, Response};
+use suno_primitives::{session::Keys, validator::ValidatorStatus, AccountKey, Epoch, Response};
 
 type Index = u64;
 type BlockNumber = u32;
@@ -83,6 +93,53 @@ pub async fn fetch_validators_authority_status(
     }
 
     Ok(responses)
+}
+
+/// Fetch validators queued keys
+pub async fn fetch_validators_queued_keys(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    validator_keys: &[AccountKey],
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
+    let queued_keys = fetch_session_queued_keys(api, block_hash).await?;
+    let mut validator_bytes: HashMap<[u8; 32], bool> = validator_keys
+        .iter()
+        .map(|key| (key.bytes(), false))
+        .collect();
+
+    for (stash, session_keys) in queued_keys.iter() {
+        let bytes: [u8; 32] = *stash.as_ref();
+        if let Some(found) = validator_bytes.get_mut(&bytes) {
+            *found = true;
+            let keys = map_keys(session_keys);
+            responses.push(Response::validator_queued_keys(bytes, Some(keys)));
+        }
+    }
+
+    // Emit None responses for validators not found in queued_keys
+    for (bytes, found) in &validator_bytes {
+        if !found {
+            responses.push(Response::validator_queued_keys(*bytes, None));
+        }
+    }
+
+    Ok(responses)
+}
+
+/// Fetch validator next session key
+pub async fn fetch_validator_next_keys(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    if let Some(session_keys) = fetch_session_next_keys(api, block_hash, stash).await? {
+        let keys = map_keys(&session_keys);
+        return Ok(Response::validator_next_keys(account_bytes, Some(keys)));
+    };
+
+    Ok(Response::validator_next_keys(account_bytes, None))
 }
 
 /// Fetch babe epoch index at the specified block hash
@@ -165,4 +222,57 @@ async fn fetch_active_validator_indices(
         .boxed()?;
 
     Ok(value)
+}
+
+/// Fetch queued keys for the next session for a stash at the specified block hash
+async fn fetch_session_next_keys(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Option<SessionKeys>, Error> {
+    let addr = node_runtime::storage().session().next_keys();
+
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .try_fetch((stash.clone(),))
+        .await
+        .boxed()?
+        .map(|entry| entry.decode())
+        .transpose()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch queued keys for the next session at the specified block hash
+async fn fetch_session_queued_keys(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+) -> Result<Vec<(AccountId32, SessionKeys)>, Error> {
+    let addr = node_runtime::storage().session().queued_keys();
+
+    let api_at = api.storage().at(block_hash);
+    let value = api_at
+        .entry(addr)
+        .boxed()?
+        .fetch()
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+// Helper function to map SessionKeys to Keys
+pub fn map_keys(session_keys: &SessionKeys) -> Keys {
+    let GrandpaPublic(grandpa) = session_keys.grandpa;
+    let BabePublic(babe) = session_keys.babe;
+    let ValidatorPublic(para) = session_keys.para_validator;
+    let AssignmentPublic(assi) = session_keys.para_assignment;
+    let AuthorityDiscoveryPublic(auth) = session_keys.authority_discovery;
+    let BeefyPublic(beef) = session_keys.beefy;
+    Keys::new(grandpa, babe, para, assi, auth, beef)
 }

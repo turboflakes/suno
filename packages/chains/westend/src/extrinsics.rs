@@ -1,5 +1,7 @@
 use crate::node_runtime;
 use node_runtime::runtime_types::{
+    pallet_proxy::pallet::Call as ProxyCall,
+    pallet_session::pallet::Call as SessionCall,
     polkadot_primitives::v9::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
     },
@@ -7,16 +9,11 @@ use node_runtime::runtime_types::{
     sp_consensus_babe::app::Public as BabePublic,
     sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
     sp_consensus_grandpa::app::Public as GrandpaPublic,
-    westend_runtime::ProxyType,
-    westend_runtime::SessionKeys,
+    westend_runtime::{ProxyType, RuntimeCall, SessionKeys},
 };
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{session::Keys, tx::Bytes};
-
-type RuntimeCall = node_runtime::runtime_types::westend_runtime::RuntimeCall;
-type ProxyCall = node_runtime::runtime_types::pallet_proxy::pallet::Call;
-type SessionCall = node_runtime::runtime_types::pallet_session::pallet::Call;
 
 pub fn wrap_call_into_proxy(
     api: &OnlineClient<SubstrateConfig>,

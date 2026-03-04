@@ -530,3 +530,13 @@ pub async fn fetch_payee(
 
     Ok(value)
 }
+
+// Helper function to map RewardDestination to Payee
+pub fn map_payee_from_reward_destination(dest: RewardDestination<AccountId32>) -> Payee {
+    match dest {
+        RewardDestination::None | RewardDestination::Controller => Payee::None,
+        RewardDestination::Account(account) => Payee::Account(account),
+        RewardDestination::Stash => Payee::Stash,
+        RewardDestination::Staked => Payee::Staked,
+    }
+}

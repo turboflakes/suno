@@ -1,9 +1,11 @@
 use crate::node_runtime;
 use node_runtime::runtime_types::{
+    pallet_proxy::pallet::Call as ProxyCall,
+    pallet_session::pallet::Call as SessionCall,
     polkadot_primitives::v8::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
     },
-    polkadot_runtime::SessionKeys,
+    polkadot_runtime::{RuntimeCall, SessionKeys},
     polkadot_runtime_constants::proxy::ProxyType,
     sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
     sp_consensus_babe::app::Public as BabePublic,
@@ -13,10 +15,6 @@ use node_runtime::runtime_types::{
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{session::Keys, tx::Bytes};
-
-type RuntimeCall = node_runtime::runtime_types::polkadot_runtime::RuntimeCall;
-type ProxyCall = node_runtime::runtime_types::pallet_proxy::pallet::Call;
-type SessionCall = node_runtime::runtime_types::pallet_session::pallet::Call;
 
 pub fn wrap_call_into_proxy(
     api: &OnlineClient<SubstrateConfig>,

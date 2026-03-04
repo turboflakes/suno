@@ -4,11 +4,10 @@ use crate::node_runtime::{
     session::events::NewSession,
 };
 use crate::storage::{fetch_epoch_data, map_keys};
-use subxt::utils::MultiAddress;
 use subxt::{
     blocks::{ExtrinsicEvents, Extrinsics},
     events::Events,
-    utils::H256,
+    utils::{MultiAddress, H256},
     OnlineClient, SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};

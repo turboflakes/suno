@@ -388,18 +388,18 @@ impl RuntimeFetcher for Runtime {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
-            // Runtime::Polkadot => {
-            //     suno_polkadot::fetch_validator_queued_keys(api, block_hash, validator_keys).await
-            // }
-            // Runtime::Kusama => {
-            //     suno_kusama::fetch_validator_queued_keys(api, block_hash, validator_keys).await
-            // }
+            Runtime::Polkadot => {
+                suno_polkadot::fetch_validators_queued_keys(api, block_hash, validator_keys).await
+            }
+            Runtime::Kusama => {
+                suno_kusama::fetch_validators_queued_keys(api, block_hash, validator_keys).await
+            }
             Runtime::Paseo => {
                 suno_paseo::fetch_validators_queued_keys(api, block_hash, validator_keys).await
             }
-            // Runtime::Westend => {
-            //     suno_westend::fetch_validator_queued_keys(api, block_hash, validator_keys).await
-            // }
+            Runtime::Westend => {
+                suno_westend::fetch_validators_queued_keys(api, block_hash, validator_keys).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -411,14 +411,14 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
-            // Runtime::Polkadot => {
-            //     suno_polkadot::fetch_validator_next_keys(api, block_hash, stash).await
-            // }
-            // Runtime::Kusama => suno_kusama::fetch_validator_next_keys(api, block_hash, stash).await,
+            Runtime::Polkadot => {
+                suno_polkadot::fetch_validator_next_keys(api, block_hash, stash).await
+            }
+            Runtime::Kusama => suno_kusama::fetch_validator_next_keys(api, block_hash, stash).await,
             Runtime::Paseo => suno_paseo::fetch_validator_next_keys(api, block_hash, stash).await,
-            // Runtime::Westend => {
-            //     suno_westend::fetch_validator_next_keys(api, block_hash, stash).await
-            // }
+            Runtime::Westend => {
+                suno_westend::fetch_validator_next_keys(api, block_hash, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

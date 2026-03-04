@@ -1,8 +1,8 @@
+pub mod blocks;
 pub mod constants;
-pub mod events;
 pub mod extrinsics;
 pub mod storage;
-pub use events::{handle_events, handle_extrinsic_events};
+pub use blocks::{process_block_extrinsics, process_runtime_events, process_transaction_events};
 pub use extrinsics::wrap_call_into_proxy;
 pub use storage::{
     fetch_active_nominators_count, fetch_active_validators_count, fetch_era_data,
