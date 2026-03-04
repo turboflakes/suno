@@ -456,12 +456,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Text::from(v.display_queued_keys(6)).alignment(Alignment::Right),
             ));
 
-            if show_next_keys {
-                if v.is_next_keys_changed() {
-                    validator_cells.push(Cell::from(
-                        Text::from(v.display_next_keys(6)).alignment(Alignment::Left),
-                    ));
-                }
+            if show_next_keys && v.is_next_keys_changed() {
+                validator_cells.push(Cell::from(
+                    Text::from(v.display_next_keys(6)).alignment(Alignment::Left),
+                ));
             }
 
             // if selected_validator.is_some() {

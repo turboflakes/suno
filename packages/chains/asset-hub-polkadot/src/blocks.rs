@@ -70,17 +70,11 @@ pub async fn process_block_extrinsics(
         let ext = ext.boxed()?;
         if let MultiAddress::Id(stash) = ext.value.real {
             let call = ext.value.call;
-            match call.as_ref() {
-                RuntimeCall::Staking(ref inner) => match inner {
-                    StakingCall::set_payee { payee } => {
-                        let account_bytes = *stash.as_ref();
-                        let payee = map_payee_from_reward_destination(payee.clone());
-                        let res = Response::validator_payee(account_bytes, payee);
-                        processed_extrinsics.push(res);
-                    }
-                    _ => {}
-                },
-                _ => {}
+            if let RuntimeCall::Staking(StakingCall::set_payee { payee }) = call.as_ref() {
+                let account_bytes = *stash.as_ref();
+                let payee = map_payee_from_reward_destination(payee.clone());
+                let res = Response::validator_payee(account_bytes, payee);
+                processed_extrinsics.push(res);
             }
         }
     }

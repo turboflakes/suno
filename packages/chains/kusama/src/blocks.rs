@@ -45,17 +45,11 @@ pub async fn process_block_extrinsics(
         let ext = ext.boxed()?;
         if let MultiAddress::Id(stash) = ext.value.real {
             let call = ext.value.call;
-            match call.as_ref() {
-                RuntimeCall::Session(ref inner) => match inner {
-                    SessionCall::set_keys { keys, .. } => {
-                        let keys = map_keys(keys);
-                        let account_bytes = *stash.as_ref();
-                        let res = Response::validator_next_keys(account_bytes, Some(keys));
-                        processed_extrinsics.push(res);
-                    }
-                    _ => {}
-                },
-                _ => {}
+            if let RuntimeCall::Session(SessionCall::set_keys { keys, .. }) = call.as_ref() {
+                let keys = map_keys(keys);
+                let account_bytes = *stash.as_ref();
+                let res = Response::validator_next_keys(account_bytes, Some(keys));
+                processed_extrinsics.push(res);
             }
         }
     }

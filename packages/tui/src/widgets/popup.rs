@@ -593,7 +593,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     let rows = state
         .options
         .iter()
-        .map(|f| f.to_row(state.mode.clone(), Some(&spinner_progress)));
+        .map(|f| f.to_row(state.mode.clone(), Some(spinner_progress)));
     let widths = [Constraint::Fill(1), Constraint::Length(7)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base)
