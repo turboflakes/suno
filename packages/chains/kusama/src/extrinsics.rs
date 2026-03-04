@@ -10,7 +10,7 @@ use node_runtime::runtime_types::{
     sp_consensus_babe::app::Public as BabePublic,
     sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
     sp_consensus_grandpa::app::Public as GrandpaPublic,
-    staging_kusama_runtime::{RuntimeCall,SessionKeys},
+    staging_kusama_runtime::{RuntimeCall, SessionKeys},
 };
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::{Error, ResultExt};
