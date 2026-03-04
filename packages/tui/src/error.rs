@@ -4,13 +4,14 @@ use suno_actions::Action;
 #[derive(thiserror::Error, Debug)]
 pub enum TuiError {
     #[error("Signer error: {0}")]
-    SignerError(#[from] suno_signer::error::Error),
+    Signer(#[from] suno_signer::error::Error),
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("Send error: {0}")]
-    SendError(#[from] tokio::sync::mpsc::error::SendError<Action>),
+    // Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
+    Send(#[from] tokio::sync::mpsc::error::SendError<Action>),
     #[error("Logger error: {0}")]
-    TuiLoggerError(#[from] tui_logger::TuiLoggerError),
+    TuiLogger(#[from] tui_logger::TuiLoggerError),
     #[error("Other error: {0}")]
     Other(String),
 }

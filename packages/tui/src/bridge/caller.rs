@@ -1,8 +1,10 @@
 use crate::call::Call;
 use async_trait::async_trait;
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt_signer::sr25519::Keypair;
 use suno_config::Runtime;
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
+use suno_primitives::{tx::payload_from_bytes, Response};
 
 #[async_trait]
 pub trait RuntimeCaller {
@@ -12,6 +14,13 @@ pub trait RuntimeCaller {
         stash: &AccountId32,
         call: Call,
     ) -> Result<Vec<u8>, Error>;
+
+    async fn sign_and_submit_call_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        proxy_signer: &Keypair,
+        call_data: Vec<u8>,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -69,5 +78,22 @@ impl RuntimeCaller for Runtime {
             },
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
+    }
+
+    async fn sign_and_submit_call_data(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        proxy_signer: &Keypair,
+        call_data: Vec<u8>,
+    ) -> Result<Response, Error> {
+        let payload = payload_from_bytes(call_data);
+
+        let response = api
+            .tx()
+            .sign_and_submit_then_watch_default(&payload, proxy_signer)
+            .await
+            .boxed()?;
+
+        Ok(Response::transaction_submitted(response))
     }
 }

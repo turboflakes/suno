@@ -1,7 +1,10 @@
 pub mod caller;
-pub use caller::RuntimeCaller;
 pub mod dispatch;
 pub mod fetcher;
-pub use fetcher::RuntimeFetcher;
+pub mod processor;
 pub mod subscribe;
 pub mod sync;
+
+pub use caller::RuntimeCaller;
+pub use fetcher::RuntimeFetcher;
+pub use processor::RuntimeProcessor;

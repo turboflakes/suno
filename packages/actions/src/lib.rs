@@ -112,7 +112,7 @@ pub enum ValidatorAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TxAction {
     Processing,
-    Sent,
+    Message(&'static str),
     InBestBlock(BlockHash),
     InFinalizedBlock(BlockHash),
     Success,

@@ -1,5 +1,8 @@
 use crate::node_runtime;
 use node_runtime::runtime_types::{
+    pallet_proxy::pallet::Call as ProxyCall,
+    pallet_session::pallet::Call as SessionCall,
+    paseo_runtime::RuntimeCall,
     paseo_runtime::SessionKeys,
     paseo_runtime_constants::proxy::ProxyType,
     polkadot_primitives::v8::{
@@ -13,10 +16,6 @@ use node_runtime::runtime_types::{
 use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{session::Keys, tx::Bytes};
-
-type RuntimeCall = node_runtime::runtime_types::paseo_runtime::RuntimeCall;
-type ProxyCall = node_runtime::runtime_types::pallet_proxy::pallet::Call;
-type SessionCall = node_runtime::runtime_types::pallet_session::pallet::Call;
 
 pub fn wrap_call_into_proxy(
     api: &OnlineClient<SubstrateConfig>,

@@ -579,8 +579,8 @@ impl App {
                 // Switch app focus to main while rendering transaction status
                 self.focus = Focus::Main;
             }
-            TxAction::Sent => {
-                self.popup.update_transaction_status("transaction sent");
+            TxAction::Message(message) => {
+                self.popup.update_transaction_status(message);
             }
             TxAction::InBestBlock(block_hash) => {
                 let message = format!("transaction in block {block_hash}");

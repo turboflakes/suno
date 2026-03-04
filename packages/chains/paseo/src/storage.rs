@@ -267,7 +267,7 @@ async fn fetch_session_queued_keys(
 }
 
 // Helper function to map SessionKeys to Keys
-fn map_keys(session_keys: &SessionKeys) -> Keys {
+pub fn map_keys(session_keys: &SessionKeys) -> Keys {
     let GrandpaPublic(grandpa) = session_keys.grandpa;
     let BabePublic(babe) = session_keys.babe;
     let ValidatorPublic(para) = session_keys.para_validator;

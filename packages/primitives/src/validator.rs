@@ -107,6 +107,14 @@ impl Validator {
         }
     }
 
+    pub fn display_identity(&self) -> String {
+        if let Some(identity) = self.identity() {
+            identity.to_string()
+        } else {
+            self.to_compact_string(6)
+        }
+    }
+
     pub fn commission_as_percentage(&self, decimal_places: usize) -> String {
         self.prefs.commission_as_percentage(decimal_places)
     }
@@ -129,6 +137,14 @@ impl Validator {
 
     pub fn has_keys(&self) -> bool {
         self.next_keys.is_some()
+    }
+
+    pub fn display_queued_keys(&self, size: usize) -> String {
+        if let Some(keys) = &self.queued_keys {
+            keys.to_compact_string(size)
+        } else {
+            "".to_string()
+        }
     }
 
     pub fn display_next_keys(&self, size: usize) -> String {

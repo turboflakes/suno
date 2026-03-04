@@ -7,7 +7,7 @@ use crate::{
 };
 use sp_arithmetic::Permill;
 use std::fmt::Debug;
-use subxt::{tx::TxProgress, OnlineClient, SubstrateConfig};
+use subxt::{tx::TxProgress, utils::H256, OnlineClient, SubstrateConfig};
 
 type AccountBytes = [u8; 32];
 type Points = u32;
@@ -116,7 +116,12 @@ pub enum Response {
     ActiveNominators(Data<u32>),
     TotalValidators(Data<u32>),
     TotalNominators(Data<u32>),
-    TxProgress(Data<TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>>),
+    TxSubmitted(Data<TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>>),
+    TxValidated,
+    TxBroadcasted,
+    TxNoLongerInBestBlock,
+    TxInBestBlock(H256),
+    TxInFinalizedBlock(H256),
     TxSuccess,
     TxError(String),
     EventBonded(Data<AmountData>),
@@ -198,10 +203,10 @@ impl Response {
         Response::Identity(Data::new(IdentityData { account, identity }))
     }
 
-    pub fn transaction_progress(
+    pub fn transaction_submitted(
         progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
     ) -> Self {
-        Response::TxProgress(Data::new(progress))
+        Response::TxSubmitted(Data::new(progress))
     }
 
     pub fn event_bonded(account: AccountBytes, amount: Amount) -> Self {

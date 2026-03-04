@@ -589,7 +589,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .style(THEME.block.main)
         .padding(Padding::proportional(1));
 
-    let spinner_progress = state.spinner.progress();
+    let spinner_progress = state.spinner.frame();
     let rows = state
         .options
         .iter()

@@ -1,6 +1,6 @@
-use log::{error, info, warn};
-use subxt::{blocks::ExtrinsicEvents, tx::TxProgress, tx::TxStatus, OnlineClient, SubstrateConfig};
-use suno_actions::{Action, ChainAction, SystemAction, TxAction, ValidatorAction};
+use crate::bridge::sync::spawn_process_transaction_progress;
+use log::warn;
+use suno_actions::{Action, ChainAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{AccountKey, Response};
@@ -168,9 +168,29 @@ pub fn dispatch_response_action(
                 warn!("No identity data found for {}", account_key,);
             }
         }
-        Response::TxProgress(data) => {
-            let response = data.value;
-            spawn_process_transaction_progress(runtime, response, tx);
+        Response::TxSubmitted(data) => {
+            spawn_process_transaction_progress(runtime, data.value, tx);
+        }
+        Response::TxValidated => {
+            let _ = tx.send(Action::Transaction(TxAction::Message(
+                "transaction validated",
+            )));
+        }
+        Response::TxBroadcasted => {
+            let _ = tx.send(Action::Transaction(TxAction::Message(
+                "transaction broadcasted",
+            )));
+        }
+        Response::TxNoLongerInBestBlock => {
+            let _ = tx.send(Action::Transaction(TxAction::Message(
+                "transaction no longer in best block",
+            )));
+        }
+        Response::TxInBestBlock(block_hash) => {
+            let _ = tx.send(Action::Transaction(TxAction::InBestBlock(block_hash)));
+        }
+        Response::TxInFinalizedBlock(block_hash) => {
+            let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock(block_hash)));
         }
         Response::TxSuccess => {
             let _ = tx.send(Action::Transaction(TxAction::Success));
@@ -200,131 +220,4 @@ pub fn dispatch_response_action(
           // }
     }
     Ok(())
-}
-
-fn spawn_process_transaction_progress(
-    runtime: SupportedRuntime,
-    progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
-    tx: &UnboundedSender<Action>,
-) {
-    let mut progress = progress;
-    let tx = tx.clone();
-    tokio::spawn(async move {
-        if let Err(e) = process_transaction_progress(runtime, &mut progress, &tx).await {
-            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                "Dispatch error: {}",
-                e
-            ))));
-        }
-    });
-}
-
-async fn process_transaction_progress(
-    runtime: SupportedRuntime,
-    progress: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
-    tx: &UnboundedSender<Action>,
-) -> Result<(), Error> {
-    while let Some(status) = progress.next().await {
-        match status.boxed()? {
-            TxStatus::Broadcasted => {
-                let _ = tx.send(Action::Transaction(TxAction::Sent));
-            }
-            TxStatus::InBestBlock(block) => {
-                let block_hash = block.block_hash();
-                let _ = tx.send(Action::Transaction(TxAction::InBestBlock(block_hash)));
-            }
-            TxStatus::InFinalizedBlock(block) => {
-                let block_hash = block.block_hash();
-                let _ = tx.send(Action::Transaction(TxAction::InFinalizedBlock(block_hash)));
-                info!(
-                    "Transaction {:?} is finalized in block {:?}",
-                    block.extrinsic_hash(),
-                    block.block_hash()
-                );
-
-                match block.wait_for_success().await {
-                    Ok(events) => {
-                        let processed_events = process_extrinsic_events(events, runtime);
-
-                        for response in processed_events {
-                            dispatch_response_action(response, runtime, tx)?;
-                        }
-                    }
-                    Err(err) => {
-                        error!("Transaction failed: {:?}", err);
-                        let _ = tx.send(Action::Transaction(TxAction::Error(
-                            "transaction failed".to_string(),
-                        )));
-                    }
-                }
-            }
-            TxStatus::Error { message } => {
-                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
-            }
-            TxStatus::Invalid { message } => {
-                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
-            }
-            TxStatus::Dropped { message } => {
-                let _ = tx.send(Action::Transaction(TxAction::Error(message)));
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-fn process_extrinsic_events(
-    events: ExtrinsicEvents<SubstrateConfig>,
-    runtime: SupportedRuntime,
-) -> Vec<Response> {
-    match runtime {
-        SupportedRuntime::Polkadot => suno_polkadot::handle_extrinsic_events(events)
-            .unwrap_or_else(|e| {
-                error!("Error processing Polkadot extrinsic events: {}", e);
-                vec![]
-            }),
-        SupportedRuntime::Kusama => {
-            suno_kusama::handle_extrinsic_events(events).unwrap_or_else(|e| {
-                error!("Error processing Kusama extrinsic events: {}", e);
-                vec![]
-            })
-        }
-        SupportedRuntime::Paseo => {
-            suno_paseo::handle_extrinsic_events(events).unwrap_or_else(|e| {
-                error!("Error processing Paseo extrinsic events: {}", e);
-                vec![]
-            })
-        }
-        SupportedRuntime::Westend => {
-            suno_westend::handle_extrinsic_events(events).unwrap_or_else(|e| {
-                error!("Error processing Westend extrinsic events: {}", e);
-                vec![]
-            })
-        }
-        SupportedRuntime::AssetHubPolkadot => {
-            suno_asset_hub_polkadot::handle_extrinsic_events(events).unwrap_or_else(|e| {
-                error!("Error processing AssetHubPolkadot extrinsic events: {}", e);
-                vec![]
-            })
-        }
-        SupportedRuntime::AssetHubKusama => suno_asset_hub_kusama::handle_extrinsic_events(events)
-            .unwrap_or_else(|e| {
-                error!("Error processing AssetHubKusama extrinsic events: {}", e);
-                vec![]
-            }),
-        SupportedRuntime::AssetHubPaseo => suno_asset_hub_paseo::handle_extrinsic_events(events)
-            .unwrap_or_else(|e| {
-                error!("Error processing AssetHubPaseo extrinsic events: {}", e);
-                vec![]
-            }),
-        SupportedRuntime::AssetHubWestend => {
-            suno_asset_hub_westend::handle_extrinsic_events(events).unwrap_or_else(|e| {
-                error!("Error processing AssetHubWestend extrinsic events: {}", e);
-                vec![]
-            })
-        }
-        _ => {
-            vec![]
-        }
-    }
 }

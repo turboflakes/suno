@@ -1,11 +1,20 @@
-use crate::bridge::{dispatch::dispatch_response_action, RuntimeFetcher};
+use crate::bridge::{
+    dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher, RuntimeProcessor,
+};
 use futures::{stream, stream::StreamExt};
-use subxt::{utils::H256, OnlineClient, SubstrateConfig};
+use log::error;
+use subxt::{
+    blocks::Extrinsics,
+    events::Events,
+    tx::{TxInBlock, TxProgress, TxStatus},
+    utils::H256,
+    OnlineClient, SubstrateConfig,
+};
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
 use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
-use suno_primitives::{tx::payload_from_bytes, AccountKey, Response};
+use suno_primitives::{AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
 const CONCURRENT_REQUESTS: usize = 3;
@@ -726,7 +735,9 @@ pub fn spawn_sign_and_submit(
     let _ = tx.send(Action::Transaction(TxAction::Processing));
 
     tokio::spawn(async move {
-        let result = sign_and_submit_call_data(&api, &signer, call_data).await;
+        let result = runtime
+            .sign_and_submit_call_data(&api, &signer, call_data)
+            .await;
         match result {
             Ok(response) => {
                 if let Err(e) = dispatch_response_action(response, runtime, &tx) {
@@ -746,18 +757,180 @@ pub fn spawn_sign_and_submit(
     });
 }
 
-async fn sign_and_submit_call_data(
+// ----
+// Processor tasks
+// ----
+pub fn spawn_process_transaction_progress(
+    runtime: SupportedRuntime,
+    progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) {
+    let mut progress = progress;
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = process_transaction_progress(runtime, &mut progress, &tx).await {
+            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                "Transaction error: {}",
+                e
+            ))));
+        }
+    });
+}
+
+async fn process_transaction_progress(
+    runtime: SupportedRuntime,
+    progress: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    while let Some(status) = progress.next().await {
+        let response = match status.boxed()? {
+            TxStatus::Validated => Response::TxValidated,
+            TxStatus::Broadcasted => Response::TxBroadcasted,
+            TxStatus::NoLongerInBestBlock => Response::TxNoLongerInBestBlock,
+            TxStatus::InBestBlock(in_block) => {
+                let block_hash = in_block.block_hash();
+                Response::TxInBestBlock(block_hash)
+            }
+            TxStatus::InFinalizedBlock(in_block) => {
+                let block_hash = in_block.block_hash();
+                spawn_process_transaction_wait_for_success(runtime, in_block, &tx);
+                Response::TxInFinalizedBlock(block_hash)
+            }
+            TxStatus::Error { message } => Response::TxError(message),
+            TxStatus::Invalid { message } => Response::TxError(message),
+            TxStatus::Dropped { message } => Response::TxError(message),
+        };
+        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                "Dispatch error: {}",
+                e
+            ))));
+        }
+    }
+    Ok(())
+}
+
+fn spawn_process_transaction_wait_for_success(
+    runtime: SupportedRuntime,
+    in_block: TxInBlock<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) {
+    let mut in_block = in_block;
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = process_transaction_wait_for_success(runtime, &mut in_block, &tx).await {
+            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                "Transaction wait error: {}",
+                e
+            ))));
+        }
+    });
+}
+
+async fn process_transaction_wait_for_success(
+    runtime: SupportedRuntime,
+    in_block: &mut TxInBlock<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    tx: &UnboundedSender<Action>,
+) -> Result<(), Error> {
+    match in_block.wait_for_success().await {
+        Ok(events) => {
+            let result = runtime.process_transaction_events(events);
+
+            match result {
+                Ok(responses) => {
+                    for response in responses {
+                        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Dispatch error: {}",
+                                e
+                            ))));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Process transaction error: {}",
+                        e
+                    ))));
+                }
+            }
+        }
+        Err(e) => {
+            error!("Transaction failed: {:?}", e);
+            let _ = tx.send(Action::Transaction(TxAction::Error(
+                "transaction failed".to_string(),
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub fn spawn_process_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
-    proxy_signer: &Keypair,
-    call_data: Vec<u8>,
-) -> Result<Response, Error> {
-    let payload = payload_from_bytes(call_data);
+    block_hash: H256,
+    events: Events<SubstrateConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let tx = tx.clone();
 
-    let response = api
-        .tx()
-        .sign_and_submit_then_watch_default(&payload, proxy_signer)
-        .await
-        .boxed()?;
+    tokio::spawn(async move {
+        let result = runtime
+            .process_runtime_events(&api, block_hash, events)
+            .await;
+        match result {
+            Ok(responses) => {
+                for response in responses {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                    "Fetch error: {}",
+                    e
+                ))));
+            }
+        }
+    });
+}
 
-    Ok(Response::transaction_progress(response))
+pub fn spawn_process_block_extrinsics(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let tx = tx.clone();
+
+    tokio::spawn(async move {
+        let result = runtime
+            .process_block_extrinsics(&api, block_hash, extrinsics)
+            .await;
+        match result {
+            Ok(responses) => {
+                for response in responses {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                    "Fetch error: {}",
+                    e
+                ))));
+            }
+        }
+    });
 }
