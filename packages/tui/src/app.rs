@@ -24,7 +24,7 @@ use suno_actions::{
     ValidatorAction,
 };
 use suno_config::{SupportedRuntime, CONFIG};
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::display::to_compact_string;
 use suno_signer::get_address_from_json_file;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -142,7 +142,7 @@ impl App {
             Event::Resize(_, _) => Action::System(SystemAction::Noop),
             // _ => Action::System(SystemAction::Noop),
         };
-        self.tx.send(action.clone())?;
+        self.tx.send(action.clone()).boxed()?;
         Ok(())
     }
 

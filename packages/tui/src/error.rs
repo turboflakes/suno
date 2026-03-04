@@ -8,8 +8,7 @@ pub enum TuiError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Send error: {0}")]
-    // Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
-    Send(#[from] tokio::sync::mpsc::error::SendError<Action>),
+    Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
     #[error("Logger error: {0}")]
     TuiLogger(#[from] tui_logger::TuiLoggerError),
     #[error("Other error: {0}")]

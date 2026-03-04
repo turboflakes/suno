@@ -793,14 +793,14 @@ async fn process_transaction_progress(
             }
             TxStatus::InFinalizedBlock(in_block) => {
                 let block_hash = in_block.block_hash();
-                spawn_process_transaction_wait_for_success(runtime, in_block, &tx);
+                spawn_process_transaction_wait_for_success(runtime, in_block, tx);
                 Response::TxInFinalizedBlock(block_hash)
             }
             TxStatus::Error { message } => Response::TxError(message),
             TxStatus::Invalid { message } => Response::TxError(message),
             TxStatus::Dropped { message } => Response::TxError(message),
         };
-        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+        if let Err(e) = dispatch_response_action(response, runtime, tx) {
             let _ = tx.send(Action::System(SystemAction::Error(format!(
                 "Dispatch error: {}",
                 e
@@ -839,7 +839,7 @@ async fn process_transaction_wait_for_success(
             match result {
                 Ok(responses) => {
                     for response in responses {
-                        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                        if let Err(e) = dispatch_response_action(response, runtime, tx) {
                             let _ = tx.send(Action::System(SystemAction::Error(format!(
                                 "Dispatch error: {}",
                                 e
