@@ -727,7 +727,7 @@ pub fn spawn_fetch_validators_proxy_status(
     tx: &UnboundedSender<Action>,
 ) {
     let validator_keys = validator_keys.to_vec();
-    let proxy = proxy.clone();
+    let proxy = *proxy;
     let api = api.clone();
     let tx = tx.clone();
 
