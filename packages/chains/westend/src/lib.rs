@@ -6,7 +6,7 @@ pub use blocks::{process_block_extrinsics, process_runtime_events, process_trans
 pub use extrinsics::wrap_call_into_proxy;
 pub use storage::{
     fetch_epoch_data, fetch_validator_next_keys, fetch_validator_points,
-    fetch_validators_authority_status, fetch_validators_queued_keys,validate_proxy_account
+    fetch_validators_authority_status, fetch_validators_queued_keys, validate_proxy_account,
 };
 
 #[subxt::subxt(

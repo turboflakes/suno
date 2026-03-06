@@ -1,13 +1,13 @@
 use crate::constants::fetch_sessions_per_era;
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
+    asset_hub_paseo_runtime::ProxyType,
     bounded_collections::bounded_vec::BoundedVec,
     pallet_proxy::ProxyDefinition,
     pallet_staking_async::{
         ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, RewardDestination,
         ValidatorPrefs,
     },
-    asset_hub_paseo_runtime::ProxyType,
     sp_staking::PagedExposureMetadata,
 };
 use sp_arithmetic::{Perbill, Permill};

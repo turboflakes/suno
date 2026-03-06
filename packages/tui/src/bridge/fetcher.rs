@@ -594,24 +594,28 @@ impl RuntimeFetcher for Runtime {
     ) -> Result<Response, Error> {
         match self {
             Runtime::Polkadot => {
-                suno_polkadot::validate_proxy_account(api, block_hash, stash,proxy).await
+                suno_polkadot::validate_proxy_account(api, block_hash, stash, proxy).await
             }
-            Runtime::Kusama => suno_kusama::validate_proxy_account(api, block_hash, stash,proxy).await,
-            Runtime::Paseo => suno_paseo::validate_proxy_account(api, block_hash, stash, proxy).await,
+            Runtime::Kusama => {
+                suno_kusama::validate_proxy_account(api, block_hash, stash, proxy).await
+            }
+            Runtime::Paseo => {
+                suno_paseo::validate_proxy_account(api, block_hash, stash, proxy).await
+            }
             Runtime::Westend => {
                 suno_westend::validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::AssetHubPolkadot => {
-                suno_asset_hub_polkadot::validate_proxy_account(api, block_hash, stash,proxy).await
+                suno_asset_hub_polkadot::validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::AssetHubKusama => {
-                suno_asset_hub_kusama::validate_proxy_account(api, block_hash, stash,proxy).await
+                suno_asset_hub_kusama::validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::AssetHubPaseo => {
-                suno_asset_hub_paseo::validate_proxy_account(api, block_hash, stash,proxy).await
+                suno_asset_hub_paseo::validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::AssetHubWestend => {
-                suno_asset_hub_westend::validate_proxy_account(api, block_hash, stash,proxy).await
+                suno_asset_hub_westend::validate_proxy_account(api, block_hash, stash, proxy).await
             }
 
             _ => Err(Error::UnsupportedRuntime(*self)),
