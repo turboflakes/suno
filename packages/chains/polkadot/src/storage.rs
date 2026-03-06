@@ -2,11 +2,11 @@ use super::node_runtime;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
-        polkadot_runtime::SessionKeys,
         polkadot_primitives::v8::ValidatorIndex,
         polkadot_primitives::v8::{
             assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
         },
+        polkadot_runtime::SessionKeys,
         sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
         sp_consensus_babe::app::Public as BabePublic,
         sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,

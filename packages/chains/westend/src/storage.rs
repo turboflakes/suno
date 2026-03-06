@@ -2,7 +2,6 @@ use super::node_runtime;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
-        westend_runtime::SessionKeys,
         polkadot_primitives::v9::ValidatorIndex,
         polkadot_primitives::v9::{
             assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
@@ -11,6 +10,7 @@ use crate::{
         sp_consensus_babe::app::Public as BabePublic,
         sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
         sp_consensus_grandpa::app::Public as GrandpaPublic,
+        westend_runtime::SessionKeys,
     },
 };
 use std::collections::{HashMap, HashSet};
