@@ -194,7 +194,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let mut legend = vec![];
 
     // show how to open popup with extrinsics/commands
-    if app.validators.is_active() && !app.popup.is_visible() {
+    if app.validators.is_active() && app.validators.is_proxy_valid() && !app.popup.is_visible() {
         legend.push(Span::styled("ctrl+e".to_string(), THEME.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled(

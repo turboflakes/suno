@@ -439,6 +439,14 @@ impl ValidatorsListWidget {
         state.get_selected()
     }
 
+    pub fn is_proxy_valid(&self) -> bool {
+        let state = self.state.read().unwrap();
+        if let Some(v) = state.get_selected() {
+            return v.is_proxy_valid();
+        }
+        false
+    }
+
     pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         let state = self.state.read().unwrap();
         state.get_keys_by_runtime(runtime.relay_chain())

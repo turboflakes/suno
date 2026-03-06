@@ -743,6 +743,10 @@ impl App {
         }
 
         if self.section == Section::Validators {
+            if !self.validators.is_proxy_valid() {
+                return;
+            }
+
             let Some(validator) = self.validators.get_selected() else {
                 return;
             };
