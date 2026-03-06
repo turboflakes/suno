@@ -8,10 +8,14 @@ pub fn format_millis(millis: u64) -> String {
     let seconds = millis / 1000;
 
     match seconds {
-        s if s < 10 => {
-            let seconds_f = millis as f64 / 1000.0;
-            format!("{:.1}s", seconds_f)
-        }
+        // NOTE: Displaying milliseconds is not really needed
+        // and doesn't bring any additional value.
+        // Is left here commented for completeness.
+        //
+        // s if s < 10 => {
+        //     let seconds_f = millis as f64 / 1000.0;
+        //     format!("{:.1}s", seconds_f)
+        // }
         s if s < 60 => format!("{}s", s),
         s if s < 3600 => format!("{} mins", s / 60),
         s => {

@@ -6,12 +6,16 @@ use node_runtime::runtime_types::{
     pallet_staking_async::{pallet::pallet::Call as StakingCall, RewardDestination},
     sp_arithmetic::per_things::Perbill,
 };
-use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
+    utils::AccountId32,
+    SubstrateConfig,
+};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{staking::Payee, tx::Bytes};
 
 pub fn wrap_call_into_proxy(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {

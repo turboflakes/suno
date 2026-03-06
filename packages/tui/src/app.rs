@@ -1,5 +1,4 @@
 use crate::bridge::{sync, RuntimeCaller};
-use crate::call::Call;
 use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
@@ -25,7 +24,7 @@ use suno_actions::{
 };
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
-use suno_primitives::display::to_compact_string;
+use suno_primitives::{call::Call, display::to_compact_string};
 use suno_signer::get_address_from_json_file;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -186,6 +185,23 @@ impl App {
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
+            PopupAction::ConfirmAndSign(
+                runtime,
+                spec_version,
+                proxy_identity,
+                stash_identity,
+                call,
+                bytes,
+            ) => {
+                self.confirm_and_sign_popup(
+                    runtime,
+                    spec_version,
+                    proxy_identity,
+                    stash_identity,
+                    call,
+                    bytes,
+                );
+            }
             PopupAction::Close => self.close_popup(),
             PopupAction::Cancel => self.cancel(),
         }
@@ -706,6 +722,32 @@ impl App {
         };
     }
 
+    /// Open confirm and sign popup
+    pub fn confirm_and_sign_popup(
+        &mut self,
+        runtime: SupportedRuntime,
+        spec_version: u32,
+        proxy_identity: String,
+        stash_identity: String,
+        call: Call,
+        bytes: Vec<u8>,
+    ) {
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        self.popup.init_confirm_and_sign(
+            runtime,
+            spec_version,
+            proxy_identity,
+            stash_identity,
+            call,
+            bytes,
+        );
+        // Dispatch focus to the input field
+        let _ = self.tx.send(Action::Input(InputAction::Editing));
+    }
+
     /// Close menu popup
     pub fn close_popup(&mut self) {
         if !self.popup.is_visible() {
@@ -741,8 +783,8 @@ impl App {
                     let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                         return;
                     };
-                    let api = chain.client();
-                    let spec_version = api.runtime_version().spec_version;
+                    let api = chain.client().clone();
+                    let tx = self.tx.clone();
                     let stash = validator.key().stash();
                     let stash_identity = validator.display_name(3);
                     let proxy_identity = match get_address_from_json_file() {
@@ -752,21 +794,51 @@ impl App {
                             return;
                         }
                     };
-                    match runtime.build_call_data(api, &stash, call.clone()) {
-                        Ok(bytes) => {
-                            self.popup.init_confirm_and_sign(
-                                runtime,
-                                spec_version,
-                                proxy_identity,
-                                stash_identity,
-                                call,
-                                bytes,
-                            );
-                            // Dispatch focus to the input field
-                            let _ = self.tx.send(Action::Input(InputAction::Editing));
+
+                    tokio::spawn(async move {
+                        let at_block = match api.at_current_block().await.boxed() {
+                            Ok(client) => client,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to client at_current_block: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+                        let spec_version = at_block.spec_version();
+
+                        match runtime.build_call_data(&at_block, &stash, call.clone()) {
+                            Ok(bytes) => {
+                                let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(
+                                    runtime,
+                                    spec_version,
+                                    proxy_identity,
+                                    stash_identity,
+                                    call,
+                                    bytes,
+                                )));
+                                // let bytes = bytes.to_vec();
+                                // self.popup.init_confirm_and_sign(
+                                //     runtime,
+                                //     spec_version,
+                                //     proxy_identity,
+                                //     stash_identity,
+                                //     call,
+                                //     bytes,
+                                // );
+                                // // Dispatch focus to the input field
+                                // let _ = tx.send(Action::Input(InputAction::Editing));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to build_call_data: {}",
+                                    e
+                                ))));
+                                return;
+                            }
                         }
-                        Err(err) => self.error(err),
-                    }
+                    });
                 }
                 PopupMode::Confirm => {
                     let Some(call) = self.popup.get_selected_call() else {

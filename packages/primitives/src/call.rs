@@ -1,12 +1,10 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
+use crate::session::{Keys, KeysError};
+use crate::staking::{Payee, PayeeError};
 use serde::Serialize;
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
-use suno_primitives::{
-    session::{Keys, KeysError},
-    staking::{Payee, PayeeError},
-};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

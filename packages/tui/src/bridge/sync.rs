@@ -4,9 +4,10 @@ use crate::bridge::{
 use futures::{stream, stream::StreamExt};
 use log::error;
 use subxt::{
-    blocks::Extrinsics,
+    client::OnlineClientAtBlockImpl,
     events::Events,
-    tx::{TxInBlock, TxProgress, TxStatus},
+    extrinsics::Extrinsics,
+    tx::{TransactionInBlock, TransactionProgress, TransactionStatus},
     utils::H256,
     OnlineClient, SubstrateConfig,
 };
@@ -762,7 +763,7 @@ pub fn spawn_sign_and_submit(
 // ----
 pub fn spawn_process_transaction_progress(
     runtime: SupportedRuntime,
-    progress: TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    progress: TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let mut progress = progress;
@@ -779,26 +780,26 @@ pub fn spawn_process_transaction_progress(
 
 async fn process_transaction_progress(
     runtime: SupportedRuntime,
-    progress: &mut TxProgress<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    progress: &mut TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     while let Some(status) = progress.next().await {
         let response = match status.boxed()? {
-            TxStatus::Validated => Response::TxValidated,
-            TxStatus::Broadcasted => Response::TxBroadcasted,
-            TxStatus::NoLongerInBestBlock => Response::TxNoLongerInBestBlock,
-            TxStatus::InBestBlock(in_block) => {
+            TransactionStatus::Validated => Response::TxValidated,
+            TransactionStatus::Broadcasted => Response::TxBroadcasted,
+            TransactionStatus::NoLongerInBestBlock => Response::TxNoLongerInBestBlock,
+            TransactionStatus::InBestBlock(in_block) => {
                 let block_hash = in_block.block_hash();
                 Response::TxInBestBlock(block_hash)
             }
-            TxStatus::InFinalizedBlock(in_block) => {
+            TransactionStatus::InFinalizedBlock(in_block) => {
                 let block_hash = in_block.block_hash();
                 spawn_process_transaction_wait_for_success(runtime, in_block, tx);
                 Response::TxInFinalizedBlock(block_hash)
             }
-            TxStatus::Error { message } => Response::TxError(message),
-            TxStatus::Invalid { message } => Response::TxError(message),
-            TxStatus::Dropped { message } => Response::TxError(message),
+            TransactionStatus::Error { message } => Response::TxError(message),
+            TransactionStatus::Invalid { message } => Response::TxError(message),
+            TransactionStatus::Dropped { message } => Response::TxError(message),
         };
         if let Err(e) = dispatch_response_action(response, runtime, tx) {
             let _ = tx.send(Action::System(SystemAction::Error(format!(
@@ -812,7 +813,7 @@ async fn process_transaction_progress(
 
 fn spawn_process_transaction_wait_for_success(
     runtime: SupportedRuntime,
-    in_block: TxInBlock<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    in_block: TransactionInBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let mut in_block = in_block;
@@ -829,7 +830,7 @@ fn spawn_process_transaction_wait_for_success(
 
 async fn process_transaction_wait_for_success(
     runtime: SupportedRuntime,
-    in_block: &mut TxInBlock<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    in_block: &mut TransactionInBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     match in_block.wait_for_success().await {
@@ -903,11 +904,12 @@ pub fn spawn_process_runtime_events(
 pub fn spawn_process_block_extrinsics(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
+    let extrinsics = extrinsics.into_owned();
     let tx = tx.clone();
 
     tokio::spawn(async move {

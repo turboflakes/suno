@@ -147,14 +147,13 @@ impl Chain {
     pub async fn validate_genesis(&mut self) -> Result<(), Error> {
         let api = self.client();
         let state_root = self.runtime.chain_state_root_hash();
-        let hash = api.genesis_hash();
+        let at_block = api.at_block(0_u32).await.boxed()?;
+        let genesis_header = at_block.block_header().await.boxed()?;
 
-        if let Some(header) = api.backend().block_header(hash).await.boxed()? {
-            if header.state_root != state_root {
-                let err = Error::Genesis;
-                self.set_state(ConnectionState::Error(err.to_string()));
-                return Err(err);
-            }
+        if genesis_header.state_root != state_root {
+            let err = Error::Genesis;
+            self.set_state(ConnectionState::Error(err.to_string()));
+            return Err(err);
         }
 
         self.set_state(ConnectionState::Validated);

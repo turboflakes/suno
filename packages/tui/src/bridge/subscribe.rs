@@ -1,6 +1,6 @@
 use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_events};
 use crate::widgets::chains::Chain;
-use log::{error, info, warn};
+use log::error;
 use suno_actions::{network::ConnectionState, Action, ChainAction};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -9,7 +9,7 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
     let api = chain.client().clone();
     let runtime = chain.runtime();
     tokio::spawn(async move {
-        match api.blocks().subscribe_best().await {
+        match api.stream_best_blocks().await {
             Ok(mut blocks_sub) => {
                 while let Some(result) = blocks_sub.next().await {
                     match result {
@@ -20,14 +20,15 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             )));
                         }
                         Err(e) => {
-                            if e.is_disconnected_will_reconnect() {
-                                warn!("Lost connection to {} reconnecting...", runtime);
-                                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                                    runtime,
-                                    ConnectionState::Reconnecting,
-                                )));
-                                continue;
-                            }
+                            // TODO: handle disconnection
+                            // if e.is_disconnected_will_reconnect() {
+                            //     warn!("Lost connection to {} reconnecting...", runtime);
+                            //     let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                            //         runtime,
+                            //         ConnectionState::Reconnecting,
+                            //     )));
+                            //     continue;
+                            // }
                             error!("subscribe_best result error: {}", e);
                         }
                     }
@@ -45,7 +46,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
     let api = chain.client().clone();
     let runtime = chain.runtime();
     tokio::spawn(async move {
-        match api.blocks().subscribe_finalized().await {
+        match api.stream_blocks().await {
             Ok(mut blocks_sub) => {
                 while let Some(result) = blocks_sub.next().await {
                     match result {
@@ -63,8 +64,16 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 ConnectionState::Connected,
                             )));
 
+                            let at_block = match block.at().await {
+                                Ok(at_block) => at_block,
+                                Err(e) => {
+                                    error!("Failed to instantiate a client at this block: {}", e);
+                                    continue; // Skip this block and continue with the next one
+                                }
+                            };
+
                             // Fetch block events
-                            let events = match block.events().await {
+                            let events = match at_block.events().fetch().await {
                                 Ok(events) => events,
                                 Err(e) => {
                                     error!("Failed to fetch block events: {}", e);
@@ -76,7 +85,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             spawn_process_runtime_events(&api, block.hash(), events, runtime, &tx);
 
                             // Fetch block extrinsics
-                            let extrinsics = match block.extrinsics().await {
+                            let extrinsics = match at_block.extrinsics().fetch().await {
                                 Ok(events) => events,
                                 Err(e) => {
                                     error!("Failed to fetch block extrinsics: {}", e);
@@ -94,14 +103,15 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             );
                         }
                         Err(e) => {
-                            if e.is_disconnected_will_reconnect() {
-                                info!("Lost connection to {} reconnecting...", runtime.clone());
-                                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                                    runtime,
-                                    ConnectionState::Reconnecting,
-                                )));
-                                continue;
-                            }
+                            // TODO: handle disconnection
+                            // if e.is_disconnected_will_reconnect() {
+                            //     info!("Lost connection to {} reconnecting...", runtime.clone());
+                            //     let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                            //         runtime,
+                            //         ConnectionState::Reconnecting,
+                            //     )));
+                            //     continue;
+                            // }
                             error!("subscribe_finalized result error: {}", e);
                         }
                     }

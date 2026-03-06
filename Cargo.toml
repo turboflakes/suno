@@ -44,6 +44,8 @@ lazy_static = "1.5"
 log = "0.4"
 ratatui = "0.29.0"
 regex = "1.11"
+scale-encode = "0.10.1"
+scale-info = "2.11.6"
 secrecy = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.68"
@@ -51,15 +53,15 @@ serde_yaml = "0.9"
 sp-arithmetic = "28.0.0"
 sp-core = "39.0.0"
 strum = { version = "0.26.3", features = ["derive"] }
-# subxt = { version = "0.44.2", features = ["reconnecting-rpc-client"] }
-# subxt-signer = { version = "0.44.2", features = ["subxt", "polkadot-js-compat"] }
-# subxt-rpcs = { version = "0.44.2", features = ["subxt"] }
+# subxt = { version = "0.50.0", features = ["reconnecting-rpc-client"] }
+# subxt-signer = { version = "0.50.0", features = ["polkadot-js-compat"] }
+# subxt-rpcs = { version = "0.50.0" }
 # subxt = { git = "https://github.com/paritytech/subxt", features = ["reconnecting-rpc-client"] }
 # subxt-signer = { git = "https://github.com/paritytech/subxt", package = "subxt-signer", features = ["subxt", "polkadot-js-compat"] }
 # subxt-rpcs = { git = "https://github.com/paritytech/subxt", package = "subxt-rpcs", features = ["subxt"] }
-subxt = { git = "https://github.com/turboflakes/subxt", branch = "fix-storage-fetch", features = ["reconnecting-rpc-client"] }
-subxt-signer = { git = "https://github.com/turboflakes/subxt", package = "subxt-signer", branch = "fix-storage-fetch", features = ["subxt", "polkadot-js-compat"] }
-subxt-rpcs = { git = "https://github.com/turboflakes/subxt", package = "subxt-rpcs",branch = "fix-storage-fetch", features = ["subxt"] }
+subxt = { git = "https://github.com/turboflakes/subxt", branch = "pm-fix-latest", features = ["reconnecting-rpc-client"] }
+subxt-signer = { git = "https://github.com/turboflakes/subxt", package = "subxt-signer", branch = "pm-fix-latest", features = ["subxt", "polkadot-js-compat"] }
+subxt-rpcs = { git = "https://github.com/turboflakes/subxt", package = "subxt-rpcs",branch = "pm-fix-latest" }
 tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }

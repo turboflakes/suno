@@ -1,12 +1,17 @@
 use suno_actions::Action;
 use suno_config::SupportedRuntime;
+use suno_primitives::tx::Error as PayloadError;
 use suno_signer::error::Error as SignerError;
 
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("OnlineClient error: {0}")]
+    OnlineClient(#[from] Box<subxt::error::OnlineClientAtBlockError>),
     #[error("Backend error: {0}")]
     Backend(#[from] Box<subxt::error::BackendError>),
+    #[error("Block error: {0}")]
+    Block(#[from] Box<subxt::error::BlockError>),
     #[error("Events error: {0}")]
     Events(#[from] Box<subxt::error::EventsError>),
     #[error("Extrinsic error: {0}")]
@@ -18,13 +23,15 @@ pub enum Error {
     #[error("Storage error: {0}")]
     Storage(#[from] Box<subxt::error::StorageError>),
     #[error("Storage value error: {0}")]
-    StorageValue(#[from] Box<subxt::ext::subxt_core::error::StorageValueError>),
+    StorageValue(#[from] Box<subxt::error::StorageValueError>),
     #[error("Constant error: {0}")]
-    Constant(#[from] Box<subxt::ext::subxt_core::error::ConstantError>),
+    Constant(#[from] Box<subxt::error::ConstantError>),
     #[error("Send error: {0}")]
     Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
     #[error("Signer error: {0}")]
     Signer(#[from] SignerError),
+    #[error("Payload error: {0}")]
+    Payload(#[from] Box<PayloadError>),
     #[error("Genesis hash does not match the expected hash from the configured chain.")]
     Genesis,
     #[error("Unsupported call: {0}")]

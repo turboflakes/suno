@@ -1,19 +1,21 @@
 use crate::node_runtime::{self, runtime_types::pallet_staking_async::ValidatorPrefs};
 use node_runtime::runtime_types::{
-    asset_hub_westend_runtime::ProxyType, pallet_staking_async::RewardDestination,
+    asset_hub_westend_runtime::{ProxyType, RuntimeCall},
+    frame_system::pallet::Call as SystemCall,
+    pallet_proxy::pallet::Call as ProxyCall,
+    pallet_staking_async::{pallet::pallet::Call as StakingCall, RewardDestination},
     sp_arithmetic::per_things::Perbill,
 };
-use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
+    utils::AccountId32,
+    SubstrateConfig,
+};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{staking::Payee, tx::Bytes};
 
-type RuntimeCall = node_runtime::runtime_types::asset_hub_westend_runtime::RuntimeCall;
-type ProxyCall = node_runtime::runtime_types::pallet_proxy::pallet::Call;
-type SystemCall = node_runtime::runtime_types::frame_system::pallet::Call;
-type StakingCall = node_runtime::runtime_types::pallet_staking_async::pallet::pallet::Call;
-
 pub fn wrap_call_into_proxy(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {

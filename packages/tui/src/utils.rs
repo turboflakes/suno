@@ -1,11 +1,12 @@
 use log::{info, warn};
 use std::time::Duration;
-use subxt::{
-    backend::rpc::{
+use subxt::ext::jsonrpsee::ws_client::PingConfig;
+use subxt_rpcs::{
+    client::{
         reconnecting_rpc_client::{ExponentialBackoff, RpcClient as ReconnectingRpcClient},
         RpcClient,
     },
-    ext::{jsonrpsee::ws_client::PingConfig, subxt_rpcs::utils::validate_url_is_secure},
+    utils::validate_url_is_secure,
 };
 
 pub async fn _create_substrate_rpc_client_from_url(

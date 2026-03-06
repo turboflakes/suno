@@ -36,8 +36,9 @@ pub async fn fetch_validator_points(
         .staking_ah_client()
         .validator_points();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .fetch((stash.clone(),))
@@ -54,8 +55,8 @@ pub async fn fetch_epoch_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
-    let duration = fetch_epoch_duration(api)?;
-    let block_time = fetch_expected_block_time(api)?;
+    let duration = fetch_epoch_duration(api, block_hash).await?;
+    let block_time = fetch_expected_block_time(api, block_hash).await?;
     let (_, start) = fetch_epoch_start(api, block_hash).await?;
     let index = fetch_epoch_index(api, block_hash).await?;
 
@@ -112,7 +113,7 @@ pub async fn fetch_validators_queued_keys(
         let bytes: [u8; 32] = *stash.as_ref();
         if let Some(found) = validator_bytes.get_mut(&bytes) {
             *found = true;
-            let keys = map_keys(session_keys);
+            let keys = map_keys_from_session_keys(session_keys);
             responses.push(Response::validator_queued_keys(bytes, Some(keys)));
         }
     }
@@ -135,7 +136,7 @@ pub async fn fetch_validator_next_keys(
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
     if let Some(session_keys) = fetch_session_next_keys(api, block_hash, stash).await? {
-        let keys = map_keys(&session_keys);
+        let keys = map_keys_from_session_keys(&session_keys);
         return Ok(Response::validator_next_keys(account_bytes, Some(keys)));
     };
 
@@ -149,11 +150,12 @@ async fn fetch_epoch_index(
 ) -> Result<Index, Error> {
     let addr = node_runtime::storage().babe().epoch_index();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -169,11 +171,12 @@ async fn fetch_epoch_start(
 ) -> Result<(BlockNumber, BlockNumber), Error> {
     let addr = node_runtime::storage().babe().epoch_start();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -189,11 +192,12 @@ async fn fetch_session_validators(
 ) -> Result<Vec<AccountId32>, Error> {
     let addr = node_runtime::storage().session().validators();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -211,11 +215,12 @@ async fn fetch_active_validator_indices(
         .paras_shared()
         .active_validator_indices();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -232,8 +237,9 @@ async fn fetch_session_next_keys(
 ) -> Result<Option<SessionKeys>, Error> {
     let addr = node_runtime::storage().session().next_keys();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .try_fetch((stash.clone(),))
@@ -253,11 +259,12 @@ async fn fetch_session_queued_keys(
 ) -> Result<Vec<(AccountId32, SessionKeys)>, Error> {
     let addr = node_runtime::storage().session().queued_keys();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -267,7 +274,7 @@ async fn fetch_session_queued_keys(
 }
 
 // Helper function to map SessionKeys to Keys
-pub fn map_keys(session_keys: &SessionKeys) -> Keys {
+pub fn map_keys_from_session_keys(session_keys: &SessionKeys) -> Keys {
     let GrandpaPublic(grandpa) = session_keys.grandpa;
     let BabePublic(babe) = session_keys.babe;
     let ValidatorPublic(para) = session_keys.para_validator;

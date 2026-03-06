@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use subxt::{
-    blocks::{ExtrinsicEvents, Extrinsics},
+    client::OnlineClientAtBlockImpl,
     events::Events,
+    extrinsics::{ExtrinsicEvents, Extrinsics},
     utils::H256,
     OnlineClient, SubstrateConfig,
 };
@@ -27,7 +28,7 @@ pub trait RuntimeProcessor {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
-        extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+        extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     ) -> Result<Vec<Response>, Error>;
 }
 
@@ -85,7 +86,7 @@ impl RuntimeProcessor for Runtime {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
-        extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+        extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
             Runtime::Polkadot => {

@@ -12,12 +12,18 @@ use node_runtime::runtime_types::{
     sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
     sp_consensus_grandpa::app::Public as GrandpaPublic,
 };
-use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
+    utils::AccountId32,
+    SubstrateConfig,
+};
 use suno_error::{Error, ResultExt};
-use suno_primitives::{session::Keys, tx::Bytes};
+use suno_primitives::session::Keys;
+
+type Bytes = Vec<u8>;
 
 pub fn wrap_call_into_proxy(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {

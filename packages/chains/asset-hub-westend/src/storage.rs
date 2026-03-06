@@ -120,7 +120,7 @@ pub async fn fetch_era_data(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
-    let sessions_per_era = fetch_sessions_per_era(api)?;
+    let sessions_per_era = fetch_sessions_per_era(api, block_hash).await?;
     let era_info = fetch_active_era_info(api, block_hash).await?;
     let BoundedVec(bonded_eras) = fetch_bonded_eras(api, block_hash).await?;
     let start_session: u64 = bonded_eras
@@ -146,8 +146,14 @@ pub async fn fetch_active_nominators_count(
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
     let mut validators_set = HashSet::<[u8; 32]>::new();
-    let api_at = api.storage().at(block_hash);
-    let mut iter = api_at.entry(addr).boxed()?.iter((era,)).await.boxed()?;
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let mut iter = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .iter((era,))
+        .await
+        .boxed()?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         let account_id = get_account_bytes_from_storage_key(storage_kv.key_bytes());
         validators_set.insert(account_id);
@@ -155,8 +161,14 @@ pub async fn fetch_active_nominators_count(
 
     let mut nominators_count = 0u32;
     let addr = node_runtime::storage().staking().nominators();
-    let api_at = api.storage().at(block_hash);
-    let mut iter = api_at.entry(addr).boxed()?.iter(()).await.boxed()?;
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let mut iter = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .iter(())
+        .await
+        .boxed()?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         // Check if any of the nominator's targets is in the validators_set
         let nominations = storage_kv.value().decode().boxed()?;
@@ -181,8 +193,14 @@ pub async fn fetch_active_validators_count(
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    let api_at = api.storage().at(block_hash);
-    let iter = api_at.entry(addr).boxed()?.iter((era,)).await.boxed()?;
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let iter = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .iter((era,))
+        .await
+        .boxed()?;
     let count = iter.count().await;
 
     Ok(Response::active_validators(count as u32))
@@ -195,11 +213,12 @@ pub async fn fetch_total_validators_count(
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_validators();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -215,11 +234,12 @@ pub async fn fetch_total_nominators_count(
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_nominators();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -284,11 +304,12 @@ async fn fetch_bonded_eras(
 ) -> Result<BoundedVec<(u32, u32)>, Error> {
     let addr = node_runtime::storage().staking().bonded_eras();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -305,8 +326,9 @@ async fn fetch_eras_total_stake(
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().staking().eras_total_stake();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .fetch((era,))
@@ -325,11 +347,12 @@ async fn fetch_total_issuance(
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().total_issuance();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -345,11 +368,12 @@ async fn fetch_inactive_issuance(
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().inactive_issuance();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -366,8 +390,9 @@ async fn fetch_validators(
 ) -> Result<ValidatorPrefs, Error> {
     let addr = node_runtime::storage().staking().validators();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .fetch((stash.clone(),))
@@ -388,8 +413,9 @@ async fn fetch_eras_validator_prefs(
 ) -> Result<Option<ValidatorPrefs>, Error> {
     let addr = node_runtime::storage().staking().eras_validator_prefs();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .try_fetch((era, stash.clone()))
@@ -410,8 +436,9 @@ async fn fetch_staking_ledger(
 ) -> Result<Option<StakingLedger>, Error> {
     let addr = node_runtime::storage().staking().ledger();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .try_fetch((stash.clone(),))
@@ -431,11 +458,12 @@ pub async fn fetch_active_era_info(
 ) -> Result<ActiveEraInfo, Error> {
     let addr = node_runtime::storage().staking().active_era();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
-        .fetch()
+        .fetch(())
         .await
         .boxed()?
         .decode()
@@ -452,8 +480,9 @@ async fn fetch_era_reward_points(
 ) -> Result<Option<EraRewardPoints>, Error> {
     let addr = node_runtime::storage().staking().eras_reward_points();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .try_fetch((era,))
@@ -475,8 +504,9 @@ async fn fetch_eras_stakers_overview(
 ) -> Result<Option<PagedExposureMetadata<u128>>, Error> {
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .try_fetch((era, stash.clone()))
@@ -497,8 +527,9 @@ async fn _fetch_nominators(
 ) -> Result<Nominations, Error> {
     let addr = node_runtime::storage().staking().nominators();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .fetch((stash.clone(),))
@@ -518,8 +549,9 @@ pub async fn fetch_payee(
 ) -> Result<RewardDestination<AccountId32>, Error> {
     let addr = node_runtime::storage().staking().payee();
 
-    let api_at = api.storage().at(block_hash);
+    let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at
+        .storage()
         .entry(addr)
         .boxed()?
         .fetch((stash.clone(),))

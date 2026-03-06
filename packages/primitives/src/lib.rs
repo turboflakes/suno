@@ -1,5 +1,7 @@
 pub mod babe;
+pub mod call;
 pub mod display;
+pub mod entry;
 pub mod identity;
 pub mod key;
 pub mod node_account;

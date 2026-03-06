@@ -1657,6 +1657,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
 name = "form_urlencoded"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1667,16 +1673,18 @@ dependencies = [
 
 [[package]]
 name = "frame-decode"
-version = "0.15.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fb3bfa2988ef40247e0e0eecfb171a01ad6f4e399485503aad4c413a5f236f3"
+checksum = "42ea4168fb6383e5abb84b5316804cb463ba2d6c9fa89981792e2b88c209192a"
 dependencies = [
  "frame-metadata",
  "parity-scale-codec",
  "scale-decode",
  "scale-encode",
  "scale-info",
+ "scale-info-legacy",
  "scale-type-resolver",
+ "serde_yaml",
  "sp-crypto-hashing",
  "thiserror 2.0.18",
 ]
@@ -1941,7 +1949,7 @@ checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "allocator-api2",
  "equivalent",
- "foldhash",
+ "foldhash 0.1.5",
  "serde",
 ]
 
@@ -1950,6 +1958,13 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "heck"
@@ -3520,6 +3535,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "scale-info-legacy"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d972ce93a4f81efc40fce251e992faf99ecb090c02bcbd3614e213991038c181"
+dependencies = [
+ "hashbrown 0.16.1",
+ "scale-type-resolver",
+ "serde",
+ "smallstr",
+ "smallvec",
+ "thiserror 2.0.18",
+ "yap",
+]
+
+[[package]]
 name = "scale-type-resolver"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3912,6 +3942,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
+name = "smallstr"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "862077b1e764f04c251fe82a2ef562fd78d7cadaeb072ca7c2bcaf7217b1ff3b"
+dependencies = [
+ "smallvec",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4259,44 +4298,48 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subxt"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "async-trait",
  "derive-where",
  "either",
+ "frame-decode",
  "frame-metadata",
  "futures",
  "hex",
+ "impl-serde",
  "jsonrpsee",
+ "keccak-hash",
  "parity-scale-codec",
  "primitive-types",
  "scale-bits",
  "scale-decode",
  "scale-encode",
  "scale-info",
+ "scale-info-legacy",
+ "scale-type-resolver",
  "scale-value",
  "serde",
  "serde_json",
  "sp-crypto-hashing",
- "subxt-core",
  "subxt-lightclient",
  "subxt-macro",
  "subxt-metadata",
  "subxt-rpcs",
+ "subxt-utils-accountid32",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "tracing",
- "url",
  "wasm-bindgen-futures",
  "web-time",
 ]
 
 [[package]]
 name = "subxt-codegen"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "heck",
  "parity-scale-codec",
@@ -4310,38 +4353,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "subxt-core"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
-dependencies = [
- "base58",
- "blake2",
- "derive-where",
- "frame-decode",
- "frame-metadata",
- "hashbrown 0.14.5",
- "hex",
- "impl-serde",
- "keccak-hash",
- "parity-scale-codec",
- "primitive-types",
- "scale-bits",
- "scale-decode",
- "scale-encode",
- "scale-info",
- "scale-value",
- "serde",
- "serde_json",
- "sp-crypto-hashing",
- "subxt-metadata",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "subxt-lightclient"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "futures",
  "futures-util",
@@ -4356,8 +4370,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-macro"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "darling 0.20.11",
  "parity-scale-codec",
@@ -4372,22 +4386,24 @@ dependencies = [
 
 [[package]]
 name = "subxt-metadata"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "frame-decode",
  "frame-metadata",
  "hashbrown 0.14.5",
  "parity-scale-codec",
  "scale-info",
+ "scale-info-legacy",
+ "scale-type-resolver",
  "sp-crypto-hashing",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "subxt-rpcs"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "derive-where",
  "finito",
@@ -4400,7 +4416,6 @@ dependencies = [
  "primitive-types",
  "serde",
  "serde_json",
- "subxt-core",
  "subxt-lightclient",
  "thiserror 2.0.18",
  "tokio",
@@ -4411,8 +4426,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-signer"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "base64",
  "bip39",
@@ -4431,15 +4446,31 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sp-crypto-hashing",
- "subxt-core",
+ "subxt",
+ "subxt-utils-accountid32",
  "thiserror 2.0.18",
  "zeroize",
 ]
 
 [[package]]
+name = "subxt-utils-accountid32"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+dependencies = [
+ "base58",
+ "blake2",
+ "parity-scale-codec",
+ "scale-decode",
+ "scale-encode",
+ "scale-info",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "subxt-utils-fetchmetadata"
-version = "0.44.0"
-source = "git+https://github.com/turboflakes/subxt?branch=fix-storage-fetch#9f33723055652000fb534c938839e0936dfa6b81"
+version = "0.50.0"
+source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
 dependencies = [
  "hex",
  "parity-scale-codec",
@@ -4548,6 +4579,7 @@ dependencies = [
  "subxt",
  "suno-actions",
  "suno-config",
+ "suno-primitives",
  "suno-signer",
  "thiserror 2.0.18",
  "tokio",
@@ -4638,7 +4670,10 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "ratatui",
+ "scale-encode",
+ "scale-info",
  "serde",
+ "serde_json",
  "sp-arithmetic",
  "sp-core",
  "subxt",
@@ -4676,6 +4711,7 @@ dependencies = [
  "sp-arithmetic",
  "strum",
  "subxt",
+ "subxt-rpcs",
  "subxt-signer",
  "suno-actions",
  "suno-asset-hub-kusama",

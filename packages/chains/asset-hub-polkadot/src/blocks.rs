@@ -1,7 +1,7 @@
 use crate::{
     constants::fetch_bonding_duration,
     node_runtime::{
-        proxy::{calls::types::Proxy, events::ProxyExecuted},
+        proxy::{calls::Proxy, events::ProxyExecuted},
         runtime_types::{
             asset_hub_polkadot_runtime::RuntimeCall,
             pallet_staking_async::pallet::pallet::Call as StakingCall,
@@ -12,8 +12,9 @@ use crate::{
 };
 use sp_arithmetic::Perbill;
 use subxt::{
-    blocks::{ExtrinsicEvents, Extrinsics},
+    client::OnlineClientAtBlockImpl,
     events::Events,
+    extrinsics::{ExtrinsicEvents, Extrinsics},
     utils::{MultiAddress, H256},
     OnlineClient, SubstrateConfig,
 };
@@ -32,22 +33,26 @@ pub async fn process_runtime_events(
     for event in events.iter() {
         let event = event.boxed()?;
 
-        if let Some(_ev) = event.as_event::<EraPaid>().boxed()? {
+        if event.is::<EraPaid>() {
             let response = fetch_era_data(api, block_hash).await?;
             processed_events.push(response);
-        } else if let Some(ev) = event.as_event::<Bonded>().boxed()? {
+        } else if let Some(ev) = event.decode_fields_as::<Bonded>() {
+            let ev = ev.boxed()?;
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_bonded(account_bytes, ev.amount);
             processed_events.push(response);
-        } else if let Some(ev) = event.as_event::<Unbonded>().boxed()? {
+        } else if let Some(ev) = event.decode_fields_as::<Unbonded>() {
+            let ev = ev.boxed()?;
             let era_info = fetch_active_era_info(api, block_hash).await?;
-            let duration = fetch_bonding_duration(api)?;
+            let duration = fetch_bonding_duration(api, block_hash).await?;
             let chunk = Chunk::new(era_info.index + duration, ev.amount);
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_unbonded(account_bytes, chunk);
             processed_events.push(response);
-        } else if let Some(_ev) = event.as_event::<Chilled>().boxed()? {
-        } else if let Some(ev) = event.as_event::<ValidatorPrefsSet>().boxed()? {
+        } else if event.is::<Chilled>() {
+            // TODO
+        } else if let Some(ev) = event.decode_fields_as::<ValidatorPrefsSet>() {
+            let ev = ev.boxed()?;
             let account_bytes = *(ev.stash).as_ref();
             let prefs =
                 ValidatorPrefs::new(Perbill::from_parts(ev.prefs.commission.0), ev.prefs.blocked);
@@ -63,16 +68,16 @@ pub async fn process_runtime_events(
 pub async fn process_block_extrinsics(
     _api: &OnlineClient<SubstrateConfig>,
     _block_hash: H256,
-    extrinsics: Extrinsics<SubstrateConfig, OnlineClient<SubstrateConfig>>,
+    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_extrinsics: Vec<Response> = Vec::new();
     for ext in extrinsics.find::<Proxy>() {
         let ext = ext.boxed()?;
-        if let MultiAddress::Id(stash) = ext.value.real {
-            let call = ext.value.call;
+        if let MultiAddress::Id(stash) = ext.real {
+            let call = ext.call;
             if let RuntimeCall::Staking(StakingCall::set_payee { payee }) = call.as_ref() {
-                let account_bytes = *stash.as_ref();
                 let payee = map_payee_from_reward_destination(payee.clone());
+                let account_bytes = *stash.as_ref();
                 let res = Response::validator_payee(account_bytes, payee);
                 processed_extrinsics.push(res);
             }
@@ -88,7 +93,8 @@ pub fn process_transaction_events(
     for event in events.iter() {
         let event = event.boxed()?;
 
-        if let Some(ev) = event.as_event::<ProxyExecuted>().boxed()? {
+        if let Some(ev) = event.decode_fields_as::<ProxyExecuted>() {
+            let ev = ev.boxed()?;
             match ev.result {
                 Ok(_) => {
                     processed_events.push(Response::TxSuccess);

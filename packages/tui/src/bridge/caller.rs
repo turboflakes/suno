@@ -1,19 +1,26 @@
-use crate::call::Call;
 use async_trait::async_trait;
-use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
+    utils::AccountId32,
+    OnlineClient, SubstrateConfig,
+};
 use subxt_signer::sr25519::Keypair;
 use suno_config::Runtime;
 use suno_error::{Error, ResultExt};
-use suno_primitives::{tx::payload_from_bytes, Response};
+use suno_primitives::{
+    call::Call,
+    tx::{Bytes, RawPayload},
+    Response,
+};
 
 #[async_trait]
 pub trait RuntimeCaller {
     fn build_call_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
         stash: &AccountId32,
         call: Call,
-    ) -> Result<Vec<u8>, Error>;
+    ) -> Result<Bytes, Error>;
 
     async fn sign_and_submit_call_data(
         &self,
@@ -27,10 +34,10 @@ pub trait RuntimeCaller {
 impl RuntimeCaller for Runtime {
     fn build_call_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
         stash: &AccountId32,
         call: Call,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Bytes, Error> {
         match &self {
             Runtime::AssetHubPaseo => match call {
                 Call::Bond { amount, payee } => {
@@ -86,10 +93,11 @@ impl RuntimeCaller for Runtime {
         proxy_signer: &Keypair,
         call_data: Vec<u8>,
     ) -> Result<Response, Error> {
-        let payload = payload_from_bytes(call_data);
-
+        let payload = RawPayload::from_call_data(api, call_data).await.boxed()?;
         let response = api
             .tx()
+            .await
+            .boxed()?
             .sign_and_submit_then_watch_default(&payload, proxy_signer)
             .await
             .boxed()?;

@@ -2,22 +2,28 @@ use crate::node_runtime;
 use node_runtime::runtime_types::{
     pallet_proxy::pallet::Call as ProxyCall,
     pallet_session::pallet::Call as SessionCall,
+    polkadot_runtime::{RuntimeCall, SessionKeys},
+    polkadot_runtime_constants::proxy::ProxyType,
     polkadot_primitives::v8::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
     },
-    polkadot_runtime::{RuntimeCall, SessionKeys},
-    polkadot_runtime_constants::proxy::ProxyType,
     sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
     sp_consensus_babe::app::Public as BabePublic,
     sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
     sp_consensus_grandpa::app::Public as GrandpaPublic,
 };
-use subxt::{utils::AccountId32, OnlineClient, SubstrateConfig};
+use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
+    utils::AccountId32,
+    SubstrateConfig,
+};
 use suno_error::{Error, ResultExt};
-use suno_primitives::{session::Keys, tx::Bytes};
+use suno_primitives::session::Keys;
+
+type Bytes = Vec<u8>;
 
 pub fn wrap_call_into_proxy(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {

@@ -1,7 +1,3 @@
-use crate::call::Call;
-use crate::entry::{
-    AsBytes, Command, Entry, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder,
-};
 use crate::theme::THEME;
 use crate::widgets::{
     input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
@@ -20,7 +16,12 @@ use ratatui::{
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
 use suno_config::SupportedRuntime;
-use suno_primitives::{session::Keys, staking::Payee, tx::Bytes};
+use suno_primitives::{
+    call::Call,
+    entry::{Command, Entry, ToDescription},
+    session::Keys,
+    staking::Payee,
+};
 use unicode_width::UnicodeWidthStr;
 
 /// Popup modes.
@@ -85,11 +86,14 @@ impl ListState {
             Some((command, _)) => command,
         };
 
-        self.options
+        let out = self
+            .options
             .iter()
             .filter(|e| e.command().to_lowercase().starts_with(input_command))
             .cloned()
-            .collect()
+            .collect();
+
+        out
     }
 
     pub fn get_selected(&self) -> Option<Entry<Call>> {
@@ -99,7 +103,11 @@ impl ListState {
                 if options.is_empty() {
                     return None;
                 }
-                self.table_state.selected().map(|i| options[i].clone())
+                self.table_state.selected().and_then(|i| {
+                    // clamp: if the filter shrank the list, use the last item
+                    let i = i.min(options.len() - 1);
+                    options.get(i).cloned()
+                })
             }
             _ => self.table_state.selected().map(|i| self.options[i].clone()),
         }
@@ -207,7 +215,7 @@ impl PopupWidget {
         proxy_identity: String,
         stash_identity: String,
         call: Call,
-        bytes: Bytes,
+        bytes: Vec<u8>,
     ) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
@@ -444,7 +452,11 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .padding(Padding::symmetric(0, 1));
 
     let options = state.get_options_filtered();
-    let rows = options.iter().map(|e| e.to_row(state.mode.clone(), None));
+
+    let rows = state.options.iter().map(|f| {
+        let command = f.get_command();
+        to_row(command, state.mode.clone(), None)
+    });
 
     // Split the area into top header to show all options, a small central box to show the input field
     // and a bottom footer to show the error message
@@ -590,10 +602,11 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
         .padding(Padding::proportional(1));
 
     let spinner_progress = state.spinner.frame();
-    let rows = state
-        .options
-        .iter()
-        .map(|f| f.to_row(state.mode.clone(), Some(spinner_progress)));
+
+    let rows = state.options.iter().map(|f| {
+        let command = f.get_command();
+        to_row(command, state.mode.clone(), Some(spinner_progress))
+    });
     let widths = [Constraint::Fill(1), Constraint::Length(7)];
     let table = Table::new(rows, widths)
         .style(THEME.table.base)
@@ -603,48 +616,35 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     StatefulWidget::render(table, area, buf, &mut state.table_state);
 }
 
-impl<
-        T: std::fmt::Display
-            + ToDescription
-            + ToPlaceholder
-            + ToJson
-            + ToMethod
-            + ToHex
-            + AsBytes
-            + Clone,
-    > Entry<T>
-{
-    pub fn to_row(&self, mode: Mode, msg: Option<&str>) -> Row<'_> {
-        let command = self.get_command();
-        match command {
-            Command::Instruction { call, .. } => {
-                let mut cols = Vec::new();
+pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> {
+    match command {
+        Command::Instruction { call, .. } => {
+            let mut cols = Vec::new();
 
-                // Add menu-specific formatting
-                if mode == Mode::Menu {
-                    cols.push("".to_string());
-                    cols.push(format!("/{}", call));
-                    cols.push(call.description());
-                    cols.push("".to_string());
-                }
+            // Add menu-specific formatting
+            if mode == Mode::Menu {
+                cols.push("".to_string());
+                cols.push(format!("/{}", call));
+                cols.push(call.description());
+                cols.push("".to_string());
+            }
+
+            Row::new(cols)
+        }
+        Command::Text(t) => match mode {
+            Mode::Transaction => {
+                let cols = vec![
+                    Cell::from(Line::from(t.to_string())),
+                    Cell::from(
+                        Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
+                    ),
+                ];
 
                 Row::new(cols)
             }
-            Command::Text(t) => match mode {
-                Mode::Transaction => {
-                    let cols = vec![
-                        Cell::from(Line::from(t.to_string())),
-                        Cell::from(
-                            Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
-                        ),
-                    ];
-
-                    Row::new(cols)
-                }
-                _ => Row::new(vec![t.to_string()]),
-            },
-            // _ => Row::new(vec!["".to_string()]),
-        }
+            _ => Row::new(vec![t.to_string()]),
+        },
+        // _ => Row::new(vec!["".to_string()]),
     }
 }
 

@@ -12,6 +12,7 @@ arboard = { workspace = true }
 subxt = { workspace = true }
 suno-actions = { path = "../actions" }
 suno-config = { path = "../config" }
+suno-primitives = { path = "../primitives" }
 suno-signer = { path = "../signer" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

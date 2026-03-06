@@ -1,9 +1,11 @@
-use crate::call::{Call, CallError};
 use crate::widgets::spinner::Spinner;
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
-use suno_primitives::display::pasted_string_info;
+use suno_primitives::{
+    call::{Call, CallError},
+    display::pasted_string_info,
+};
 use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Zeroize)]

@@ -23,6 +23,7 @@ serde_yaml = { workspace = true }
 sp-arithmetic = { workspace = true }
 strum = { workspace = true }
 subxt = { workspace = true }
+subxt-rpcs = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../actions" }
 suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }

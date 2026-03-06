@@ -1,6 +1,5 @@
 use crate::theme::THEME;
 use crate::widgets::input_field::InputField;
-use crate::{call::Call, entry::ToPlaceholder};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Position, Rect},
@@ -8,6 +7,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
+use suno_primitives::{call::Call, entry::ToPlaceholder};
 
 #[derive(Debug)]
 pub struct InputCommandWidget {

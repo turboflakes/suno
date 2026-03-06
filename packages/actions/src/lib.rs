@@ -6,6 +6,7 @@ use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
+    call::Call,
     identity::Identity,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -54,9 +55,22 @@ pub enum NavigationAction {
     Copy,
 }
 
+type SpecVersion = u32;
+type ProxyIdentity = String;
+type StashIdentity = String;
+type Bytes = Vec<u8>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
     Open,
+    ConfirmAndSign(
+        SupportedRuntime,
+        SpecVersion,
+        ProxyIdentity,
+        StashIdentity,
+        Call,
+        Bytes,
+    ),
     Close,
     Cancel,
 }
