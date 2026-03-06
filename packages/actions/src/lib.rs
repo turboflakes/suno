@@ -21,6 +21,7 @@ type BlockHash = H256;
 type Amount = u128;
 type Points = u32;
 type Counter = u32;
+type IsValid = bool;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +122,7 @@ pub enum ValidatorAction {
     AddAmountToStakeLedger(ValidatorKey, Amount),
     SubChunkFromStakeLedger(ValidatorKey, Chunk),
     UpdateStatus(ValidatorKey, ValidatorStatus),
+    UpdateProxyStatus(ValidatorKey, IsValid),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

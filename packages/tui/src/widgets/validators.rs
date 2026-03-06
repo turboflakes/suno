@@ -172,6 +172,12 @@ impl ValidatorsListState {
         }
     }
 
+    pub fn set_proxy_status(&mut self, validator_key: &AccountKey, is_valid: bool) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.is_proxy_valid = is_valid;
+        }
+    }
+
     pub fn set_viewport_height(&mut self, height: u16) {
         self.viewport_height = height;
     }
@@ -501,5 +507,10 @@ impl ValidatorsListWidget {
     pub fn sub_chunk_from_stake_ledger(&self, validator_key: &AccountKey, chunk: Chunk) {
         let mut state = self.state.write().unwrap();
         state.sub_chunk_from_stake_ledger(validator_key, chunk);
+    }
+
+    pub fn update_proxy_status(&self, validator_key: &AccountKey, is_valid: bool) {
+        let mut state = self.state.write().unwrap();
+        state.set_proxy_status(validator_key, is_valid);
     }
 }

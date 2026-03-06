@@ -96,6 +96,13 @@ pub struct ValidatorKeysData {
     pub keys: Option<Keys>,
 }
 
+/// Stash proxied data combining account and its proxied status
+#[derive(Debug)]
+pub struct StashProxiedData {
+    pub account: AccountBytes,
+    pub proxied: bool,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -130,6 +137,7 @@ pub enum Response {
     TxError(String),
     EventBonded(Data<AmountData>),
     EventUnbonded(Data<ChunkData>),
+    StashProxied(Data<StashProxiedData>),
 }
 
 // Some constructors for convenience
@@ -219,5 +227,9 @@ impl Response {
 
     pub fn event_unbonded(account: AccountBytes, chunk: Chunk) -> Self {
         Response::EventUnbonded(Data::new(ChunkData { account, chunk }))
+    }
+
+    pub fn stash_proxied(account: AccountBytes, proxied: bool) -> Self {
+        Response::StashProxied(Data::new(StashProxiedData { account, proxied }))
     }
 }

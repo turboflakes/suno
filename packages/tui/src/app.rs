@@ -250,6 +250,16 @@ impl App {
                     .chains
                     .update_connection_state(&chain_key, connection_state.clone());
 
+                let proxy = match get_address_from_json_file() {
+                    Ok(address) => address,
+                    Err(e) => {
+                        let _ = self
+                            .tx
+                            .send(Action::System(SystemAction::Error(e.to_string())));
+                        return;
+                    }
+                };
+
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
                     let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
@@ -284,6 +294,15 @@ impl App {
                                     block_hash,
                                     runtime,
                                     &validator_keys,
+                                    &self.tx,
+                                );
+
+                                sync::spawn_fetch_validators_proxy_status(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &proxy,
                                     &self.tx,
                                 );
                             }
@@ -327,6 +346,15 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
+
+                                sync::spawn_fetch_validators_proxy_status(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &proxy,
+                                    &self.tx,
+                                );
                             }
                         }
                         SupportedRuntime::PeoplePolkadot
@@ -342,7 +370,7 @@ impl App {
                                     runtime,
                                     &validator_keys,
                                     &self.tx,
-                                )
+                                );
                             }
                         }
                         _ => {}
@@ -585,6 +613,10 @@ impl App {
                 self.validators
                     .sub_chunk_from_stake_ledger(&validator_key, chunk);
             }
+            ValidatorAction::UpdateProxyStatus(validator_key, is_valid) => {
+                self.validators
+                    .update_proxy_status(&validator_key, is_valid);
+            }
         }
     }
 
@@ -818,17 +850,6 @@ impl App {
                                     Box::new(call),
                                     bytes,
                                 )));
-                                // let bytes = bytes.to_vec();
-                                // self.popup.init_confirm_and_sign(
-                                //     runtime,
-                                //     spec_version,
-                                //     proxy_identity,
-                                //     stash_identity,
-                                //     call,
-                                //     bytes,
-                                // );
-                                // // Dispatch focus to the input field
-                                // let _ = tx.send(Action::Input(InputAction::Editing));
                             }
                             Err(e) => {
                                 let _ = tx.send(Action::System(SystemAction::Error(format!(

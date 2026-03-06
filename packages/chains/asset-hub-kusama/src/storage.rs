@@ -2,10 +2,12 @@ use crate::constants::fetch_sessions_per_era;
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
     bounded_collections::bounded_vec::BoundedVec,
+    pallet_proxy::ProxyDefinition,
     pallet_staking_async::{
         ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, RewardDestination,
         ValidatorPrefs,
     },
+    asset_hub_kusama_runtime::ProxyType,
     sp_staking::PagedExposureMetadata,
 };
 use sp_arithmetic::{Perbill, Permill};
@@ -22,6 +24,27 @@ use suno_primitives::{
     staking::{Chunk, Payee},
     AccountKey, Response,
 };
+
+/// Fetch and validate a proxy account for a given stash at the specified block hash
+pub async fn validate_proxy_account(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+    proxy: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
+    let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
+
+    if proxies
+        .iter()
+        .any(|def| def.delegate == *proxy && def.proxy_type == ProxyType::Staking)
+    {
+        return Ok(Response::stash_proxied(account_bytes, true));
+    }
+
+    Ok(Response::stash_proxied(account_bytes, false))
+}
 
 /// Fetch validator prefs
 pub async fn fetch_validator_prefs(
@@ -548,6 +571,34 @@ pub async fn fetch_payee(
     stash: &AccountId32,
 ) -> Result<RewardDestination<AccountId32>, Error> {
     let addr = node_runtime::storage().staking().payee();
+
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let value = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch proxies for a given account at the specified block hash
+async fn fetch_account_proxies(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<
+    (
+        BoundedVec<ProxyDefinition<AccountId32, ProxyType, u32>>,
+        u128,
+    ),
+    Error,
+> {
+    let addr = node_runtime::storage().proxy().proxies();
 
     let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at

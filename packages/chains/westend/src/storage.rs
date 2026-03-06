@@ -2,6 +2,8 @@ use super::node_runtime;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
+        bounded_collections::bounded_vec::BoundedVec,
+        pallet_proxy::ProxyDefinition,
         polkadot_primitives::v9::ValidatorIndex,
         polkadot_primitives::v9::{
             assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
@@ -10,7 +12,7 @@ use crate::{
         sp_consensus_babe::app::Public as BabePublic,
         sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
         sp_consensus_grandpa::app::Public as GrandpaPublic,
-        westend_runtime::SessionKeys,
+        westend_runtime::{ProxyType, SessionKeys},
     },
 };
 use std::collections::{HashMap, HashSet};
@@ -23,6 +25,27 @@ use suno_primitives::{session::Keys, validator::ValidatorStatus, AccountKey, Epo
 
 type Index = u64;
 type BlockNumber = u32;
+
+/// Fetch and validate a proxy account for a given stash at the specified block hash
+pub async fn validate_proxy_account(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+    proxy: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
+    let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
+
+    if proxies
+        .iter()
+        .any(|def| def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer)
+    {
+        return Ok(Response::stash_proxied(account_bytes, true));
+    }
+
+    Ok(Response::stash_proxied(account_bytes, false))
+}
 
 /// Fetch validator points at the specified block hash
 pub async fn fetch_validator_points(
@@ -265,6 +288,34 @@ async fn fetch_session_queued_keys(
         .entry(addr)
         .boxed()?
         .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch proxies for a given account at the specified block hash
+async fn fetch_account_proxies(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<
+    (
+        BoundedVec<ProxyDefinition<AccountId32, ProxyType, u32>>,
+        u128,
+    ),
+    Error,
+> {
+    let addr = node_runtime::storage().proxy().proxies();
+
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let value = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
         .await
         .boxed()?
         .decode()

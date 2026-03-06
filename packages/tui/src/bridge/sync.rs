@@ -8,7 +8,7 @@ use subxt::{
     events::Events,
     extrinsics::Extrinsics,
     tx::{TransactionInBlock, TransactionProgress, TransactionStatus},
-    utils::H256,
+    utils::{AccountId32, H256},
     OnlineClient, SubstrateConfig,
 };
 use subxt_signer::sr25519::Keypair;
@@ -692,6 +692,54 @@ pub fn spawn_fetch_validators_identity(
                 async move {
                     runtime
                         .fetch_validator_identity(&api, block_hash, &stash)
+                        .await
+                }
+            })
+            .buffer_unordered(CONCURRENT_REQUESTS);
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(response) => {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Fetch error: {}",
+                        e
+                    ))));
+                }
+            }
+        }
+    });
+}
+
+pub fn spawn_fetch_validators_proxy_status(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: SupportedRuntime,
+    validator_keys: &[AccountKey],
+    proxy: &AccountId32,
+    tx: &UnboundedSender<Action>,
+) {
+    let validator_keys = validator_keys.to_vec();
+    let proxy = proxy.clone();
+    let api = api.clone();
+    let tx = tx.clone();
+
+    tokio::spawn(async move {
+        let mut stream = stream::iter(validator_keys)
+            .map(|key| {
+                let api = api.clone();
+                let stash = key.stash();
+
+                async move {
+                    runtime
+                        .validate_proxy_account(&api, block_hash, &stash, &proxy)
                         .await
                 }
             })

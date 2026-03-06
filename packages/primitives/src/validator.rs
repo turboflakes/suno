@@ -63,6 +63,7 @@ pub struct Validator {
     // the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
     pub is_chilled: bool,
+    pub is_proxy_valid: bool,
     pub status: ValidatorStatus,
 }
 
@@ -83,6 +84,7 @@ impl Validator {
             old_points_ts: 0,
             era_points: 0,
             is_chilled: false,
+            is_proxy_valid: false,
             status: ValidatorStatus::default(),
         }
     }
@@ -193,6 +195,10 @@ impl Validator {
     pub fn is_unknown(&self) -> bool {
         self.status == ValidatorStatus::Unknown
     }
+
+    pub fn is_proxy_valid(&self) -> bool {
+        self.is_proxy_valid
+    }
 }
 
 impl AccountDisplay for Validator {
@@ -207,9 +213,7 @@ impl AccountDisplay for Validator {
 
 impl From<&Validator> for Row<'_> {
     fn from(v: &Validator) -> Self {
-        // TODO: Verify if proxy is available and correctly setup for each stash
-        let has_proxy = false;
-        let status = if has_proxy { "[P]" } else { "[R]" };
+        let status = if v.is_proxy_valid() { "[S]" } else { "" };
         let v = v.clone();
         Row::new(vec![
             Text::from(""),

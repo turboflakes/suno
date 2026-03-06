@@ -215,6 +215,15 @@ pub fn dispatch_response_action(
                 data.value.chunk,
             )))
             .boxed()?;
+        }
+        Response::StashProxied(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdateProxyStatus(
+                account_key,
+                data.value.proxied,
+            )))
+            .boxed()?;
         } // _ => {
           //     error!("Unhandled response type: {:?}", response);
           // }
