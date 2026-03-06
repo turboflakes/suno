@@ -81,7 +81,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted, macos-latest, windows-latest]
+        # os: [self-hosted, macos-latest, windows-latest]
+        # NOTE: Only self-hosted is used here to avoid rate limiting
+        os: [self-hosted]
     steps:
       # if your project needs OpenSSL, uncomment this to fix Windows builds.
       # it's commented out by default as the install command takes 5-10m.
