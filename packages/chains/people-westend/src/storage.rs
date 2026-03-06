@@ -64,7 +64,7 @@ async fn fetch_identity_of(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((stash.clone(),))
+        .try_fetch((*stash,))
         .await
         .boxed()?
         .map(|entry| entry.decode())
@@ -86,7 +86,7 @@ async fn fetch_super_of(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((stash.clone(),))
+        .try_fetch((*stash,))
         .await
         .boxed()?
         .map(|entry| entry.decode())

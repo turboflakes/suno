@@ -78,7 +78,7 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_runtime_events(api, block_hash, events).await
             }
-            _ => Err(Error::UnsupportedRuntime(*self)),
+            _ => Ok(vec![]),
         }
     }
 
@@ -113,7 +113,7 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_block_extrinsics(api, block_hash, extrinsics).await
             }
-            _ => Err(Error::UnsupportedRuntime(*self)),
+            _ => Ok(vec![]),
         }
     }
 }

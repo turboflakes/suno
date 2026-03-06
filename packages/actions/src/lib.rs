@@ -68,7 +68,7 @@ pub enum PopupAction {
         SpecVersion,
         ProxyIdentity,
         StashIdentity,
-        Call,
+        Box<Call>,
         Bytes,
     ),
     Close,

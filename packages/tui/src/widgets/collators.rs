@@ -31,14 +31,10 @@ impl CollatorsListWidget {
                 for collator in &chain_config.collators {
                     match collator {
                         NodeConfig::Address(stash) => {
-                            state
-                                .collators
-                                .push(Collator::new(*chain_name, stash.clone()));
+                            state.collators.push(Collator::new(*chain_name, *stash));
                         }
                         NodeConfig::Detailed { stash, .. } => {
-                            state
-                                .collators
-                                .push(Collator::new(*chain_name, stash.clone()));
+                            state.collators.push(Collator::new(*chain_name, *stash));
                             // if let Some(cmds) = commands {
                             //     for cmd in cmds {
                             //         println!("  Command: {} ({})", cmd.name, cmd.run);
