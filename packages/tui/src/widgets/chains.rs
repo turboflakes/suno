@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
-use suno_error::{Error, ResultExt};
+use suno_error::Error;
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
     Epoch, Era,
@@ -144,13 +144,8 @@ impl Chain {
         self.finalized_block_hash
     }
 
-    pub async fn validate_genesis(&mut self) -> Result<(), Error> {
-        let api = self.client();
-        let state_root = self.runtime.chain_state_root_hash();
-        let at_block = api.at_block(0_u32).await.boxed()?;
-        let genesis_header = at_block.block_header().await.boxed()?;
-
-        if genesis_header.state_root != state_root {
+    pub fn validate_genesis(&mut self) -> Result<(), Error> {
+        if self.client().genesis_hash() != self.runtime.chain_genesis_hash() {
             let err = Error::Genesis;
             self.set_state(ConnectionState::Error(err.to_string()));
             return Err(err);
@@ -358,7 +353,7 @@ impl ChainsListWidget {
                         match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
                             Ok(client) => {
                                 let mut chain = Chain::new(*chain_name, client);
-                                if let Err(err) = chain.validate_genesis().await {
+                                if let Err(err) = chain.validate_genesis() {
                                     self.error(err.into());
                                 }
                                 self.add_chain(&chain);

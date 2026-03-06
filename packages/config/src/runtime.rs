@@ -124,6 +124,76 @@ impl SupportedRuntime {
         }
     }
 
+    pub fn chain_genesis_hash(&self) -> H256 {
+        match &self {
+            Self::Polkadot => {
+                H256::from_str("0x91b171bb158e2d3848fa23a9f1c25182fb8e20313b2c1eb49219da7a70ce90c3")
+                    .expect("Invalid genesis hash")
+            }
+            Self::Kusama => {
+                H256::from_str("0xb0a8d493285c2df73290dfb7e61f870f17b41801197a149ca93654499ea3dafe")
+                    .expect("Invalid genesis hash")
+            }
+            Self::Westend => {
+                H256::from_str("0xe143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423e")
+                    .expect("Invalid genesis hash")
+            }
+            Self::Paseo => {
+                H256::from_str("0x77afd6190f1554ad45fd0d31aee62aacc33c6db0ea801129acb813f913e0764f")
+                    .expect("Invalid genesis hash")
+            }
+            Self::PeoplePolkadot => {
+                H256::from_str("0x67fa177a097bfa18f77ea95ab56e9bcdfeb0e5b8a40e46298bb93e16b6fc5008")
+                    .expect("Invalid genesis hash")
+            }
+            Self::PeopleKusama => {
+                H256::from_str("0xc1af4cb4eb3918e5db15086c0cc5ec17fb334f728b7c65dd44bfe1e174ff8b3f")
+                    .expect("Invalid genesis hash")
+            }
+            Self::PeopleWestend => {
+                H256::from_str("0x1eb6fb0ba5187434de017a70cb84d4f47142df1d571d0ef9e7e1407f2b80b93c")
+                    .expect("Invalid genesis hash")
+            }
+            Self::PeoplePaseo => {
+                H256::from_str("0xe6c30d6e148f250b887105237bcaa5cb9f16dd203bf7b5b9d4f1da7387cb86ec")
+                    .expect("Invalid genesis hash")
+            }
+            Self::AssetHubPolkadot => {
+                H256::from_str("0x68d56f15f85d3136970ec16946040bc1752654e906147f7e43e9d539d7c3de2f")
+                    .expect("Invalid genesis hash")
+            }
+            Self::AssetHubKusama => {
+                H256::from_str("0x48239ef607d7928874027a43a67689209727dfb3d3dc5e5b03a39bdc2eda771a")
+                    .expect("Invalid genesis hash")
+            }
+            Self::AssetHubWestend => {
+                H256::from_str("0x67f9723393ef76214df0118c34bbbd3dbebc8ed46a10973a8c969d48fe7598c9")
+                    .expect("Invalid genesis hash")
+            }
+            Self::AssetHubPaseo => {
+                H256::from_str("0xd6eec26135305a8ad257a20d003357284c8aa03d0bdb2b357ab0a22371e11ef2")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BridgeHubPolkadot => {
+                H256::from_str("0xdcf691b5a3fbe24adc99ddc959c0561b973e329b1aef4c4b22e7bb2ddecb4464")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BridgeHubKusama => {
+                H256::from_str("0x00dcb981df86429de8bbacf9803401f09485366c44efbf53af9ecfab03adc7e5")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BridgeHubWestend => {
+                H256::from_str("0x0441383e31d1266a92b4cb2ddd4c2e3661ac476996db7e5844c52433b81fe782")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BridgeHubPaseo => {
+                H256::from_str("0xcc624979479dc37afee4cb23cb72b1772bbf377c0d3e8fa257c0fe6146572e3e")
+                    .expect("Invalid genesis hash")
+            }
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
     pub fn chain_state_root_hash(&self) -> H256 {
         match &self {
             Self::Polkadot => get_state_root_hash(POLKADOT_SPEC),
