@@ -19,11 +19,10 @@ pub fn wrap_call_into_proxy(
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {
-    let proxy_call = node_runtime::tx().proxy().proxy(
-        proxied_account.clone().into(),
-        Some(ProxyType::Staking),
-        call,
-    );
+    let proxy_call =
+        node_runtime::tx()
+            .proxy()
+            .proxy((*proxied_account).into(), Some(ProxyType::Staking), call);
 
     let payload = api.tx().call_data(&proxy_call).boxed()?;
 
@@ -32,7 +31,7 @@ pub fn wrap_call_into_proxy(
 
 pub fn proxy(call: RuntimeCall, proxied_account: &AccountId32) -> RuntimeCall {
     RuntimeCall::Proxy(ProxyCall::proxy {
-        real: proxied_account.clone().into(),
+        real: (*proxied_account).into(),
         force_proxy_type: Some(ProxyType::Staking),
         call: Box::new(call),
     })

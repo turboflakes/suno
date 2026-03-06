@@ -346,11 +346,11 @@ impl ValidatorsListWidget {
                 for validator in &chain_config.validators {
                     match validator {
                         NodeConfig::Address(stash) => {
-                            let validator = Validator::new(*chain_name, stash.clone());
+                            let validator = Validator::new(*chain_name, *stash);
                             self.add_validator(&validator);
                         }
                         NodeConfig::Detailed { stash, .. } => {
-                            let validator = Validator::new(*chain_name, stash.clone());
+                            let validator = Validator::new(*chain_name, *stash);
                             self.add_validator(&validator);
 
                             // TODO: Implement command handling

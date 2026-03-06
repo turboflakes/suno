@@ -41,7 +41,7 @@ pub async fn fetch_validator_points(
         .storage()
         .entry(addr)
         .boxed()?
-        .fetch((stash.clone(),))
+        .fetch((*stash,))
         .await
         .boxed()?
         .decode()
@@ -242,7 +242,7 @@ async fn fetch_session_next_keys(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((stash.clone(),))
+        .try_fetch((*stash,))
         .await
         .boxed()?
         .map(|entry| entry.decode())

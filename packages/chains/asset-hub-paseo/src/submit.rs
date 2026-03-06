@@ -14,7 +14,7 @@ pub async fn _submit_as_proxy(
     proxy_signer: &Keypair,
 ) -> Result<Response, Error> {
     let proxy_call = node_runtime::tx().proxy().proxy(
-        proxied_account.clone().into(),
+        (*proxied_account).into(),
         Some(ProxyType::NonTransfer),
         call,
     );

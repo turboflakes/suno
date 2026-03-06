@@ -16,7 +16,7 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
                         Ok(block) => {
                             let _ = tx.send(Action::Chain(ChainAction::UpdateBestBlock(
                                 runtime,
-                                block.number().into(),
+                                block.number(),
                             )));
                         }
                         Err(e) => {
@@ -53,7 +53,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                         Ok(block) => {
                             let _ = tx.send(Action::Chain(ChainAction::UpdateFinalizedBlock(
                                 runtime,
-                                block.number().into(),
+                                block.number(),
                                 block.hash(),
                             )));
 

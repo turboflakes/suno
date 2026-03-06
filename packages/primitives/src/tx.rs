@@ -67,6 +67,7 @@ impl RawPayload {
 
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("OnlineClient error: {0}")]
     OnlineClient(#[from] subxt::error::OnlineClientAtBlockError),

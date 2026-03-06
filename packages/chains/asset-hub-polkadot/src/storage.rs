@@ -395,7 +395,7 @@ async fn fetch_validators(
         .storage()
         .entry(addr)
         .boxed()?
-        .fetch((stash.clone(),))
+        .fetch((*stash,))
         .await
         .boxed()?
         .decode()
@@ -418,7 +418,7 @@ async fn fetch_eras_validator_prefs(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((era, stash.clone()))
+        .try_fetch((era, *stash))
         .await
         .boxed()?
         .map(|entry| entry.decode())
@@ -441,7 +441,7 @@ async fn fetch_staking_ledger(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((stash.clone(),))
+        .try_fetch((*stash,))
         .await
         .boxed()?
         .map(|entry| entry.decode())
@@ -509,7 +509,7 @@ async fn fetch_eras_stakers_overview(
         .storage()
         .entry(addr)
         .boxed()?
-        .try_fetch((era, stash.clone()))
+        .try_fetch((era, *stash))
         .await
         .boxed()?
         .map(|entry| entry.decode())
@@ -523,7 +523,7 @@ async fn fetch_eras_stakers_overview(
 async fn _fetch_nominators(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    stash: AccountId32,
+    stash: &AccountId32,
 ) -> Result<Nominations, Error> {
     let addr = node_runtime::storage().staking().nominators();
 
@@ -532,7 +532,7 @@ async fn _fetch_nominators(
         .storage()
         .entry(addr)
         .boxed()?
-        .fetch((stash.clone(),))
+        .fetch((*stash,))
         .await
         .boxed()?
         .decode()
@@ -554,7 +554,7 @@ pub async fn fetch_payee(
         .storage()
         .entry(addr)
         .boxed()?
-        .fetch((stash.clone(),))
+        .fetch((*stash,))
         .await
         .boxed()?
         .decode()

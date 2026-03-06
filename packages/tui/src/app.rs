@@ -198,7 +198,7 @@ impl App {
                     spec_version,
                     proxy_identity,
                     stash_identity,
-                    call,
+                    *call,
                     bytes,
                 );
             }
@@ -815,7 +815,7 @@ impl App {
                                     spec_version,
                                     proxy_identity,
                                     stash_identity,
-                                    call,
+                                    Box::new(call),
                                     bytes,
                                 )));
                                 // let bytes = bytes.to_vec();
@@ -835,7 +835,6 @@ impl App {
                                     "Failed to build_call_data: {}",
                                     e
                                 ))));
-                                return;
                             }
                         }
                     });
