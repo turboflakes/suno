@@ -785,7 +785,7 @@ pub fn spawn_sign_and_submit(
 
     tokio::spawn(async move {
         let result = runtime
-            .sign_and_submit_call_data(&api, &signer, call_data)
+            .sign_and_submit_call_data(&api, &signer, &call_data)
             .await;
         match result {
             Ok(response) => {

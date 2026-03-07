@@ -1,7 +1,7 @@
 use scale_encode::{EncodeAsFields, Error as EncodeError, FieldIter, TypeResolver};
 use subxt::{
     transactions::{Payload, ValidationDetails},
-    OnlineClient, SubstrateConfig,
+    Metadata,
 };
 
 pub type Bytes = Vec<u8>;
@@ -44,37 +44,27 @@ impl Payload for RawPayload {
 }
 
 impl RawPayload {
-    pub async fn from_call_data(
-        api: &OnlineClient<SubstrateConfig>,
-        call_data: Bytes,
-    ) -> Result<Self, Error> {
-        let at_block = api.at_current_block().await?;
-        let metadata = at_block.metadata();
+    pub fn from_bytes(metadata: &Metadata, bytes: &[u8]) -> Result<Self, Error> {
         let pallet = metadata
-            .pallet_by_call_index(call_data[0])
+            .pallet_by_call_index(bytes[0])
             .ok_or(Error::PalletNotFound)?;
         let call_variant = pallet
-            .call_variant_by_index(call_data[1])
+            .call_variant_by_index(bytes[1])
             .ok_or(Error::CallNotFound)?;
 
         Ok(Self {
             pallet_name: pallet.name().to_string(),
             call_name: call_variant.name.clone(),
-            field_bytes: RawFields(call_data[2..].to_vec()),
+            field_bytes: RawFields(bytes[2..].to_vec()),
         })
     }
 }
 
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum Error {
-    #[error("OnlineClient error: {0}")]
-    OnlineClient(#[from] subxt::error::OnlineClientAtBlockError),
     #[error("Pallet not found")]
     PalletNotFound,
     #[error("Call not found")]
     CallNotFound,
-    #[error("Other error: {0}")]
-    Other(String),
 }

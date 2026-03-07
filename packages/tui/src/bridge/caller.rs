@@ -26,7 +26,7 @@ pub trait RuntimeCaller {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         proxy_signer: &Keypair,
-        call_data: Vec<u8>,
+        call_data: &[u8],
     ) -> Result<Response, Error>;
 }
 
@@ -91,9 +91,11 @@ impl RuntimeCaller for Runtime {
         &self,
         api: &OnlineClient<SubstrateConfig>,
         proxy_signer: &Keypair,
-        call_data: Vec<u8>,
+        call_data: &[u8],
     ) -> Result<Response, Error> {
-        let payload = RawPayload::from_call_data(api, call_data).await.boxed()?;
+        let at_block = api.at_current_block().await.boxed()?;
+        let metadata = at_block.metadata();
+        let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
         let response = api
             .tx()
             .await
