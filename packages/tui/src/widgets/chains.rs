@@ -542,7 +542,7 @@ impl Widget for &ChainsListWidget {
             Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(6),
-            Constraint::Length(4),
+            Constraint::Length(3),
             Constraint::Length(1),
         ];
 
