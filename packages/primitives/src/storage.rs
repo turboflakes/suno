@@ -1,5 +1,6 @@
 use crate::{
     babe::Epoch,
+    balance::Balance,
     identity::Identity,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -103,6 +104,13 @@ pub struct StashProxiedData {
     pub proxied: bool,
 }
 
+/// Stash proxied data combining account and its proxied status
+#[derive(Debug)]
+pub struct BalanceData {
+    pub account: AccountBytes,
+    pub balance: Balance,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -138,6 +146,7 @@ pub enum Response {
     EventBonded(Data<AmountData>),
     EventUnbonded(Data<ChunkData>),
     StashProxied(Data<StashProxiedData>),
+    Balance(Data<BalanceData>),
 }
 
 // Some constructors for convenience
@@ -231,5 +240,9 @@ impl Response {
 
     pub fn stash_proxied(account: AccountBytes, proxied: bool) -> Self {
         Response::StashProxied(Data::new(StashProxiedData { account, proxied }))
+    }
+
+    pub fn balance(account: AccountBytes, balance: Balance) -> Self {
+        Response::Balance(Data::new(BalanceData { account, balance }))
     }
 }

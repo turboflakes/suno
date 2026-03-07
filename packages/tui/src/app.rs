@@ -617,6 +617,9 @@ impl App {
                 self.validators
                     .update_proxy_status(&validator_key, is_valid);
             }
+            ValidatorAction::UpdateBalance(validator_key, balance) => {
+                self.validators.update_balance(&validator_key, balance);
+            }
         }
     }
 

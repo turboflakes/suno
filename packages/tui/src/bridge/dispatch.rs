@@ -224,6 +224,15 @@ pub fn dispatch_response_action(
                 data.value.proxied,
             )))
             .boxed()?;
+        }
+        Response::Balance(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
+            tx.send(Action::Validator(ValidatorAction::UpdateBalance(
+                account_key,
+                data.value.balance,
+            )))
+            .boxed()?;
         } // _ => {
           //     error!("Unhandled response type: {:?}", response);
           // }

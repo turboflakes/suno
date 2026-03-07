@@ -6,6 +6,7 @@ use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     babe::Epoch,
+    balance::Balance,
     call::Call,
     identity::Identity,
     session::Keys,
@@ -123,6 +124,7 @@ pub enum ValidatorAction {
     SubChunkFromStakeLedger(ValidatorKey, Chunk),
     UpdateStatus(ValidatorKey, ValidatorStatus),
     UpdateProxyStatus(ValidatorKey, IsValid),
+    UpdateBalance(ValidatorKey, Balance),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -10,8 +10,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
-use suno_primitives::identity::Identity;
 use suno_primitives::{
+    balance::Balance,
+    identity::Identity,
     session::Keys,
     staking::{Chunk, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::{Validator, ValidatorStatus},
@@ -178,6 +179,12 @@ impl ValidatorsListState {
         }
     }
 
+    pub fn set_balance(&mut self, validator_key: &AccountKey, balance: Balance) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.account.set_balance(balance);
+        }
+    }
+
     pub fn set_viewport_height(&mut self, height: u16) {
         self.viewport_height = height;
     }
@@ -334,6 +341,12 @@ impl<'a> ValidatorsListWidget {
         ValidatorsDetailedListWidget {
             state: self.state.clone(),
         }
+    }
+}
+
+impl Default for ValidatorsListWidget {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -520,5 +533,10 @@ impl ValidatorsListWidget {
     pub fn update_proxy_status(&self, validator_key: &AccountKey, is_valid: bool) {
         let mut state = self.state.write().unwrap();
         state.set_proxy_status(validator_key, is_valid);
+    }
+
+    pub fn update_balance(&self, validator_key: &AccountKey, balance: Balance) {
+        let mut state = self.state.write().unwrap();
+        state.set_balance(validator_key, balance);
     }
 }

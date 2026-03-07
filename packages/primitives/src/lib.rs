@@ -1,4 +1,5 @@
 pub mod babe;
+pub mod balance;
 pub mod call;
 pub mod display;
 pub mod entry;

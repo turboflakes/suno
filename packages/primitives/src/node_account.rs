@@ -1,3 +1,4 @@
+use crate::balance::Balance;
 use crate::display::to_compact_string;
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
@@ -19,6 +20,7 @@ pub trait AccountDisplay {
 pub struct NodeAccount {
     account_key: AccountKey,
     identity: Option<Identity>,
+    balance: Balance,
 }
 
 impl NodeAccount {
@@ -26,6 +28,7 @@ impl NodeAccount {
         Self {
             account_key: AccountKey::new(runtime, stash),
             identity: None,
+            balance: Balance::default(),
         }
     }
 
@@ -47,6 +50,10 @@ impl NodeAccount {
 
     pub fn set_identity(&mut self, identity: Option<Identity>) {
         self.identity = identity;
+    }
+
+    pub fn set_balance(&mut self, balance: Balance) {
+        self.balance = balance;
     }
 
     pub fn account_format(&self) -> u16 {
