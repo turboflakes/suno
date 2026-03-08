@@ -355,6 +355,14 @@ impl App {
                                     &proxy,
                                     &self.tx,
                                 );
+
+                                sync::spawn_fetch_account_balance(
+                                    &api,
+                                    block_hash,
+                                    runtime,
+                                    &validator_keys,
+                                    &self.tx,
+                                );
                             }
                         }
                         SupportedRuntime::PeoplePolkadot

@@ -3,6 +3,8 @@ use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
     asset_hub_westend_runtime::ProxyType,
     bounded_collections::bounded_vec::BoundedVec,
+    frame_system::AccountInfo,
+    pallet_balances::types::AccountData,
     pallet_proxy::ProxyDefinition,
     pallet_staking_async::{
         ledger::StakingLedger, ActiveEraInfo, EraRewardPoints, Nominations, RewardDestination,
@@ -19,11 +21,32 @@ use subxt::{
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
+    balance::Balance,
     node_account::get_account_bytes_from_storage_key,
     staking,
     staking::{Chunk, Payee},
     AccountKey, Response,
 };
+
+/// Fetch balance for a given stash at the specified block hash
+pub async fn fetch_balance(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
+    let account_info = fetch_system_account(api, block_hash, stash).await?;
+
+    Ok(Response::balance(
+        account_bytes,
+        Balance::new(
+            account_info.data.free,
+            account_info.data.frozen,
+            account_info.data.reserved,
+        ),
+    ))
+}
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
 pub async fn validate_proxy_account(
@@ -599,6 +622,28 @@ async fn fetch_account_proxies(
     Error,
 > {
     let addr = node_runtime::storage().proxy().proxies();
+
+    let api_at = api.at_block(block_hash).await.boxed()?;
+    let value = api_at
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch balance for a given account at the specified block hash
+async fn fetch_system_account(
+    api: &OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    stash: &AccountId32,
+) -> Result<AccountInfo<u32, AccountData<u128>>, Error> {
+    let addr = node_runtime::storage().system().account();
 
     let api_at = api.at_block(block_hash).await.boxed()?;
     let value = api_at

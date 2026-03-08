@@ -141,6 +141,13 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
         proxy: &AccountId32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_account_balance(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
 }
 
 #[async_trait]
@@ -618,6 +625,29 @@ impl RuntimeFetcher for Runtime {
                 suno_asset_hub_westend::validate_proxy_account(api, block_hash, stash, proxy).await
             }
 
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_account_balance(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_balance(api, block_hash, stash).await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_balance(api, block_hash, stash).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_balance(api, block_hash, stash).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_balance(api, block_hash, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
