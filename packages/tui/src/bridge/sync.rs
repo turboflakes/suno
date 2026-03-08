@@ -1,7 +1,7 @@
 use crate::bridge::{
     dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher, RuntimeProcessor,
 };
-use futures::{stream, stream::StreamExt};
+use futures::{stream, stream::StreamExt, Future};
 use log::error;
 use subxt::{
     client::OnlineClientAtBlockImpl,
@@ -20,6 +20,63 @@ use tokio::sync::mpsc::UnboundedSender;
 
 const CONCURRENT_REQUESTS: usize = 3;
 
+/// Default spawner for making asynchronous fetch requests.
+struct DefaultSpawner {
+    api: OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: SupportedRuntime,
+    tx: UnboundedSender<Action>,
+}
+
+impl DefaultSpawner {
+    fn new(
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: SupportedRuntime,
+        tx: &UnboundedSender<Action>,
+    ) -> Self {
+        Self {
+            api: api.clone(),
+            block_hash,
+            runtime,
+            tx: tx.clone(),
+        }
+    }
+
+    fn spawn<F, Fut>(self, fetch_fn: F)
+    where
+        F: Fn(OnlineClient<SubstrateConfig>, H256) -> Fut + Send + 'static,
+        Fut: Future<Output = Result<Response, Error>> + Send,
+    {
+        let Self {
+            api,
+            block_hash,
+            runtime,
+            tx,
+        } = self;
+
+        tokio::spawn(async move {
+            let result = fetch_fn(api, block_hash).await;
+            match result {
+                Ok(response) => {
+                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Dispatch error: {}",
+                            e
+                        ))));
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Fetch error: {}",
+                        e
+                    ))));
+                }
+            }
+        });
+    }
+}
+
 // ----
 // Fetcher tasks
 // ----
@@ -30,28 +87,8 @@ pub fn spawn_fetch_era_data(
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime.fetch_era_data(&api, block_hash).await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    DefaultSpawner::new(api, block_hash, runtime, tx)
+        .spawn(move |api, bh| async move { runtime.fetch_era_data(&api, bh).await });
 }
 
 pub fn spawn_fetch_epoch_data(
@@ -60,28 +97,8 @@ pub fn spawn_fetch_epoch_data(
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime.fetch_epoch_data(&api, block_hash).await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    DefaultSpawner::new(api, block_hash, runtime, tx)
+        .spawn(move |api, bh| async move { runtime.fetch_epoch_data(&api, bh).await });
 }
 
 pub fn spawn_fetch_total_staked(
@@ -91,30 +108,8 @@ pub fn spawn_fetch_total_staked(
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_total_staked(&api, block_hash, era_index)
-            .await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    DefaultSpawner::new(api, block_hash, runtime, tx)
+        .spawn(move |api, bh| async move { runtime.fetch_total_staked(&api, bh, era_index).await });
 }
 
 pub fn spawn_fetch_active_validators_count(
@@ -124,29 +119,10 @@ pub fn spawn_fetch_active_validators_count(
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_active_validators_count(&api, block_hash, era_index)
-            .await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
+    DefaultSpawner::new(api, block_hash, runtime, tx).spawn(move |api, bh| async move {
+        runtime
+            .fetch_active_validators_count(&api, bh, era_index)
+            .await
     });
 }
 
@@ -157,29 +133,10 @@ pub fn spawn_fetch_active_nominators_count(
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_active_nominators_count(&api, block_hash, era_index)
-            .await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
+    DefaultSpawner::new(api, block_hash, runtime, tx).spawn(move |api, bh| async move {
+        runtime
+            .fetch_active_nominators_count(&api, bh, era_index)
+            .await
     });
 }
 
@@ -189,28 +146,8 @@ pub fn spawn_fetch_total_validators_count(
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime.fetch_total_validators_count(&api, block_hash).await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    DefaultSpawner::new(api, block_hash, runtime, tx)
+        .spawn(move |api, bh| async move { runtime.fetch_total_validators_count(&api, bh).await });
 }
 
 pub fn spawn_fetch_total_nominators_count(
@@ -219,28 +156,8 @@ pub fn spawn_fetch_total_nominators_count(
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime.fetch_total_nominators_count(&api, block_hash).await;
-        match result {
-            Ok(response) => {
-                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Dispatch error: {}",
-                        e
-                    ))));
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    DefaultSpawner::new(api, block_hash, runtime, tx)
+        .spawn(move |api, bh| async move { runtime.fetch_total_nominators_count(&api, bh).await });
 }
 
 pub fn spawn_fetch_validators_era_points(
