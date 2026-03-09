@@ -6,18 +6,44 @@ use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
 
+type Amount = u128;
+type Description = String;
+type Max = Option<(Amount, Description)>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Call {
-    Bond { amount: u128, payee: Payee },
-    BondExtra { amount: u128 },
-    Unbond { amount: u128 },
-    Rebond { amount: u128 },
-    WithdrawUnbonded,
-    SetPayee { payee: Payee },
-    Validate { commission: Perbill, blocked: bool },
+    Bond {
+        amount: u128,
+        payee: Payee,
+        max: Max,
+    },
+    BondExtra {
+        amount: u128,
+        max: Max,
+    },
+    Unbond {
+        amount: u128,
+        max: Max,
+    },
+    Rebond {
+        amount: u128,
+        max: Max,
+    },
+    WithdrawUnbonded {
+        max: Max,
+    },
+    SetPayee {
+        payee: Payee,
+    },
+    Validate {
+        commission: Perbill,
+        blocked: bool,
+    },
     Chill,
-    SetSessionKeys { keys: Keys },
+    SetSessionKeys {
+        keys: Keys,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -38,8 +64,8 @@ pub enum CallError {
     InvalidAddress(String),
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
-    #[error("Missing arguments: {0}")]
-    MissingArguments(String),
+    #[error("No argument provided")]
+    MissingArgument,
     #[error("No extrinsic provided")]
     MissingExtrinsic,
     #[error("Invalid payee: {0}")]
@@ -53,7 +79,7 @@ impl Call {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
-                "withdraw_unbonded" => Ok(Self::WithdrawUnbonded),
+                "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
                 _ => Err(CallError::MissingExtrinsic),
             },
             Some((extrinsic, args)) => match extrinsic {
@@ -63,6 +89,7 @@ impl Call {
                         Ok(Self::Bond {
                             amount,
                             payee: Payee::None,
+                            max: None,
                         })
                     }
                     Some((value, args)) => {
@@ -73,7 +100,11 @@ impl Call {
                             )),
                             Some(("payee", args)) => {
                                 let payee = Payee::from_str(args)?;
-                                Ok(Self::Bond { amount, payee })
+                                Ok(Self::Bond {
+                                    amount,
+                                    payee,
+                                    max: None,
+                                })
                             }
                             Some((_other, _)) => Err(CallError::UnknownOptional(
                                 "payee <staked|stash|account <address>>".to_string(),
@@ -84,21 +115,21 @@ impl Call {
                 "bond_extra" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
-                        Ok(Self::BondExtra { amount })
+                        Ok(Self::BondExtra { amount, max: None })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
                 "unbond" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
-                        Ok(Self::Unbond { amount })
+                        Ok(Self::Unbond { amount, max: None })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
                 "rebond" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
-                        Ok(Self::Rebond { amount })
+                        Ok(Self::Rebond { amount, max: None })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
@@ -150,7 +181,7 @@ impl std::fmt::Display for Call {
             Self::BondExtra { .. } => write!(f, "bond_extra"),
             Self::Unbond { .. } => write!(f, "unbond"),
             Self::Rebond { .. } => write!(f, "rebond"),
-            Self::WithdrawUnbonded => write!(f, "withdraw_unbonded"),
+            Self::WithdrawUnbonded { .. } => write!(f, "withdraw_unbonded"),
             Self::SetPayee { .. } => write!(f, "set_payee"),
             Self::Validate { .. } => write!(f, "validate"),
             Self::Chill => write!(f, "chill"),
@@ -162,11 +193,39 @@ impl std::fmt::Display for Call {
 impl ToDescription for Call {
     fn description(&self) -> String {
         match self {
-            Self::Bond { .. } => "Bond funds".to_string(),
-            Self::BondExtra { .. } => "Bond some of the available funds".to_string(),
-            Self::Unbond { .. } => "Unbond some of the funds currently locked".to_string(),
-            Self::Rebond { .. } => "Rebond some of the funds due to be unlocked".to_string(),
-            Self::WithdrawUnbonded => "Withdraw any funds that has been fully unbonded".to_string(),
+            Self::Bond { max, .. } => format!(
+                "Bond up to {} from your free balance",
+                max.as_ref()
+                    .map(|(_, description)| description.to_string())
+                    .unwrap_or_default()
+            ),
+            Self::BondExtra { max, .. } => format!(
+                "Bond extra funds, up to {} from your free balance",
+                max.as_ref()
+                    .map(|(_, description)| description.to_string())
+                    .unwrap_or_default()
+            )
+            .to_string(),
+            Self::Unbond { max, .. } => format!(
+                "Unbond up to {} that is bonded",
+                max.as_ref()
+                    .map(|(_, description)| description.to_string())
+                    .unwrap_or_default()
+            ),
+            Self::Rebond { max, .. } => format!(
+                "Rebond up to {} that is currently unlocking",
+                max.as_ref()
+                    .map(|(_, description)| description.to_string())
+                    .unwrap_or_default()
+            ),
+            Self::WithdrawUnbonded { max } => {
+                format!(
+                    "Withdraw the {} that are fully unlocked",
+                    max.as_ref()
+                        .map(|(_, description)| description.to_string())
+                        .unwrap_or_default()
+                )
+            }
             Self::SetPayee { .. } => "Set reward destination".to_string(),
             Self::Validate { .. } => {
                 "Validate/Change commission or enable/disable nominations".to_string()
@@ -189,7 +248,7 @@ impl ToPlaceholder for Call {
             Self::BondExtra { .. } => "bond_extra <value-in-standard-units>".to_string(),
             Self::Unbond { .. } => "unbond <value-in-standard-units>".to_string(),
             Self::Rebond { .. } => "rebond <value-in-standard-units>".to_string(),
-            Self::WithdrawUnbonded => "withdraw_unbonded".to_string(),
+            Self::WithdrawUnbonded { .. } => "withdraw_unbonded".to_string(),
             Self::SetPayee { .. } => "set_payee <staked|stash|account <address>>".to_string(),
             Self::Validate { .. } => {
                 "validate <value-in-percentage> [blocked <yes|no>]".to_string()
@@ -205,11 +264,11 @@ impl ToPlaceholder for Call {
 impl ToMethod for Call {
     fn to_method(&self) -> String {
         match self {
-            Self::Bond { amount, payee } => format!("bond {amount} payee {payee}"),
-            Self::BondExtra { amount } => format!("bond_extra {amount}"),
-            Self::Unbond { amount } => format!("unbond {amount}"),
-            Self::Rebond { amount } => format!("rebond {amount}"),
-            Self::WithdrawUnbonded => "withdraw_unbonded".to_string(),
+            Self::Bond { amount, payee, .. } => format!("bond {amount} payee {payee}"),
+            Self::BondExtra { amount, .. } => format!("bond_extra {amount}"),
+            Self::Unbond { amount, .. } => format!("unbond {amount}"),
+            Self::Rebond { amount, .. } => format!("rebond {amount}"),
+            Self::WithdrawUnbonded { .. } => "withdraw_unbonded".to_string(),
             Self::SetPayee { payee } => format!("set_payee {payee}"),
             Self::Validate {
                 commission,
@@ -243,6 +302,9 @@ impl AsBytes for Call {
 fn parse_standard_unit(value: &str, decimals: u32) -> Result<u128, CallError> {
     match value.split_once('.') {
         None => {
+            if value.is_empty() {
+                return Err(CallError::MissingArgument);
+            }
             let value = value
                 .parse::<u128>()
                 .map_err(|_| CallError::InvalidAmount(value.to_string()))?;

@@ -183,11 +183,13 @@ impl InputField {
                         | CallError::UnknownArgument(_)
                         | CallError::UnknownCommand(_)
                         | CallError::UnknownOptional(_)
-                        | CallError::MissingArguments(_)
                         | CallError::InvalidKeys(_)
                         | CallError::InvalidPayee(_)
                         | CallError::InvalidPercentage(_)
-                        | CallError::InvalidPercentageRange(_) => {
+                        | CallError::InvalidPercentageRange(_)
+                        // NOTE: MissingArgument is silently ignored
+                        // | CallError::MissingArgument
+                        => {
                             self.status = Status::Invalid(e.to_string())
                         }
                         _ => self.status = Status::None,

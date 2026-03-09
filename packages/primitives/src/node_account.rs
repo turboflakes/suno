@@ -1,5 +1,5 @@
 use crate::balance::Balance;
-use crate::display::to_compact_string;
+use crate::display::{format_planks, to_compact_string};
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
 use subxt::utils::AccountId32;
@@ -66,6 +66,15 @@ impl NodeAccount {
 
     pub fn token_symbol(&self) -> &'static str {
         self.runtime().token_symbol()
+    }
+
+    pub fn free_balance(&self) -> u128 {
+        self.balance.free_balance()
+    }
+
+    pub fn free_balance_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(self.free_balance(), self.token_decimals(), decimal_places);
+        format!("{}{}", value, self.token_symbol())
     }
 }
 

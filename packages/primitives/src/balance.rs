@@ -15,4 +15,20 @@ impl Balance {
             frozen,
         }
     }
+
+    pub fn free_balance(&self) -> Amount {
+        self.free
+    }
+
+    pub fn reserved_balance(&self) -> Amount {
+        self.reserved
+    }
+
+    pub fn frozen_balance(&self) -> Amount {
+        self.frozen
+    }
+
+    pub fn total_balance(&self) -> Amount {
+        self.free + self.reserved + self.frozen
+    }
 }

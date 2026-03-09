@@ -762,8 +762,18 @@ impl App {
                 return;
             };
 
-            let runtime = validator.runtime().asset_hub_runtime();
-            self.popup.show_extrinsics(Some(runtime));
+            let Some(chain) = self
+                .chains
+                .get_chain_by_runtime(validator.runtime().asset_hub_runtime())
+            else {
+                return;
+            };
+
+            let Some(active_era) = chain.era() else {
+                return;
+            };
+
+            self.popup.show_extrinsics(active_era.index(), validator);
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         };

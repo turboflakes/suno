@@ -21,6 +21,7 @@ use suno_primitives::{
     entry::{Command, Entry, ToDescription},
     session::Keys,
     staking::Payee,
+    Validator,
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -36,11 +37,11 @@ pub enum Mode {
 
 #[derive(Debug, Clone, Default)]
 pub struct PopupWidget {
-    pub state: Arc<RwLock<ListState>>,
+    pub state: Arc<RwLock<PopupState>>,
 }
 
 #[derive(Debug)]
-pub struct ListState {
+pub struct PopupState {
     options: Vec<Entry<Call>>,
     table_state: TableState,
     is_visible: bool,
@@ -49,7 +50,7 @@ pub struct ListState {
     spinner: Spinner,
 }
 
-impl Default for ListState {
+impl Default for PopupState {
     fn default() -> Self {
         Self {
             options: Vec::new(),
@@ -62,7 +63,7 @@ impl Default for ListState {
     }
 }
 
-impl ListState {
+impl PopupState {
     pub fn set_lock(&mut self) {
         self.mode = Mode::Locked;
     }
@@ -125,12 +126,14 @@ impl ListState {
     }
 }
 
+type ActiveEra = u32;
+
 impl PopupWidget {
-    pub fn on_init(&self, mode: Mode, runtime: Option<SupportedRuntime>) {
+    pub fn on_init(&self, mode: Mode, context: Option<(ActiveEra, Validator)>) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
         match mode {
-            Mode::Menu => self.init_menu(&mut state),
+            Mode::Menu => self.init_menu(&mut state, context),
             Mode::Transaction => self.init_transaction(&mut state),
             _ => {}
         }
@@ -139,14 +142,6 @@ impl PopupWidget {
         // Select the first option.
         if !state.options.is_empty() {
             state.table_state.select(Some(0));
-        }
-
-        // Reset the input field to command mode and set metadata.
-        if let Some(runtime) = runtime {
-            let unit = runtime.token_symbol();
-            let decimals = runtime.token_decimals();
-            let metadata = InputFieldMetadata::new(unit, decimals);
-            state.input.reset_as_command(Some(metadata));
         }
 
         // Make popup visible.
@@ -158,29 +153,53 @@ impl PopupWidget {
         // TODO: Set chain state to error
     }
 
-    fn init_menu(&self, state: &mut ListState) {
-        // TODO: Define supported calls depending on the context
+    fn init_menu(&self, state: &mut PopupState, context: Option<(ActiveEra, Validator)>) {
+        let Some((active_era, validator)) = context else {
+            return;
+        };
+
+        let runtime = validator.runtime().asset_hub_runtime();
+
+        // Reset the input field to command mode and set metadata.
+        let unit = runtime.token_symbol();
+        let decimals = runtime.token_decimals();
+        let metadata = InputFieldMetadata::new(unit, decimals);
+        state.input.reset_as_command(Some(metadata));
+
+        // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
         state.options.push(Entry::new(Command::Instruction {
             call: Call::Bond {
                 amount: 0,
                 payee: Payee::default(),
+                max: Some(validator.free_balance_extended(4)),
             },
             bytes: None,
         }));
         state.options.push(Entry::new(Command::Instruction {
-            call: Call::BondExtra { amount: 0 },
+            call: Call::BondExtra {
+                amount: 0,
+                max: Some(validator.free_balance_extended(4)),
+            },
             bytes: None,
         }));
         state.options.push(Entry::new(Command::Instruction {
-            call: Call::Unbond { amount: 0 },
+            call: Call::Unbond {
+                amount: 0,
+                max: Some(validator.bounded_extended(4)),
+            },
             bytes: None,
         }));
         state.options.push(Entry::new(Command::Instruction {
-            call: Call::Rebond { amount: 0 },
+            call: Call::Rebond {
+                amount: 0,
+                max: Some(validator.unlocking_extended(active_era, 4)),
+            },
             bytes: None,
         }));
         state.options.push(Entry::new(Command::Instruction {
-            call: Call::WithdrawUnbonded,
+            call: Call::WithdrawUnbonded {
+                max: Some(validator.unlocked_extended(active_era, 4)),
+            },
             bytes: None,
         }));
         state.options.push(Entry::new(Command::Instruction {
@@ -246,7 +265,7 @@ impl PopupWidget {
         state.input.reset_as_password();
     }
 
-    fn init_transaction(&self, state: &mut ListState) {
+    fn init_transaction(&self, state: &mut PopupState) {
         state.spinner.increment();
         state.options.push(Entry::new(Command::Text(
             "processing transaction".to_string(),
@@ -306,8 +325,8 @@ impl PopupWidget {
         matches!(state.mode, Mode::Transaction)
     }
 
-    pub fn show_extrinsics(&self, runtime: Option<SupportedRuntime>) {
-        self.on_init(Mode::Menu, runtime);
+    pub fn show_extrinsics(&self, active_era: ActiveEra, validator: Validator) {
+        self.on_init(Mode::Menu, Some((active_era, validator)));
     }
 
     pub fn close(&self) {
@@ -446,7 +465,7 @@ impl Widget for &PopupWidget {
     }
 }
 
-fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let block = Block::new()
         .style(THEME.block.active)
         .padding(Padding::symmetric(0, 1));
@@ -496,7 +515,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut ListState) {
     state.input.as_command(call).render(input_area, buf);
 }
 
-fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let block = Block::new()
         .style(THEME.block.active)
         .padding(Padding::proportional(1));
@@ -591,7 +610,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut ListState) 
     state.input.as_password().render(input_area, buf);
 }
 
-fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut ListState) {
+fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let horizontal = Layout::horizontal([Constraint::Max(56)]);
     let [area] = horizontal.areas(area);
 

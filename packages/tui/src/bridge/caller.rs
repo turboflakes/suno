@@ -40,23 +40,23 @@ impl RuntimeCaller for Runtime {
     ) -> Result<Bytes, Error> {
         match &self {
             Runtime::AssetHubPaseo => match call {
-                Call::Bond { amount, payee } => {
+                Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond(amount, payee);
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
-                Call::BondExtra { amount } => {
+                Call::BondExtra { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond_extra(amount);
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
-                Call::Unbond { amount } => {
+                Call::Unbond { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_unbond(amount);
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
-                Call::Rebond { amount } => {
+                Call::Rebond { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_rebond(amount);
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
-                Call::WithdrawUnbonded => {
+                Call::WithdrawUnbonded { .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_withdraw_unbonded();
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }

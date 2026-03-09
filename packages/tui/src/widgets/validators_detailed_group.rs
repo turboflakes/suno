@@ -299,31 +299,15 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let show_bonded = validators
+        let show_bonded = validators.iter().any(|v| v.self_stake() != v.bounded());
+
+        let show_unlocking = validators
             .iter()
-            .any(|v| v.stake.own() != v.ledger.active());
+            .any(|v| v.unlocking(active_era.index()) > 0);
 
-        let show_unlocking = validators.iter().any(|v| {
-            let unlocking: u128 = v
-                .ledger
-                .unlocking()
-                .iter()
-                .filter(|c| c.era > active_era.index())
-                .map(|c| c.value)
-                .sum();
-            unlocking > 0
-        });
-
-        let show_unlocked = validators.iter().any(|v| {
-            let unlocking: u128 = v
-                .ledger
-                .unlocking()
-                .iter()
-                .filter(|c| c.era <= active_era.index())
-                .map(|c| c.value)
-                .sum();
-            unlocking > 0
-        });
+        let show_unlocked = validators
+            .iter()
+            .any(|v| v.unlocked(active_era.index()) > 0);
 
         let show_next_commission = validators.iter().any(|v| v.is_commission_changed());
 
@@ -363,7 +347,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 ),
                 Cell::from(
                     Line::from(vec![
-                        Span::raw(format_planks(v.stake.own(), decimals, 4)),
+                        Span::raw(format_planks(v.self_stake(), decimals, 4)),
                         span_symbol.clone(),
                     ])
                     .alignment(Alignment::Right),
@@ -371,13 +355,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ];
 
             if show_bonded {
-                if v.stake.own() != v.ledger.active() {
+                if v.self_stake() != v.bounded() {
                     validator_cells.push(Cell::from(
                         Line::from(vec![
-                            Span::raw("("),
-                            Span::raw(format_planks(v.ledger.active(), decimals, 4)),
+                            Span::raw(format_planks(v.bounded(), decimals, 4)),
                             span_symbol.clone(),
-                            Span::raw(")"),
                         ])
                         .alignment(Alignment::Left),
                     ));
@@ -387,13 +369,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             }
 
             if show_unlocking {
-                let unlocking: u128 = v
-                    .ledger
-                    .unlocking()
-                    .iter()
-                    .filter(|c| c.era > active_era.index())
-                    .map(|c| c.value)
-                    .sum();
+                let unlocking: u128 = v.unlocking(active_era.index());
 
                 if unlocking > 0 {
                     validator_cells.push(Cell::from(
@@ -409,13 +385,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             }
 
             if show_unlocked {
-                let unlocked: u128 = v
-                    .ledger
-                    .unlocking()
-                    .iter()
-                    .filter(|c| c.era <= active_era.index())
-                    .map(|c| c.value)
-                    .sum();
+                let unlocked: u128 = v.unlocked(active_era.index());
 
                 if unlocked > 0 {
                     validator_cells.push(Cell::from(

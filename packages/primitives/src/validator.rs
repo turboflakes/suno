@@ -1,5 +1,5 @@
 use crate::{
-    display::get_elapsed_millis,
+    display::{format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
@@ -99,6 +99,67 @@ impl Validator {
 
     pub fn identity(&self) -> &Option<Identity> {
         self.account.identity()
+    }
+
+    pub fn free_balance(&self) -> u128 {
+        self.account.free_balance()
+    }
+
+    pub fn free_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.free_balance(),
+            self.account.free_balance_as_str(decimal_places),
+        )
+    }
+
+    pub fn unlocked(&self, era: u32) -> u128 {
+        self.ledger
+            .unlocking()
+            .iter()
+            .filter(|c| c.era <= era)
+            .map(|c| c.value)
+            .sum()
+    }
+
+    pub fn unlocked_extended(&self, era: u32, decimal_places: usize) -> (u128, String) {
+        let unlocked = self.unlocked(era);
+        let value = format_planks(unlocked, self.account.token_decimals(), decimal_places);
+        let description = format!("{}{}", value, self.account.token_symbol());
+        (unlocked, description)
+    }
+
+    pub fn unlocking(&self, era: u32) -> u128 {
+        self.ledger
+            .unlocking()
+            .iter()
+            .filter(|c| c.era > era)
+            .map(|c| c.value)
+            .sum()
+    }
+
+    pub fn unlocking_extended(&self, era: u32, decimal_places: usize) -> (u128, String) {
+        let unlocking = self.unlocking(era);
+        let value = format_planks(unlocking, self.account.token_decimals(), decimal_places);
+        let description = format!("{}{}", value, self.account.token_symbol());
+        (unlocking, description)
+    }
+
+    pub fn bounded(&self) -> u128 {
+        self.ledger.active()
+    }
+
+    pub fn bounded_extended(&self, decimal_places: usize) -> (u128, String) {
+        let value = format_planks(
+            self.bounded(),
+            self.account.token_decimals(),
+            decimal_places,
+        );
+        let description = format!("{}{}", value, self.account.token_symbol());
+        (self.bounded(), description)
+    }
+
+    pub fn self_stake(&self) -> u128 {
+        self.stake.own()
     }
 
     pub fn display_name(&self, size: usize) -> String {

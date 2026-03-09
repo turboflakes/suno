@@ -31,8 +31,8 @@ pub fn format_millis(millis: u64) -> String {
 }
 
 /// Format planks to human-readable string (e.g., "1.5K")
-pub fn format_planks(plancks: u128, decimals: u32, display_decimals: usize) -> String {
-    let value = plancks as f64 / 10_f64.powi(decimals as i32);
+pub fn format_planks(planks: u128, decimals: u32, display_decimals: usize) -> String {
+    let value = planks as f64 / 10_f64.powi(decimals as i32);
 
     match value {
         v if v >= 1_000_000_000.0 => format!("{:.prec$}B", v / 1e9, prec = display_decimals),
