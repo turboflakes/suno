@@ -82,7 +82,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             };
 
                             // Process block events in a separate task
-                            spawn_process_runtime_events(&api, block.hash(), events, runtime, &tx);
+                            spawn_process_runtime_events(&api, block.hash(), runtime, events, &tx);
 
                             // Fetch block extrinsics
                             let extrinsics = match at_block.extrinsics().fetch().await {
@@ -97,8 +97,8 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             spawn_process_block_extrinsics(
                                 &api,
                                 block.hash(),
-                                extrinsics,
                                 runtime,
+                                extrinsics,
                                 &tx,
                             );
                         }

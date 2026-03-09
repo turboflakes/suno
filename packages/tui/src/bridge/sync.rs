@@ -18,8 +18,6 @@ use suno_error::{Error, ResultExt};
 use suno_primitives::{AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
-const CONCURRENT_REQUESTS: usize = 3;
-
 /// Default spawner for making asynchronous fetch requests.
 struct DefaultSpawner {
     api: OnlineClient<SubstrateConfig>,
@@ -77,8 +75,114 @@ impl DefaultSpawner {
     }
 }
 
+/// Validator spawner for making asynchronous fetch requests.
+struct ValidatorSpawner {
+    api: OnlineClient<SubstrateConfig>,
+    block_hash: H256,
+    runtime: SupportedRuntime,
+    validator_keys: Vec<AccountKey>,
+    tx: UnboundedSender<Action>,
+}
+
+impl ValidatorSpawner {
+    fn new(
+        api: &OnlineClient<SubstrateConfig>,
+        block_hash: H256,
+        runtime: SupportedRuntime,
+        validator_keys: &[AccountKey],
+        tx: &UnboundedSender<Action>,
+    ) -> Self {
+        Self {
+            api: api.clone(),
+            block_hash,
+            runtime,
+            validator_keys: validator_keys.to_vec(),
+            tx: tx.clone(),
+        }
+    }
+
+    fn spawn_unordered<F, Fut>(self, fetch_fn: F, n: usize)
+    where
+        F: Fn(OnlineClient<SubstrateConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Response, Error>> + Send,
+    {
+        let Self {
+            api,
+            block_hash,
+            runtime,
+            validator_keys,
+            tx,
+        } = self;
+
+        tokio::spawn(async move {
+            let mut stream = stream::iter(validator_keys)
+                .map(|key| {
+                    let api = api.clone();
+                    let stash = key.stash();
+                    fetch_fn(api, block_hash, stash)
+                })
+                .buffer_unordered(n);
+
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok(response) => {
+                        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Dispatch error: {}",
+                                e
+                            ))));
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Fetch error: {}",
+                            e
+                        ))));
+                    }
+                }
+            }
+        });
+    }
+
+    fn spawn_batch<F, Fut>(self, fetch_fn: F)
+    where
+        F: Fn(OnlineClient<SubstrateConfig>, H256, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
+    {
+        let Self {
+            api,
+            block_hash,
+            runtime,
+            validator_keys,
+            tx,
+        } = self;
+
+        tokio::spawn(async move {
+            let result = fetch_fn(api, block_hash, validator_keys).await;
+
+            match result {
+                Ok(responses) => {
+                    for response in responses {
+                        if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Dispatch error: {}",
+                                e
+                            ))));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Fetch error: {}",
+                        e
+                    ))));
+                }
+            }
+        });
+    }
+}
 // ----
-// Fetcher tasks
+// General chain fetcher tasks
 // ----
 
 pub fn spawn_fetch_era_data(
@@ -160,6 +264,10 @@ pub fn spawn_fetch_total_nominators_count(
         .spawn(move |api, bh| async move { runtime.fetch_total_nominators_count(&api, bh).await });
 }
 
+// ----
+// Validator fetcher tasks
+// ----
+//
 pub fn spawn_fetch_validators_era_points(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
@@ -168,33 +276,13 @@ pub fn spawn_fetch_validators_era_points(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let validator_keys = validator_keys.to_vec();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_validators_era_points(&api, block_hash, era_index, &validator_keys)
-            .await;
-        match result {
-            Ok(responses) => {
-                for response in responses {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
+        move |api, bh, vk| async move {
+            runtime
+                .fetch_validators_era_points(&api, bh, era_index, &vk)
+                .await
+        },
+    );
 }
 
 pub fn spawn_fetch_validators_authority_status(
@@ -204,33 +292,13 @@ pub fn spawn_fetch_validators_authority_status(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let validator_keys = validator_keys.to_vec();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_validators_authority_status(&api, block_hash, &validator_keys)
-            .await;
-        match result {
-            Ok(responses) => {
-                for response in responses {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
+        move |api, bh, vk| async move {
+            runtime
+                .fetch_validators_authority_status(&api, bh, &vk)
+                .await
+        },
+    );
 }
 
 pub fn spawn_fetch_validators_queued_keys(
@@ -240,33 +308,9 @@ pub fn spawn_fetch_validators_queued_keys(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let api = api.clone();
-    let validator_keys = validator_keys.to_vec();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let result = runtime
-            .fetch_validators_queued_keys(&api, block_hash, &validator_keys)
-            .await;
-        match result {
-            Ok(responses) => {
-                for response in responses {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                    "Fetch error: {}",
-                    e
-                ))));
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
+        move |api, bh, vk| async move { runtime.fetch_validators_queued_keys(&api, bh, &vk).await },
+    );
 }
 
 pub fn spawn_fetch_validators_stake_overview(
@@ -277,43 +321,14 @@ pub fn spawn_fetch_validators_stake_overview(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_stake_overview(&api, block_hash, era_index, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move {
+            runtime
+                .fetch_stake_overview(&api, bh, era_index, &stash)
+                .await
+        },
+        3,
+    );
 }
 
 pub fn spawn_fetch_validators_staking_ledger(
@@ -323,39 +338,10 @@ pub fn spawn_fetch_validators_staking_ledger(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move { runtime.fetch_stake_ledger(&api, block_hash, &stash).await }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_stake_ledger(&api, bh, &stash).await },
+        3,
+    );
 }
 
 pub fn spawn_fetch_validators_points(
@@ -365,43 +351,10 @@ pub fn spawn_fetch_validators_points(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_points(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_validator_points(&api, bh, &stash).await },
+        3,
+    );
 }
 
 pub fn spawn_fetch_validators_prefs(
@@ -412,43 +365,14 @@ pub fn spawn_fetch_validators_prefs(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_prefs(&api, block_hash, era_index, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move {
+            runtime
+                .fetch_validator_prefs(&api, bh, era_index, &stash)
+                .await
+        },
+        3,
+    );
 }
 
 pub fn spawn_fetch_validators_prefs_next(
@@ -458,43 +382,13 @@ pub fn spawn_fetch_validators_prefs_next(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_prefs_next(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move {
+            runtime
+                .fetch_validator_prefs_next(&api, bh, &stash)
+                .await
+        }, 3,
+    );
 }
 
 pub fn spawn_fetch_validators_payee(
@@ -504,43 +398,10 @@ pub fn spawn_fetch_validators_payee(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_payee(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_validator_payee(&api, bh, &stash).await },
+        3,
+    );
 }
 
 pub fn spawn_fetch_validators_next_keys(
@@ -550,43 +411,9 @@ pub fn spawn_fetch_validators_next_keys(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_next_keys(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_validator_next_keys(&api, bh, &stash).await }, 3,
+    );
 }
 
 pub fn spawn_fetch_validators_identity(
@@ -596,43 +423,9 @@ pub fn spawn_fetch_validators_identity(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_validator_identity(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_validator_identity(&api, bh, &stash).await }, 3,
+    );
 }
 
 pub fn spawn_fetch_validators_proxy_status(
@@ -643,44 +436,15 @@ pub fn spawn_fetch_validators_proxy_status(
     proxy: &AccountId32,
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
     let proxy = *proxy;
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .validate_proxy_account(&api, block_hash, &stash, &proxy)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move {
+            runtime
+                .validate_proxy_account(&api, bh, &stash, &proxy)
+                .await
+        },
+        3,
+    );
 }
 
 pub fn spawn_fetch_account_balance(
@@ -690,43 +454,10 @@ pub fn spawn_fetch_account_balance(
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    let validator_keys = validator_keys.to_vec();
-    let api = api.clone();
-    let tx = tx.clone();
-
-    tokio::spawn(async move {
-        let mut stream = stream::iter(validator_keys)
-            .map(|key| {
-                let api = api.clone();
-                let stash = key.stash();
-
-                async move {
-                    runtime
-                        .fetch_account_balance(&api, block_hash, &stash)
-                        .await
-                }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(response) => {
-                    if let Err(e) = dispatch_response_action(response, runtime, &tx) {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Dispatch error: {}",
-                            e
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Fetch error: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-    });
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+        move |api, bh, stash| async move { runtime.fetch_account_balance(&api, bh, &stash).await },
+        3,
+    );
 }
 
 // ----
@@ -880,8 +611,8 @@ async fn process_transaction_wait_for_success(
 pub fn spawn_process_runtime_events(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    events: Events<SubstrateConfig>,
     runtime: SupportedRuntime,
+    events: Events<SubstrateConfig>,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -915,8 +646,8 @@ pub fn spawn_process_runtime_events(
 pub fn spawn_process_block_extrinsics(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
-    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     runtime: SupportedRuntime,
+    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
