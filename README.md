@@ -1,6 +1,6 @@
 # suno &middot; ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
 
-`suno` -- Just another way of managing **Su**bstrate **n**ode **o**perations in the Polkadot ecosystem.
+`suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal.
 
 ## Development / Build from Source
 
