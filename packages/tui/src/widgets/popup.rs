@@ -21,6 +21,7 @@ use suno_primitives::{
     entry::{Command, Entry, ToDescription},
     session::Keys,
     staking::Payee,
+    validator::ValidatorStatus,
     Validator,
 };
 use unicode_width::UnicodeWidthStr;
@@ -166,59 +167,87 @@ impl PopupWidget {
         let metadata = InputFieldMetadata::new(unit, decimals);
         state.input.reset_as_command(Some(metadata));
 
-        // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Bond {
-                amount: 0,
-                payee: Payee::default(),
-                max: Some(validator.free_balance_extended(4)),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::BondExtra {
-                amount: 0,
-                max: Some(validator.free_balance_extended(4)),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Unbond {
-                amount: 0,
-                max: Some(validator.bounded_extended(4)),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Rebond {
-                amount: 0,
-                max: Some(validator.unlocking_extended(active_era, 4)),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::WithdrawUnbonded {
-                max: Some(validator.unlocked_extended(active_era, 4)),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::SetPayee {
-                payee: Payee::default(),
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Validate {
-                commission: Perbill::from_percent(0),
-                blocked: false,
-            },
-            bytes: None,
-        }));
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Chill,
-            bytes: None,
-        }));
+        match validator.status {
+            ValidatorStatus::Waiting | ValidatorStatus::Unknown => {
+                // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
+                state.options.push(Entry::new(Command::Instruction {
+                    call: Call::Bond {
+                        amount: 0,
+                        payee: Payee::default(),
+                        max: Some(validator.free_balance_extended(4)),
+                    },
+                    bytes: None,
+                }));
+                state.options.push(Entry::new(Command::Instruction {
+                    call: Call::Validate {
+                        commission: Perbill::from_percent(0),
+                        blocked: false,
+                    },
+                    bytes: None,
+                }));
+            }
+            _ => {
+                if validator.free_balance() > 0 {
+                    state.options.push(Entry::new(Command::Instruction {
+                        call: Call::BondExtra {
+                            amount: 0,
+                            max: Some(validator.free_balance_extended(4)),
+                        },
+                        bytes: None,
+                    }));
+                }
+
+                if validator.bounded() > 0 {
+                    state.options.push(Entry::new(Command::Instruction {
+                        call: Call::Unbond {
+                            amount: 0,
+                            max: Some(validator.bounded_extended(4)),
+                        },
+                        bytes: None,
+                    }));
+                }
+
+                if validator.unlocking(active_era) > 0 {
+                    state.options.push(Entry::new(Command::Instruction {
+                        call: Call::Rebond {
+                            amount: 0,
+                            max: Some(validator.unlocking_extended(active_era, 4)),
+                        },
+                        bytes: None,
+                    }));
+                }
+
+                if validator.unlocked(active_era) > 0 {
+                    state.options.push(Entry::new(Command::Instruction {
+                        call: Call::WithdrawUnbonded {
+                            max: Some(validator.unlocked_extended(active_era, 4)),
+                        },
+                        bytes: None,
+                    }));
+                }
+
+                state.options.push(Entry::new(Command::Instruction {
+                    call: Call::SetPayee {
+                        payee: Payee::default(),
+                    },
+                    bytes: None,
+                }));
+
+                state.options.push(Entry::new(Command::Instruction {
+                    call: Call::Validate {
+                        commission: Perbill::from_percent(0),
+                        blocked: false,
+                    },
+                    bytes: None,
+                }));
+
+                state.options.push(Entry::new(Command::Instruction {
+                    call: Call::Chill,
+                    bytes: None,
+                }));
+            }
+        }
+
         state.options.push(Entry::new(Command::Instruction {
             call: Call::SetSessionKeys {
                 keys: Keys::default(),
