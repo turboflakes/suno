@@ -605,10 +605,18 @@ impl App {
                 // In case of 'Rebond' funds should be added to staking_ledger and also
                 // subtracted from unlocking vec.
                 // To keep things in sync, a fetch for this respective stash is being called here.
+                // And also a fetch to the account balance is being called here.
                 let runtime = validator_key.runtime().asset_hub_runtime();
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
                     sync::spawn_fetch_validators_staking_ledger(
+                        &api,
+                        block_hash,
+                        runtime,
+                        &validator_keys,
+                        &self.tx,
+                    );
+                    sync::spawn_fetch_account_balance(
                         &api,
                         block_hash,
                         runtime,
@@ -620,6 +628,18 @@ impl App {
             ValidatorAction::SubChunkFromStakeLedger(validator_key, chunk) => {
                 self.validators
                     .sub_chunk_from_stake_ledger(&validator_key, chunk);
+                // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
+                let runtime = validator_key.runtime().asset_hub_runtime();
+                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+                    let validator_keys = vec![validator_key];
+                    sync::spawn_fetch_account_balance(
+                        &api,
+                        block_hash,
+                        runtime,
+                        &validator_keys,
+                        &self.tx,
+                    );
+                }
             }
             ValidatorAction::UpdateProxyStatus(validator_key, is_valid) => {
                 self.validators
