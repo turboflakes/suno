@@ -3,7 +3,8 @@ use crate::node_runtime::{
     runtime_types::{pallet_session::pallet::Call as SessionCall, polkadot_runtime::RuntimeCall},
     session::events::NewSession,
 };
-use crate::storage::{fetch_epoch_data, map_keys_from_session_keys};
+use crate::storage::fetch_epoch_data;
+use crate::utils::map_keys_from_session_keys;
 use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,

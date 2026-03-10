@@ -324,6 +324,7 @@ impl SupportedRuntime {
             Self::PeopleWestend => "People Westend",
         }
     }
+
     pub fn as_str_long(&self) -> &'static str {
         match self {
             Self::Local => "Local",

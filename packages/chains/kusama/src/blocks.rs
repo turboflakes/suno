@@ -5,7 +5,8 @@ use crate::node_runtime::{
     },
     session::events::NewSession,
 };
-use crate::storage::{fetch_epoch_data, map_keys_from_session_keys};
+use crate::storage::fetch_epoch_data;
+use crate::utils::map_keys_from_session_keys;
 use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,

@@ -29,14 +29,14 @@ impl Widget for &ValidatorsCompactWidget {
         let widths = [
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(3),
+            Constraint::Length(7),
             Constraint::Length(1),
         ];
 
         let header_cells = vec![
             Cell::from(""),
             Cell::from(Text::from("validators").alignment(Alignment::Left)),
-            Cell::from(""),
+            Cell::from(Text::from("proxies").alignment(Alignment::Right)),
             Cell::from(""),
         ];
 

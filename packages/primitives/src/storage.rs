@@ -2,6 +2,7 @@ use crate::{
     babe::Epoch,
     balance::Balance,
     identity::Identity,
+    proxy::SupportedProxy,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
@@ -99,9 +100,16 @@ pub struct ValidatorKeysData {
 
 /// Stash proxied data combining account and its proxied status
 #[derive(Debug)]
-pub struct StashProxiedData {
+pub struct SupportedProxyData {
     pub account: AccountBytes,
-    pub proxied: bool,
+    pub supported_proxy: SupportedProxy,
+}
+
+/// Stash proxies data combining account and its supported proxies
+#[derive(Debug)]
+pub struct SupportedProxiesData {
+    pub account: AccountBytes,
+    pub supported_proxies: Vec<SupportedProxy>,
 }
 
 /// Stash proxied data combining account and its proxied status
@@ -145,7 +153,7 @@ pub enum Response {
     TxError(String),
     EventBonded(Data<AmountData>),
     EventUnbonded(Data<ChunkData>),
-    StashProxied(Data<StashProxiedData>),
+    SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
 }
 
@@ -238,8 +246,11 @@ impl Response {
         Response::EventUnbonded(Data::new(ChunkData { account, chunk }))
     }
 
-    pub fn stash_proxied(account: AccountBytes, proxied: bool) -> Self {
-        Response::StashProxied(Data::new(StashProxiedData { account, proxied }))
+    pub fn supported_proxy(account: AccountBytes, supported_proxy: SupportedProxy) -> Self {
+        Response::SupportedProxy(Data::new(SupportedProxyData {
+            account,
+            supported_proxy,
+        }))
     }
 
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {

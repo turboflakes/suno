@@ -144,6 +144,51 @@ impl ValidatorSpawner {
         });
     }
 
+    fn spawn_unordered_multi<F, Fut>(self, fetch_fn: F, n: usize)
+    where
+        F: Fn(OnlineClient<SubstrateConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
+    {
+        let Self {
+            api,
+            block_hash,
+            runtime,
+            validator_keys,
+            tx,
+        } = self;
+
+        tokio::spawn(async move {
+            let mut stream = stream::iter(validator_keys)
+                .map(|key| {
+                    let api = api.clone();
+                    let stash = key.stash();
+                    fetch_fn(api, block_hash, stash)
+                })
+                .buffer_unordered(n);
+
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok(responses) => {
+                        for response in responses {
+                            if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Dispatch error: {}",
+                                    e
+                                ))));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Fetch error: {}",
+                            e
+                        ))));
+                    }
+                }
+            }
+        });
+    }
+
     fn spawn_batch<F, Fut>(self, fetch_fn: F)
     where
         F: Fn(OnlineClient<SubstrateConfig>, H256, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
@@ -437,10 +482,10 @@ pub fn spawn_fetch_validators_proxy_status(
     tx: &UnboundedSender<Action>,
 ) {
     let proxy = *proxy;
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
+    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered_multi(
         move |api, bh, stash| async move {
             runtime
-                .validate_proxy_account(&api, bh, &stash, &proxy)
+                .fetch_and_validate_proxy_account(&api, bh, &stash, &proxy)
                 .await
         },
         3,

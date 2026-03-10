@@ -3,7 +3,7 @@ use log::warn;
 use suno_actions::{Action, ChainAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
-use suno_primitives::{AccountKey, Response};
+use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub fn dispatch_response_action(
@@ -216,12 +216,13 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
-        Response::StashProxied(data) => {
+        Response::SupportedProxy(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
-            tx.send(Action::Validator(ValidatorAction::UpdateProxyStatus(
+            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            tx.send(Action::Validator(ValidatorAction::AddProxy(
                 account_key,
-                data.value.proxied,
+                proxy_key,
             )))
             .boxed()?;
         }

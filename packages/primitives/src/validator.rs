@@ -3,6 +3,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
+    proxy::ProxyKey,
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
@@ -63,7 +64,7 @@ pub struct Validator {
     // the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
     pub is_chilled: bool,
-    pub is_proxy_valid: bool,
+    pub proxies: Vec<ProxyKey>,
     pub status: ValidatorStatus,
 }
 
@@ -84,7 +85,7 @@ impl Validator {
             old_points_ts: 0,
             era_points: 0,
             is_chilled: false,
-            is_proxy_valid: false,
+            proxies: Vec::new(),
             status: ValidatorStatus::default(),
         }
     }
@@ -257,8 +258,28 @@ impl Validator {
         self.status == ValidatorStatus::Unknown
     }
 
+    pub fn is_waiting_or_unknown(&self) -> bool {
+        self.status == ValidatorStatus::Waiting || self.status == ValidatorStatus::Unknown
+    }
+
+    pub fn is_active_or_waiting(&self) -> bool {
+        self.status != ValidatorStatus::Unknown
+    }
+
     pub fn is_proxy_valid(&self) -> bool {
-        self.is_proxy_valid
+        self.proxies.iter().any(|p| {
+            p.is_non_transfer_valid() || p.is_staking_valid() || p.is_staking_operator_valid()
+        })
+    }
+
+    pub fn proxies_as_str(&self) -> String {
+        let mut proxies = self.proxies.clone();
+        proxies.sort();
+        proxies
+            .iter()
+            .map(|p| (*p).to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     }
 }
 
@@ -274,12 +295,10 @@ impl AccountDisplay for Validator {
 
 impl From<&Validator> for Row<'_> {
     fn from(v: &Validator) -> Self {
-        let status = if v.is_proxy_valid() { "[S]" } else { "" };
-        let v = v.clone();
         Row::new(vec![
             Text::from(""),
-            Text::from(format!("{}/{}", v.runtime(), v.display_name(3),)),
-            Text::from(status).alignment(Alignment::Right),
+            Text::from(format!("{}/{}", v.runtime(), v.display_name(4),)),
+            Text::from(format!("[{}]", v.proxies_as_str())).alignment(Alignment::Right),
             Text::from(""),
         ])
     }

@@ -21,7 +21,6 @@ use suno_primitives::{
     entry::{Command, Entry, ToDescription},
     session::Keys,
     staking::Payee,
-    validator::ValidatorStatus,
     Validator,
 };
 use unicode_width::UnicodeWidthStr;
@@ -159,6 +158,10 @@ impl PopupWidget {
             return;
         };
 
+        if !validator.is_proxy_valid() {
+            return;
+        }
+
         let runtime = validator.runtime().asset_hub_runtime();
 
         // Reset the input field to command mode and set metadata.
@@ -167,93 +170,116 @@ impl PopupWidget {
         let metadata = InputFieldMetadata::new(unit, decimals);
         state.input.reset_as_command(Some(metadata));
 
-        match validator.status {
-            ValidatorStatus::Waiting | ValidatorStatus::Unknown => {
-                // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
+        // For each supported proxy, push the respective calls depending on the validator's status.
+        validator.proxies.iter().for_each(|p| {
+            // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
+            let bond = Call::Bond {
+                amount: 0,
+                payee: Payee::default(),
+                max: Some(validator.free_balance_extended(4)),
+            };
+            if p.proxy().can_call(&bond) && validator.is_waiting_or_unknown() {
                 state.options.push(Entry::new(Command::Instruction {
-                    call: Call::Bond {
-                        amount: 0,
-                        payee: Payee::default(),
-                        max: Some(validator.free_balance_extended(4)),
-                    },
-                    bytes: None,
-                }));
-                state.options.push(Entry::new(Command::Instruction {
-                    call: Call::Validate {
-                        commission: Perbill::from_percent(0),
-                        blocked: false,
-                    },
+                    call: bond,
                     bytes: None,
                 }));
             }
-            _ => {
-                if validator.free_balance() > 0 {
-                    state.options.push(Entry::new(Command::Instruction {
-                        call: Call::BondExtra {
-                            amount: 0,
-                            max: Some(validator.free_balance_extended(4)),
-                        },
-                        bytes: None,
-                    }));
-                }
 
-                if validator.bounded() > 0 {
-                    state.options.push(Entry::new(Command::Instruction {
-                        call: Call::Unbond {
-                            amount: 0,
-                            max: Some(validator.bounded_extended(4)),
-                        },
-                        bytes: None,
-                    }));
-                }
-
-                if validator.unlocking(active_era) > 0 {
-                    state.options.push(Entry::new(Command::Instruction {
-                        call: Call::Rebond {
-                            amount: 0,
-                            max: Some(validator.unlocking_extended(active_era, 4)),
-                        },
-                        bytes: None,
-                    }));
-                }
-
-                if validator.unlocked(active_era) > 0 {
-                    state.options.push(Entry::new(Command::Instruction {
-                        call: Call::WithdrawUnbonded {
-                            max: Some(validator.unlocked_extended(active_era, 4)),
-                        },
-                        bytes: None,
-                    }));
-                }
-
+            let bond_extra = Call::BondExtra {
+                amount: 0,
+                max: Some(validator.free_balance_extended(4)),
+            };
+            if p.proxy().can_call(&bond_extra)
+                && validator.is_active_or_waiting()
+                && validator.free_balance() > 0
+            {
                 state.options.push(Entry::new(Command::Instruction {
-                    call: Call::SetPayee {
-                        payee: Payee::default(),
-                    },
-                    bytes: None,
-                }));
-
-                state.options.push(Entry::new(Command::Instruction {
-                    call: Call::Validate {
-                        commission: Perbill::from_percent(0),
-                        blocked: false,
-                    },
-                    bytes: None,
-                }));
-
-                state.options.push(Entry::new(Command::Instruction {
-                    call: Call::Chill,
+                    call: bond_extra,
                     bytes: None,
                 }));
             }
-        }
 
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::SetSessionKeys {
+            let unbond = Call::Unbond {
+                amount: 0,
+                max: Some(validator.bounded_extended(4)),
+            };
+            if p.proxy().can_call(&unbond)
+                && validator.is_active_or_waiting()
+                && validator.bounded() > 0
+            {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: unbond,
+                    bytes: None,
+                }));
+            }
+
+            let rebond = Call::Rebond {
+                amount: 0,
+                max: Some(validator.unlocking_extended(active_era, 4)),
+            };
+            if p.proxy().can_call(&rebond)
+                && validator.is_active_or_waiting()
+                && validator.unlocking(active_era) > 0
+            {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: rebond,
+                    bytes: None,
+                }));
+            }
+
+            let withdraw = Call::WithdrawUnbonded {
+                max: Some(validator.unlocked_extended(active_era, 4)),
+            };
+            if p.proxy().can_call(&withdraw)
+                && validator.is_active_or_waiting()
+                && validator.unlocked(active_era) > 0
+            {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: withdraw,
+                    bytes: None,
+                }));
+            }
+
+            let set_payee = Call::SetPayee {
+                payee: Payee::default(),
+            };
+            if p.proxy().can_call(&set_payee) && validator.is_active_or_waiting() {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: set_payee,
+                    bytes: None,
+                }));
+            }
+
+            // NOTE: Validate calls are always available.
+            let validate = Call::Validate {
+                commission: Perbill::from_percent(0),
+                blocked: false,
+            };
+            if p.proxy().can_call(&validate) {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: validate,
+                    bytes: None,
+                }));
+            }
+
+            let chill = Call::Chill;
+            if p.proxy().can_call(&chill) && validator.is_active_or_waiting() {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: chill,
+                    bytes: None,
+                }));
+            }
+
+            let set_keys = Call::SetSessionKeys {
                 keys: Keys::default(),
-            },
-            bytes: None,
-        }));
+            };
+            if p.proxy().can_call(&set_keys) && validator.is_active_or_waiting() {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: set_keys,
+                    bytes: None,
+                }));
+            }
+        });
     }
 
     pub fn init_confirm_and_sign(

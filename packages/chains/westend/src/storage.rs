@@ -1,17 +1,11 @@
 use super::node_runtime;
+use crate::utils::map_keys_from_session_keys;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
         bounded_collections::bounded_vec::BoundedVec,
         pallet_proxy::ProxyDefinition,
         polkadot_primitives::v9::ValidatorIndex,
-        polkadot_primitives::v9::{
-            assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
-        },
-        sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
-        sp_consensus_babe::app::Public as BabePublic,
-        sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
-        sp_consensus_grandpa::app::Public as GrandpaPublic,
         westend_runtime::{ProxyType, SessionKeys},
     },
 };
@@ -21,30 +15,42 @@ use subxt::{
     OnlineClient, SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{session::Keys, validator::ValidatorStatus, AccountKey, Epoch, Response};
+use suno_primitives::{
+    proxy::SupportedProxy, validator::ValidatorStatus, AccountKey, Epoch, Response,
+};
 
 type Index = u64;
 type BlockNumber = u32;
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
-pub async fn validate_proxy_account(
+pub async fn fetch_and_validate_proxy_account(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
     proxy: &AccountId32,
-) -> Result<Response, Error> {
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
     let account_bytes = *stash.as_ref();
 
     let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
 
-    if proxies
-        .iter()
-        .any(|def| def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer)
-    {
-        return Ok(Response::stash_proxied(account_bytes, true));
+    for def in proxies {
+        if def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::NonTransfer,
+            ));
+        }
     }
 
-    Ok(Response::stash_proxied(account_bytes, false))
+    if responses.is_empty() {
+        responses.push(Response::supported_proxy(
+            account_bytes,
+            SupportedProxy::None,
+        ));
+    }
+
+    Ok(responses)
 }
 
 /// Fetch validator points at the specified block hash
@@ -322,15 +328,4 @@ async fn fetch_account_proxies(
         .boxed()?;
 
     Ok(value)
-}
-
-// Helper function to map SessionKeys to Keys
-pub fn map_keys_from_session_keys(session_keys: &SessionKeys) -> Keys {
-    let GrandpaPublic(grandpa) = session_keys.grandpa;
-    let BabePublic(babe) = session_keys.babe;
-    let ValidatorPublic(para) = session_keys.para_validator;
-    let AssignmentPublic(assi) = session_keys.para_assignment;
-    let AuthorityDiscoveryPublic(auth) = session_keys.authority_discovery;
-    let BeefyPublic(beef) = session_keys.beefy;
-    Keys::new(grandpa, babe, para, assi, auth, beef)
 }

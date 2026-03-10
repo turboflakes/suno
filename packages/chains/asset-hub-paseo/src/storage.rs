@@ -12,6 +12,7 @@ use crate::node_runtime::runtime_types::{
     },
     sp_staking::PagedExposureMetadata,
 };
+use crate::utils::map_reward_destination;
 use sp_arithmetic::{Perbill, Permill};
 use std::collections::HashSet;
 use subxt::{
@@ -23,6 +24,7 @@ use suno_error::{Error, ResultExt};
 use suno_primitives::{
     balance::Balance,
     node_account::get_account_bytes_from_storage_key,
+    proxy::SupportedProxy,
     staking,
     staking::{Chunk, Payee},
     AccountKey, Response,
@@ -49,24 +51,35 @@ pub async fn fetch_balance(
 }
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
-pub async fn validate_proxy_account(
+pub async fn fetch_and_validate_proxy_account(
     api: &OnlineClient<SubstrateConfig>,
     block_hash: H256,
     stash: &AccountId32,
     proxy: &AccountId32,
-) -> Result<Response, Error> {
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
     let account_bytes = *stash.as_ref();
 
     let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
 
-    if proxies
-        .iter()
-        .any(|def| def.delegate == *proxy && def.proxy_type == ProxyType::Staking)
-    {
-        return Ok(Response::stash_proxied(account_bytes, true));
+    for def in proxies {
+        if def.delegate == *proxy && def.proxy_type == ProxyType::Staking {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::Staking,
+            ));
+        }
+        // TODO: Support StakingOperator as soon as it is supported by the chain
     }
 
-    Ok(Response::stash_proxied(account_bytes, false))
+    if responses.is_empty() {
+        responses.push(Response::supported_proxy(
+            account_bytes,
+            SupportedProxy::None,
+        ));
+    }
+
+    Ok(responses)
 }
 
 /// Fetch validator prefs
@@ -327,16 +340,6 @@ pub async fn fetch_validator_payee(
     let payee = map_reward_destination(destination);
 
     Ok(Response::validator_payee(account_bytes, payee))
-}
-
-// Helper function to map RewardDestination to Payee
-fn map_reward_destination(dest: RewardDestination<AccountId32>) -> Payee {
-    match dest {
-        RewardDestination::None | RewardDestination::Controller => Payee::None,
-        RewardDestination::Account(account) => Payee::Account(account),
-        RewardDestination::Stash => Payee::Stash,
-        RewardDestination::Staked => Payee::Staked,
-    }
 }
 
 //

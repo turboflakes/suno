@@ -641,9 +641,8 @@ impl App {
                     );
                 }
             }
-            ValidatorAction::UpdateProxyStatus(validator_key, is_valid) => {
-                self.validators
-                    .update_proxy_status(&validator_key, is_valid);
+            ValidatorAction::AddProxy(validator_key, proxy) => {
+                self.validators.add_proxy(&validator_key, proxy);
             }
             ValidatorAction::UpdateBalance(validator_key, balance) => {
                 self.validators.update_balance(&validator_key, balance);

@@ -134,13 +134,13 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
-    async fn validate_proxy_account(
+    async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         stash: &AccountId32,
         proxy: &AccountId32,
-    ) -> Result<Response, Error>;
+    ) -> Result<Vec<Response>, Error>;
 
     async fn fetch_account_balance(
         &self,
@@ -592,37 +592,49 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
-    async fn validate_proxy_account(
+    async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClient<SubstrateConfig>,
         block_hash: H256,
         stash: &AccountId32,
         proxy: &AccountId32,
-    ) -> Result<Response, Error> {
+    ) -> Result<Vec<Response>, Error> {
         match self {
             Runtime::Polkadot => {
-                suno_polkadot::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_polkadot::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::Kusama => {
-                suno_kusama::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_kusama::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::Paseo => {
-                suno_paseo::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_paseo::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::Westend => {
-                suno_westend::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_westend::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
             }
             Runtime::AssetHubPolkadot => {
-                suno_asset_hub_polkadot::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_asset_hub_polkadot::fetch_and_validate_proxy_account(
+                    api, block_hash, stash, proxy,
+                )
+                .await
             }
             Runtime::AssetHubKusama => {
-                suno_asset_hub_kusama::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_asset_hub_kusama::fetch_and_validate_proxy_account(
+                    api, block_hash, stash, proxy,
+                )
+                .await
             }
             Runtime::AssetHubPaseo => {
-                suno_asset_hub_paseo::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_asset_hub_paseo::fetch_and_validate_proxy_account(
+                    api, block_hash, stash, proxy,
+                )
+                .await
             }
             Runtime::AssetHubWestend => {
-                suno_asset_hub_westend::validate_proxy_account(api, block_hash, stash, proxy).await
+                suno_asset_hub_westend::fetch_and_validate_proxy_account(
+                    api, block_hash, stash, proxy,
+                )
+                .await
             }
 
             _ => Err(Error::UnsupportedRuntime(*self)),

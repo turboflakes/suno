@@ -44,6 +44,7 @@ pub enum Call {
     SetSessionKeys {
         keys: Keys,
     },
+    // TODO: implement Kick and PurgeKeys
 }
 
 #[derive(thiserror::Error, Debug)]

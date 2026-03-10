@@ -9,6 +9,7 @@ use suno_primitives::{
     balance::Balance,
     call::Call,
     identity::Identity,
+    proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
@@ -22,7 +23,6 @@ type BlockHash = H256;
 type Amount = u128;
 type Points = u32;
 type Counter = u32;
-type IsValid = bool;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,7 +123,7 @@ pub enum ValidatorAction {
     AddAmountToStakeLedger(ValidatorKey, Amount),
     SubChunkFromStakeLedger(ValidatorKey, Chunk),
     UpdateStatus(ValidatorKey, ValidatorStatus),
-    UpdateProxyStatus(ValidatorKey, IsValid),
+    AddProxy(ValidatorKey, ProxyKey),
     UpdateBalance(ValidatorKey, Balance),
 }
 

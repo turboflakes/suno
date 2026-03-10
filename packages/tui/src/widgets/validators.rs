@@ -13,6 +13,7 @@ use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
+    proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::{Validator, ValidatorStatus},
@@ -173,9 +174,15 @@ impl ValidatorsListState {
         }
     }
 
-    pub fn set_proxy_status(&mut self, validator_key: &AccountKey, is_valid: bool) {
+    pub fn set_proxies(&mut self, validator_key: &AccountKey, proxies: Vec<ProxyKey>) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            validator.is_proxy_valid = is_valid;
+            validator.proxies = proxies;
+        }
+    }
+
+    pub fn add_proxy(&mut self, validator_key: &AccountKey, proxy: ProxyKey) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.proxies.push(proxy);
         }
     }
 
@@ -530,9 +537,9 @@ impl ValidatorsListWidget {
         state.sub_chunk_from_stake_ledger(validator_key, chunk);
     }
 
-    pub fn update_proxy_status(&self, validator_key: &AccountKey, is_valid: bool) {
+    pub fn add_proxy(&self, validator_key: &AccountKey, proxy: ProxyKey) {
         let mut state = self.state.write().unwrap();
-        state.set_proxy_status(validator_key, is_valid);
+        state.add_proxy(validator_key, proxy);
     }
 
     pub fn update_balance(&self, validator_key: &AccountKey, balance: Balance) {
