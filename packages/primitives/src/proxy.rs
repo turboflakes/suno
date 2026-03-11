@@ -9,7 +9,7 @@ pub type Proxy = SupportedProxy;
 /// https://docs.polkadot.com/node-infrastructure/run-a-validator/operational-tasks/staking-operator-proxy/#staking-operator-vs-staking-proxy
 pub enum SupportedProxy {
     None,
-    /// NonTransfer proxy must be configured on the Relay chain and is limited to SetSessionKeys/PurgeKeys
+    /// NonTransfer proxy must be configured on the Relay chain and is limited to SetKeys/PurgeKeys
     /// extrinsics on the Relay chain
     NonTransfer,
     /// Staking proxy must be configured on Asset Hub and is limited to call extrinsics for
@@ -32,8 +32,8 @@ impl SupportedProxy {
 
     pub fn can_call(&self, call: &Call) -> bool {
         match (self, call) {
-            // NOTE: NonTransfer proxy is limited to SetSessionKeys/PurgeKeys on the Relay chain
-            (Self::NonTransfer, Call::SetSessionKeys { .. }) => true,
+            // NOTE: NonTransfer proxy is limited to SetKeys/PurgeKeys on the Relay chain
+            (Self::NonTransfer, Call::SetKeys { .. }) => true,
             // (Self::NonTransfer, Call::PurgeKeys) => true,
             // NOTE: Staking proxy is limited to staking operations on Asset Hub
             (Self::Staking, Call::Bond { .. }) => true,
@@ -49,7 +49,7 @@ impl SupportedProxy {
             // NOTE: StakingOperator proxy is limited to staking operations on Asset Hub
             (Self::StakingOperator, Call::Validate { .. }) => true,
             (Self::StakingOperator, Call::Chill) => true,
-            (Self::StakingOperator, Call::SetSessionKeys { .. }) => true,
+            (Self::StakingOperator, Call::SetKeys { .. }) => true,
             // TODO: implement Kick and PurgeKeys
             // (Self::StakingOperator, Call::Kick) => true,
             // (Self::StakingOperator, Call::PurgeKeys) => true,

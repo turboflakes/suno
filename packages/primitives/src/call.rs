@@ -41,7 +41,7 @@ pub enum Call {
         blocked: bool,
     },
     Chill,
-    SetSessionKeys {
+    SetKeys {
         keys: Keys,
     },
     // TODO: implement Kick and PurgeKeys
@@ -140,7 +140,7 @@ impl Call {
                 }
                 "set_keys" => {
                     let keys = Keys::from_str(args)?;
-                    Ok(Self::SetSessionKeys { keys })
+                    Ok(Self::SetKeys { keys })
                 }
                 "validate" => match args.split_once(' ') {
                     None => {
@@ -186,7 +186,7 @@ impl std::fmt::Display for Call {
             Self::SetPayee { .. } => write!(f, "set_payee"),
             Self::Validate { .. } => write!(f, "validate"),
             Self::Chill => write!(f, "chill"),
-            Self::SetSessionKeys { .. } => write!(f, "set_keys"),
+            Self::SetKeys { .. } => write!(f, "set_keys"),
         }
     }
 }
@@ -232,7 +232,7 @@ impl ToDescription for Call {
                 "Validate/Change commission or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
-            Self::SetSessionKeys { .. } => {
+            Self::SetKeys { .. } => {
                 "Set session keys from the output of 'author_rotateKeys' call".to_string()
             }
         }
@@ -255,7 +255,7 @@ impl ToPlaceholder for Call {
                 "validate <value-in-percentage> [blocked <yes|no>]".to_string()
             }
             Self::Chill => "chill".to_string(),
-            Self::SetSessionKeys { .. } => {
+            Self::SetKeys { .. } => {
                 "set_keys <hex-session-keys-from-author-rotate-keys>".to_string()
             }
         }
@@ -276,7 +276,7 @@ impl ToMethod for Call {
                 blocked,
             } => format!("validate {} blocked {blocked}", commission.deconstruct()),
             Self::Chill => "chill".to_string(),
-            Self::SetSessionKeys { keys } => format!("set_keys {keys}"),
+            Self::SetKeys { keys } => format!("set_keys {keys}"),
         }
     }
 }

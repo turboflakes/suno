@@ -850,7 +850,7 @@ impl App {
                         return;
                     };
                     // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                    let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                    let runtime = if matches!(call, Call::SetKeys { .. }) {
                         validator.runtime().relay_chain()
                     } else {
                         validator.runtime().asset_hub_runtime()
@@ -909,7 +909,7 @@ impl App {
                         return;
                     };
                     // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                    let runtime = if matches!(call, Call::SetSessionKeys { .. }) {
+                    let runtime = if matches!(call, Call::SetKeys { .. }) {
                         validator.runtime().relay_chain()
                     } else {
                         validator.runtime().asset_hub_runtime()

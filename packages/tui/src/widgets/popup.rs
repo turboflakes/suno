@@ -270,7 +270,7 @@ impl PopupWidget {
                 }));
             }
 
-            let set_keys = Call::SetSessionKeys {
+            let set_keys = Call::SetKeys {
                 keys: Keys::default(),
             };
             if p.proxy().can_call(&set_keys) && validator.is_active_or_waiting() {

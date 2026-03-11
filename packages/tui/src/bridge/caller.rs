@@ -204,28 +204,28 @@ impl RuntimeCaller for Runtime {
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::Polkadot => match call {
-                Call::SetSessionKeys { keys } => {
+                Call::SetKeys { keys } => {
                     let rc = suno_polkadot::extrinsics::session_set_keys(keys);
                     suno_polkadot::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::Kusama => match call {
-                Call::SetSessionKeys { keys } => {
+                Call::SetKeys { keys } => {
                     let rc = suno_kusama::extrinsics::session_set_keys(keys);
                     suno_kusama::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::Paseo => match call {
-                Call::SetSessionKeys { keys } => {
+                Call::SetKeys { keys } => {
                     let rc = suno_paseo::extrinsics::session_set_keys(keys);
                     suno_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::Westend => match call {
-                Call::SetSessionKeys { keys } => {
+                Call::SetKeys { keys } => {
                     let rc = suno_westend::extrinsics::session_set_keys(keys);
                     suno_westend::wrap_call_into_proxy(api, rc, stash)
                 }
