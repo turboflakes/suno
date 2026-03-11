@@ -44,7 +44,7 @@ pub enum Call {
     SetKeys {
         keys: Keys,
     },
-    // TODO: implement Kick and PurgeKeys
+    PurgeKeys, // TODO: implement Kick
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -80,6 +80,7 @@ impl Call {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
+                "purge_keys" => Ok(Self::PurgeKeys),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
                 _ => Err(CallError::MissingExtrinsic),
             },
@@ -187,6 +188,7 @@ impl std::fmt::Display for Call {
             Self::Validate { .. } => write!(f, "validate"),
             Self::Chill => write!(f, "chill"),
             Self::SetKeys { .. } => write!(f, "set_keys"),
+            Self::PurgeKeys => write!(f, "purge_keys"),
         }
     }
 }
@@ -235,6 +237,7 @@ impl ToDescription for Call {
             Self::SetKeys { .. } => {
                 "Set session keys from the output of 'author_rotateKeys' call".to_string()
             }
+            Self::PurgeKeys => "Remove all session keys".to_string(),
         }
     }
 }
@@ -258,6 +261,7 @@ impl ToPlaceholder for Call {
             Self::SetKeys { .. } => {
                 "set_keys <hex-session-keys-from-author-rotate-keys>".to_string()
             }
+            Self::PurgeKeys => "purge_keys".to_string(),
         }
     }
 }
@@ -277,6 +281,7 @@ impl ToMethod for Call {
             } => format!("validate {} blocked {blocked}", commission.deconstruct()),
             Self::Chill => "chill".to_string(),
             Self::SetKeys { keys } => format!("set_keys {keys}"),
+            Self::PurgeKeys => "purge_keys".to_string(),
         }
     }
 }

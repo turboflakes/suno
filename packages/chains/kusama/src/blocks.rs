@@ -52,6 +52,10 @@ pub async fn process_block_extrinsics(
                 let account_bytes = *stash.as_ref();
                 let res = Response::validator_next_keys(account_bytes, Some(keys));
                 processed_extrinsics.push(res);
+            } else if let RuntimeCall::Session(SessionCall::purge_keys) = call.as_ref() {
+                let account_bytes = *stash.as_ref();
+                let res = Response::validator_next_keys(account_bytes, None);
+                processed_extrinsics.push(res);
             }
         }
     }

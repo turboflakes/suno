@@ -34,7 +34,7 @@ impl SupportedProxy {
         match (self, call) {
             // NOTE: NonTransfer proxy is limited to SetKeys/PurgeKeys on the Relay chain
             (Self::NonTransfer, Call::SetKeys { .. }) => true,
-            // (Self::NonTransfer, Call::PurgeKeys) => true,
+            (Self::NonTransfer, Call::PurgeKeys) => true,
             // NOTE: Staking proxy is limited to staking operations on Asset Hub
             (Self::Staking, Call::Bond { .. }) => true,
             (Self::Staking, Call::BondExtra { .. }) => true,
@@ -44,15 +44,15 @@ impl SupportedProxy {
             (Self::Staking, Call::SetPayee { .. }) => true,
             (Self::Staking, Call::Validate { .. }) => true,
             (Self::Staking, Call::Chill) => true,
-            // TODO: implement Kick and PurgeKeys
+            // TODO: implement Kick
             // (Self::Staking, Call::Kick) => true,
             // NOTE: StakingOperator proxy is limited to staking operations on Asset Hub
             (Self::StakingOperator, Call::Validate { .. }) => true,
             (Self::StakingOperator, Call::Chill) => true,
             (Self::StakingOperator, Call::SetKeys { .. }) => true,
-            // TODO: implement Kick and PurgeKeys
+            (Self::StakingOperator, Call::PurgeKeys) => true,
+            // TODO: implement Kick
             // (Self::StakingOperator, Call::Kick) => true,
-            // (Self::StakingOperator, Call::PurgeKeys) => true,
             _ => false,
         }
     }

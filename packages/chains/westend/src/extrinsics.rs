@@ -58,3 +58,7 @@ pub fn session_set_keys(keys: Keys) -> RuntimeCall {
         proof: vec![],
     })
 }
+
+pub fn session_purge_keys() -> RuntimeCall {
+    RuntimeCall::Session(SessionCall::purge_keys {})
+}

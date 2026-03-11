@@ -279,6 +279,17 @@ impl PopupWidget {
                     bytes: None,
                 }));
             }
+
+            let purge_keys = Call::PurgeKeys;
+            if p.proxy().can_call(&purge_keys)
+                && validator.is_active_or_waiting()
+                && validator.has_keys()
+            {
+                state.options.push(Entry::new(Command::Instruction {
+                    call: purge_keys,
+                    bytes: None,
+                }));
+            }
         });
     }
 
