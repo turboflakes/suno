@@ -106,7 +106,7 @@ impl<T: Display + AsBytes> Command<T> {
 //     }
 // }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry<T> {
     command: Command<T>,
 }

@@ -850,7 +850,9 @@ impl App {
                         return;
                     };
                     // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                    let runtime = if matches!(call, Call::SetKeys { .. }) {
+                    let runtime = if matches!(call, Call::SetKeys { .. })
+                        || matches!(call, Call::PurgeKeys { .. })
+                    {
                         validator.runtime().relay_chain()
                     } else {
                         validator.runtime().asset_hub_runtime()

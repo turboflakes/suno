@@ -240,6 +240,16 @@ impl InputField {
         self.validate();
     }
 
+    fn set_value(&mut self, value: String) {
+        self.character_index = value.chars().count();
+        if let Some(old_pos) = self.cursor_position {
+            let new_pos = Position::new(old_pos.x + self.character_index as u16, old_pos.y + 1);
+            self.cursor_position = Some(new_pos);
+        }
+        self.input = Zeroizing::new(value);
+        self.validate();
+    }
+
     /// Returns the byte index based on the character position.
     ///
     /// Since each character in a string can contain multiple bytes, it's necessary to calculate
@@ -325,16 +335,6 @@ impl InputField {
         self.mode = Mode::Normal;
     }
 
-    fn set_value(&mut self, value: String) {
-        self.character_index = value.chars().count();
-        if let Some(old_pos) = self.cursor_position {
-            let new_pos = Position::new(old_pos.x + self.character_index as u16, old_pos.y + 1);
-
-            self.cursor_position = Some(new_pos);
-        }
-        self.input = Zeroizing::new(value);
-    }
-
     pub fn is_busy(&self) -> bool {
         matches!(self.status, Status::Busy)
     }
@@ -405,9 +405,14 @@ impl InputFieldWidget {
         }
     }
 
-    pub fn value(&self) -> String {
+    pub fn _value(&self) -> String {
         let state = self.state.read().unwrap();
         state.value()
+    }
+
+    pub fn raw_value(&self) -> String {
+        let state = self.state.read().unwrap();
+        state.raw_value()
     }
 
     pub fn get_cursor_position(&self) -> Option<Position> {

@@ -81,20 +81,17 @@ impl PopupState {
     }
 
     pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
-        let input_value = self.input.value();
+        let input_value = self.input.raw_value();
         let input_command = match input_value.split_once(' ') {
             None => input_value.as_str(),
             Some((command, _)) => command,
         };
 
-        let out = self
-            .options
+        self.options
             .iter()
             .filter(|e| e.command().to_lowercase().starts_with(input_command))
             .cloned()
-            .collect();
-
-        out
+            .collect()
     }
 
     pub fn get_selected(&self) -> Option<Entry<Call>> {
@@ -538,7 +535,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     let options = state.get_options_filtered();
 
-    let rows = state.options.iter().map(|f| {
+    let rows = options.iter().map(|f| {
         let command = f.get_command();
         to_row(command, state.mode.clone(), None)
     });
