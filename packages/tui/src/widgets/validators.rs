@@ -105,6 +105,13 @@ impl ValidatorsListState {
     pub fn set_stake_ledger(&mut self, validator_key: &AccountKey, data: StakeLedger) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.ledger = data;
+
+            // NOTE: If the ledger is updated and the validator status is unknowe
+            // the validator status should be changed to waiting. Meaning that valitor_prefs
+            // should become available
+            if validator.status == ValidatorStatus::Unknown {
+                validator.status = ValidatorStatus::Waiting;
+            }
         }
     }
 

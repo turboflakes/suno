@@ -20,9 +20,9 @@ pub enum ValidatorStatus {
     /// Validator is an authority and also a parachain authority, displayed as [P]
     ParaAuthority,
     /// Validator is in the waiting queue, displayed as [W]
-    #[default]
     Waiting,
     /// Validator status is unknown or not yet determined, displayed as [U]
+    #[default]
     Unknown,
 }
 
@@ -256,10 +256,6 @@ impl Validator {
 
     pub fn is_unknown(&self) -> bool {
         self.status == ValidatorStatus::Unknown
-    }
-
-    pub fn is_waiting_or_unknown(&self) -> bool {
-        self.status == ValidatorStatus::Waiting || self.status == ValidatorStatus::Unknown
     }
 
     pub fn is_active_or_waiting(&self) -> bool {

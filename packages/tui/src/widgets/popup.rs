@@ -172,13 +172,13 @@ impl PopupWidget {
 
         // For each supported proxy, push the respective calls depending on the validator's status.
         validator.proxies.iter().for_each(|p| {
-            // NOTE: Bonding calls are only available if validator is waiting or has been chilled.
+            // NOTE: Bonding calls are only available if validator status is unknown.
             let bond = Call::Bond {
                 amount: 0,
                 payee: Payee::default(),
                 max: Some(validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond) && validator.is_waiting_or_unknown() {
+            if p.proxy().can_call(&bond) && validator.is_unknown() {
                 state.options.push(Entry::new(Command::Instruction {
                     call: bond,
                     bytes: None,
