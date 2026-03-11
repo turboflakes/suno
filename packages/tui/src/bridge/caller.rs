@@ -209,8 +209,8 @@ impl RuntimeCaller for Runtime {
                     suno_polkadot::wrap_call_into_proxy(api, rc, stash)
                 }
                 Call::PurgeKeys => {
-                    let rc = suno_paseo::extrinsics::session_purge_keys();
-                    suno_paseo::wrap_call_into_proxy(api, rc, stash)
+                    let rc = suno_polkadot::extrinsics::session_purge_keys();
+                    suno_polkadot::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
@@ -220,8 +220,8 @@ impl RuntimeCaller for Runtime {
                     suno_kusama::wrap_call_into_proxy(api, rc, stash)
                 }
                 Call::PurgeKeys => {
-                    let rc = suno_paseo::extrinsics::session_purge_keys();
-                    suno_paseo::wrap_call_into_proxy(api, rc, stash)
+                    let rc = suno_kusama::extrinsics::session_purge_keys();
+                    suno_kusama::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
@@ -242,8 +242,8 @@ impl RuntimeCaller for Runtime {
                     suno_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 Call::PurgeKeys => {
-                    let rc = suno_paseo::extrinsics::session_purge_keys();
-                    suno_paseo::wrap_call_into_proxy(api, rc, stash)
+                    let rc = suno_westend::extrinsics::session_purge_keys();
+                    suno_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
