@@ -191,15 +191,15 @@ impl RuntimeCaller for Runtime {
                     commission,
                     blocked,
                 } => {
-                    let rc = suno_asset_hub_paseo::extrinsics::staking_validate(
+                    let rc = suno_asset_hub_westend::extrinsics::staking_validate(
                         commission.deconstruct(),
                         blocked,
                     );
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 Call::Chill => {
-                    let rc = suno_asset_hub_paseo::extrinsics::staking_chill();
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    let rc = suno_asset_hub_westend::extrinsics::staking_chill();
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
