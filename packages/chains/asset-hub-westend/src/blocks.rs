@@ -6,7 +6,7 @@ use crate::{
             asset_hub_westend_runtime::RuntimeCall,
             pallet_staking_async::pallet::pallet::Call as StakingCall,
         },
-        staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet},
+        staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet, Withdrawn},
     },
     storage::{fetch_active_era_info, fetch_era_data, map_payee_from_reward_destination},
 };
@@ -48,6 +48,11 @@ pub async fn process_runtime_events(
             let chunk = Chunk::new(era_info.index + duration, ev.amount);
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_unbonded(account_bytes, chunk);
+            processed_events.push(response);
+        } else if let Some(ev) = event.decode_fields_as::<Withdrawn>() {
+            let ev = ev.boxed()?;
+            let account_bytes = *(ev.stash).as_ref();
+            let response = Response::event_withdrawn(account_bytes, ev.amount);
             processed_events.push(response);
         } else if event.is::<Chilled>() {
             // TODO

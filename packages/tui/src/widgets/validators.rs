@@ -4,7 +4,6 @@ use crate::widgets::validators_detailed_group::{
     ValidatorsDetailedGroupWidget, GROUP_HEADER_HEIGHT, PADDING,
 };
 use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
-use log::info;
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
@@ -165,8 +164,6 @@ impl ValidatorsListState {
                     .collect()
             };
 
-            info!("Unlocking chunks: {:?}", unlocking);
-
             validator.ledger = StakeLedger {
                 active: validator.ledger.active().saturating_sub(chunk.value),
                 total: validator.ledger.total().saturating_sub(chunk.value),
@@ -196,6 +193,12 @@ impl ValidatorsListState {
     pub fn set_balance(&mut self, validator_key: &AccountKey, balance: Balance) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.account.set_balance(balance);
+        }
+    }
+
+    pub fn add_amount_to_balance(&mut self, validator_key: &AccountKey, amount: Amount) {
+        if let Some(validator) = self.validators.get_mut(validator_key) {
+            validator.account.add_free_amount(amount);
         }
     }
 
@@ -552,5 +555,10 @@ impl ValidatorsListWidget {
     pub fn update_balance(&self, validator_key: &AccountKey, balance: Balance) {
         let mut state = self.state.write().unwrap();
         state.set_balance(validator_key, balance);
+    }
+
+    pub fn add_amount_to_balance(&self, validator_key: &AccountKey, amount: Amount) {
+        let mut state = self.state.write().unwrap();
+        state.add_amount_to_balance(validator_key, amount);
     }
 }

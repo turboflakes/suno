@@ -153,6 +153,7 @@ pub enum Response {
     TxError(String),
     EventBonded(Data<AmountData>),
     EventUnbonded(Data<ChunkData>),
+    EventWithdrawn(Data<AmountData>),
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
 }
@@ -244,6 +245,10 @@ impl Response {
 
     pub fn event_unbonded(account: AccountBytes, chunk: Chunk) -> Self {
         Response::EventUnbonded(Data::new(ChunkData { account, chunk }))
+    }
+
+    pub fn event_withdrawn(account: AccountBytes, amount: Amount) -> Self {
+        Response::EventWithdrawn(Data::new(AmountData { account, amount }))
     }
 
     pub fn supported_proxy(account: AccountBytes, supported_proxy: SupportedProxy) -> Self {

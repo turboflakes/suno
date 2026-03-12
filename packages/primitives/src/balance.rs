@@ -1,4 +1,4 @@
-type Amount = u128;
+pub type Amount = u128;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Balance {
@@ -30,5 +30,9 @@ impl Balance {
 
     pub fn total_balance(&self) -> Amount {
         self.free + self.reserved + self.frozen
+    }
+
+    pub fn add_free_amount(&mut self, amount: Amount) {
+        self.free += amount;
     }
 }

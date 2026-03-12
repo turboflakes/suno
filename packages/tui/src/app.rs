@@ -647,6 +647,25 @@ impl App {
             ValidatorAction::UpdateBalance(validator_key, balance) => {
                 self.validators.update_balance(&validator_key, balance);
             }
+            ValidatorAction::AddAmountToBalance(validator_key, amount) => {
+                self.validators
+                    .add_amount_to_balance(&validator_key, amount);
+                // NOTE: spawn_fetch_validator_staking_ledger is called here due to the
+                // 'Withdrawn' event. The witdrawn amount is expected to be available as free in balance
+                // and also unlocked from `staking.ledger`. Rather than unlocking manually is easier just
+                // to fetch storage for staking ledger.
+                let runtime = validator_key.runtime().asset_hub_runtime();
+                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+                    let validator_keys = vec![validator_key];
+                    sync::spawn_fetch_validators_staking_ledger(
+                        &api,
+                        block_hash,
+                        runtime,
+                        &validator_keys,
+                        &self.tx,
+                    );
+                }
+            }
         }
     }
 

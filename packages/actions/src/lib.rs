@@ -125,6 +125,7 @@ pub enum ValidatorAction {
     UpdateStatus(ValidatorKey, ValidatorStatus),
     AddProxy(ValidatorKey, ProxyKey),
     UpdateBalance(ValidatorKey, Balance),
+    AddAmountToBalance(ValidatorKey, Amount),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

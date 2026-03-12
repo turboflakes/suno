@@ -216,6 +216,15 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::EventWithdrawn(data) => {
+            let rc_runtime = runtime.relay_chain();
+            let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
+            tx.send(Action::Validator(ValidatorAction::AddAmountToBalance(
+                account_key,
+                data.value.amount,
+            )))
+            .boxed()?;
+        }
         Response::SupportedProxy(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);

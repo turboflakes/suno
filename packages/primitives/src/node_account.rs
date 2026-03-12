@@ -1,4 +1,4 @@
-use crate::balance::Balance;
+use crate::balance::{Amount, Balance};
 use crate::display::{format_planks, to_compact_string};
 use crate::{identity::Identity, key::AccountKey};
 use ratatui::widgets::Row;
@@ -54,6 +54,10 @@ impl NodeAccount {
 
     pub fn set_balance(&mut self, balance: Balance) {
         self.balance = balance;
+    }
+
+    pub fn add_free_amount(&mut self, amount: Amount) {
+        self.balance.add_free_amount(amount);
     }
 
     pub fn account_format(&self) -> u16 {
