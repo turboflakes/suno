@@ -849,10 +849,9 @@ impl App {
                     let Some(call) = self.popup.get_input_parsed_call() else {
                         return;
                     };
+
                     // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                    let runtime = if matches!(call, Call::SetKeys { .. })
-                        || matches!(call, Call::PurgeKeys)
-                    {
+                    let runtime = if call.is_call_on_relay_chain() {
                         validator.runtime().relay_chain()
                     } else {
                         validator.runtime().asset_hub_runtime()
@@ -910,8 +909,9 @@ impl App {
                     let Some(call) = self.popup.get_selected_call() else {
                         return;
                     };
+
                     // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-                    let runtime = if matches!(call, Call::SetKeys { .. }) {
+                    let runtime = if call.is_call_on_relay_chain() {
                         validator.runtime().relay_chain()
                     } else {
                         validator.runtime().asset_hub_runtime()

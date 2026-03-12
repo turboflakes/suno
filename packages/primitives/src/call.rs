@@ -76,6 +76,7 @@ pub enum CallError {
 }
 
 impl Call {
+    /// Parses a call from a string representation.
     pub fn parse(input: &str, decimals: u32) -> Result<Self, CallError> {
         match input.split_once(' ') {
             None => match input {
@@ -172,6 +173,14 @@ impl Call {
                 },
                 _ => Err(CallError::InvalidArgument(input.to_string())),
             },
+        }
+    }
+
+    /// Returns `true` if the call is meant to be sent to the relay chain.
+    pub fn is_call_on_relay_chain(&self) -> bool {
+        match self {
+            Self::SetKeys { .. } | Self::PurgeKeys => true,
+            _ => false,
         }
     }
 }
