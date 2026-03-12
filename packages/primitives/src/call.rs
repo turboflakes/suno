@@ -178,10 +178,7 @@ impl Call {
 
     /// Returns `true` if the call is meant to be sent to the relay chain.
     pub fn is_call_on_relay_chain(&self) -> bool {
-        match self {
-            Self::SetKeys { .. } | Self::PurgeKeys => true,
-            _ => false,
-        }
+        matches!(self, Self::SetKeys { .. } | Self::PurgeKeys)
     }
 }
 
