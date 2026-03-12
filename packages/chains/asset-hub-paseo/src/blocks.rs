@@ -54,8 +54,12 @@ pub async fn process_runtime_events(
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_withdrawn(account_bytes, ev.amount);
             processed_events.push(response);
-        } else if event.is::<Chilled>() {
-            // TODO
+        } else if let Some(ev) = event.decode_fields_as::<Chilled>() {
+            let ev = ev.boxed()?;
+            let account_bytes = *(ev.stash).as_ref();
+            let prefs = ValidatorPrefs::new(Perbill::zero(), false);
+            let response = Response::validator_prefs_next(account_bytes, Some(prefs));
+            processed_events.push(response);
         } else if let Some(ev) = event.decode_fields_as::<ValidatorPrefsSet>() {
             let ev = ev.boxed()?;
             let account_bytes = *(ev.stash).as_ref();

@@ -66,7 +66,7 @@ pub enum CallError {
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
     #[error("No argument provided")]
-    MissingArgument,
+    MissingArgumentSilent,
     #[error("No extrinsic provided")]
     MissingExtrinsic,
     #[error("Invalid payee: {0}")]
@@ -315,7 +315,7 @@ fn parse_standard_unit(value: &str, decimals: u32) -> Result<u128, CallError> {
     match value.split_once('.') {
         None => {
             if value.is_empty() {
-                return Err(CallError::MissingArgument);
+                return Err(CallError::MissingArgumentSilent);
             }
             let value = value
                 .parse::<u128>()
@@ -347,6 +347,10 @@ fn parse_standard_unit(value: &str, decimals: u32) -> Result<u128, CallError> {
 }
 
 fn parse_percentage(value: &str) -> Result<Perbill, CallError> {
+    if value.is_empty() {
+        return Err(CallError::MissingArgumentSilent);
+    }
+
     let percent_value = value
         .trim()
         .parse::<f64>()

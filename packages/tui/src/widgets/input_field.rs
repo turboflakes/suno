@@ -187,8 +187,8 @@ impl InputField {
                         | CallError::InvalidPayee(_)
                         | CallError::InvalidPercentage(_)
                         | CallError::InvalidPercentageRange(_)
-                        // NOTE: MissingArgument is silently ignored
-                        // | CallError::MissingArgument
+                        // NOTE: MissingArgumentSilent is silently ignored
+                        // | CallError::MissingArgumentSilent
                         => {
                             self.status = Status::Invalid(e.to_string())
                         }
