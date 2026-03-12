@@ -217,8 +217,9 @@ impl FromStr for Payee {
             None => match s {
                 "staked" => Ok(Payee::Staked),
                 "stash" => Ok(Payee::Stash),
+                "none" => Ok(Payee::None),
                 _ => Err(PayeeError::UnknownArgument(
-                    "staked|stash|account <address>".to_string(),
+                    "staked|stash|none|account <address>".to_string(),
                 )),
             },
             Some((argument, account)) => match argument {
@@ -228,7 +229,7 @@ impl FromStr for Payee {
                     Ok(Payee::Account(acc))
                 }
                 _ => Err(PayeeError::UnknownArgument(
-                    "staked|stash|account <address>".to_string(),
+                    "staked|stash|none|account <address>".to_string(),
                 )),
             },
         }
