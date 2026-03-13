@@ -4,7 +4,7 @@ use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
         bounded_collections::bounded_vec::BoundedVec, kusama_runtime_constants::proxy::ProxyType,
-        pallet_proxy::ProxyDefinition, polkadot_primitives::v8::ValidatorIndex,
+        pallet_proxy::ProxyDefinition, polkadot_primitives::v9::ValidatorIndex,
         staging_kusama_runtime::SessionKeys,
     },
 };

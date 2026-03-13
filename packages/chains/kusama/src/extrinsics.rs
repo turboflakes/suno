@@ -3,7 +3,7 @@ use node_runtime::runtime_types::{
     kusama_runtime_constants::proxy::ProxyType,
     pallet_proxy::pallet::Call as ProxyCall,
     pallet_session::pallet::Call as SessionCall,
-    polkadot_primitives::v8::{
+    polkadot_primitives::v9::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
     },
     sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
