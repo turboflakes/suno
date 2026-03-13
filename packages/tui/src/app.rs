@@ -14,7 +14,7 @@ use crate::{
     tui::Tui,
 };
 use arboard::Clipboard;
-use log::error;
+use log::{error, info};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use suno_actions::network::ConnectionState;
@@ -681,14 +681,16 @@ impl App {
             }
             TxAction::InBestBlock(block_hash) => {
                 let message = format!("transaction in block {block_hash}");
+                info!("{message}");
                 self.popup.update_transaction_status(&message);
+                self.close_popup();
             }
+            // NOTE: The following actions can just be logged.
             TxAction::InFinalizedBlock(block_hash) => {
-                let message = format!("transaction finalized in block {block_hash}");
-                self.popup.update_transaction_status(&message);
+                info!("Transaction finalized in block {block_hash}");
             }
             TxAction::Success => {
-                self.close_popup();
+                info!("Transaction succeeded");
             }
             TxAction::Error(err) => {
                 error!("Transaction error: {}", err);

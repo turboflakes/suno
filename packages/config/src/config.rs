@@ -31,6 +31,7 @@ pub struct Config {
     // rpcs: Vec<HashMap<String, Vec<String>>>,
     pub features: Features,
     pub signer: Signer,
+    pub explorer: Explorer,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -91,6 +92,12 @@ impl Default for Signer {
     }
 }
 
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct Explorer {
+    pjs_url: Option<String>,
+    papi_url: Option<String>,
+}
+
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let contents = fs::read_to_string(path)?;
@@ -107,42 +114,26 @@ impl Config {
         Ok(())
     }
 
-    // async fn validate_chains_genesis(&self) -> Result<(), Error> {
-    //     for chain in self.chains.iter() {
-    //         for (chain_name, chain_config) in chain {
-    //             // First, create a raw RPC client:
-    //             let mut rpc_client = RpcClient::from_url(&chain_config.rpc_url).await?;
-
-    //             // Use this to construct our RPC methods:
-    //             let mut rpc = LegacyRpcMethods::<SubstrateConfig>::new(rpc_client.clone().into());
-
-    //             // We can use the same client to drive our full Subxt interface too:
-    //             let mut api =
-    //                 OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
-
-    //             match create_substrate_rpc_client_from_url(&chain_config.rpc_url).await {
-    //                 Ok(rpc_client) => {}
-    //             }
-    //         }
-    //     }
-    //     //         chain.
-    //     //     }
-
-    //     //     // Validate a chain is enabled
-    //     //     if self.chains.is_empty() {
-    //     //         return Err(
-    //     //             "At least one chain has to be enabled [Polkadot, Kusama, Paseo]".to_string(),
-    //     //         );
-
-    //     Ok(())
-    // }
-
     pub fn signer_json_path(&self) -> Option<String> {
         self.signer.proxy_json_path.clone()
     }
 
     pub fn signer_seed_path(&self) -> Option<String> {
         self.signer.proxy_seed_path.clone()
+    }
+
+    pub fn explorer_papi_url(&self, chain: &str, block_hash: &str) -> Option<String> {
+        self.explorer.papi_url.as_ref().map(|url| {
+            url.replace("{chain}", chain)
+                .replace("{block_hash}", block_hash)
+        })
+    }
+
+    pub fn explorer_pjs_url(&self, chain: &str, block_hash: &str) -> Option<String> {
+        self.explorer.pjs_url.as_ref().map(|url| {
+            url.replace("{chain}", chain)
+                .replace("{block_hash}", block_hash)
+        })
     }
 }
 
@@ -249,6 +240,7 @@ mod tests {
             chains: vec![],
             features: Features::default(),
             signer: Signer::default(),
+            explorer: Explorer::default(),
         };
         assert!(config.validate().is_err());
     }

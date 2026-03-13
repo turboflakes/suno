@@ -1,3 +1,5 @@
+use crate::config::CONFIG;
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 use std::str::FromStr;
@@ -345,6 +347,21 @@ impl SupportedRuntime {
             Self::BridgeHubWestend => "Bridge Hub Westend",
             Self::PeopleWestend => "People Westend",
         }
+    }
+
+    fn chain_name(&self) -> String {
+        self.as_str_long().to_lowercase().replace(' ', "-")
+    }
+
+    pub fn log_block_hash_explorer(&self, block_hash: H256) {
+        let config = CONFIG.clone();
+        let hash = format!("{:#x}", block_hash);
+        if let Some(url) = config.explorer_papi_url(&self.chain_name(), &hash) {
+            info!("{url}");
+        };
+        if let Some(url) = config.explorer_pjs_url(&self.chain_name(), &hash) {
+            info!("{url}");
+        };
     }
 }
 

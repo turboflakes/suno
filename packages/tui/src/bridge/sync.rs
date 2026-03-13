@@ -577,6 +577,7 @@ async fn process_transaction_progress(
             TransactionStatus::NoLongerInBestBlock => Response::TxNoLongerInBestBlock,
             TransactionStatus::InBestBlock(in_block) => {
                 let block_hash = in_block.block_hash();
+                runtime.log_block_hash_explorer(block_hash);
                 Response::TxInBestBlock(block_hash)
             }
             TransactionStatus::InFinalizedBlock(in_block) => {
