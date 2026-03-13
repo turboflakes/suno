@@ -17,10 +17,10 @@ subxt metadata --url wss://kusama.rpc.turboflakes.io:443 --pallets Session,Staki
 subxt metadata --url wss://polkadot.rpc.turboflakes.io:443 --pallets Session,StakingAhClient,Proxy,Babe,ParasShared -f bytes > packages/chains/polkadot/artifacts/metadata/polkadot_metadata_small.scale
 
 # AssetHub Chains
-subxt metadata --url wss://asset-hub-westend.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-westend/artifacts/metadata/asset_hub_westend_metadata_small.scale
-subxt metadata --url wss://asset-hub-paseo.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-paseo/artifacts/metadata/asset_hub_paseo_metadata_small.scale
-subxt metadata --url wss://asset-hub-kusama.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-kusama/artifacts/metadata/asset_hub_kusama_metadata_small.scale
-subxt metadata --url wss://asset-hub-polkadot.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,Utility,NominationPools -f bytes > packages/chains/asset-hub-polkadot/artifacts/metadata/asset_hub_polkadot_metadata_small.scale
+subxt metadata --url wss://asset-hub-westend.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools -f bytes > packages/chains/asset-hub-westend/artifacts/metadata/asset_hub_westend_metadata_small.scale
+subxt metadata --url wss://asset-hub-paseo.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools -f bytes > packages/chains/asset-hub-paseo/artifacts/metadata/asset_hub_paseo_metadata_small.scale
+subxt metadata --url wss://asset-hub-kusama.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools -f bytes > packages/chains/asset-hub-kusama/artifacts/metadata/asset_hub_kusama_metadata_small.scale
+subxt metadata --url wss://asset-hub-polkadot.rpc.turboflakes.io:443 --pallets System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools -f bytes > packages/chains/asset-hub-polkadot/artifacts/metadata/asset_hub_polkadot_metadata_small.scale
 
 # People Chains
 subxt metadata --url wss://people-westend.rpc.turboflakes.io:443 --pallets Identity -f bytes > packages/chains/people-westend/artifacts/metadata/people_westend_metadata_small.scale
