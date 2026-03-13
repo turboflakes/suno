@@ -1,4 +1,4 @@
-# suno &middot; ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
+# suno &middot; [![latest commit](https://github.com/turboflakes/suno/actions/workflows/rust.yml/badge.svg)](https://github.com/turboflakes/suno/actions/workflows/rust.yml) ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
 
 `suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal.
 
