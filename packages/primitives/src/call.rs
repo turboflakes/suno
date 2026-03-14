@@ -44,7 +44,11 @@ pub enum Call {
     SetKeys {
         keys: Keys,
     },
-    PurgeKeys, // TODO: implement Kick
+    PurgeKeys,
+    SetKeysAsync {
+        keys: Keys,
+    },
+    PurgeKeysAsync, // TODO: implement Kick
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -82,6 +86,7 @@ impl Call {
             None => match input {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
+                "purge_keys_async" => Ok(Self::PurgeKeysAsync),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
                 _ => Err(CallError::MissingExtrinsic),
             },
@@ -141,8 +146,18 @@ impl Call {
                     Ok(Self::SetPayee { payee })
                 }
                 "set_keys" => {
-                    let keys = Keys::from_str(args)?;
+                    let keys = Keys::from_str(args).map_err(|e| match e {
+                        KeysError::MissingHex => CallError::MissingArgumentSilent,
+                        e => CallError::InvalidKeys(e),
+                    })?;
                     Ok(Self::SetKeys { keys })
+                }
+                "set_keys_async" => {
+                    let keys = Keys::from_str(args).map_err(|e| match e {
+                        KeysError::MissingHex => CallError::MissingArgumentSilent,
+                        e => CallError::InvalidKeys(e),
+                    })?;
+                    Ok(Self::SetKeysAsync { keys })
                 }
                 "validate" => match args.split_once(' ') {
                     None => {
@@ -195,6 +210,8 @@ impl std::fmt::Display for Call {
             Self::Chill => write!(f, "chill"),
             Self::SetKeys { .. } => write!(f, "set_keys"),
             Self::PurgeKeys => write!(f, "purge_keys"),
+            Self::SetKeysAsync { .. } => write!(f, "set_keys_async"),
+            Self::PurgeKeysAsync => write!(f, "purge_keys_async"),
         }
     }
 }
@@ -240,10 +257,10 @@ impl ToDescription for Call {
                 "Validate/Change commission or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
-            Self::SetKeys { .. } => {
+            Self::SetKeys { .. } | Self::SetKeysAsync { .. } => {
                 "Set session keys from the output of 'author_rotateKeys' call".to_string()
             }
-            Self::PurgeKeys => "Remove all session keys".to_string(),
+            Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),
         }
     }
 }
@@ -268,6 +285,10 @@ impl ToPlaceholder for Call {
                 "set_keys <hex-session-keys-from-author-rotate-keys>".to_string()
             }
             Self::PurgeKeys => "purge_keys".to_string(),
+            Self::SetKeysAsync { .. } => {
+                "set_keys_async <hex-session-keys-from-author-rotate-keys>".to_string()
+            }
+            Self::PurgeKeysAsync => "purge_keys_async".to_string(),
         }
     }
 }
@@ -275,19 +296,28 @@ impl ToPlaceholder for Call {
 impl ToMethod for Call {
     fn to_method(&self) -> String {
         match self {
-            Self::Bond { amount, payee, .. } => format!("bond {amount} payee {payee}"),
-            Self::BondExtra { amount, .. } => format!("bond_extra {amount}"),
-            Self::Unbond { amount, .. } => format!("unbond {amount}"),
-            Self::Rebond { amount, .. } => format!("rebond {amount}"),
-            Self::WithdrawUnbonded { .. } => "withdraw_unbonded".to_string(),
-            Self::SetPayee { payee } => format!("set_payee {payee}"),
+            Self::Bond { amount, payee, .. } => format!("staking.bond {amount} payee {payee}"),
+            Self::BondExtra { amount, .. } => format!("staking.bond_extra {amount}"),
+            Self::Unbond { amount, .. } => format!("staking.unbond {amount}"),
+            Self::Rebond { amount, .. } => format!("staking.rebond {amount}"),
+            Self::WithdrawUnbonded { .. } => "staking.withdraw_unbonded".to_string(),
+            Self::SetPayee { payee } => format!("staking.set_payee {payee}"),
             Self::Validate {
                 commission,
                 blocked,
-            } => format!("validate {} blocked {blocked}", commission.deconstruct()),
-            Self::Chill => "chill".to_string(),
-            Self::SetKeys { keys } => format!("set_keys {keys}"),
-            Self::PurgeKeys => "purge_keys".to_string(),
+            } => format!(
+                "staking.validate {} blocked {blocked}",
+                commission.deconstruct()
+            ),
+            Self::Chill => "staking.chill".to_string(),
+            Self::SetKeys { keys } => {
+                format!("session.set_keys {keys}")
+            }
+            Self::PurgeKeys => "session.purge_keys".to_string(),
+            Self::SetKeysAsync { keys } => {
+                format!("staking_rc_client.set_keys {keys}")
+            }
+            Self::PurgeKeysAsync => "staking_rc_client.purge_keys".to_string(),
         }
     }
 }

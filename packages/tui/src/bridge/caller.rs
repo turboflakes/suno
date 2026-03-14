@@ -78,6 +78,15 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_chill();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
                 }
+                // TODO: Implement SetKeysAsync and PurgeKeysAsync when ready
+                // Call::SetKeysAsync { keys } => {
+                //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(keys);
+                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                // }
+                // Call::PurgeKeysAsync => {
+                //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
+                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                // }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubKusama => match call {
@@ -117,6 +126,14 @@ impl RuntimeCaller for Runtime {
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_chill();
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                }
+                Call::SetKeysAsync { keys } => {
+                    let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_set_keys(keys);
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                }
+                Call::PurgeKeysAsync => {
+                    let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
@@ -160,6 +177,15 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_chill();
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
                 }
+                // TODO: Implement SetKeysAsync and PurgeKeysAsync when ready
+                // Call::SetKeysAsync { keys } => {
+                //     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_set_keys(keys);
+                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                // }
+                // Call::PurgeKeysAsync => {
+                //     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_purge_keys();
+                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                // }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubWestend => match call {
@@ -199,6 +225,14 @@ impl RuntimeCaller for Runtime {
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_chill();
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                }
+                Call::SetKeysAsync { keys } => {
+                    let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_set_keys(keys);
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                }
+                Call::PurgeKeysAsync => {
+                    let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),

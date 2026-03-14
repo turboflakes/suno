@@ -70,6 +70,12 @@ pub async fn fetch_and_validate_proxy_account(
             ));
         }
         // TODO: Support StakingOperator as soon as it is supported by the chain
+        // if def.delegate == *proxy && def.proxy_type == ProxyType::StakingOperator {
+        //     responses.push(Response::supported_proxy(
+        //         account_bytes,
+        //         SupportedProxy::StakingOperator,
+        //     ));
+        // }
     }
 
     if responses.is_empty() {

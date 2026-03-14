@@ -49,6 +49,8 @@ impl std::fmt::Display for Keys {
 
 #[derive(thiserror::Error, Debug)]
 pub enum KeysError {
+    #[error("No hex provided")]
+    MissingHex,
     #[error("Invalid hex string: {0}")]
     InvalidHex(#[from] hex::FromHexError),
     #[error("Invalid hex length: expected 193 bytes, got {0}")]
@@ -60,6 +62,9 @@ pub enum KeysError {
 impl FromStr for Keys {
     type Err = KeysError;
     fn from_str(keys: &str) -> Result<Self, Self::Err> {
+        if keys.is_empty() {
+            return Err(KeysError::MissingHex);
+        }
         // Strip "0x" prefix if present
         let hex_str = keys.trim_start_matches("0x");
 
@@ -136,6 +141,18 @@ impl Keys {
     pub fn to_compact_string(&self, size: usize) -> String {
         let keys = self.to_string();
         format!("[{}..]", &keys[..size])
+    }
+
+    pub fn into_bytes(&self) -> Vec<u8> {
+        [
+            self.grandpa_bytes.as_slice(),
+            self.babe_bytes.as_slice(),
+            self.para_validator_bytes.as_slice(),
+            self.para_assignment_bytes.as_slice(),
+            self.authority_discovery_bytes.as_slice(),
+            self.beefy_bytes.as_slice(),
+        ]
+        .concat()
     }
 }
 
@@ -362,5 +379,26 @@ mod tests {
 
         let err2 = KeysError::Other("custom error".to_string());
         assert_eq!(err2.to_string(), "Other error: custom error");
+    }
+
+    #[test]
+    fn test_keys_into_bytes() {
+        let keys = Keys::from_str(VALID_SESSION_KEYS).unwrap();
+        let bytes = keys.into_bytes();
+
+        // 32 + 32 + 32 + 32 + 32 + 33 = 193 raw bytes
+        assert_eq!(bytes.len(), 193);
+
+        // Each field occupies its expected slice
+        assert_eq!(&bytes[0..32], keys.grandpa_bytes);
+        assert_eq!(&bytes[32..64], keys.babe_bytes);
+        assert_eq!(&bytes[64..96], keys.para_validator_bytes);
+        assert_eq!(&bytes[96..128], keys.para_assignment_bytes);
+        assert_eq!(&bytes[128..160], keys.authority_discovery_bytes);
+        assert_eq!(&bytes[160..193], keys.beefy_bytes);
+
+        // Roundtrip: hex-encode the raw bytes and parse back
+        let recovered = Keys::from_str(&format!("0x{}", hex::encode(&bytes))).unwrap();
+        assert_eq!(recovered, keys);
     }
 }

@@ -49,8 +49,8 @@ impl SupportedProxy {
             // NOTE: StakingOperator proxy is limited to staking operations on Asset Hub
             (Self::StakingOperator, Call::Validate { .. }) => true,
             (Self::StakingOperator, Call::Chill) => true,
-            (Self::StakingOperator, Call::SetKeys { .. }) => true,
-            (Self::StakingOperator, Call::PurgeKeys) => true,
+            (Self::StakingOperator, Call::SetKeysAsync { .. }) => true,
+            (Self::StakingOperator, Call::PurgeKeysAsync) => true,
             // TODO: implement Kick
             // (Self::StakingOperator, Call::Kick) => true,
             _ => false,
