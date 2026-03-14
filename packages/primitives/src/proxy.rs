@@ -23,7 +23,7 @@ pub enum SupportedProxy {
 impl SupportedProxy {
     pub fn as_short(&self) -> &'static str {
         match self {
-            Self::None => "×",
+            Self::None => "",
             Self::NonTransfer => "NT",
             Self::Staking => "S",
             Self::StakingOperator => "SO",
@@ -81,6 +81,10 @@ impl ProxyKey {
 
     pub fn proxy(&self) -> SupportedProxy {
         self.proxy
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.proxy != SupportedProxy::None
     }
 
     pub fn is_staking_valid(&self) -> bool {

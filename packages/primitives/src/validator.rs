@@ -269,13 +269,26 @@ impl Validator {
     }
 
     pub fn proxies_as_str(&self) -> String {
-        let mut proxies = self.proxies.clone();
-        proxies.sort();
-        proxies
+        let mut proxies = self
+            .proxies
             .iter()
-            .map(|p| (*p).to_string())
-            .collect::<Vec<_>>()
-            .join(",")
+            .filter(|p| p.is_valid())
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if proxies.is_empty() {
+            return String::new();
+        }
+
+        proxies.sort();
+        format!(
+            "[{}]",
+            proxies
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
     }
 }
 
@@ -294,7 +307,7 @@ impl From<&Validator> for Row<'_> {
         Row::new(vec![
             Text::from(""),
             Text::from(format!("{}/{}", v.runtime(), v.display_name(4),)),
-            Text::from(format!("[{}]", v.proxies_as_str())).alignment(Alignment::Right),
+            Text::from(v.proxies_as_str()).alignment(Alignment::Right),
             Text::from(""),
         ])
     }
