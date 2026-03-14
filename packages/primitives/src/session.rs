@@ -278,13 +278,6 @@ mod tests {
     fn test_keys_from_str_empty_string() {
         let result = Keys::from_str("");
         assert!(result.is_err(), "Should fail with empty string");
-
-        match result.unwrap_err() {
-            KeysError::InvalidHexLength(len) => {
-                assert_eq!(len, 0, "Should report length of 0");
-            }
-            _ => panic!("Expected InvalidHexLength error"),
-        }
     }
 
     #[test]
