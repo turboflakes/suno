@@ -20,3 +20,15 @@ pub fn map_keys_from_session_keys(session_keys: &SessionKeys) -> Keys {
     let BeefyPublic(beef) = session_keys.beefy;
     Keys::new(grandpa, babe, para, assi, auth, beef)
 }
+
+/// Helper function to map Keys to SessionKeys
+pub fn map_session_keys_from_keys(keys: &Keys) -> SessionKeys {
+    SessionKeys {
+        grandpa: GrandpaPublic(keys.grandpa_bytes),
+        babe: BabePublic(keys.babe_bytes),
+        para_validator: ValidatorPublic(keys.para_validator_bytes),
+        para_assignment: AssignmentPublic(keys.para_assignment_bytes),
+        authority_discovery: AuthorityDiscoveryPublic(keys.authority_discovery_bytes),
+        beefy: BeefyPublic(keys.beefy_bytes),
+    }
+}

@@ -1,16 +1,8 @@
 use crate::node_runtime;
+use crate::utils::map_session_keys_from_keys;
 use node_runtime::runtime_types::{
-    pallet_proxy::pallet::Call as ProxyCall,
-    pallet_session::pallet::Call as SessionCall,
-    paseo_runtime::{RuntimeCall, SessionKeys},
-    paseo_runtime_constants::proxy::ProxyType,
-    polkadot_primitives::v8::{
-        assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
-    },
-    sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
-    sp_consensus_babe::app::Public as BabePublic,
-    sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
-    sp_consensus_grandpa::app::Public as GrandpaPublic,
+    pallet_proxy::pallet::Call as ProxyCall, pallet_session::pallet::Call as SessionCall,
+    paseo_runtime::RuntimeCall, paseo_runtime_constants::proxy::ProxyType,
 };
 use subxt::{
     client::{ClientAtBlock, OnlineClientAtBlockImpl},
@@ -47,15 +39,9 @@ pub fn proxy(call: RuntimeCall, proxied_account: &AccountId32) -> RuntimeCall {
 }
 
 pub fn session_set_keys(keys: Keys) -> RuntimeCall {
+    let session_keys = map_session_keys_from_keys(&keys);
     RuntimeCall::Session(SessionCall::set_keys {
-        keys: SessionKeys {
-            grandpa: GrandpaPublic(keys.grandpa_bytes),
-            babe: BabePublic(keys.babe_bytes),
-            para_validator: ValidatorPublic(keys.para_validator_bytes),
-            para_assignment: AssignmentPublic(keys.para_assignment_bytes),
-            authority_discovery: AuthorityDiscoveryPublic(keys.authority_discovery_bytes),
-            beefy: BeefyPublic(keys.beefy_bytes),
-        },
+        keys: session_keys,
         proof: vec![],
     })
 }
