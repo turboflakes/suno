@@ -214,6 +214,10 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                     THEME.paragraph.label,
                 ));
                 legend.push(Span::raw("   "));
+                legend.push(Span::styled("↑ ↓".to_string(), THEME.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("select".to_string(), THEME.paragraph.label));
+                legend.push(Span::raw("   "));
                 legend.push(Span::styled("enter".to_string(), THEME.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("confirm".to_string(), THEME.paragraph.label));
@@ -238,10 +242,19 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         }
     } else if app.chains.is_active() || app.validators.is_active() {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab or ↑ ↓".to_string(), THEME.paragraph.base));
+        legend.push(Span::styled("↑ ↓".to_string(), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("select".to_string(), THEME.paragraph.label));
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("tab or ← →".to_string(), THEME.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), THEME.paragraph.label));
-    };
+    } else {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("tab or ← →".to_string(), THEME.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("navigate".to_string(), THEME.paragraph.label));
+    }
 
     // Always visible
     legend.push(Span::raw("   "));
