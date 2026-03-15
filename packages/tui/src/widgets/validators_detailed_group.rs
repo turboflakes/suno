@@ -167,11 +167,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let [network_area, progress_area, countdown_area] = Layout::default()
+        let [network_area, progress_area, progress_bar_area, countdown_area] = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(82), // Network info
-                Constraint::Fill(1),    // Era / Session progress bar
+                Constraint::Fill(1),    // Network info
+                Constraint::Fill(2),    // Era / Session info bar
+                Constraint::Length(24), // Era / Session progress bar
                 Constraint::Length(16), // Countdown
             ])
             .areas(area);
@@ -220,7 +221,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         network_info.render(network_area, buf);
 
-        // Draw and render Progress Bars
+        // Draw and render Progress Info
 
         let Some(epoch) = chain.epoch() else {
             // TODO: Handle epoch not available, maybe render loading indicator
@@ -228,7 +229,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         };
 
         let epoch_progress = epoch.progress(chain.finalized_block());
-        let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
 
         let Some(era) = ah_chain.era() else {
             // TODO: Handle era not available, maybe render loading indicator
@@ -236,22 +236,19 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         };
 
         let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
-        let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
 
         let progress_lines = vec![
             Line::from(""),
             Line::from(format!(
-                "era {} {:.0}% {}",
+                "era {} {:.0}% ",
                 era.index(),
                 era_progress * 100_f64,
-                era_progress_bar
             ))
             .alignment(Alignment::Right),
             Line::from(format!(
-                "epoch {} {:.0}% {}",
+                "epoch {} {:.0}% ",
                 epoch.index(),
                 epoch_progress * 100_f64,
-                epoch_progress_bar,
             ))
             .alignment(Alignment::Right),
         ];
@@ -262,6 +259,23 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .style(THEME.paragraph.base);
 
         progress_info.render(progress_area, buf);
+
+        // Draw and render Progress Bars
+        let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
+        let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
+
+        let progress_bar_lines = vec![
+            Line::from(""),
+            Line::from(era_progress_bar).alignment(Alignment::Right),
+            Line::from(epoch_progress_bar).alignment(Alignment::Right),
+        ];
+
+        let block = Block::new().set_style(THEME.block.main);
+        let progress_bar = Paragraph::new(progress_bar_lines)
+            .block(block)
+            .style(THEME.paragraph.base);
+
+        progress_bar.render(progress_bar_area, buf);
 
         // Draw and render Countdowns
 
