@@ -1,42 +1,34 @@
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
-    asset_hub_kusama_runtime::{ProxyType, RuntimeCall},
-    frame_system::pallet::Call as SystemCall,
-    pallet_proxy::pallet::Call as ProxyCall,
+    asset_hub_kusama_runtime::RuntimeCall, frame_system::pallet::Call as SystemCall,
+    pallet_staking_async::pallet::pallet::Call as StakingCall,
     pallet_staking_async::ValidatorPrefs,
-    pallet_staking_async::{pallet::pallet::Call as StakingCall, RewardDestination},
     pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
     sp_arithmetic::per_things::Perbill,
 };
+use crate::utils::{map_payee, map_supported_proxy};
 use subxt::{
     client::{ClientAtBlock, OnlineClientAtBlockImpl},
     utils::AccountId32,
     SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{session::Keys, staking::Payee, tx::Bytes};
+use suno_primitives::{proxy::SupportedProxy, session::Keys, staking::Payee, tx::Bytes};
 
 pub fn wrap_call_into_proxy(
     api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
+    supported_proxy: SupportedProxy,
 ) -> Result<Bytes, Error> {
-    let proxy_call =
-        node_runtime::tx()
-            .proxy()
-            .proxy((*proxied_account).into(), Some(ProxyType::Staking), call);
+    let proxy_type = map_supported_proxy(supported_proxy);
+    let proxy_call = node_runtime::tx()
+        .proxy()
+        .proxy((*proxied_account).into(), proxy_type, call);
 
     let payload = api.tx().call_data(&proxy_call).boxed()?;
 
     Ok(payload)
-}
-
-pub fn proxy(call: RuntimeCall, proxied_account: &AccountId32) -> RuntimeCall {
-    RuntimeCall::Proxy(ProxyCall::proxy {
-        real: (*proxied_account).into(),
-        force_proxy_type: Some(ProxyType::Staking),
-        call: Box::new(call),
-    })
 }
 
 pub fn remark_with_event(value: Vec<u8>) -> RuntimeCall {
@@ -101,14 +93,4 @@ pub fn staking_rc_client_purge_keys() -> RuntimeCall {
     RuntimeCall::StakingRcClient(StakingRcClientCall::purge_keys {
         max_delivery_and_remote_execution_fee: None,
     })
-}
-
-// Helper function to map Payee to RewardDestination
-fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
-    match payee {
-        Payee::None => RewardDestination::None,
-        Payee::Account(account) => RewardDestination::Account(account),
-        Payee::Stash => RewardDestination::Stash,
-        Payee::Staked => RewardDestination::Staked,
-    }
 }

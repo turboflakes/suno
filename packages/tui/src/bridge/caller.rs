@@ -9,6 +9,7 @@ use suno_config::Runtime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call,
+    proxy::SupportedProxy,
     tx::{Bytes, RawPayload},
     Response,
 };
@@ -20,6 +21,7 @@ pub trait RuntimeCaller {
         api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
         stash: &AccountId32,
         call: Call,
+        supported_proxy: SupportedProxy,
     ) -> Result<Bytes, Error>;
 
     async fn sign_and_submit_call_data(
@@ -37,32 +39,33 @@ impl RuntimeCaller for Runtime {
         api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
         stash: &AccountId32,
         call: Call,
+        supported_proxy: SupportedProxy,
     ) -> Result<Bytes, Error> {
         match &self {
             Runtime::AssetHubPolkadot => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_bond(amount, payee);
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::BondExtra { amount, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_bond_extra(amount);
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Unbond { amount, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_unbond(amount);
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Rebond { amount, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_rebond(amount);
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::WithdrawUnbonded { .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_withdraw_unbonded();
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetPayee { payee } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_set_payee(payee);
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Validate {
                     commission,
@@ -72,47 +75,47 @@ impl RuntimeCaller for Runtime {
                         commission.deconstruct(),
                         blocked,
                     );
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_chill();
-                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 // TODO: Implement SetKeysAsync and PurgeKeysAsync when ready
                 // Call::SetKeysAsync { keys } => {
                 //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(keys);
-                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 // }
                 // Call::PurgeKeysAsync => {
                 //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
-                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash)
+                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 // }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubKusama => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_bond(amount, payee);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::BondExtra { amount, .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_bond_extra(amount);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Unbond { amount, .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_unbond(amount);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Rebond { amount, .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_rebond(amount);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::WithdrawUnbonded { .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_withdraw_unbonded();
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetPayee { payee } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_set_payee(payee);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Validate {
                     commission,
@@ -122,46 +125,46 @@ impl RuntimeCaller for Runtime {
                         commission.deconstruct(),
                         blocked,
                     );
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_chill();
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetKeysAsync { keys } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_set_keys(keys);
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::PurgeKeysAsync => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_purge_keys();
-                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubPaseo => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond(amount, payee);
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::BondExtra { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond_extra(amount);
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Unbond { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_unbond(amount);
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Rebond { amount, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_rebond(amount);
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::WithdrawUnbonded { .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_withdraw_unbonded();
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetPayee { payee } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_set_payee(payee);
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Validate {
                     commission,
@@ -171,47 +174,47 @@ impl RuntimeCaller for Runtime {
                         commission.deconstruct(),
                         blocked,
                     );
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_chill();
-                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 // TODO: Implement SetKeysAsync and PurgeKeysAsync when ready
                 // Call::SetKeysAsync { keys } => {
                 //     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_set_keys(keys);
-                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 // }
                 // Call::PurgeKeysAsync => {
                 //     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_purge_keys();
-                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash)
+                //     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 // }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubWestend => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_bond(amount, payee);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::BondExtra { amount, .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_bond_extra(amount);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Unbond { amount, .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_unbond(amount);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Rebond { amount, .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_rebond(amount);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::WithdrawUnbonded { .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_withdraw_unbonded();
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetPayee { payee } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_set_payee(payee);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Validate {
                     commission,
@@ -221,19 +224,19 @@ impl RuntimeCaller for Runtime {
                         commission.deconstruct(),
                         blocked,
                     );
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::Chill => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_chill();
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::SetKeysAsync { keys } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_set_keys(keys);
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 Call::PurgeKeysAsync => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_purge_keys();
-                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash)
+                    suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },

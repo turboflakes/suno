@@ -3,7 +3,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
-    proxy::ProxyKey,
+    proxy::{ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
@@ -289,6 +289,14 @@ impl Validator {
                 .collect::<Vec<_>>()
                 .join(",")
         )
+    }
+
+    pub fn get_proxy(&self, runtime: SupportedRuntime) -> SupportedProxy {
+        self.proxies
+            .iter()
+            .find(|p| p.runtime == runtime)
+            .map(|p| p.proxy)
+            .unwrap_or(SupportedProxy::None)
     }
 }
 

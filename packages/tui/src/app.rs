@@ -892,6 +892,7 @@ impl App {
                             return;
                         }
                     };
+                    let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
                         let at_block = match api.at_current_block().await.boxed() {
@@ -906,7 +907,12 @@ impl App {
                         };
                         let spec_version = at_block.spec_version();
 
-                        match runtime.build_call_data(&at_block, &stash, call.clone()) {
+                        match runtime.build_call_data(
+                            &at_block,
+                            &stash,
+                            call.clone(),
+                            supported_proxy,
+                        ) {
                             Ok(bytes) => {
                                 let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(
                                     runtime,
