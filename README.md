@@ -4,7 +4,52 @@
   <img src="https://github.com/turboflakes/suno/blob/main/assets/suno-github-header.webp?raw=true">
 </p>
 
-`suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal.
+`suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal. `suno` is a terminal user interface to monitor live data and manage your own or third-party nodes. It supports Polkadot, Kusama, Paseo, and Westend networks.
+
+## Implementation constraints
+### Decentralised
+  - Runs on your terminal.
+  - Users can connect to any RPC node of their choice. 
+  - No backend APIs. All displayed data comes directly from the RPCs configured.
+
+### Security
+ - Restricted Proxy-Only operations with only three proxy types supported:
+	- Staking, StakingOperator (Asset Hub)
+	- NonTransfer (Relay Chain)
+- Proxy account already encrypted. Must be an account exported from PJS with a password already encoded. Format json.
+
+## Features
+
+- [&check;] Support Polkadot, Kusama, Paseo and Westend networks all at once on the same view;
+- [&check;] General network stats. Block height, era and epoch progress.
+- [&check;] Total validators and total nominators (active vs waiting).
+- [&check;] Network total staked percentage.
+- [&check;] Validator status, identity and Live Points
+- [&check;] Total nominators, Total stake, Self stake, Bonded, Unbonding, Unlocked. Display payee.
+- [&check;] Active vs Next commission. Current and Queued session keys;
+- [&check;] Validate and display proxy type for each stash.
+- [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
+- [&check;] Support for `/bond`, `/bond_extra`, `/unbond`, `/rebond`, `/withdraw_unbonded`, `/validate`, `/chill`, `/set_keys`, `/purge_keys`, `/set_keys_async`, `/purge_keys_async`.
+- [&check;] Verify and sign call_data. Display and log transaction progress.
+
+## 🚧 TODOs
+
+ - [] Custom themes
+ - [] Config custom commands
+ - [] Pro / Advanced mode to show validators key insight metrics
+ - [] Collator metrics and extrinsics
+ - [] RPC manual restarts and health check metrics
+ - [] Light client mode
+ - [] Multi-proxy setup
+
+## Installation
+<!-- TODO -->
+
+## Configuration
+<!-- TODO -->
+
+## Usage
+<!-- TODO -->
 
 ## Development / Build from Source
 
@@ -59,3 +104,17 @@ Otherwise, recompile the code on changes and run the binary
 #!/bin/bash
 cargo watch -x 'run --bin suno'
 ```
+
+## Collaboration
+
+Have an idea for a new feature, a fix or you found a bug, please open an [issue](https://github.com/turboflakes/suno/issues) or submit a [pull request](https://github.com/turboflakes/suno/pulls).
+
+Any feedback is welcome.
+
+### License
+
+**suno** - The entire code within this repository is licensed under the [Apache License 2.0](./LICENSE).
+
+__
+
+Enjoy `suno`
