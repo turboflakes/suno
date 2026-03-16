@@ -157,6 +157,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
     ) {
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            let block = Block::new().set_style(THEME.block.main);
+            block.render(area, buf);
             return;
         };
 
@@ -164,6 +166,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .chains
             .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
+            let block = Block::new().set_style(THEME.block.main);
+            block.render(area, buf);
             return;
         };
 
@@ -225,16 +229,21 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let Some(epoch) = chain.epoch() else {
             // TODO: Handle epoch not available, maybe render loading indicator
+            let block = Block::new().set_style(THEME.block.main);
+            let area = progress_area.union(progress_bar_area).union(countdown_area);
+            block.render(area, buf);
+            return;
+        };
+
+        let Some(era) = ah_chain.era() else {
+            // TODO: Handle era not available, maybe render loading indicator
+            let block = Block::new().set_style(THEME.block.main);
+            let area = progress_area.union(progress_bar_area).union(countdown_area);
+            block.render(area, buf);
             return;
         };
 
         let epoch_progress = epoch.progress(chain.finalized_block());
-
-        let Some(era) = ah_chain.era() else {
-            // TODO: Handle era not available, maybe render loading indicator
-            return;
-        };
-
         let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
 
         let progress_lines = vec![
@@ -309,10 +318,14 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .chains
             .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
+            let block = Block::new().set_style(THEME.block.main);
+            block.render(area, buf);
             return;
         };
 
         let Some(active_era) = ah_chain.era() else {
+            let block = Block::new().set_style(THEME.block.main);
+            block.render(area, buf);
             return;
         };
 
