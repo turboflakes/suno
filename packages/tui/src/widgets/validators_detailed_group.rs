@@ -186,7 +186,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let network_lines = vec![
             Line::from(
                 Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
-                    .style(THEME.paragraph.header),
+                    .style(THEME.paragraph.header_active),
             ),
             Line::from(vec![
                 Span::raw("total validators ").style(THEME.paragraph.label),

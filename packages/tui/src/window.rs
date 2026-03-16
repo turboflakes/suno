@@ -4,7 +4,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Clear, Padding, Paragraph, Widget},
+    widgets::{Block, Clear, Padding, Paragraph, Widget, Wrap},
 };
 use strum::{Display, EnumIter, FromRepr};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
@@ -58,27 +58,17 @@ impl Window {
     }
 
     fn render_help(&self, area: Rect, buf: &mut Buffer) {
-        let [logo_area, help_area] = Layout::default()
-            .direction(Direction::Vertical)
+        let [details_area, logo_area] = Layout::default()
+            .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(28), // Large logo height
-                Constraint::Fill(1),    // Help area takes remaining
+                Constraint::Fill(1),    // General project details
+                Constraint::Length(46), // Large logo width
             ])
             .areas(area);
 
-        // Render logo block
-        let logo_block = Block::default()
-            .style(THEME.logo.base)
-            .padding(Padding::proportional(4));
-        let logo_inner_area = logo_block.inner(logo_area);
-        logo_block.render(logo_area, buf);
-
-        let logo = Logo::original();
-        logo.render(logo_inner_area, buf);
-
         // Render help and legend block
-        let help_lines = vec![
-            Line::from(Span::raw("GENERAL INFO").style(THEME.paragraph.header)),
+        let details_lines = vec![
+            Line::from(Span::raw("PROJECT DETAILS").style(THEME.paragraph.header_active)),
             Line::from(vec![
                 Span::raw("site ").style(THEME.paragraph.label),
                 Span::raw("https://suno.sh"),
@@ -92,21 +82,7 @@ impl Window {
                 Span::raw("https://github.com/turboflakes/suno"),
             ]),
             Line::from(Span::raw("")),
-            Line::from(Span::raw("SUPPORTED PROXIES").style(THEME.paragraph.header)),
-            Line::from(vec![
-                Span::raw("[NT] ").style(THEME.paragraph.label),
-                Span::raw("NonTransfer, must be set up on the Relay Chain."),
-            ]),
-            Line::from(vec![
-                Span::raw("[S] ").style(THEME.paragraph.label),
-                Span::raw("Staking, must be set up on the Asset Hub Chain."),
-            ]),
-            Line::from(vec![
-                Span::raw("[SO] ").style(THEME.paragraph.label),
-                Span::raw("StakingOperator, must be set up on the Asset Hub Chain."),
-            ]),
-            Line::from(Span::raw("")),
-            Line::from(Span::raw("VALIDATOR STATUS (◈)").style(THEME.paragraph.header)),
+            Line::from(Span::raw("VALIDATOR STATUS (◈)").style(THEME.paragraph.header_active)),
             Line::from(vec![
                 Span::raw("[A] ").style(THEME.paragraph.label),
                 Span::raw("Authority"),
@@ -121,52 +97,70 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("[U] ").style(THEME.paragraph.label),
-                Span::raw("Undefined. A bond is required to set the account as stash. Next, the operator must set the session keys and trigger the validate intention."),
+                Span::raw("Undefined. No Validator intention set."),
             ]),
             Line::from(Span::raw("")),
-            Line::from(Span::raw("SUPPORTED EXTRINSICS").style(THEME.paragraph.header)),
+            Line::from(Span::raw("SUPPORTED PROXIES").style(THEME.paragraph.header_active)),
+            Line::from(vec![
+                Span::raw("[NT] ").style(THEME.paragraph.label),
+                Span::raw("NonTransfer. Must be configured on the Relay Chain."),
+            ]),
+            Line::from(vec![
+                Span::raw("[S] ").style(THEME.paragraph.label),
+                Span::raw("Staking. Must be configured on Asset Hub Chain."),
+            ]),
+            Line::from(vec![
+                Span::raw("[SO] ").style(THEME.paragraph.label),
+                Span::raw("StakingOperator. Must be configured on Asset Hub Chain."),
+            ]),
+            Line::from(Span::raw("")),
+            Line::from(Span::raw("SUPPORTED EXTRINSICS").style(THEME.paragraph.header_active)),
             Line::from(vec![
                 Span::raw("/bond ").style(THEME.paragraph.label),
-                Span::raw("Bond an amount from your free balance. Only available if the `Staking` proxy is set."),
+                Span::raw("Bond requires `Staking` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/bond_extra ").style(THEME.paragraph.label),
-                Span::raw("Bond additional funds to your existing stash, from your free balance. Only available if the `Staking` proxy is set."),
+                Span::raw("BondExtra requires `Staking` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/unbond ").style(THEME.paragraph.label),
-                Span::raw("Unbond a portion of your staked balance. Only available if the `Staking` proxy is set."),
+                Span::raw("Unbond requires `Staking` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/rebond ").style(THEME.paragraph.label),
-                Span::raw("Rebond a portion that is currently unlocking. Only available if the `Staking` proxy is set."),
+                Span::raw("Rebond requires `Staking` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/withdraw_unbonded ").style(THEME.paragraph.label),
-                Span::raw("Withdraw unbonded funds back to your free balance. Only available if the `Staking` proxy is set."),
+                Span::raw("Withdraw unbonded requires `Staking` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/validate ").style(THEME.paragraph.label),
-                Span::raw("Set validate intention, change commission or enable/disable nominations. Only available if the `Staking` or `StakingOperator` proxy is set."),
+                Span::raw("Validate requires one of `Staking` or `StakingOperator` proxy."),
+            ]),
+            Line::from(vec![
+                Span::raw("/chill ").style(THEME.paragraph.label),
+                Span::raw("Chill requires one of `Staking` or `StakingOperator` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/set_keys ").style(THEME.paragraph.label),
-                Span::raw("Set session keys from the output of 'author_rotateKeys' RPC call. Only available if the `NonTransfer` proxy is set."),
+                Span::raw("Set session keys requires `NonTransfer` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/purge_keys ").style(THEME.paragraph.label),
-                Span::raw("Remove all session keys. Only available is `NonTransfer` proxy is set."),
+                Span::raw("Purge session keys requires `NonTransfer` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/set_keys_async ").style(THEME.paragraph.label),
-                Span::raw("Set session keys from the output of 'author_rotateKeys' RPC call asynchronously. Only available if the `StakingOperator` proxy is set."),
+                Span::raw("Set session keys from Asset Hub requires `StakingOperator` proxy."),
             ]),
             Line::from(vec![
                 Span::raw("/purge_keys_async ").style(THEME.paragraph.label),
-                Span::raw("Remove all session keys. Only available if the `StakingOperator` proxy is set."),
+                Span::raw("Purge all session keys from Asset Hub requires `StakingOperator` proxy."),
             ]),
             Line::from(Span::raw("")),
-            Line::from(Span::raw("KEY BINDINGS").style(THEME.paragraph.header)),
+            Line::from(Span::raw("KEY BINDINGS").style(THEME.paragraph.header_active)),
             Line::from(vec![
                 Span::raw("ctrl+w ").style(THEME.paragraph.label),
                 Span::raw("Switch window."),
@@ -177,7 +171,7 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("esc ").style(THEME.paragraph.label),
-                Span::raw("Close or go back."),
+                Span::raw("Close popup or Go back."),
             ]),
             Line::from(vec![
                 Span::raw("ctrl+h/ctrl+l/left/right ").style(THEME.paragraph.label),
@@ -185,7 +179,7 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("tab ").style(THEME.paragraph.label),
-                Span::raw("Autocomplete or navigate between pane sections."),
+                Span::raw("Input focus, Autocomplete or Navigate between pane sections."),
             ]),
             Line::from(vec![
                 Span::raw("ctrl+j/ctrl+k/up/down ").style(THEME.paragraph.label),
@@ -196,11 +190,22 @@ impl Window {
         let block = Block::default()
             .style(THEME.block.main)
             .padding(Padding::proportional(1));
-        let help = Paragraph::new(help_lines)
+        let details = Paragraph::new(details_lines)
             .block(block)
-            .style(THEME.paragraph.base);
+            .style(THEME.paragraph.base)
+            .wrap(Wrap { trim: true });
 
-        help.render(help_area, buf);
+        details.render(details_area, buf);
+
+        // Render logo block
+        let logo_block = Block::default()
+            .style(THEME.logo.base)
+            .padding(Padding::proportional(2));
+        let logo_inner_area = logo_block.inner(logo_area);
+        logo_block.render(logo_area, buf);
+
+        let logo = Logo::original();
+        logo.render(logo_inner_area, buf);
     }
 }
 
