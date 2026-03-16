@@ -1,5 +1,9 @@
 # suno &middot; [![latest commit](https://github.com/turboflakes/suno/actions/workflows/rust.yml/badge.svg)](https://github.com/turboflakes/suno/actions/workflows/rust.yml) ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
 
+<p align="center">
+  <img src="https://github.com/turboflakes/suno/blob/main/assets/suno-github-header.webp?raw=true">
+</p>
+
 `suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal.
 
 ## Development / Build from Source
