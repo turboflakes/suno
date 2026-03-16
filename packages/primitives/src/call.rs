@@ -233,7 +233,7 @@ impl ToDescription for Call {
             )
             .to_string(),
             Self::Unbond { max, .. } => format!(
-                "Unbond up to {} that is bonded",
+                "Unbond up to {} of your staked balance.",
                 max.as_ref()
                     .map(|(_, description)| description.to_string())
                     .unwrap_or_default()
