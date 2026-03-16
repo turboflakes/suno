@@ -11,7 +11,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
     {
         return match key_event.code {
             // Select previous main window/tab
-            KeyCode::Char('t') => Action::Navigation(NavigationAction::PrevTab),
+            KeyCode::Char('w') => Action::Navigation(NavigationAction::PrevWindow),
             KeyCode::Char('c') => Action::Navigation(NavigationAction::Copy),
             _ => Action::System(SystemAction::Noop),
         };
@@ -25,7 +25,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 // Open popup on `ctrl-e` within the active section
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Select next main window/tab
-                KeyCode::Char('t') => Action::Navigation(NavigationAction::NextTab),
+                KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
                 _ => match app_focus {
                     Focus::Main => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),

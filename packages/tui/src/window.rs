@@ -5,12 +5,13 @@ pub enum Window {
     #[default]
     Main,
     Logs,
+    Help,
 }
 
 impl Window {
     pub fn next(self) -> Self {
         let current_index = self as usize;
-        if Self::from_repr(current_index) == Some(Window::Logs) {
+        if Self::from_repr(current_index) == Some(Window::Help) {
             return Window::Main;
         }
         let next_index = current_index.saturating_add(1);
@@ -20,7 +21,7 @@ impl Window {
     pub fn prev(self) -> Self {
         let current_index = self as usize;
         if Self::from_repr(current_index) == Some(Window::Main) {
-            return Window::Logs;
+            return Window::Help;
         }
         let prev_index = current_index.saturating_sub(1);
         Self::from_repr(prev_index).unwrap_or(self)

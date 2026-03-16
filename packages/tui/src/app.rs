@@ -175,8 +175,8 @@ impl App {
             NavigationAction::SectionDown => self.section_down(),
             NavigationAction::MoveUp => self.move_up(),
             NavigationAction::MoveDown => self.move_down(),
-            NavigationAction::NextTab => self.next_tab(),
-            NavigationAction::PrevTab => self.prev_tab(),
+            NavigationAction::NextWindow => self.next_window(),
+            NavigationAction::PrevWindow => self.prev_window(),
             NavigationAction::Reset => self.reset_selection(),
             NavigationAction::Copy => self.copy_to_clipboard(),
         }
@@ -778,12 +778,12 @@ impl App {
     }
 
     /// Selects the previous window.
-    fn prev_tab(&mut self) {
+    fn prev_window(&mut self) {
         self.window = self.window.prev();
     }
 
-    /// Selects the next tab.
-    fn next_tab(&mut self) {
+    /// Selects the next window.
+    fn next_window(&mut self) {
         self.window = self.window.next();
     }
 

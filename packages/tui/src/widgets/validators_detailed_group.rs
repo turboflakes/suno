@@ -185,7 +185,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                     .style(THEME.paragraph.header),
             ),
             Line::from(vec![
-                Span::raw("total validators: ").style(THEME.paragraph.label),
+                Span::raw("total validators ").style(THEME.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     ah_chain.active_validators_count(),
@@ -193,7 +193,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 )),
             ]),
             Line::from(vec![
-                Span::raw("total nominators: ").style(THEME.paragraph.label),
+                Span::raw("total nominators ").style(THEME.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     ah_chain.active_nominators_count(),
@@ -201,11 +201,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 )),
             ]),
             Line::from(vec![
-                Span::raw("total staked: ").style(THEME.paragraph.label),
+                Span::raw("total staked ").style(THEME.paragraph.label),
                 Span::raw(ah_chain.total_staked_percentage()),
             ]),
             Line::from(vec![
-                Span::raw("displayed: ").style(THEME.paragraph.label),
+                Span::raw("displayed ").style(THEME.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     validators.iter().filter(|v| v.is_active()).count(),
