@@ -44,12 +44,32 @@ const YELLOW_70: Color = Color::Rgb(253, 217, 30); // Secondary
 const YELLOW_80: Color = Color::Rgb(222, 187, 2);
 const YELLOW_90: Color = Color::Rgb(167, 140, 1);
 
+pub trait Themed {
+    fn active_style(&self) -> Style;
+
+    fn get_style(&self, style: Style, is_active: bool) -> Style {
+        if is_active {
+            self.active_style()
+        } else {
+            style
+        }
+    }
+}
+
 pub struct Theme {
     pub block: Block,
     pub table: Table,
     pub paragraph: Paragraph,
     pub scrollbar: Scrollbar,
     pub input: Input,
+    pub logo: Logo,
+}
+
+pub struct Logo {
+    pub base: Style,
+    pub base_dark: Style,
+    pub with_shadow: Style,
+    pub only_shadow: Style,
 }
 
 pub struct Block {
@@ -59,19 +79,10 @@ pub struct Block {
     pub footer_left: Style,
     pub footer_right: Style,
     pub main: Style,
-    pub logo: Style,
     pub active: Style,
 }
 
 impl Block {
-    fn get_style(&self, style: Style, active: bool) -> Style {
-        if active {
-            self.active
-        } else {
-            style
-        }
-    }
-
     pub fn base(&self, active: bool) -> Style {
         self.get_style(self.base, active)
     }
@@ -86,6 +97,12 @@ impl Block {
 
     pub fn main(&self, active: bool) -> Style {
         self.get_style(self.main, active)
+    }
+}
+
+impl Themed for Block {
+    fn active_style(&self) -> Style {
+        self.active
     }
 }
 
@@ -197,7 +214,6 @@ pub const THEME: Theme = Theme {
         menu_top: Style::new().bg(GRAY_90).fg(GRAY_20),
         menu_bottom: Style::new().bg(GRAY_80).fg(GRAY_20),
         main: Style::new().bg(GRAY_100).fg(GRAY_20),
-        logo: Style::new().bg(GRAY_100).fg(GRAY_40),
         footer_left: Style::new().bg(GRAY_80).fg(GRAY_50),
         footer_right: Style::new().bg(GRAY_100).fg(GRAY_50),
         active: Style::new().bg(GRAY_70).fg(GRAY_10),
@@ -232,5 +248,11 @@ pub const THEME: Theme = Theme {
         suffix: Style::new().fg(YELLOW_90),
         suffix_active: Style::new().fg(YELLOW_70).add_modifier(Modifier::BOLD),
         error: Style::new().fg(YELLOW_90).add_modifier(Modifier::ITALIC),
+    },
+    logo: Logo {
+        base: Style::new().bg(GRAY_100).fg(GRAY_20),
+        base_dark: Style::new().bg(GRAY_20).fg(GRAY_100),
+        with_shadow: Style::new().bg(YELLOW_70).fg(GRAY_20),
+        only_shadow: Style::new().bg(GRAY_100).fg(YELLOW_70),
     },
 };

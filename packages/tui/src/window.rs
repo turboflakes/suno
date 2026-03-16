@@ -4,7 +4,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Padding, Paragraph, Widget},
+    widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use strum::{Display, EnumIter, FromRepr};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
@@ -40,7 +40,10 @@ impl Window {
         let block = Block::default()
             .style(THEME.block.main)
             .padding(Padding::proportional(1));
-        let block_area = block.inner(area);
+
+        Clear.render(area, buf);
+
+        let inner_area = block.inner(area);
         block.render(area, buf);
 
         let logger = TuiLoggerWidget::default()
@@ -51,27 +54,27 @@ impl Window {
             .output_file(false)
             .output_line(false)
             .style(THEME.block.main);
-        logger.render(block_area, buf);
+        logger.render(inner_area, buf);
     }
 
     fn render_help(&self, area: Rect, buf: &mut Buffer) {
         let [logo_area, help_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(24), // Large logo height
+                Constraint::Length(28), // Large logo height
                 Constraint::Fill(1),    // Help area takes remaining
             ])
             .areas(area);
 
         // Render logo block
         let logo_block = Block::default()
-            .style(THEME.block.logo)
-            .padding(Padding::proportional(1));
-        let logo_block_area = logo_block.inner(logo_area);
+            .style(THEME.logo.base)
+            .padding(Padding::proportional(4));
+        let logo_inner_area = logo_block.inner(logo_area);
         logo_block.render(logo_area, buf);
 
-        let logo = Logo::large();
-        logo.render(logo_block_area, buf);
+        let logo = Logo::original();
+        logo.render(logo_inner_area, buf);
 
         // Render help and legend block
         let help_lines = vec![
