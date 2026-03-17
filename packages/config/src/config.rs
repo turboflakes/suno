@@ -98,13 +98,13 @@ impl Signer {
 
         if !path.exists() {
             warn!("Proxy path does not exist: {}", path.display());
-            return Err(Error::InvalidProxyPath);
+            return Err(Error::InvalidPath(path.display().to_string()));
         }
 
         let contents = fs::read_to_string(path)?;
         if contents.is_empty() {
             warn!("Proxy path content is empty: {}", path.display());
-            return Err(Error::InvalidProxyContent);
+            return Err(Error::InvalidContent(path.display().to_string()));
         }
 
         Ok(Signer {
@@ -121,8 +121,19 @@ pub struct Explorer {
 
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let path = path.as_ref();
+
+        if !path.exists() {
+            return Err(Error::InvalidPath(path.display().to_string()));
+        }
+
         let contents = fs::read_to_string(path)?;
+        if contents.is_empty() {
+            return Err(Error::InvalidContent(path.display().to_string()));
+        }
+
         let mut config: Config = serde_yaml::from_str(&contents)?;
+
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
             let signer = Signer::from_file(signer.proxy_path).ok();
