@@ -37,22 +37,23 @@ jobs:
       - name: Run cargo build
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Generate SHA-256 hash file
+      - name: Package binary
         run: |
           cd target/x86_64-unknown-linux-gnu/release
-          sha256sum suno > suno.sha256
+          tar -czvf suno-x86_64-unknown-linux-gnu.tar.gz suno
+          sha256sum suno-x86_64-unknown-linux-gnu.tar.gz > suno-x86_64-unknown-linux-gnu.tar.gz.sha256
 
-      - name: Upload suno binary
+      - name: Upload suno tarball
         uses: actions/upload-artifact@v4
         with:
-          name: suno-x86_64-unknown-linux-gnu
-          path: target/x86_64-unknown-linux-gnu/release/suno
+          name: suno-x86_64-unknown-linux-gnu.tar.gz
+          path: target/x86_64-unknown-linux-gnu/release/suno-x86_64-unknown-linux-gnu.tar.gz
 
-      - name: Upload suno.sha256
+      - name: Upload suno tarball sha256
         uses: actions/upload-artifact@v4
         with:
-          name: suno-x86_64-unknown-linux-gnu.sha256
-          path: target/x86_64-unknown-linux-gnu/release/suno.sha256
+          name: suno-x86_64-unknown-linux-gnu.tar.gz.sha256
+          path: target/x86_64-unknown-linux-gnu/release/suno-x86_64-unknown-linux-gnu.tar.gz.sha256
 
   build-macos-aarch64:
     name: Build on macOS (aarch64-apple-darwin)
@@ -82,22 +83,23 @@ jobs:
       - name: Run cargo build
         run: cargo build --release --target aarch64-apple-darwin
 
-      - name: Generate SHA-256 hash file
+      - name: Package binary
         run: |
           cd target/aarch64-apple-darwin/release
-          shasum -a 256 suno > suno.sha256
+          tar -czvf suno-aarch64-apple-darwin.tar.gz suno
+          shasum -a 256 suno-aarch64-apple-darwin.tar.gz > suno-aarch64-apple-darwin.tar.gz.sha256
 
-      - name: Upload suno binary
+      - name: Upload suno tarball
         uses: actions/upload-artifact@v4
         with:
-          name: suno-aarch64-apple-darwin
-          path: target/aarch64-apple-darwin/release/suno
+          name: suno-aarch64-apple-darwin.tar.gz
+          path: target/aarch64-apple-darwin/release/suno-aarch64-apple-darwin.tar.gz
 
-      - name: Upload suno.sha256
+      - name: Upload suno tarball sha256
         uses: actions/upload-artifact@v4
         with:
-          name: suno-aarch64-apple-darwin.sha256
-          path: target/aarch64-apple-darwin/release/suno.sha256
+          name: suno-aarch64-apple-darwin.tar.gz.sha256
+          path: target/aarch64-apple-darwin/release/suno-aarch64-apple-darwin.tar.gz.sha256
 
   create-release:
     needs:
@@ -132,68 +134,68 @@ jobs:
           draft: true
           prerelease: false
 
-      # --- Linux binary ---
-      - name: Download suno (linux)
+      # --- Linux tarball ---
+      - name: Download suno tarball (linux)
         uses: actions/download-artifact@v4
         with:
-          name: suno-x86_64-unknown-linux-gnu
+          name: suno-x86_64-unknown-linux-gnu.tar.gz
           path: artifacts/linux
 
-      - name: Download suno.sha256 (linux)
+      - name: Download suno tarball sha256 (linux)
         uses: actions/download-artifact@v4
         with:
-          name: suno-x86_64-unknown-linux-gnu.sha256
+          name: suno-x86_64-unknown-linux-gnu.tar.gz.sha256
           path: artifacts/linux
 
-      - name: Upload suno binary (linux)
+      - name: Upload suno tarball (linux)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/linux/suno
-          asset_name: suno-x86_64-unknown-linux-gnu
+          asset_path: artifacts/linux/suno-x86_64-unknown-linux-gnu.tar.gz
+          asset_name: suno-x86_64-unknown-linux-gnu.tar.gz
           asset_content_type: application/octet-stream
 
-      - name: Upload suno.sha256 (linux)
+      - name: Upload suno tarball sha256 (linux)
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/linux/suno.sha256
-          asset_name: suno-x86_64-unknown-linux-gnu.sha256
+          asset_path: artifacts/linux/suno-x86_64-unknown-linux-gnu.tar.gz.sha256
+          asset_name: suno-x86_64-unknown-linux-gnu.tar.gz.sha256
           asset_content_type: text/plain
 
-      # --- macOS aarch64 binary ---
-      - name: Download suno (macos aarch64)
+      # --- macOS aarch64 tarball ---
+      - name: Download suno tarball (macos aarch64)
         uses: actions/download-artifact@v4
         with:
-          name: suno-aarch64-apple-darwin
+          name: suno-aarch64-apple-darwin.tar.gz
           path: artifacts/macos
 
-      - name: Download suno.sha256 (macos aarch64)
+      - name: Download suno tarball sha256 (macos aarch64)
         uses: actions/download-artifact@v4
         with:
-          name: suno-aarch64-apple-darwin.sha256
+          name: suno-aarch64-apple-darwin.tar.gz.sha256
           path: artifacts/macos
 
-      - name: Upload suno binary (macos aarch64)
+      - name: Upload suno tarball (macos aarch64)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/macos/suno
-          asset_name: suno-aarch64-apple-darwin
+          asset_path: artifacts/macos/suno-aarch64-apple-darwin.tar.gz
+          asset_name: suno-aarch64-apple-darwin.tar.gz
           asset_content_type: application/octet-stream
 
-      - name: Upload suno.sha256 (macos aarch64)
+      - name: Upload suno tarball sha256 (macos aarch64)
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/macos/suno.sha256
-          asset_name: suno-aarch64-apple-darwin.sha256
+          asset_path: artifacts/macos/suno-aarch64-apple-darwin.tar.gz.sha256
+          asset_name: suno-aarch64-apple-darwin.tar.gz.sha256
           asset_content_type: text/plain
