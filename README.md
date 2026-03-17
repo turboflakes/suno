@@ -7,16 +7,13 @@
 `suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal. `suno` is a terminal user interface to monitor live data and manage your own or third-party nodes. It supports Polkadot, Kusama, Paseo, and Westend networks.
 
 ## Implementation constraints
-### Decentralised
-  - Runs on your terminal.
-  - Users can connect to any RPC node of their choice. 
-  - No backend APIs. All displayed data comes directly from the RPCs configured.
-
-### Security
+ - Runs on the terminal.
+ - Users can connect to any RPC node of their choice. 
+ - No backend APIs. All displayed data comes directly from the RPCs configured.
  - Restricted Proxy-Only operations with only three proxy types supported:
-	- Staking, StakingOperator (Asset Hub)
-	- NonTransfer (Relay Chain)
-- Proxy account already encrypted. Must be an account exported from PJS with a password already encoded. Format json.
+  - Staking, StakingOperator (Asset Hub)
+  - NonTransfer (Relay Chain)
+ - Proxy account must be an account exported from PJS with a password already encoded (json format).
 
 ## Features
 
@@ -32,7 +29,7 @@
 - [&check;] Support for `/bond`, `/bond_extra`, `/unbond`, `/rebond`, `/withdraw_unbonded`, `/validate`, `/chill`, `/set_keys`, `/purge_keys`, `/set_keys_async`, `/purge_keys_async`.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
 
-## 🚧 TODOs
+## Future / Ideas / Work in Progress
 
  - [] Custom themes
  - [] Config custom commands
