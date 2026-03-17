@@ -287,7 +287,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Some(proxy) = get_address_from_json_file().ok() {
+                                if let Ok(proxy) = get_address_from_json_file() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,
@@ -347,7 +347,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Some(proxy) = get_address_from_json_file().ok() {
+                                if let Ok(proxy) = get_address_from_json_file() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,

@@ -152,9 +152,6 @@ impl Config {
     }
 
     pub fn signer_path(&self) -> Option<String> {
-        if self.signer.is_none() {
-            return None;
-        }
         self.signer.as_ref().map(|s| s.proxy_path.clone())
     }
 
@@ -212,7 +209,7 @@ fn get_config() -> Result<Config, Error> {
     info!("Loading configuration from {}", config_path);
 
     // Read and parse the config file
-    let mut config = Config::from_file(&config_path)?;
+    let mut config = Config::from_file(config_path)?;
 
     // If not specified in the config file, load the signer proxy path
     // from the command line argument, otherwise try to load the default
