@@ -9,6 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 # ensure that the workflow is only triggered once per PR, subsequent pushes to the PR will cancel
 # and restart the workflow. See https://docs.github.com/en/actions/using-jobs/using-concurrency
