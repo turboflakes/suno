@@ -69,3 +69,17 @@ tokio = { version = "1.43.0", features = ["full"] }
 tui-logger = "0.14"
 unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }
+
+[profile.dev]
+panic = "abort"
+opt-level = 0
+debug = true
+[profile.dev.package."*"] # Keep LIBRARIES optimized
+opt-level = 3
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = "z"
+incremental = true
