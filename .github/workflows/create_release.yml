@@ -2,16 +2,15 @@ name: Rust CI - Create Release
 
 on:
   push:
-    # Sequence of patterns matched against refs/tags
     tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+      - "v*"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build-self-hosted:
-    name: Build on self-hosted (Ubuntu latest)
+    name: Build on self-hosted (ubuntu-latest)
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +18,7 @@ jobs:
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          targets: x86_64-unknown-linux-gnu
           components: rustfmt, clippy
 
       - name: Rust Cache
@@ -28,43 +28,81 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: |
-          cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
 
       - name: Run cargo test --locked
-        run: cargo test --locked --all-features --all-targets
-
-      - name: Clean cargo target
-        uses: actions-rs/cargo@v1
-        with:
-          command: clean
+        run: |
+          cargo test --locked --all-features --all-targets --target x86_64-unknown-linux-gnu
 
       - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Generate SHA-256 hash file
         run: |
-          cd target/release
+          cd target/x86_64-unknown-linux-gnu/release
           sha256sum suno > suno.sha256
 
       - name: Upload suno binary
         uses: actions/upload-artifact@v4
         with:
-          name: suno
-          path: target/release
+          name: suno-x86_64-unknown-linux-gnu
+          path: target/x86_64-unknown-linux-gnu/release/suno
 
       - name: Upload suno.sha256
         uses: actions/upload-artifact@v4
         with:
-          name: suno.sha256
-          path: target/release
+          name: suno-x86_64-unknown-linux-gnu.sha256
+          path: target/x86_64-unknown-linux-gnu/release/suno.sha256
+
+  build-macos-aarch64:
+    name: Build on macOS (aarch64-apple-darwin)
+    runs-on: macos-latest # GitHub-hosted; use macos-14 for guaranteed Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+
+      - name: Run check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --target aarch64-apple-darwin -- -D warnings
+
+      - name: Run cargo test --locked
+        run: |
+          cargo test --locked --all-features --all-targets --target aarch64-apple-darwin
+
+      - name: Run cargo build
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Generate SHA-256 hash file
+        run: |
+          cd target/aarch64-apple-darwin/release
+          shasum -a 256 suno > suno.sha256
+
+      - name: Upload suno binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: suno-aarch64-apple-darwin
+          path: target/aarch64-apple-darwin/release/suno
+
+      - name: Upload suno.sha256
+        uses: actions/upload-artifact@v4
+        with:
+          name: suno-aarch64-apple-darwin.sha256
+          path: target/aarch64-apple-darwin/release/suno.sha256
 
   create-release:
     needs:
       - build-self-hosted
+      - build-macos-aarch64
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -94,34 +132,68 @@ jobs:
           draft: true
           prerelease: false
 
-      - name: Download suno
+      # --- Linux binary ---
+      - name: Download suno (linux)
         uses: actions/download-artifact@v4
         with:
-          name: suno
-          path: target/release
+          name: suno-x86_64-unknown-linux-gnu
+          path: artifacts/linux
 
-      - name: Download suno sha256
+      - name: Download suno.sha256 (linux)
         uses: actions/download-artifact@v4
         with:
-          name: suno.sha256
-          path: target/release
+          name: suno-x86_64-unknown-linux-gnu.sha256
+          path: artifacts/linux
 
-      - name: Upload suno binary
+      - name: Upload suno binary (linux)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: target/release/suno
-          asset_name: suno
+          asset_path: artifacts/linux/suno
+          asset_name: suno-x86_64-unknown-linux-gnu
           asset_content_type: application/octet-stream
 
-      - name: Upload suno.sha256
+      - name: Upload suno.sha256 (linux)
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: target/release/suno.sha256
-          asset_name: suno.sha256
+          asset_path: artifacts/linux/suno.sha256
+          asset_name: suno-x86_64-unknown-linux-gnu.sha256
+          asset_content_type: text/plain
+
+      # --- macOS aarch64 binary ---
+      - name: Download suno (macos aarch64)
+        uses: actions/download-artifact@v4
+        with:
+          name: suno-aarch64-apple-darwin
+          path: artifacts/macos
+
+      - name: Download suno.sha256 (macos aarch64)
+        uses: actions/download-artifact@v4
+        with:
+          name: suno-aarch64-apple-darwin.sha256
+          path: artifacts/macos
+
+      - name: Upload suno binary (macos aarch64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/macos/suno
+          asset_name: suno-aarch64-apple-darwin
+          asset_content_type: application/octet-stream
+
+      - name: Upload suno.sha256 (macos aarch64)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/macos/suno.sha256
+          asset_name: suno-aarch64-apple-darwin.sha256
           asset_content_type: text/plain
