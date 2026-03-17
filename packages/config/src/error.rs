@@ -11,6 +11,10 @@ pub enum Error {
     Genesis(String),
     #[error("At least one chain has to be enabled [Polkadot, Kusama, Paseo, Westend]")]
     ChainNotAvailable,
+    #[error("Invalid proxy path")]
+    InvalidProxyPath,
+    #[error("Invalid proxy content")]
+    InvalidProxyContent,
     #[error("Other error: {0}")]
     Other(String),
 }

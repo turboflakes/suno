@@ -19,7 +19,7 @@ fn load_keypair_from_json_file(password: &str) -> Result<Keypair, Error> {
 
     // Load the signer json path
     let signer_path = config
-        .signer_json_path()
+        .signer_path()
         .ok_or(Error::SignerPathNotFound("json".into()))?;
 
     // Read data from json file
@@ -35,7 +35,7 @@ pub fn get_address_from_json_file() -> Result<AccountId32, Error> {
 
     // Load the signer json path
     let signer_path = config
-        .signer_json_path()
+        .signer_path()
         .ok_or(Error::SignerPathNotFound("json".into()))?;
 
     // Read data from json file
@@ -60,7 +60,7 @@ fn _load_keypair_from_seed_file(password: Option<String>) -> Result<Keypair, Err
 
     // Load the signer seed path
     let signer_path = config
-        .signer_seed_path()
+        .signer_path()
         .ok_or(Error::SignerPathNotFound("seed".into()))?;
 
     // Read data from seed file

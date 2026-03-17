@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
 use lazy_static::lazy_static;
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -24,13 +24,23 @@ lazy_static! {
 
 type Stash = AccountId32;
 
+/// Provides default value for the configuration file path
+fn default_config_path() -> &'static str {
+    ".config.yaml"
+}
+
+/// Provides default value for the proxy account file path
+fn default_proxy_path() -> &'static str {
+    ".proxy_account.json"
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
     // TODO: Add support for RPCs
     // rpcs: Vec<HashMap<String, Vec<String>>>,
     pub features: Features,
-    pub signer: Signer,
+    pub signer: Option<Signer>,
     pub explorer: Explorer,
 }
 
@@ -79,16 +89,27 @@ impl Default for Features {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Signer {
-    proxy_seed_path: Option<String>,
-    proxy_json_path: Option<String>,
+    proxy_path: String,
 }
 
-impl Default for Signer {
-    fn default() -> Self {
-        Self {
-            proxy_seed_path: Some(".proxy_private.seed".into()),
-            proxy_json_path: None,
+impl Signer {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let path = path.as_ref();
+
+        if !path.exists() {
+            warn!("Proxy path does not exist: {}", path.display());
+            return Err(Error::InvalidProxyPath);
         }
+
+        let contents = fs::read_to_string(path)?;
+        if contents.is_empty() {
+            warn!("Proxy path content is empty: {}", path.display());
+            return Err(Error::InvalidProxyContent);
+        }
+
+        Ok(Signer {
+            proxy_path: path.to_string_lossy().into_owned(),
+        })
     }
 }
 
@@ -101,7 +122,12 @@ pub struct Explorer {
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let contents = fs::read_to_string(path)?;
-        let config: Config = serde_yaml::from_str(&contents)?;
+        let mut config: Config = serde_yaml::from_str(&contents)?;
+        // Verify and validate if signer path exists
+        if let Some(signer) = config.signer {
+            let signer = Signer::from_file(signer.proxy_path).ok();
+            config.signer = signer;
+        }
         Ok(config)
     }
 
@@ -114,12 +140,16 @@ impl Config {
         Ok(())
     }
 
-    pub fn signer_json_path(&self) -> Option<String> {
-        self.signer.proxy_json_path.clone()
+    pub fn signer_path(&self) -> Option<String> {
+        if self.signer.is_none() {
+            return None;
+        }
+        self.signer.as_ref().map(|s| s.proxy_path.clone())
     }
 
-    pub fn signer_seed_path(&self) -> Option<String> {
-        self.signer.proxy_seed_path.clone()
+    pub fn set_signer_path(&mut self, path: &str) {
+        let signer = Signer::from_file(path).ok();
+        self.signer = signer;
     }
 
     pub fn explorer_papi_url(&self, chain: &str, block_hash: &str) -> Option<String> {
@@ -138,12 +168,48 @@ impl Config {
 }
 
 fn get_config() -> Result<Config, Error> {
-    info!("Loading configuration");
-    // Check for custom config file path in environment variable
-    let config_path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| ".config.yaml".to_string());
+    let default_config_path = default_config_path();
+    let default_proxy_path = default_proxy_path();
+
+    let matches = clap::Command::new("suno")
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .arg(
+            clap::Arg::new("config-path")
+                .short('c')
+                .long("config-path")
+                .value_name("FILE")
+                .default_value(default_config_path)
+                .help("Sets a custom config file path."),
+        )
+        .arg(
+            clap::Arg::new("proxy-path")
+                .short('p')
+                .long("proxy-path")
+                .value_name("FILE")
+                .default_value(default_proxy_path)
+                .help("Sets a custom proxy account file path."),
+        )
+        .get_matches();
+
+    let config_path = matches
+        .get_one::<String>("config-path")
+        .map(|s| s.as_str())
+        .unwrap_or(default_config_path);
+
+    info!("Loading configuration from {}", config_path);
 
     // Read and parse the config file
-    let config = Config::from_file(&config_path)?;
+    let mut config = Config::from_file(&config_path)?;
+
+    // If not specified in the config file, load the signer proxy path
+    // from the command line argument, otherwise try to load the default
+    if config.signer.is_none() {
+        if let Some(path) = matches.get_one::<String>("proxy-path") {
+            config.set_signer_path(path.as_str());
+        }
+    }
 
     // Validate the configuration
     config.validate()?;
@@ -239,7 +305,7 @@ mod tests {
         let config = Config {
             chains: vec![],
             features: Features::default(),
-            signer: Signer::default(),
+            signer: None,
             explorer: Explorer::default(),
         };
         assert!(config.validate().is_err());

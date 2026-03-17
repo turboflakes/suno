@@ -9,6 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
+clap = { workspace = true }
 lazy_static = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

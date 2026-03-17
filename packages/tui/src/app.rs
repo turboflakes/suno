@@ -250,16 +250,6 @@ impl App {
                     .chains
                     .update_connection_state(&chain_key, connection_state.clone());
 
-                let proxy = match get_address_from_json_file() {
-                    Ok(address) => address,
-                    Err(e) => {
-                        let _ = self
-                            .tx
-                            .send(Action::System(SystemAction::Error(e.to_string())));
-                        return;
-                    }
-                };
-
                 if is_updated && connection_state == ConnectionState::Connected {
                     let runtime = chain_key;
                     let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
@@ -297,14 +287,16 @@ impl App {
                                     &self.tx,
                                 );
 
-                                sync::spawn_fetch_validators_proxy_status(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &proxy,
-                                    &self.tx,
-                                );
+                                if let Some(proxy) = get_address_from_json_file().ok() {
+                                    sync::spawn_fetch_validators_proxy_status(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &proxy,
+                                        &self.tx,
+                                    );
+                                };
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -347,15 +339,6 @@ impl App {
                                     &self.tx,
                                 );
 
-                                sync::spawn_fetch_validators_proxy_status(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &proxy,
-                                    &self.tx,
-                                );
-
                                 sync::spawn_fetch_account_balance(
                                     &api,
                                     block_hash,
@@ -363,6 +346,17 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
+
+                                if let Some(proxy) = get_address_from_json_file().ok() {
+                                    sync::spawn_fetch_validators_proxy_status(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &proxy,
+                                        &self.tx,
+                                    );
+                                };
                             }
                         }
                         SupportedRuntime::PeoplePolkadot
