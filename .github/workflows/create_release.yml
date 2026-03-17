@@ -70,15 +70,17 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
 
-      - name: Run check formatting
-        run: cargo fmt --all -- --check
+      # NOTE: The following steps are commented out as they are run also on the self-hosted build
+      #
+      # - name: Run check formatting
+      #   run: cargo fmt --all -- --check
 
-      - name: Run clippy
-        run: cargo clippy --all-targets --target aarch64-apple-darwin -- -D warnings
+      # - name: Run clippy
+      #   run: cargo clippy --all-targets --target aarch64-apple-darwin -- -D warnings
 
-      - name: Run cargo test --locked
-        run: |
-          cargo test --locked --all-features --all-targets --target aarch64-apple-darwin
+      # - name: Run cargo test --locked
+      #   run: |
+      #     cargo test --locked --all-features --all-targets --target aarch64-apple-darwin
 
       - name: Run cargo build
         run: cargo build --release --target aarch64-apple-darwin
