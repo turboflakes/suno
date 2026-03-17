@@ -29,4 +29,8 @@ target/
 .proxy_private.seed
 .proxy_private.json
 
+# Scripts
+bump-version.sh
+
+# Other
 .DS_Store
