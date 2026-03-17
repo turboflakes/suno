@@ -333,7 +333,7 @@ features:
   enable_collators: false
   enable_rpcs: false
 signer:
-  proxy_seed_path: ".proxy_private.seed"
+  proxy_path: ".proxy_private.seed"
 explorer:
   pjs_url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 "#;
@@ -381,7 +381,7 @@ features:
   enable_collators: true
   enable_rpcs: false
 signer:
-  proxy_seed_path: ".proxy_private.seed"
+  proxy_path: ".proxy_private.json"
 explorer:
     pjs_url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 "#;
