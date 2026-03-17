@@ -11,8 +11,8 @@
  - Users can connect to any RPC node of their choice. 
  - No backend APIs. All displayed data comes directly from the RPCs configured.
  - Restricted Proxy-Only operations with only three proxy types supported:
-  - Staking, StakingOperator (Asset Hub)
-  - NonTransfer (Relay Chain)
+    - Staking, StakingOperator (Asset Hub)
+    - NonTransfer (Relay Chain)
  - Proxy account must be an account exported from PJS with a password already encoded (json format).
 
 ## Features
