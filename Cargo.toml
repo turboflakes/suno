@@ -26,9 +26,9 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 authors = ["paulo <paulo@turboflakes.io>"]
-license = "MIT or Apache-2.0"
+license = "Apache-2.0"
 repository = "https://github.com/turboflakes/suno"
-description = "Just another way of managing Substrate node operations in the Polkadot ecosystem."
+description = "Yet another way to manage Substrate Node Operations from your terminal."
 edition = "2021"
 
 [workspace.dependencies]
