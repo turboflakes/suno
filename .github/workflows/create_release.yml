@@ -1,0 +1,127 @@
+name: Rust CI - Create Release
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-self-hosted:
+    name: Build on self-hosted (Ubuntu latest)
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+
+      - name: Run check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: |
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Run cargo test --locked
+        run: cargo test --locked --all-features --all-targets
+
+      - name: Clean cargo target
+        uses: actions-rs/cargo@v1
+        with:
+          command: clean
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Generate SHA-256 hash file
+        run: |
+          cd target/release
+          sha256sum suno > suno.sha256
+
+      - name: Upload suno binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: suno
+          path: target/release
+
+      - name: Upload suno.sha256
+        uses: actions/upload-artifact@v4
+        with:
+          name: suno.sha256
+          path: target/release
+
+  create-release:
+    needs:
+      - build-self-hosted
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Get Rustc version
+        id: get_rustc
+        run: echo "rustc=$(rustc -V)" >> $GITHUB_OUTPUT
+
+      - name: Get Tag version
+        id: get_tag
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          release_name: suno ${{ steps.get_tag.outputs.tag }}
+          body: "Note: This release was built using `${{ steps.get_rustc.outputs.rustc }}`"
+          draft: true
+          prerelease: false
+
+      - name: Download suno
+        uses: actions/download-artifact@v4
+        with:
+          name: suno
+          path: target/release
+
+      - name: Download suno sha256
+        uses: actions/download-artifact@v4
+        with:
+          name: suno.sha256
+          path: target/release
+
+      - name: Upload suno binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: target/release/suno
+          asset_name: suno
+          asset_content_type: application/octet-stream
+
+      - name: Upload suno.sha256
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: target/release/suno.sha256
+          asset_name: suno.sha256
+          asset_content_type: text/plain
