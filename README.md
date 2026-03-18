@@ -28,10 +28,9 @@
 - [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
 - [&check;] Support for `/bond`, `/bond_extra`, `/unbond`, `/rebond`, `/withdraw_unbonded`, `/validate`, `/chill`, `/set_keys`, `/purge_keys`, `/set_keys_async`, `/purge_keys_async`.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
+- [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
 
 ## Future / Ideas / Work in Progress
-
- - [] Custom themes
  - [] Config custom commands
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
@@ -40,13 +39,127 @@
  - [] Multi-proxy setup
 
 ## Installation
-<!-- TODO -->
 
+**Note: Binary release available for Linux and macOS only**
+
+### Option 1
+Download and extract the latest released binaries available from the github [Releases](https://github.com/turboflakes/suno/releases) section.
+
+### Option 2
+Alternatively, run the bash script in [/scripts/install.sh](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/scripts/install.sh) with the command below:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/turboflakes/suno/main/scripts/install.sh | bash
+```
+The script downloads the latest release, extracts it, and installs the binary into the `$HOME/suno` directory by default. It prompts you to change the directory as well as asking if a default configuration file is required.
+
+An example of the instructions presented:
+```bash
+> Enter SUNO installation path [default: /home/suno]:
+√ Output directory /home/suno
+√ Downloading suno v0.1.2
+suno-aarch64-apple-darwin.tar.gz          100%[=====================================================================================>]  21.12M  17.3MB/s    in 1.2s
+suno-aarch64-apple-darwin.tar.gz.sha256   100%[=====================================================================================>]      99  --.-KB/s    in 0s
+√ Checksum verified
+√ Existing binary backed up to /home/suno/suno.backup
+√ Checking if suno exists: total 262688
+-rwxr-xr-x@ 1 paulo  staff  112007760 Mar 17 12:05 suno
+-rw-r--r--@ 1 paulo  staff   22151830 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz
+-rw-r--r--@ 1 paulo  staff         99 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz.sha256
+√ Successfully installed suno v0.1.2 at /home/suno/suno
+> Would you like to install the DEFAULT configuration file? [y/N]: y
+> Enter the configuration path [default: /Users/paulo/suno/.config.yaml]:
+√ Writing /Users/paulo/suno/.config.yaml template
+√ Config file saved at /Users/paulo/suno/.config.yaml.
+-> Edit the config file and replace STASHES and RPC endpoints as you wish.
+√ Installation complete
+— Enjoy suno v0.1.2
+```
 ## Configuration
-<!-- TODO -->
+
+### Validator **stashes** and **RPCs**
+Most configuration is done via an initialized config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
+
+```yaml
+chains:
+  - polkadot:
+      rpc_url: "wss://polkadot.rpc.PROVIDER_ENDPOINT"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+  - asset_hub_polkadot:
+      rpc_url: "wss://asset-hub-polkadot.rpc.PROVIDER_ENDPOINT"
+      light_client: false
+  - people_polkadot:
+      rpc_url: "wss://people-polkadot.rpc.PROVIDER_ENDPOINT"
+      light_client: false
+  - kusama:
+      rpc_url: "wss://kusama.rpc.PROVIDER_ENDPOINT"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+  - asset_hub_kusama:
+      rpc_url: "wss://asset-hub-kusama.rpc.PROVIDER_ENDPOINT"
+      light_client: false
+features:
+  enable_validators: true
+  enable_collators: true
+  enable_rpcs: false
+themes:
+  active: "Suno Dark"
+  path: "./themes"
+signer:
+  proxy_path: ".proxy_private.json"
+explorer:
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+    # A few other explorers commented out below
+    # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
+    # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+```
+### Signer Account (Proxy-Only)
+To operate and execute extrinsics onchain, a proxy account with at least one of the following types [Staking, StakingOperator, NonTransfer] must be set-up for the stashes listed in the configuration file. For example, `Staking` or `StakingOperator` must be setup on the Asset-Hub chain, and `NonTransfer` on the Relay chain.
+
 
 ## Usage
-<!-- TODO -->
+From your favourite terminal, simply call `suno`. To use a custom configuration file, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
+
+Check all flags available:
+
+```bash
+suno --help
+Yet another way to manage Substrate Node Operations from your terminal.
+
+Usage: suno [OPTIONS]
+
+Options:
+  -c, --config-path <FILE>  Sets a custom config file path. [default: .config.yaml]
+  -p, --proxy-path <FILE>   Sets a custom proxy account file path.
+  -h, --help                Print help
+  -V, --version             Print version
+```
+
+### List of keybindings
+
+```bash
+'ctrl+w' to switch window
+'ctrl+c' to quit suno
+'esc' to close popup or unfocus from input field
+'ctrl+h / ctrl+l / left / right' to navigate between pane sections
+'tab' to input focus, to command autocomplete or just to navigate between pane sections
+'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
+```
+
+### Change or Build your own **theme**
+
+The default `Suno Dark` theme and `Suno Light` are builtin, you can swap between them updating the configuration file.
+
+To create your own **theme**, pick one of the ones available in the [/themes](https://github.com/turboflakes/suno/tree/main/themes) directory, copy and rename it, adjust the colors as you please. The filename will serve as the theme name. Under the **themes** section in the configuration file (see below), specify the new theme name and adjust the directory path as needed; It should point to the custom themes folder.
+
+```yaml
+themes:
+  active: "Blue Sky"
+  path: "./themes"
+```
 
 ## Development / Build from Source
 
