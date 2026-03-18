@@ -37,13 +37,14 @@
  - [] RPC manual restarts and health check metrics
  - [] Light client mode
  - [] Multi-proxy setup
-
+ - [] Support for `/kick`, `/nominate` extrinsics
+ 
 ## Installation
 
 **Note: Binary release available for Linux and macOS only**
 
 ### Option 1
-Download and extract the latest released binaries available from the github [Releases](https://github.com/turboflakes/suno/releases) section.
+Download and extract the latest binary from the GitHub [Releases](https://github.com/turboflakes/suno/releases) section.
 
 ### Option 2
 Alternatively, run the bash script in [/scripts/install.sh](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/scripts/install.sh) with the command below:
@@ -75,6 +76,7 @@ suno-aarch64-apple-darwin.tar.gz.sha256   100%[=================================
 √ Installation complete
 — Enjoy suno v0.1.2
 ```
+
 ## Configuration
 
 ### Validator **stashes** and **RPCs**
@@ -116,12 +118,68 @@ explorer:
     # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
     # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 ```
-### Signer Account (Proxy-Only)
-To operate and execute extrinsics onchain, a proxy account with at least one of the following types [Staking, StakingOperator, NonTransfer] must be set-up for the stashes listed in the configuration file. For example, `Staking` or `StakingOperator` must be setup on the Asset-Hub chain, and `NonTransfer` on the Relay chain.
 
+## Signer Account (Proxy-Only)
+To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator`, `NonTransfer` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` [SO] must be setup on the Asset-Hub chain, and `NonTransfer` [NT] on the Relay chain.
+
+###  Commands supported per Proxy Type
+  NOTE: Each `suno` command is intrinsically dependant on its availability within the runtime
+
+- **[S] Staking (Asset Hub)**
+  - `/bond`
+  - `/bond_extra`
+  - `/unbond`
+  - `/rebond`
+  - `/withdraw_unbonded`
+  - `/set_payee`
+  - `/validate`
+  - `/chill`
+
+- **[SO] StakingOperator (Asset Hub)**
+  - `/validate`
+  - `/chill`
+  - `/set_keys_async`
+  - `/purge_keys_async`
+  
+- **[NT] NonTransfer (Relay Chain)**
+  - `/set_keys`
+  - `/purge_keys`
+
+### Proxy Account configuration
+
+#### Step 1
+Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [Polkadot Developer Signer](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
+```json
+{
+  "encoded": "J2FFcPHAY11Pmq/38eqbwfUv9OPitYJs+oYgahBvlagAAAIAAQAAAAgAAAB5o0DwXCWDblsH+9pc++RaBO4fpHBHzUirHFHFE9yS3sDzgAIQjhgvPqJ3ODrMR2gy7vk0VZg1fyirIvmsrfjGbWnOI8YU0joX0tYytroyWaykFKtZJMmE0pNKcJ5dJmDxscbK53Ac+7ld2UdH07yKPXxmPuYNNw3vKx8cg9CdQgifKfzQxHnC+EUpOoHPLwGlHsFEYtIlQtngqd9n",
+  "encoding": {
+    "content": ["pkcs8", "sr25519"],
+    "type": ["scrypt", "xsalsa20-poly1305"],
+    "version": "3"
+  },
+  "address": "5CfWTDh7XxJ2yrayqQ2aJnnZAH5v5XaF1oJFfH5QCpbfP9v8",
+  "meta": {
+    "genesisHash": "",
+    "name": "Bob",
+    "whenCreated": 1768916488918
+  }
+}
+```
+
+#### Step 2
+You can rename the file to `.proxy_private.json`, since it is the one built-in by default and is expected to live alongside the binary. Alternatively, you can rename it and move the file to a directory of your choice. If you choose a different name and path, you have 2 options:
+
+**Option 1** specify the new **proxy_path** under the **signer** section in the configuration file. For example:
+
+```yaml
+signer:
+  proxy_path: ".proxy_private.json"
+```
+
+**Option 2** via the `--proxy-path` flag when calling `suno` from the terminal, eg. `suno --proxy-path /home/suno/suno-proxy-account.json`
 
 ## Usage
-From your favourite terminal, simply call `suno`. To use a custom configuration file, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
+From your favourite terminal, simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
 
 Check all flags available:
 
@@ -151,7 +209,7 @@ Options:
 
 ### Change or Build your own **theme**
 
-The default `Suno Dark` theme and `Suno Light` are builtin, you can swap between them updating the configuration file.
+The `Suno Dark` and `Suno Light` themes are built-in, you can swap between them by updating the configuration file.
 
 To create your own **theme**, pick one of the ones available in the [/themes](https://github.com/turboflakes/suno/tree/main/themes) directory, copy and rename it, adjust the colors as you please. The filename will serve as the theme name. Under the **themes** section in the configuration file (see below), specify the new theme name and adjust the directory path as needed; It should point to the custom themes folder.
 
