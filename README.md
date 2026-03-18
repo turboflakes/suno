@@ -13,7 +13,7 @@
  - Restricted Proxy-Only operations with only three proxy types supported:
     - Staking, StakingOperator (Asset Hub)
     - NonTransfer (Relay Chain)
- - Proxy account must be an account exported from PJS with a password already encoded (json format).
+ - Proxy account must be an account with password exported from [Polkadot Developer Signer](https://polkadot.js.org/extension/).
 
 ## Features
 
@@ -21,12 +21,12 @@
 - [&check;] General network stats. Block height, era and epoch progress.
 - [&check;] Total validators and total nominators (active vs waiting).
 - [&check;] Network total staked percentage.
-- [&check;] Validator status, identity and Live Points
+- [&check;] Validator status, identity and **Live Points**
 - [&check;] Total nominators, Total stake, Self stake, Bonded, Unbonding, Unlocked. Display payee.
 - [&check;] Active vs Next commission. Current and Queued session keys;
-- [&check;] Validate and display proxy type for each stash.
+- [&check;] Validate and display only supported proxy type for each stash.
 - [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
-- [&check;] Support for `/bond`, `/bond_extra`, `/unbond`, `/rebond`, `/withdraw_unbonded`, `/validate`, `/chill`, `/set_keys`, `/purge_keys`, `/set_keys_async`, `/purge_keys_async`.
+- [&check;] Support for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
 - [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
 
@@ -41,10 +41,10 @@
  
 ## Installation
 
-**Note: Binary release available for Linux and macOS only**
+**Note: Binary release available for Linux and macOS**
 
 ### Option 1
-Download and extract the latest binary from the GitHub [Releases](https://github.com/turboflakes/suno/releases) section.
+Download and extract the latest binary from GitHub [Releases](https://github.com/turboflakes/suno/releases).
 
 ### Option 2
 Alternatively, run the bash script in [/scripts/install.sh](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/scripts/install.sh) with the command below:
@@ -69,9 +69,9 @@ suno-aarch64-apple-darwin.tar.gz.sha256   100%[=================================
 -rw-r--r--@ 1 paulo  staff         99 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz.sha256
 √ Successfully installed suno v0.1.2 at /home/suno/suno
 > Would you like to install the DEFAULT configuration file? [y/N]: y
-> Enter the configuration path [default: /Users/paulo/suno/.config.yaml]:
-√ Writing /Users/paulo/suno/.config.yaml template
-√ Config file saved at /Users/paulo/suno/.config.yaml.
+> Enter the configuration path [default: /home/suno/.config.yaml]:
+√ Writing /home/suno/.config.yaml template
+√ Config file saved at /home/suno/.config.yaml.
 -> Edit the config file and replace STASHES and RPC endpoints as you wish.
 √ Installation complete
 — Enjoy suno v0.1.2
@@ -148,7 +148,7 @@ To operate and execute extrinsics onchain, a proxy account with at least one of 
 ### Proxy Account configuration
 
 #### Step 1
-Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [Polkadot Developer Signer](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
+Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [PDS](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
 ```json
 {
   "encoded": "J2FFcPHAY11Pmq/38eqbwfUv9OPitYJs+oYgahBvlagAAAIAAQAAAAgAAAB5o0DwXCWDblsH+9pc++RaBO4fpHBHzUirHFHFE9yS3sDzgAIQjhgvPqJ3ODrMR2gy7vk0VZg1fyirIvmsrfjGbWnOI8YU0joX0tYytroyWaykFKtZJMmE0pNKcJ5dJmDxscbK53Ac+7ld2UdH07yKPXxmPuYNNw3vKx8cg9CdQgifKfzQxHnC+EUpOoHPLwGlHsFEYtIlQtngqd9n",
@@ -177,6 +177,9 @@ signer:
 ```
 
 **Option 2** via the `--proxy-path` flag when calling `suno` from the terminal, eg. `suno --proxy-path /home/suno/suno-proxy-account.json`
+
+#### Step 3
+If you end up creating a brand new account, don't forget to transfer some funds to it and set up the proxy types described above for your target stashes you would like to operate via `suno`. This can be done in many other tools already available in the Polkadot ecosystem.
 
 ## Usage
 From your favourite terminal, simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
