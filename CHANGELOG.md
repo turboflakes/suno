@@ -6,10 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Add support for default builtin Themes and user specific Custom Themes.
-- Add CLI support for custom `--config-path` and `--proxy-path`
-- Only allow one `url` explorer
-- Add `install.sh` script to download and install latest version with optional default configuration
+- Add support for default builtin themes [`Suno Dark`, `Suno Light`] and user specific Custom Themes.
+- Add CLI support for custom `--config-path` and `--proxy-path`.
+- Change explorer configuration section to support only `url`.
+- Add `install.sh` script to download and install latest version with optional default configuration.
 
 ## [0.1.1] - 2026-03-17
 - Support Polkadot, Kusama, Paseo and Westend networks all at once on the same view;
