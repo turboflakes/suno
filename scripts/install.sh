@@ -20,7 +20,7 @@ trap cleanup EXIT
 # 3. Fetch the latest version from GitHub releases
 # 4. Download and install suno
 #
-read -p "> Enter SUNO installation path [$DEFAULT_DIRNAME]: " DIRNAME </dev/tty
+read -p "> Enter SUNO installation path [default: $DEFAULT_DIRNAME]: " DIRNAME </dev/tty
 # Shorthand for "if empty, use default"
 DIRNAME="${DIRNAME:-$DEFAULT_DIRNAME}"
 
@@ -93,7 +93,7 @@ fi
 DEFAULT_CONFIG="$DIRNAME/.config.yaml"
 read -p "> Would you like to install the DEFAULT configuration file? [y/N]: " INSTALL_CONFIG </dev/tty
 if [[ "$INSTALL_CONFIG" == "y" || "$INSTALL_CONFIG" == "Y" ]]; then
-    read -p "> Enter the configuration path [$DEFAULT_CONFIG]: " CONFIG </dev/tty
+    read -p "> Enter the configuration path [default: $DEFAULT_CONFIG]: " CONFIG </dev/tty
     CONFIG="${CONFIG:-$DEFAULT_CONFIG}"
 
     if [ ! -f "$CONFIG" ]; then
@@ -106,9 +106,8 @@ chains:
       validators:
         - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   - asset_hub_polkadot:
-     rpc_url: "ws://10.10.10.2:9944"
-     light_client: false
-
+      rpc_url: "ws://10.10.10.2:9944"
+      light_client: false
   - people_polkadot:
       rpc_url: "ws://10.10.10.3:9944"
       light_client: false
@@ -118,10 +117,12 @@ features:
   enable_collators: false
   enable_rpcs: false
 
+# Builtin themes: ["Suno Dark", "Suno Light"]
 themes:
   active: "Suno Dark"
   path: "./themes"
 
+# Uncomment to use a signer proxy
 # signer:
 #   proxy_path: ".proxy_private.json"
 
@@ -131,6 +132,8 @@ explorer:
   # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
   # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 EOF
+    echo "√ Config file saved at $CONFIG. ";
+    echo "-> Next edit the config file and replace STASHES and RPC endpoints as you wish.";
     else
         echo "√ Config file $CONFIG already exists. Configuration skipped";
     fi
@@ -138,4 +141,5 @@ else
     echo "√ Configuration skipped";
 fi
 
-echo "√ All done! Enjoy suno $LATEST_VERSION";
+echo "√ Installation complete";
+echo "— Enjoy suno $LATEST_VERSION";
