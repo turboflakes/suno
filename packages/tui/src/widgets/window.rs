@@ -162,7 +162,7 @@ impl Window {
                         Span::raw("Purge all session keys from Asset Hub requires `StakingOperator` proxy."),
                     ]),
                     Line::from(Span::raw("")),
-                    Line::from(Span::raw("KEY BINDINGS").style(theme.paragraph.header_active)),
+                    Line::from(Span::raw("KEYBINDINGS").style(theme.paragraph.header_active)),
                     Line::from(vec![
                         Span::raw("ctrl+w ").style(theme.paragraph.label),
                         Span::raw("Switch window."),
