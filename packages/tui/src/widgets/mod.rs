@@ -11,3 +11,4 @@ pub mod validators;
 pub mod validators_compact;
 pub mod validators_detailed_group;
 pub mod validators_detailed_list;
+pub mod window;

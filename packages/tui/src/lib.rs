@@ -9,12 +9,10 @@ mod error;
 mod event;
 mod handler;
 mod section;
-mod theme;
 mod tui;
 mod ui;
 mod utils;
 mod widgets;
-mod window;
 
 pub async fn start() -> AppResult<()> {
     // Initialize logs

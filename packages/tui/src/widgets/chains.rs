@@ -1,5 +1,4 @@
 use crate::bridge::subscribe::{subscribe_best_block, subscribe_finalized_block};
-use crate::theme::THEME;
 use crate::utils::create_substrate_rpc_client_from_url;
 use crate::widgets::scrollbar::render_scrollbar;
 use log::debug;
@@ -529,10 +528,11 @@ impl ChainsListWidget {
 
 impl Widget for &ChainsListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(THEME.block.menu_top(state.is_active))
+            .set_style(theme.block.menu_top(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
         let rows = state.chains_iter();
@@ -558,10 +558,10 @@ impl Widget for &ChainsListWidget {
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(THEME.table.header(state.is_active)))
-            .style(THEME.table.base)
-            .row_highlight_style(THEME.table.row_highlight(state.is_active))
-            .highlight_symbol(THEME.table.highlight_symbol(state.is_active));
+            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active)))
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(state.is_active))
+            .highlight_symbol(theme.table.highlight_symbol(state.is_active));
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 

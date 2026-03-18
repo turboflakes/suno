@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::{
     input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
     spinner::Spinner,
@@ -15,7 +14,7 @@ use ratatui::{
 };
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
-use suno_config::SupportedRuntime;
+use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::Call,
     entry::{Command, Entry, ToDescription},
@@ -550,8 +549,9 @@ impl Widget for &PopupWidget {
 }
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let theme = CONFIG.theme();
     let block = Block::new()
-        .style(THEME.block.active)
+        .style(theme.block.active)
         .padding(Padding::symmetric(0, 1));
 
     let options = state.get_options_filtered();
@@ -588,9 +588,9 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     let table = Table::new(rows, widths)
         .block(block)
-        .header(Row::new(header_labels).style(THEME.table.header))
-        .style(THEME.table.base)
-        .row_highlight_style(THEME.table.row_highlight(state.is_visible));
+        .header(Row::new(header_labels).style(theme.table.header))
+        .style(theme.table.base)
+        .row_highlight_style(theme.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, details_area, buf, &mut state.table_state);
 
@@ -600,8 +600,9 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 }
 
 fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let theme = CONFIG.theme();
     let block = Block::new()
-        .style(THEME.block.active)
+        .style(theme.block.active)
         .padding(Padding::proportional(1));
 
     // Get all required data from 'state.options' based on the indices established
@@ -629,23 +630,23 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
             network_entry.command(),
             spec_version_entry.command()
         ),
-        THEME.paragraph.header_active,
+        theme.paragraph.header_active,
     )])
     .alignment(Alignment::Right);
 
     let stash = Line::from(vec![
-        Span::styled("stash ", THEME.paragraph.label),
+        Span::styled("stash ", theme.paragraph.label),
         Span::raw(stash_identity_entry.command()),
     ]);
 
     let method = Line::from(vec![
-        Span::styled("method ", THEME.paragraph.label),
+        Span::styled("method ", theme.paragraph.label),
         Span::raw(call_entry.to_method()),
     ]);
     let method_lines = calculate_text_wrapped_lines(&call_entry.to_method(), area.width);
 
     let proxy = Line::from(vec![
-        Span::styled("proxy account ", THEME.paragraph.label),
+        Span::styled("proxy account ", theme.paragraph.label),
         Span::raw(proxy_identity_entry.command()),
     ]);
 
@@ -655,11 +656,11 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let spaces = available_width.saturating_sub((left_text.len() + 17) as u16);
 
     let call_data_label = Line::from(vec![
-        Span::styled(left_text, THEME.paragraph.label),
+        Span::styled(left_text, theme.paragraph.label),
         Span::raw(" ".repeat(spaces as usize)),
-        Span::styled("ctrl+shift+c", THEME.paragraph.base),
+        Span::styled("ctrl+shift+c", theme.paragraph.base),
         Span::raw(" "),
-        Span::styled("copy", THEME.paragraph.label),
+        Span::styled("copy", theme.paragraph.label),
     ]);
 
     let call_data = Line::from(call_entry.to_hex());
@@ -695,13 +696,14 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let theme = CONFIG.theme();
     let horizontal = Layout::horizontal([Constraint::Max(56)]);
     let [area] = horizontal.areas(area);
 
     Clear.render(area, buf);
 
     let block = Block::new()
-        .style(THEME.block.main)
+        .style(theme.block.main)
         .padding(Padding::proportional(1));
 
     let spinner_progress = state.spinner.frame();
@@ -712,7 +714,7 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     });
     let widths = [Constraint::Fill(1), Constraint::Length(7)];
     let table = Table::new(rows, widths)
-        .style(THEME.table.base)
+        .style(theme.table.base)
         .block(block);
     // .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 

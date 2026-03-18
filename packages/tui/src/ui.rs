@@ -1,7 +1,6 @@
+use crate::app::App;
 use crate::section::Section;
-use crate::theme::THEME;
-use crate::widgets::{logo::Logo, popup::Mode as PopupMode};
-use crate::{app::App, window::Window};
+use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
@@ -160,8 +159,9 @@ fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = CONFIG.theme();
     let block = Block::default()
-        .style(THEME.block.main)
+        .style(theme.block.main)
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
@@ -169,19 +169,20 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = CONFIG.theme();
     let block = Block::default()
-        .style(THEME.block.footer_right)
+        .style(theme.block.footer_right)
         .padding(Padding::new(0, 2, 1, 1));
 
     let mut legend = vec![];
 
     // show how to open popup with extrinsics/commands
     if app.validators.is_active() && app.validators.is_proxy_valid() && !app.popup.is_visible() {
-        legend.push(Span::styled("ctrl+e".to_string(), THEME.paragraph.base));
+        legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled(
             "show extrinsics".to_string(),
-            THEME.paragraph.label,
+            theme.paragraph.label,
         ));
     };
 
@@ -189,67 +190,67 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.push(Span::raw("   "));
         match app.popup.get_mode() {
             PopupMode::Menu => {
-                legend.push(Span::styled("tab".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled(
                     "autocomplete".to_string(),
-                    THEME.paragraph.label,
+                    theme.paragraph.label,
                 ));
                 legend.push(Span::raw("   "));
-                legend.push(Span::styled("↑ ↓".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("select".to_string(), THEME.paragraph.label));
+                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
                 legend.push(Span::raw("   "));
-                legend.push(Span::styled("enter".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("confirm".to_string(), THEME.paragraph.label));
+                legend.push(Span::styled("confirm".to_string(), theme.paragraph.label));
                 legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("close".to_string(), THEME.paragraph.label));
+                legend.push(Span::styled("close".to_string(), theme.paragraph.label));
             }
             PopupMode::Confirm => {
-                legend.push(Span::styled("enter".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled(
                     "sign and submit".to_string(),
-                    THEME.paragraph.label,
+                    theme.paragraph.label,
                 ));
                 legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), THEME.paragraph.base));
+                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("close".to_string(), THEME.paragraph.label));
+                legend.push(Span::styled("close".to_string(), theme.paragraph.label));
             }
             _ => {}
         }
     } else if app.chains.is_active() || app.validators.is_active() {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("↑ ↓".to_string(), THEME.paragraph.base));
+        legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled("select".to_string(), THEME.paragraph.label));
+        legend.push(Span::styled("select".to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab or ← →".to_string(), THEME.paragraph.base));
+        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled("navigate".to_string(), THEME.paragraph.label));
+        legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     } else {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab or ← →".to_string(), THEME.paragraph.base));
+        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled("navigate".to_string(), THEME.paragraph.label));
+        legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     }
 
     // Always visible
     legend.push(Span::raw("   "));
-    legend.push(Span::styled("ctrl+w".to_string(), THEME.paragraph.base));
+    legend.push(Span::styled("ctrl+w".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));
     legend.push(Span::styled(
         "switch window".to_string(),
-        THEME.paragraph.label,
+        theme.paragraph.label,
     ));
     legend.push(Span::raw("   "));
-    legend.push(Span::styled("ctrl+c".to_string(), THEME.paragraph.base));
+    legend.push(Span::styled("ctrl+c".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));
-    legend.push(Span::styled("quit".to_string(), THEME.paragraph.label));
+    legend.push(Span::styled("quit".to_string(), theme.paragraph.label));
 
     let footer = Paragraph::new(Line::from(legend))
         .block(block)
@@ -259,8 +260,9 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_logo_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = CONFIG.theme();
     let block = Block::default()
-        .style(THEME.block.menu_bottom)
+        .style(theme.block.menu_bottom)
         .padding(Padding::new(2, 0, 1, 1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);

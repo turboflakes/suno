@@ -1,10 +1,10 @@
-use crate::theme::THEME;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     widgets::{Block, Padding, Paragraph, Widget},
 };
 use std::time::Instant;
+use suno_config::CONFIG;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spinner {
@@ -46,13 +46,14 @@ impl Spinner {
 
 impl Widget for &Spinner {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let spinner = self.progress();
         let block = Block::new()
-            .style(THEME.input.base_active)
+            .style(theme.input.base_active)
             .padding(Padding::new(0, 2, 1, 1));
         Paragraph::new(spinner)
             .block(block)
-            .style(THEME.input.suffix_active)
+            .style(theme.input.suffix_active)
             .render(area, buf);
     }
 }

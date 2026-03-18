@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::input_field::InputField;
 use ratatui::{
     buffer::Buffer,
@@ -7,6 +6,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
+use suno_config::CONFIG;
 use suno_primitives::{call::Call, entry::ToPlaceholder};
 
 #[derive(Debug)]
@@ -17,6 +17,7 @@ pub struct InputCommandWidget {
 
 impl Widget for &InputCommandWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
         // Split area into two parts vertically for the main input field
@@ -49,24 +50,24 @@ impl Widget for &InputCommandWidget {
             .split(area[0]);
 
         let block = Block::new()
-            .style(THEME.input.base(state.is_active()))
+            .style(theme.input.base(state.is_active()))
             .padding(Padding::new(2, 0, 1, 1));
 
         let marker = Paragraph::new(Line::from(vec![
-            Span::raw("/").style(THEME.input.prefix(state.is_active()))
+            Span::raw("/").style(theme.input.prefix(state.is_active()))
         ]))
         .block(block);
         marker.render(input_area[0], buf);
 
         let block = Block::new()
-            .style(THEME.input.base(state.is_active()))
+            .style(theme.input.base(state.is_active()))
             .padding(Padding::new(0, 2, 1, 1));
 
         let mut input_spans = vec![];
 
         // Label
         if let Some(label) = state.label() {
-            input_spans.push(Span::styled(format!("{}: ", label), THEME.input.label));
+            input_spans.push(Span::styled(format!("{}: ", label), theme.input.label));
         };
 
         // Input value
@@ -81,7 +82,7 @@ impl Widget for &InputCommandWidget {
                     .chars()
                     .skip(state.value().len())
                     .collect();
-                input_spans.push(Span::raw(placeholder).style(THEME.input.placeholder));
+                input_spans.push(Span::raw(placeholder).style(theme.input.placeholder));
             };
         }
 
@@ -102,11 +103,11 @@ impl Widget for &InputCommandWidget {
         // Show hotkey when input is valid
         if state.is_valid() {
             let block = Block::new()
-                .style(THEME.input.base(state.is_active()))
+                .style(theme.input.base(state.is_active()))
                 .padding(Padding::new(0, 2, 1, 1));
 
             let hotkey = Paragraph::new(Line::from(vec![
-                Span::raw("enter").style(THEME.input.suffix(state.is_valid()))
+                Span::raw("enter").style(theme.input.suffix(state.is_valid()))
             ]))
             .block(block);
             hotkey.render(input_area[2], buf);
@@ -116,11 +117,11 @@ impl Widget for &InputCommandWidget {
         if state.is_invalid() {
             Clear.render(area[1], buf);
             let block = Block::new()
-                .style(THEME.input.base(state.is_active()))
+                .style(theme.input.base(state.is_active()))
                 .padding(Padding::new(2, 0, 0, 1));
 
             let error = Paragraph::new(Line::from(vec![
-                Span::raw(state.status()).style(THEME.input.error)
+                Span::raw(state.status()).style(theme.input.error)
             ]))
             .block(block);
             error.render(area[1], buf);

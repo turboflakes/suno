@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::chains::ChainsListWidget;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsListState;
@@ -10,7 +9,7 @@ use ratatui::{
     widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
-use suno_config::SupportedRuntime;
+use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_blocks, format_planks},
     validator::Validator,
@@ -156,8 +155,9 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
     ) {
+        let theme = CONFIG.theme();
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
         };
@@ -166,7 +166,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .chains
             .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
         };
@@ -186,10 +186,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let network_lines = vec![
             Line::from(
                 Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
-                    .style(THEME.paragraph.header_active),
+                    .style(theme.paragraph.header_active),
             ),
             Line::from(vec![
-                Span::raw("total validators ").style(THEME.paragraph.label),
+                Span::raw("total validators ").style(theme.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     ah_chain.active_validators_count(),
@@ -197,7 +197,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 )),
             ]),
             Line::from(vec![
-                Span::raw("total nominators ").style(THEME.paragraph.label),
+                Span::raw("total nominators ").style(theme.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     ah_chain.active_nominators_count(),
@@ -205,11 +205,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 )),
             ]),
             Line::from(vec![
-                Span::raw("total staked ").style(THEME.paragraph.label),
+                Span::raw("total staked ").style(theme.paragraph.label),
                 Span::raw(ah_chain.total_staked_percentage()),
             ]),
             Line::from(vec![
-                Span::raw("displayed ").style(THEME.paragraph.label),
+                Span::raw("displayed ").style(theme.paragraph.label),
                 Span::raw(format!(
                     "{} active, {} waiting",
                     validators.iter().filter(|v| v.is_active()).count(),
@@ -218,10 +218,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ]),
         ];
 
-        let block = Block::new().set_style(THEME.block.main);
+        let block = Block::new().set_style(theme.block.main);
         let network_info = Paragraph::new(network_lines)
             .block(block)
-            .style(THEME.paragraph.base);
+            .style(theme.paragraph.base);
 
         network_info.render(network_area, buf);
 
@@ -229,7 +229,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let Some(epoch) = chain.epoch() else {
             // TODO: Handle epoch not available, maybe render loading indicator
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             let area = progress_area.union(progress_bar_area).union(countdown_area);
             block.render(area, buf);
             return;
@@ -237,7 +237,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let Some(era) = ah_chain.era() else {
             // TODO: Handle era not available, maybe render loading indicator
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             let area = progress_area.union(progress_bar_area).union(countdown_area);
             block.render(area, buf);
             return;
@@ -262,10 +262,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(THEME.block.main);
+        let block = Block::new().set_style(theme.block.main);
         let progress_info = Paragraph::new(progress_lines)
             .block(block)
-            .style(THEME.paragraph.base);
+            .style(theme.paragraph.base);
 
         progress_info.render(progress_area, buf);
 
@@ -279,10 +279,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(epoch_progress_bar).alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(THEME.block.main);
+        let block = Block::new().set_style(theme.block.main);
         let progress_bar = Paragraph::new(progress_bar_lines)
             .block(block)
-            .style(THEME.paragraph.base);
+            .style(theme.paragraph.base);
 
         progress_bar.render(progress_bar_area, buf);
 
@@ -297,10 +297,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
         ];
 
-        let block = Block::new().set_style(THEME.block.main);
+        let block = Block::new().set_style(theme.block.main);
         let countdown_info = Paragraph::new(countdown_lines)
             .block(block)
-            .style(THEME.paragraph.base);
+            .style(theme.paragraph.base);
 
         countdown_info.render(countdown_area, buf);
     }
@@ -314,17 +314,18 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
         table_state: &mut TableState,
     ) {
+        let theme = CONFIG.theme();
         let Some(ah_chain) = self
             .chains
             .get_chain_by_runtime(runtime.asset_hub_runtime())
         else {
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
         };
 
         let Some(active_era) = ah_chain.era() else {
-            let block = Block::new().set_style(THEME.block.main);
+            let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
         };
@@ -345,7 +346,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let mut rows = Vec::new();
 
-        let span_symbol = Span::raw(runtime.token_symbol()).style(THEME.paragraph.label);
+        let span_symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label);
 
         for v in validators {
             let text_points = match v.delta_points() {
@@ -566,10 +567,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
         *table_state.offset_mut() = 0;
 
-        let block = Block::new().set_style(THEME.block.main);
+        let block = Block::new().set_style(theme.block.main);
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(THEME.table.header))
+            .header(Row::new(header_cells).set_style(theme.table.header))
             .style(Style::default().fg(Color::Blue));
 
         StatefulWidget::render(table, area, buf, table_state);

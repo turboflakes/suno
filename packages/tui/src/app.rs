@@ -6,8 +6,8 @@ use crate::widgets::{
     collators::CollatorsListWidget,
     popup::{Mode as PopupMode, PopupWidget},
     validators::ValidatorsListWidget,
+    window::Window,
 };
-use crate::window::Window;
 use crate::{
     event::{Event, EventHandler},
     handler::handle_key_events,

@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsListState;
 use ratatui::{
@@ -9,6 +8,7 @@ use ratatui::{
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, Widget},
 };
 use std::sync::{Arc, RwLock};
+use suno_config::CONFIG;
 
 #[derive(Debug, Clone)]
 pub struct ValidatorsCompactWidget {
@@ -18,10 +18,11 @@ pub struct ValidatorsCompactWidget {
 /// Validators compact view widget implementation, mostly to be used on the left menu
 impl Widget for &ValidatorsCompactWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(THEME.block.menu_bottom(state.is_active))
+            .set_style(theme.block.menu_bottom(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
         let rows = state.validators_iter();
@@ -42,10 +43,10 @@ impl Widget for &ValidatorsCompactWidget {
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(THEME.table.header(state.is_active)))
-            .style(THEME.table.base)
-            .row_highlight_style(THEME.table.row_highlight(state.is_active))
-            .highlight_symbol(THEME.table.highlight_symbol(state.is_active));
+            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active)))
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(state.is_active))
+            .highlight_symbol(theme.table.highlight_symbol(state.is_active));
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 

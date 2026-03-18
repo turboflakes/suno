@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use indoc::indoc;
 use ratatui::{
     buffer::Buffer,
@@ -6,6 +5,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Widget},
 };
+use suno_config::CONFIG;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Logo {
@@ -88,214 +88,203 @@ impl Logo {
     }
 
     pub fn render_original(&self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut lines = vec![];
         lines.push(Line::from(vec![
-            Span::styled("            ", THEME.logo.base),
-            Span::styled("▀█", THEME.logo.base),
-            Span::styled("▀", THEME.logo.with_shadow),
-            Span::styled("▘", THEME.logo.only_shadow),
+            Span::styled("            ", theme.logo.base),
+            Span::styled("▀█", theme.logo.base),
+            Span::styled("▀", theme.logo.with_shadow),
+            Span::styled("▘", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("       ", THEME.logo.base),
-            Span::styled("▄▄████████████████████", THEME.logo.base),
-            Span::styled("▄", THEME.logo.with_shadow),
-            Span::styled("▄", THEME.logo.base),
-            Span::styled("▖", THEME.logo.only_shadow),
+            Span::styled("       ", theme.logo.base),
+            Span::styled("▄▄████████████████████", theme.logo.base),
+            Span::styled("▄", theme.logo.with_shadow),
+            Span::styled("▄", theme.logo.base),
+            Span::styled("▖", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("    ", THEME.logo.base),
-            Span::styled("▄████████████████████████████", THEME.logo.base),
-            Span::styled("▄", THEME.logo.with_shadow),
-            Span::styled("▖", THEME.logo.only_shadow),
+            Span::styled("    ", theme.logo.base),
+            Span::styled("▄████████████████████████████", theme.logo.base),
+            Span::styled("▄", theme.logo.with_shadow),
+            Span::styled("▖", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("   ", THEME.logo.base),
-            Span::styled("████████████████████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("   ", theme.logo.base),
+            Span::styled("████████████████████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("█████", THEME.logo.base),
-            Span::styled("▀", THEME.logo.with_shadow),
-            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("█████", theme.logo.base),
+            Span::styled("▀", theme.logo.with_shadow),
+            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████████████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████████████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀██████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀██████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("██████", THEME.logo.base),
-            Span::styled("▙", THEME.logo.with_shadow),
-            Span::styled("▄", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀██████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("██████", theme.logo.base),
+            Span::styled("▙", theme.logo.with_shadow),
+            Span::styled("▄", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀██████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled(" ", THEME.logo.base),
-            Span::styled("▄████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀", THEME.logo.base),
-            Span::styled("▙", THEME.logo.with_shadow),
-            Span::styled("▄██████", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀▀▀▀▀████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████▙", THEME.logo.base),
-            Span::styled("▖", THEME.logo.only_shadow),
+            Span::styled(" ", theme.logo.base),
+            Span::styled("▄████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀", theme.logo.base),
+            Span::styled("▙", theme.logo.with_shadow),
+            Span::styled("▄██████", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀▀▀▀▀████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████▙", theme.logo.base),
+            Span::styled("▖", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled(" ", THEME.logo.base),
-            Span::styled("█████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████████████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("█████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled(" ", theme.logo.base),
+            Span::styled("█████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████████████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("█████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled(" ", THEME.logo.base),
-            Span::styled("▀█████", THEME.logo.base),
-            Span::styled("▄", THEME.logo.with_shadow),
-            Span::styled("▄▄▄▄▄▄▄▄▄▄", THEME.logo.base),
-            Span::styled("▖", THEME.logo.only_shadow),
-            Span::styled("█", THEME.logo.base_dark),
-            Span::styled("▄▄▄▄▄▄▄▄▄▄▄█████▛", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
+            Span::styled(" ", theme.logo.base),
+            Span::styled("▀█████", theme.logo.base),
+            Span::styled("▄", theme.logo.with_shadow),
+            Span::styled("▄▄▄▄▄▄▄▄▄▄", theme.logo.base),
+            Span::styled("▖", theme.logo.only_shadow),
+            Span::styled("█", theme.logo.base_dark),
+            Span::styled("▄▄▄▄▄▄▄▄▄▄▄█████▛", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("██████████████", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("█", THEME.logo.base_dark),
-            Span::styled("▀▀██████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("██████████████", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("█", theme.logo.base_dark),
+            Span::styled("▀▀██████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("██████████████████████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("██████████████████████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("█████", THEME.logo.base),
-            Span::styled("▛", THEME.logo.with_shadow),
-            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("█████", theme.logo.base),
+            Span::styled("▛", theme.logo.with_shadow),
+            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("  ", THEME.logo.base),
-            Span::styled("▀████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("▀▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀█", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("████▛", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
+            Span::styled("  ", theme.logo.base),
+            Span::styled("▀████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("▀▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀█", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("████▛", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("   ", THEME.logo.base),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("   ", theme.logo.base),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("   ", THEME.logo.base),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
-            Span::styled("▀▀▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("▀▀▀", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
-            Span::styled("████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("   ", theme.logo.base),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
+            Span::styled("▀▀▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀▀▀▀▀▀▀▀▀▀▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("▀▀▀", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
+            Span::styled("████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("   ", THEME.logo.base),
-            Span::styled("████████████████████████████████", THEME.logo.base),
-            Span::styled("▌", THEME.logo.only_shadow),
+            Span::styled("   ", theme.logo.base),
+            Span::styled("████████████████████████████████", theme.logo.base),
+            Span::styled("▌", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("   ", THEME.logo.base),
-            Span::styled("▀██████████████████████████████▛", THEME.logo.base),
-            Span::styled("▘", THEME.logo.only_shadow),
+            Span::styled("   ", theme.logo.base),
+            Span::styled("▀██████████████████████████████▛", theme.logo.base),
+            Span::styled("▘", theme.logo.only_shadow),
         ]));
         lines.push(Line::from(vec![Span::styled(
             format!("    suno v{}", env!("CARGO_PKG_VERSION")),
-            THEME.logo.base,
+            theme.logo.base,
         )]));
 
         Paragraph::new(lines)
             .alignment(Alignment::Left)
             .render(area, buf);
-    }
-}
-
-impl Widget for &Logo {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        if self.size == Size::Original {
-            self.render_original(area, buf);
-            return;
-        }
-
-        let logo = self.size.as_str();
-        Paragraph::new(logo).render(area, buf);
     }
 }
 
@@ -346,5 +335,17 @@ impl Size {
        suno v",
             env!("CARGO_PKG_VERSION")
         )
+    }
+}
+
+impl Widget for &Logo {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        if self.size == Size::Original {
+            self.render_original(area, buf);
+            return;
+        }
+
+        let logo = self.size.as_str();
+        Paragraph::new(logo).render(area, buf);
     }
 }

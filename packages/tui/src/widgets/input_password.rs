@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::input_field::InputField;
 use ratatui::{
     buffer::Buffer,
@@ -8,6 +7,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
+use suno_config::CONFIG;
 
 #[derive(Debug)]
 pub struct InputPasswordWidget {
@@ -16,6 +16,7 @@ pub struct InputPasswordWidget {
 
 impl Widget for &InputPasswordWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
         // Split area into two parts vertically for the main input field
@@ -52,21 +53,21 @@ impl Widget for &InputPasswordWidget {
             .split(area[0]);
 
         let block = Block::new()
-            .set_style(THEME.input.base(state.is_active()))
+            .set_style(theme.input.base(state.is_active()))
             .padding(Padding::proportional(1));
 
         let mut input_spans = vec![];
 
         // Label
         if let Some(label) = state.label() {
-            input_spans.push(Span::styled(format!("{}: ", label), THEME.input.label));
+            input_spans.push(Span::styled(format!("{}: ", label), theme.input.label));
         };
 
         // Placeholder
         if state.is_empty() && state.is_active() {
-            input_spans.push(Span::raw("proxy password").style(THEME.input.placeholder));
+            input_spans.push(Span::raw("proxy password").style(theme.input.placeholder));
         } else if state.is_locked() {
-            input_spans.push(Span::raw("unlocking proxy account..").style(THEME.input.placeholder));
+            input_spans.push(Span::raw("unlocking proxy account..").style(theme.input.placeholder));
         }
 
         // Input value
@@ -89,11 +90,11 @@ impl Widget for &InputPasswordWidget {
         // Show hotkey when input is valid
         if state.is_valid() {
             let block = Block::new()
-                .set_style(THEME.input.base(state.is_active()))
+                .set_style(theme.input.base(state.is_active()))
                 .padding(Padding::new(0, 2, 1, 1));
 
             let hotkey = Paragraph::new(Line::from(vec![
-                Span::raw("enter").style(THEME.input.suffix(state.is_valid()))
+                Span::raw("enter").style(theme.input.suffix(state.is_valid()))
             ]))
             .block(block);
             hotkey.render(input_area[1], buf);
@@ -109,11 +110,11 @@ impl Widget for &InputPasswordWidget {
         if state.is_invalid() {
             Clear.render(area[1], buf);
             let block = Block::new()
-                .set_style(THEME.input.base(state.is_active()))
+                .set_style(theme.input.base(state.is_active()))
                 .padding(Padding::new(2, 0, 0, 1));
 
             let error = Paragraph::new(Line::from(vec![
-                Span::raw(state.status()).style(THEME.input.error)
+                Span::raw(state.status()).style(theme.input.error)
             ]))
             .block(block);
             error.render(area[1], buf);

@@ -1,4 +1,3 @@
-use crate::theme::THEME;
 use crate::widgets::validators::ValidatorsListState;
 use ratatui::{
     buffer::Buffer,
@@ -8,6 +7,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, Widget},
 };
 use std::sync::{Arc, RwLock};
+use suno_config::CONFIG;
 use suno_primitives::display::format_planks;
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,7 @@ pub struct ValidatorsDetailedListWidget {
 /// Validators detailed list view widget implementation, to be used as an alternative of the grouped view
 impl Widget for &ValidatorsDetailedListWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
         let (table_style, highlight_style) = match state.is_active {
@@ -72,7 +73,7 @@ impl Widget for &ValidatorsDetailedListWidget {
                     Cell::from(Text::from("nominators").alignment(Alignment::Right)),
                     Cell::from(Text::from("commission").alignment(Alignment::Right)),
                 ])
-                .set_style(THEME.table.header),
+                .set_style(theme.table.header),
             )
             .style(table_style)
             .row_highlight_style(highlight_style);
