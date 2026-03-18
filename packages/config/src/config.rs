@@ -125,8 +125,7 @@ impl Signer {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Explorer {
-    pjs_url: Option<String>,
-    papi_url: Option<String>,
+    url: Option<String>,
 }
 
 impl Config {
@@ -178,15 +177,8 @@ impl Config {
         self.signer = signer;
     }
 
-    pub fn explorer_papi_url(&self, chain: &str, block_hash: &str) -> Option<String> {
-        self.explorer.papi_url.as_ref().map(|url| {
-            url.replace("{chain}", chain)
-                .replace("{block_hash}", block_hash)
-        })
-    }
-
-    pub fn explorer_pjs_url(&self, chain: &str, block_hash: &str) -> Option<String> {
-        self.explorer.pjs_url.as_ref().map(|url| {
+    pub fn explorer_url(&self, chain: &str, block_hash: &str) -> Option<String> {
+        self.explorer.url.as_ref().map(|url| {
             url.replace("{chain}", chain)
                 .replace("{block_hash}", block_hash)
         })

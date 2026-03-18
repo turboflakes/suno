@@ -356,10 +356,7 @@ impl SupportedRuntime {
     pub fn log_block_hash_explorer(&self, block_hash: H256) {
         let config = CONFIG.clone();
         let hash = format!("{:#x}", block_hash);
-        if let Some(url) = config.explorer_papi_url(&self.chain_name(), &hash) {
-            info!("{url}");
-        };
-        if let Some(url) = config.explorer_pjs_url(&self.chain_name(), &hash) {
+        if let Some(url) = config.explorer_url(&self.chain_name(), &hash) {
             info!("{url}");
         };
     }
