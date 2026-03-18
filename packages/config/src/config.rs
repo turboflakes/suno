@@ -359,7 +359,7 @@ themes:
 signer:
   proxy_path: ".proxy_private.seed"
 explorer:
-  pjs_url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+  url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 "#;
         let file = create_temp_file(yaml);
         let config = Config::from_file(file.path()).unwrap();
@@ -410,7 +410,7 @@ themes:
 signer:
   proxy_path: ".proxy_private.json"
 explorer:
-    pjs_url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 "#;
 
         let file = create_temp_file(yaml);
