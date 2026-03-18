@@ -1,0 +1,15 @@
+[package]
+name = "suno-theme"
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+
+
+[dependencies]
+serde = { workspace = true }
+ratatui = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }

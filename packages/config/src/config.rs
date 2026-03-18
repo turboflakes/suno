@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
+use crate::themes::Themes;
 use lazy_static::lazy_static;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
+use suno_theme::Theme;
 
 // Set Config struct into a CONFIG lazy_static to avoid multiple processing
 lazy_static! {
@@ -30,8 +32,8 @@ fn default_config_path() -> &'static str {
 }
 
 /// Provides default value for the proxy account file path
-fn default_proxy_path() -> &'static str {
-    ".proxy_account.json"
+fn default_proxy_path() -> String {
+    ".proxy_account.json".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +44,7 @@ pub struct Config {
     pub features: Features,
     pub signer: Option<Signer>,
     pub explorer: Explorer,
+    themes: Themes,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -89,6 +92,7 @@ impl Default for Features {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Signer {
+    #[serde(default = "default_proxy_path")]
     proxy_path: String,
 }
 
@@ -101,8 +105,8 @@ impl Signer {
             return Err(Error::InvalidPath(path.display().to_string()));
         }
 
-        let contents = fs::read_to_string(path)?;
-        if contents.is_empty() {
+        let content = fs::read_to_string(path)?;
+        if content.is_empty() {
             warn!("Proxy path content is empty: {}", path.display());
             return Err(Error::InvalidContent(path.display().to_string()));
         }
@@ -127,18 +131,23 @@ impl Config {
             return Err(Error::InvalidPath(path.display().to_string()));
         }
 
-        let contents = fs::read_to_string(path)?;
-        if contents.is_empty() {
+        let content = fs::read_to_string(path)?;
+        if content.is_empty() {
             return Err(Error::InvalidContent(path.display().to_string()));
         }
 
-        let mut config: Config = serde_yaml::from_str(&contents)?;
+        let mut config: Config = serde_yaml::from_str(&content)?;
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
             let signer = Signer::from_file(signer.proxy_path).ok();
             config.signer = signer;
         }
+
+        // Load themes
+        let themes = Themes::load(&config.themes.themes_path)?;
+        config.themes.set_themes(themes);
+
         Ok(config)
     }
 
@@ -173,11 +182,14 @@ impl Config {
                 .replace("{block_hash}", block_hash)
         })
     }
+
+    pub fn theme(&self) -> &Theme {
+        self.themes.theme()
+    }
 }
 
 fn get_config() -> Result<Config, Error> {
     let default_config_path = default_config_path();
-    let default_proxy_path = default_proxy_path();
 
     let matches = clap::Command::new("suno")
         .version(env!("CARGO_PKG_VERSION"))
@@ -196,7 +208,6 @@ fn get_config() -> Result<Config, Error> {
                 .short('p')
                 .long("proxy-path")
                 .value_name("FILE")
-                .default_value(default_proxy_path)
                 .help("Sets a custom proxy account file path."),
         )
         .get_matches();
@@ -315,6 +326,7 @@ mod tests {
             features: Features::default(),
             signer: None,
             explorer: Explorer::default(),
+            themes: Themes::default(),
         };
         assert!(config.validate().is_err());
     }

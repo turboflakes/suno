@@ -6,6 +6,7 @@ members = [
     "packages/primitives",
     "packages/signer",
     "packages/suno",
+    "packages/theme",
     "packages/tui",
     "packages/chains/asset-hub-paseo",
     "packages/chains/asset-hub-polkadot",
@@ -66,6 +67,7 @@ subxt-rpcs = { git = "https://github.com/turboflakes/subxt", package = "subxt-rp
 tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
+toml = "1.0.7"
 tui-logger = "0.14"
 unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }

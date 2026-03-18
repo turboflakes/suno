@@ -16,6 +16,7 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 subxt = { workspace = true }
 subxt-rpcs = { workspace = true }
+suno-theme = { path = "../theme" }
 thiserror = { workspace = true }
 log = { workspace = true }
 

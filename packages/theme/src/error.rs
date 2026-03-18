@@ -5,14 +5,12 @@ pub enum Error {
     InvalidPath(String),
     #[error("Invalid content: {0}")]
     InvalidContent(String),
+    #[error("Invalid color: {0}")]
+    InvalidColor(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("YAML parsing error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
-    #[error("At least one chain has to be configured [Polkadot, Kusama, Paseo, Westend]")]
-    ChainNotAvailable,
-    #[error("Theme parsing error: {0}")]
-    Theme(#[from] suno_theme::Error),
+    #[error("TOML parsing error: {0}")]
+    Toml(#[from] toml::de::Error),
     #[error("Other error: {0}")]
     Other(String),
 }
