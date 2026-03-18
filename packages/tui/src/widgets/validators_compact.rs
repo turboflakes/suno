@@ -27,19 +27,24 @@ impl Widget for &ValidatorsCompactWidget {
 
         let rows = state.validators_iter();
 
-        let widths = [
-            Constraint::Length(1),
-            Constraint::Fill(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-        ];
+        let mut widths = vec![Constraint::Length(1), Constraint::Fill(1)];
 
-        let header_cells = vec![
+        let mut header_cells = vec![
             Cell::from(""),
             Cell::from(Text::from("validators").alignment(Alignment::Left)),
-            Cell::from(Text::from("proxies").alignment(Alignment::Right)),
-            Cell::from(""),
         ];
+
+        if CONFIG.signer.is_some() {
+            header_cells.push(Cell::from(
+                Text::from("proxies").alignment(Alignment::Right),
+            ));
+            header_cells.push(Cell::from(""));
+            widths.push(Constraint::Length(7));
+            widths.push(Constraint::Length(1));
+        } else {
+            widths.push(Constraint::Length(1));
+            header_cells.push(Cell::from(""))
+        }
 
         let table = Table::new(rows, widths)
             .block(block)
