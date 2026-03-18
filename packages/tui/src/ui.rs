@@ -262,7 +262,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 fn render_logo_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = CONFIG.theme();
     let block = Block::default()
-        .style(theme.block.menu_bottom)
+        .style(theme.block.pane_body)
         .padding(Padding::new(2, 0, 1, 1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);

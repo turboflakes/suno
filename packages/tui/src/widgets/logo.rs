@@ -284,6 +284,7 @@ impl Logo {
 
         Paragraph::new(lines)
             .alignment(Alignment::Left)
+            .style(theme.logo.base)
             .render(area, buf);
     }
 }

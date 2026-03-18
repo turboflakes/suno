@@ -532,7 +532,7 @@ impl Widget for &ChainsListWidget {
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(theme.block.menu_top(state.is_active))
+            .set_style(theme.block.pane_header(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
         let rows = state.chains_iter();

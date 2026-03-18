@@ -22,7 +22,7 @@ impl Widget for &ValidatorsCompactWidget {
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(theme.block.menu_bottom(state.is_active))
+            .set_style(theme.block.pane_body(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
         let rows = state.validators_iter();

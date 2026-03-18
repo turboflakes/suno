@@ -35,19 +35,21 @@ impl Theme {
         Theme {
             block: Block {
                 base: Style::new().bg(p.color_06).fg(p.color_01),
-                menu_top: Style::new().bg(p.color_08).fg(p.color_01),
-                menu_bottom: Style::new().bg(p.color_07).fg(p.color_01),
-                main: Style::new().bg(p.color_09).fg(p.color_01),
+                main: Style::new().bg(p.background).fg(p.foreground),
+                pane_header: Style::new().bg(p.color_08).fg(p.color_01),
+                pane_body: Style::new().bg(p.color_07).fg(p.color_01),
                 footer_left: Style::new().bg(p.color_07).fg(p.color_04),
                 footer_right: Style::new().bg(p.color_09).fg(p.color_04),
                 active: Style::new().bg(p.color_06).fg(p.color_00),
             },
             table: Table {
                 base: Style::new().fg(p.color_01),
-                header: Style::new().fg(p.color_12),
+                header: Style::new().fg(p.color_13),
                 header_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
-                row_highlight: Style::new().fg(p.color_00),
-                row_highlight_active: Style::new().bg(p.color_00).fg(p.color_09),
+                row_highlight: Style::default(),
+                row_highlight_active: Style::new()
+                    .bg(p.selection_background)
+                    .fg(p.selection_foreground),
             },
             paragraph: Paragraph {
                 base: Style::new().fg(p.color_01),
@@ -55,29 +57,33 @@ impl Theme {
                 header: Style::new().fg(p.color_12),
                 header_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
                 label: Style::new().fg(p.color_04).add_modifier(Modifier::BOLD),
+                cell: Style::default(),
+                cell_active: Style::new()
+                    .bg(p.selection_background)
+                    .fg(p.selection_foreground),
             },
             scrollbar: Scrollbar {
                 base: Style::new().fg(p.color_01),
             },
             input: Input {
-                base: Style::new().bg(p.color_08).fg(p.color_03),
+                base: Style::new().bg(p.color_07).fg(p.color_03),
                 base_active: Style::new()
-                    .bg(p.color_08)
-                    .fg(p.color_01)
+                    .bg(p.cursor_color)
+                    .fg(p.cursor_text)
                     .add_modifier(Modifier::SLOW_BLINK),
-                label: Style::new().fg(p.color_12).add_modifier(Modifier::BOLD),
+                label: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
                 placeholder: Style::new().fg(p.color_04),
                 prefix: Style::new().fg(p.color_15),
-                prefix_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
+                prefix_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 suffix: Style::new().fg(p.color_15),
-                suffix_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
+                suffix_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 error: Style::new().fg(p.color_15).add_modifier(Modifier::ITALIC),
             },
             logo: Logo {
-                base: Style::new().bg(p.color_09).fg(p.color_01),
-                base_dark: Style::new().bg(p.color_01).fg(p.color_09),
-                with_shadow: Style::new().bg(p.color_13).fg(p.color_01),
-                only_shadow: Style::new().bg(p.color_09).fg(p.color_13),
+                base: Style::new().bg(p.background).fg(p.foreground),
+                base_dark: Style::new().bg(p.foreground).fg(p.background),
+                with_shadow: Style::new().bg(p.color_13).fg(p.foreground),
+                only_shadow: Style::new().bg(p.background).fg(p.color_13),
             },
         }
     }
@@ -86,8 +92,8 @@ impl Theme {
 #[derive(Debug)]
 pub struct Block {
     pub base: Style,
-    pub menu_top: Style,
-    pub menu_bottom: Style,
+    pub pane_header: Style,
+    pub pane_body: Style,
     pub footer_left: Style,
     pub footer_right: Style,
     pub main: Style,
@@ -99,12 +105,12 @@ impl Block {
         self.get_style(self.base, active)
     }
 
-    pub fn menu_top(&self, active: bool) -> Style {
-        self.get_style(self.menu_top, active)
+    pub fn pane_header(&self, active: bool) -> Style {
+        self.get_style(self.pane_header, active)
     }
 
-    pub fn menu_bottom(&self, active: bool) -> Style {
-        self.get_style(self.menu_bottom, active)
+    pub fn pane_body(&self, active: bool) -> Style {
+        self.get_style(self.pane_body, active)
     }
 
     pub fn main(&self, active: bool) -> Style {
@@ -160,6 +166,8 @@ pub struct Paragraph {
     pub header: Style,
     pub header_active: Style,
     pub label: Style,
+    pub cell: Style,
+    pub cell_active: Style,
 }
 
 impl Paragraph {

@@ -4,7 +4,7 @@ use crate::widgets::validators::ValidatorsListState;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Styled},
+    style::{Modifier, Style, Styled},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
@@ -350,7 +350,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         for v in validators {
             let text_points = match v.delta_points() {
-                Some(d) => Text::from(format!("+{}", d)).style(Style::default().fg(Color::White)),
+                Some(d) => Text::from(format!("+{}", d))
+                    .style(Style::default().add_modifier(Modifier::BOLD)),
                 None => Text::from(v.total_points().to_string()),
             };
 
@@ -358,10 +359,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             let staked_total = if v.is_active() { v.stake.total() } else { 0 };
 
             let (cell_style, _highlight_symbol) = match selected_validator {
-                Some(ref selected) if v == selected => {
-                    (Style::default().fg(Color::Black).bg(Color::White), "❯")
-                }
-                _ => (Style::default(), ""),
+                Some(ref selected) if v == selected => (theme.paragraph.cell_active, "❯"),
+                _ => (theme.paragraph.cell, ""),
             };
 
             let mut validator_cells = vec![
@@ -570,8 +569,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let block = Block::new().set_style(theme.block.main);
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(theme.table.header))
-            .style(Style::default().fg(Color::Blue));
+            .header(Row::new(header_cells).set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);
     }
