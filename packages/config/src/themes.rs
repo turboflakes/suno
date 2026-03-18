@@ -66,7 +66,7 @@ impl Themes {
         );
 
         // Scan {path_dir}/*.toml
-        if let Ok(entries) = std::fs::read_dir(&path_dir) {
+        if let Ok(entries) = std::fs::read_dir(path_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
 
