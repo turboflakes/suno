@@ -1,69 +1,71 @@
 use crate::error::Error;
-use log::warn;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use suno_theme::{Palette, Theme, SUNO_DARK_PALETTE, SUNO_LIGHT_PALETTE};
 
+type Name = String;
+type ThemesMap = HashMap<Name, Theme>;
+
 /// Provides default value for the themes directory
 fn default_themes_path() -> String {
-    "themes".to_string()
+    "./themes".to_string()
 }
 
 /// Provides default value for the active theme
-fn default_active_theme() -> String {
-    "Suno Dark".to_string()
-}
-
-/// Provides default value for the active theme
-fn default_themes() -> HashMap<String, Theme> {
-    // Register SUNO built-ins Themes
-    let mut themes = HashMap::new();
-    themes.insert("Suno Dark".into(), Theme::from_palette(&SUNO_DARK_PALETTE));
-    themes.insert(
-        "Suno Light".into(),
-        Theme::from_palette(&SUNO_LIGHT_PALETTE),
-    );
-    themes
+pub fn default_active_theme() -> String {
+    SUNO_DARK_PALETTE.0.into()
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Themes {
     #[serde(default = "default_themes_path")]
-    pub themes_path: String,
+    pub path: String,
     #[serde(default = "default_active_theme")]
-    pub active_theme: String,
+    pub active: String,
     #[serde(skip)]
-    #[serde(default = "default_themes")]
-    themes: HashMap<String, Theme>,
+    themes: ThemesMap,
 }
 
 impl Themes {
     pub fn theme(&self) -> &Theme {
         self.themes
-            .get(&self.active_theme)
-            .expect("no themes loaded")
+            .get(&self.active)
+            .or_else(|| self.themes.get(&default_active_theme()))
+            .expect("No theme loaded")
     }
 
-    pub fn set_themes(&mut self, themes: HashMap<String, Theme>) {
+    pub fn set_themes(&mut self, themes: ThemesMap) {
         self.themes = themes;
     }
 
-    pub fn load<P: AsRef<Path>>(path_dir: P) -> Result<HashMap<String, Theme>, Error> {
+    pub fn validate(&self) -> Result<(), Error> {
+        if !self.themes.contains_key(&self.active) {
+            return Err(Error::InvalidTheme(self.active.clone()));
+        }
+        info!("Theme: {}", self.active);
+        Ok(())
+    }
+
+    pub fn load<P: AsRef<Path>>(path_dir: P) -> Result<ThemesMap, Error> {
         let path_dir = path_dir.as_ref();
 
-        if !path_dir.exists() {
-            warn!("Themes directory does not exist: {}", path_dir.display());
-            return Err(Error::InvalidPath(path_dir.display().to_string()));
-        }
-
-        // Register SUNO built-ins Themes
+        // Register SUNO builtins Themes
         let mut themes = HashMap::new();
-        themes.insert("Suno Dark".into(), Theme::from_palette(&SUNO_DARK_PALETTE));
         themes.insert(
-            "Suno Light".into(),
-            Theme::from_palette(&SUNO_LIGHT_PALETTE),
+            SUNO_DARK_PALETTE.0.into(),
+            Theme::from_palette(&SUNO_DARK_PALETTE.1),
         );
+        themes.insert(
+            SUNO_LIGHT_PALETTE.0.into(),
+            Theme::from_palette(&SUNO_LIGHT_PALETTE.1),
+        );
+
+        if !path_dir.is_dir() {
+            warn!("Themes directory does not exist: {}", path_dir.display());
+            return Ok(themes);
+        }
 
         // Scan {path_dir}/*.toml
         if let Ok(entries) = std::fs::read_dir(path_dir) {
@@ -79,6 +81,7 @@ impl Themes {
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown")
+                    .trim()
                     .to_string();
 
                 let palette = Palette::from_file(path)?;

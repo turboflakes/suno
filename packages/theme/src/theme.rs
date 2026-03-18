@@ -26,7 +26,7 @@ pub struct Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Self::from_palette(&SUNO_DARK_PALETTE)
+        Self::from_palette(&SUNO_DARK_PALETTE.1)
     }
 }
 

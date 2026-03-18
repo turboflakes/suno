@@ -50,55 +50,63 @@ const YELLOW_02: Color = Color::Rgb(253, 217, 30); // color_13 - Secondary
 const YELLOW_01: Color = Color::Rgb(222, 187, 2); // color_14
 const YELLOW_00: Color = Color::Rgb(167, 140, 1); // color_15
 
-pub const SUNO_DARK_PALETTE: Palette = Palette {
-    color_00: GRAY_09,
-    color_01: GRAY_08,
-    color_02: GRAY_07,
-    color_03: GRAY_06,
-    color_04: GRAY_05,
-    color_05: GRAY_04,
-    color_06: GRAY_03,
-    color_07: GRAY_02,
-    color_08: GRAY_01,
-    color_09: GRAY_00,
-    color_10: YELLOW_05,
-    color_11: YELLOW_04,
-    color_12: YELLOW_03,
-    color_13: YELLOW_02,
-    color_14: YELLOW_01,
-    color_15: YELLOW_00,
-    background: GRAY_00,
-    foreground: GRAY_08,
-    cursor_color: GRAY_01,
-    cursor_text: GRAY_08,
-    selection_background: GRAY_09,
-    selection_foreground: GRAY_00,
-};
+type Name = &'static str;
 
-pub const SUNO_LIGHT_PALETTE: Palette = Palette {
-    color_00: GRAY_00,
-    color_01: GRAY_01,
-    color_02: GRAY_02,
-    color_03: GRAY_03,
-    color_04: GRAY_04,
-    color_05: GRAY_05,
-    color_06: GRAY_06,
-    color_07: GRAY_07,
-    color_08: GRAY_08,
-    color_09: GRAY_09,
-    color_10: YELLOW_00,
-    color_11: YELLOW_01,
-    color_12: YELLOW_02,
-    color_13: YELLOW_03,
-    color_14: YELLOW_04,
-    color_15: YELLOW_05,
-    background: GRAY_08,
-    foreground: GRAY_00,
-    cursor_color: GRAY_08,
-    cursor_text: GRAY_01,
-    selection_background: GRAY_00,
-    selection_foreground: GRAY_09,
-};
+pub const SUNO_DARK_PALETTE: (Name, Palette) = (
+    "Suno Dark",
+    Palette {
+        color_00: GRAY_09,
+        color_01: GRAY_08,
+        color_02: GRAY_07,
+        color_03: GRAY_06,
+        color_04: GRAY_05,
+        color_05: GRAY_04,
+        color_06: GRAY_03,
+        color_07: GRAY_02,
+        color_08: GRAY_01,
+        color_09: GRAY_00,
+        color_10: YELLOW_05,
+        color_11: YELLOW_04,
+        color_12: YELLOW_03,
+        color_13: YELLOW_02,
+        color_14: YELLOW_01,
+        color_15: YELLOW_00,
+        background: GRAY_00,
+        foreground: GRAY_08,
+        cursor_color: GRAY_01,
+        cursor_text: GRAY_08,
+        selection_background: GRAY_09,
+        selection_foreground: GRAY_00,
+    },
+);
+
+pub const SUNO_LIGHT_PALETTE: (Name, Palette) = (
+    "Suno Light",
+    Palette {
+        color_00: GRAY_00,
+        color_01: GRAY_01,
+        color_02: GRAY_02,
+        color_03: GRAY_03,
+        color_04: GRAY_04,
+        color_05: GRAY_05,
+        color_06: GRAY_06,
+        color_07: GRAY_07,
+        color_08: GRAY_08,
+        color_09: GRAY_09,
+        color_10: YELLOW_00,
+        color_11: YELLOW_01,
+        color_12: YELLOW_02,
+        color_13: YELLOW_03,
+        color_14: YELLOW_04,
+        color_15: YELLOW_05,
+        background: GRAY_08,
+        foreground: GRAY_00,
+        cursor_color: GRAY_08,
+        cursor_text: GRAY_01,
+        selection_background: GRAY_00,
+        selection_foreground: GRAY_09,
+    },
+);
 
 pub struct Palette {
     pub color_00: Color,
@@ -127,7 +135,7 @@ pub struct Palette {
 
 impl Default for Palette {
     fn default() -> Self {
-        SUNO_DARK_PALETTE
+        SUNO_DARK_PALETTE.1
     }
 }
 

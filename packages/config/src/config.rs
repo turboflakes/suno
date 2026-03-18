@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
-use crate::themes::Themes;
+use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,11 @@ fn default_proxy_path() -> String {
     ".proxy_account.json".to_string()
 }
 
+/// Provides default value for Themes struct
+fn default_themes() -> Themes {
+    Themes::default()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
@@ -44,6 +49,7 @@ pub struct Config {
     pub features: Features,
     pub signer: Option<Signer>,
     pub explorer: Explorer,
+    #[serde(default = "default_themes")]
     themes: Themes,
 }
 
@@ -145,7 +151,7 @@ impl Config {
         }
 
         // Load themes
-        let themes = Themes::load(&config.themes.themes_path)?;
+        let themes = Themes::load(&config.themes.path)?;
         config.themes.set_themes(themes);
 
         Ok(config)
@@ -156,6 +162,9 @@ impl Config {
         if self.chains.is_empty() {
             return Err(Error::ChainNotAvailable);
         }
+
+        // Validate themes
+        self.themes.validate()?;
 
         Ok(())
     }
@@ -185,6 +194,10 @@ impl Config {
 
     pub fn theme(&self) -> &Theme {
         self.themes.theme()
+    }
+
+    fn set_default_theme(&mut self) {
+        self.themes.active = default_active_theme();
     }
 }
 
@@ -228,6 +241,10 @@ fn get_config() -> Result<Config, Error> {
         if let Some(path) = matches.get_one::<String>("proxy-path") {
             config.set_signer_path(path.as_str());
         }
+    }
+
+    if config.themes.active.is_empty() {
+        config.set_default_theme();
     }
 
     // Validate the configuration
@@ -344,6 +361,9 @@ features:
   enable_validators: true
   enable_collators: false
   enable_rpcs: false
+themes:
+  active: "Suno Light"
+  path: "./themes"
 signer:
   proxy_path: ".proxy_private.seed"
 explorer:
@@ -392,6 +412,9 @@ features:
   enable_validators: true
   enable_collators: true
   enable_rpcs: false
+themes:
+  active: "Suno Dark"
+  path: "./themes"
 signer:
   proxy_path: ".proxy_private.json"
 explorer:

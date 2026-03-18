@@ -13,6 +13,8 @@ pub enum Error {
     ChainNotAvailable,
     #[error("Theme parsing error: {0}")]
     Theme(#[from] suno_theme::Error),
+    #[error("Invalid theme: {0}")]
+    InvalidTheme(String),
     #[error("Other error: {0}")]
     Other(String),
 }
