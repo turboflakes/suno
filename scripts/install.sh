@@ -20,7 +20,7 @@ trap cleanup EXIT
 # 3. Fetch the latest version from GitHub releases
 # 4. Download and install suno
 #
-read -p "> Enter SUNO installation path [$DEFAULT_DIRNAME]: " DIRNAME
+read -p "> Enter SUNO installation path [$DEFAULT_DIRNAME]: " DIRNAME </dev/tty
 # Shorthand for "if empty, use default"
 DIRNAME="${DIRNAME:-$DEFAULT_DIRNAME}"
 
@@ -91,9 +91,9 @@ fi
 # 2. Install a default configuration template if the user accepts
 #
 DEFAULT_CONFIG="$DIRNAME/.config.yaml"
-read -p "> Would you like to install the DEFAULT configuration file? [y/N]: " INSTALL_CONFIG
+read -p "> Would you like to install the DEFAULT configuration file? [y/N]: " INSTALL_CONFIG </dev/tty
 if [[ "$INSTALL_CONFIG" == "y" || "$INSTALL_CONFIG" == "Y" ]]; then
-    read -p "> Enter the configuration path [$DEFAULT_CONFIG]: " CONFIG
+    read -p "> Enter the configuration path [$DEFAULT_CONFIG]: " CONFIG </dev/tty
     CONFIG="${CONFIG:-$DEFAULT_CONFIG}"
 
     if [ ! -f "$CONFIG" ]; then
