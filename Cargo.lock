@@ -4403,7 +4403,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "subxt"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "async-trait",
  "derive-where",
@@ -4443,7 +4443,7 @@ dependencies = [
 [[package]]
 name = "subxt-codegen"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "heck",
  "parity-scale-codec",
@@ -4459,7 +4459,7 @@ dependencies = [
 [[package]]
 name = "subxt-lightclient"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "futures",
  "futures-util",
@@ -4475,7 +4475,7 @@ dependencies = [
 [[package]]
 name = "subxt-macro"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "darling 0.20.11",
  "parity-scale-codec",
@@ -4491,7 +4491,7 @@ dependencies = [
 [[package]]
 name = "subxt-metadata"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "frame-decode",
  "frame-metadata",
@@ -4507,7 +4507,7 @@ dependencies = [
 [[package]]
 name = "subxt-rpcs"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "derive-where",
  "finito",
@@ -4531,7 +4531,7 @@ dependencies = [
 [[package]]
 name = "subxt-signer"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "base64",
  "bip39",
@@ -4559,7 +4559,7 @@ dependencies = [
 [[package]]
 name = "subxt-utils-accountid32"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "base58",
  "blake2",
@@ -4574,7 +4574,7 @@ dependencies = [
 [[package]]
 name = "subxt-utils-fetchmetadata"
 version = "0.50.0"
-source = "git+https://github.com/turboflakes/subxt?branch=pm-fix-latest#8a1272fa173106ec68b5f951fc34c70aa4cecc0a"
+source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
 dependencies = [
  "hex",
  "parity-scale-codec",

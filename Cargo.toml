@@ -58,12 +58,9 @@ strum = { version = "0.26.3", features = ["derive"] }
 # subxt = { version = "0.50.0", features = ["reconnecting-rpc-client"] }
 # subxt-signer = { version = "0.50.0", features = ["polkadot-js-compat"] }
 # subxt-rpcs = { version = "0.50.0" }
-# subxt = { git = "https://github.com/paritytech/subxt", features = ["reconnecting-rpc-client"] }
-# subxt-signer = { git = "https://github.com/paritytech/subxt", package = "subxt-signer", features = ["subxt", "polkadot-js-compat"] }
-# subxt-rpcs = { git = "https://github.com/paritytech/subxt", package = "subxt-rpcs", features = ["subxt"] }
-subxt = { git = "https://github.com/turboflakes/subxt", branch = "pm-fix-latest", features = ["reconnecting-rpc-client"] }
-subxt-signer = { git = "https://github.com/turboflakes/subxt", package = "subxt-signer", branch = "pm-fix-latest", features = ["subxt", "polkadot-js-compat"] }
-subxt-rpcs = { git = "https://github.com/turboflakes/subxt", package = "subxt-rpcs",branch = "pm-fix-latest" }
+subxt = { git = "https://github.com/paritytech/subxt", features = ["reconnecting-rpc-client"] }
+subxt-signer = { git = "https://github.com/paritytech/subxt", package = "subxt-signer", features = ["subxt", "polkadot-js-compat"] }
+subxt-rpcs = { git = "https://github.com/paritytech/subxt", package = "subxt-rpcs" }
 tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
