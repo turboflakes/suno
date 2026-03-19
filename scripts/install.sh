@@ -119,7 +119,7 @@ themes:
 
 # Uncomment to use a signer proxy
 # signer:
-#   proxy_path: ".proxy_private.json"
+#   proxy_path: ".proxy_account.json"
 
 explorer:
   url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"

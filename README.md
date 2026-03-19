@@ -8,8 +8,8 @@
 
 ## Implementation constraints
  - Runs on the terminal.
- - Users can connect to any RPC node of their choice. 
- - No backend APIs. All displayed data comes directly from the RPCs configured.
+ - No backend APIs. No indexers.
+ - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
  - Restricted Proxy-Only operations with only three proxy types supported:
     - Staking, StakingOperator (Asset Hub)
     - NonTransfer (Relay Chain)
@@ -26,7 +26,7 @@
 - [&check;] Active vs Next commission. Current and Queued session keys;
 - [&check;] Validate and display only supported proxy type for each stash.
 - [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
-- [&check;] Support for most of **Staking Operations** as well as **Rotate session keys**.
+- [&check;] Support [commands](#commands-supported-per-proxy-type) for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
 - [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
 
@@ -56,22 +56,22 @@ The script downloads the latest release, extracts it, and installs the binary in
 
 An example of the instructions presented:
 ```bash
-> Enter SUNO installation path [default: /home/suno]:
-√ Output directory /home/suno
+> Enter SUNO installation path [default: /home/paulo/suno]:
+√ Output directory /home/paulo/suno
 √ Downloading suno v0.1.2
 suno-aarch64-apple-darwin.tar.gz          100%[=====================================================================================>]  21.12M  17.3MB/s    in 1.2s
 suno-aarch64-apple-darwin.tar.gz.sha256   100%[=====================================================================================>]      99  --.-KB/s    in 0s
 √ Checksum verified
-√ Existing binary backed up to /home/suno/suno.backup
+√ Existing binary backed up to /home/paulo/suno/suno.backup
 √ Checking if suno exists: total 262688
 -rwxr-xr-x@ 1 paulo  staff  112007760 Mar 17 12:05 suno
 -rw-r--r--@ 1 paulo  staff   22151830 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz
 -rw-r--r--@ 1 paulo  staff         99 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz.sha256
-√ Successfully installed suno v0.1.2 at /home/suno/suno
+√ Successfully installed suno v0.1.2 at /home/paulo/suno/suno
 > Would you like to install the DEFAULT configuration file? [y/N]: y
-> Enter the configuration path [default: /home/suno/.config.yaml]:
-√ Writing /home/suno/.config.yaml template
-√ Config file saved at /home/suno/.config.yaml.
+> Enter the configuration path [default: /home/paulo/suno/.config.yaml]:
+√ Writing /home/paulo/suno/.config.yaml template
+√ Config file saved at /home/paulo/suno/.config.yaml.
 -> Edit the config file and replace STASHES and RPC endpoints as you wish.
 √ Installation complete
 — Enjoy suno v0.1.2
@@ -121,7 +121,7 @@ themes:
   path: "./themes"
   
 signer:
-  proxy_path: ".proxy_private.json"
+  proxy_path: ".proxy_account.json"
   
 explorer:
     url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
@@ -133,7 +133,7 @@ explorer:
 ## Signer Account (Proxy-Only)
 To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator`, `NonTransfer` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` [SO] must be setup on the Asset-Hub chain, and `NonTransfer` [NT] on the Relay chain.
 
-###  Commands supported per Proxy Type
+### Commands supported per Proxy Type
   NOTE: Each `suno` command is intrinsically dependant on its availability within the runtime
 
 - **[S] Staking (Asset Hub)**
@@ -178,13 +178,13 @@ Currently, to setup the proxy account on `suno`, the ONLY supported, recommended
 ```
 
 #### Step 2
-You can rename the file to `.proxy_private.json`, since it is the one built-in by default and is expected to live alongside the binary. Alternatively, you can rename it and move the file to a directory of your choice. If you choose a different name and path, you have 2 options:
+You can rename the file to `.proxy_account.json`, since it is the one built-in by default and is expected to live alongside the binary. Alternatively, you can rename it and move the file to a directory of your choice. If you choose a different name and path, you have 2 options:
 
 **Option 1** specify the new **proxy_path** under the **signer** section in the configuration file. For example:
 
 ```yaml
 signer:
-  proxy_path: ".proxy_private.json"
+  proxy_path: ".proxy_account.json"
 ```
 
 **Option 2** via the `--proxy-path` flag when calling `suno` from the terminal, eg. `suno --proxy-path /home/suno/suno-proxy-account.json`
@@ -193,7 +193,7 @@ signer:
 If you end up creating a brand new account, don't forget to transfer some funds to it and set up the proxy types described above for your target stashes you would like to operate via `suno`. This can be done in many other tools already available in the Polkadot ecosystem.
 
 ## Usage
-From your favourite terminal, simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
+From your favourite terminal (personally I use [Ghostty](https://ghostty.org/), it works great), simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
 
 Check all flags available:
 
@@ -232,6 +232,8 @@ themes:
   active: "Blue Sky"
   path: "./themes"
 ```
+
+When you are done, make a [PR](https://github.com/turboflakes/suno/pulls) with your art, I'll thank you :)
 
 ## Development / Build from Source
 
