@@ -4,7 +4,7 @@
   <img src="https://github.com/turboflakes/suno/blob/main/assets/suno-github-header.webp?raw=true">
 </p>
 
-`suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal. `suno` is a terminal user interface to monitor live data and manage your own or third-party nodes. It supports Polkadot, Kusama, Paseo, and Westend networks.
+`suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal. `suno` is a terminal user interface to monitor live data and manage your own or third-party nodes. It supports [Polkadot](https://polkadot.com/), [Kusama](https://kusama.network/), [Paseo](https://paseo.site/), and Westend networks.
 
 ## Implementation constraints
  - Runs on the terminal.
@@ -80,7 +80,7 @@ suno-aarch64-apple-darwin.tar.gz.sha256   100%[=================================
 ## Configuration
 
 ### Validator **stashes** and **RPCs**
-Most configuration is done via an initialized config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
+Most configuration is done via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
 
 ```yaml
 chains:
