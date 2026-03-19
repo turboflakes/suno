@@ -13,7 +13,7 @@
  - Restricted Proxy-Only operations with only three proxy types supported:
     - Staking, StakingOperator (Asset Hub)
     - NonTransfer (Relay Chain)
- - Proxy account must be an account with password exported from [Polkadot Developer Signer](https://polkadot.js.org/extension/).
+ - Proxy account must be an account with password exported from [PDS/PJS](https://polkadot.js.org/extension/).
 
 ## Features
 
@@ -131,7 +131,7 @@ explorer:
 ```
 
 ## Signer Account (Proxy-Only)
-To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator`, `NonTransfer` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` [SO] must be setup on the Asset-Hub chain, and `NonTransfer` [NT] on the Relay chain.
+To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator`, `NonTransfer` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain, and `NonTransfer` `[NT]` on the Relay chain.
 
 ### Commands supported per Proxy Type
   NOTE: Each `suno` command is intrinsically dependant on its availability within the runtime
@@ -193,7 +193,7 @@ signer:
 If you end up creating a brand new account, don't forget to transfer some funds to it and set up the proxy types described above for your target stashes you would like to operate via `suno`. This can be done in many other tools already available in the Polkadot ecosystem.
 
 ## Usage
-From your favourite terminal (personally I use [Ghostty](https://ghostty.org/), it works great), simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
+From your favourite terminal (personally I use [Ghostty](https://ghostty.org/)), simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
 
 Check all flags available:
 
