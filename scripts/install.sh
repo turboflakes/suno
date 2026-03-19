@@ -102,20 +102,15 @@ if [[ "$INSTALL_CONFIG" == "y" || "$INSTALL_CONFIG" == "Y" ]]; then
 chains:
   - polkadot:
       rpc_url: "ws://10.10.10.1:9944"
-      light_client: false
       validators:
         - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   - asset_hub_polkadot:
       rpc_url: "ws://10.10.10.2:9944"
-      light_client: false
   - people_polkadot:
       rpc_url: "ws://10.10.10.3:9944"
-      light_client: false
 
 features:
   enable_validators: true
-  enable_collators: false
-  enable_rpcs: false
 
 # Builtin themes: ["Suno Dark", "Suno Light"]
 themes:

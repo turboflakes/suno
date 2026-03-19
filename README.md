@@ -85,33 +85,44 @@ Most configuration is done via an initialized config file. Here is a full exampl
 ```yaml
 chains:
   - polkadot:
-      rpc_url: "wss://polkadot.rpc.PROVIDER_ENDPOINT"
-      light_client: false
+      rpc_url: "__WSS_POLKADOT_RPC_PROVIDER__"
       validators:
         - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        - "1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd"
   - asset_hub_polkadot:
-      rpc_url: "wss://asset-hub-polkadot.rpc.PROVIDER_ENDPOINT"
-      light_client: false
+      rpc_url: "__WSS_POLKADOT_HUB_RPC_PROVIDER__"
   - people_polkadot:
-      rpc_url: "wss://people-polkadot.rpc.PROVIDER_ENDPOINT"
-      light_client: false
+      rpc_url: "__WSS_POLKADOT_PEOPLE_RPC_PROVIDER__"
+      
   - kusama:
-      rpc_url: "wss://kusama.rpc.PROVIDER_ENDPOINT"
-      light_client: false
+      rpc_url: "__WSS_KUSAMA_RPC_PROVIDER__"
       validators:
         - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
   - asset_hub_kusama:
-      rpc_url: "wss://asset-hub-kusama.rpc.PROVIDER_ENDPOINT"
-      light_client: false
+      rpc_url: "__WSS_KUSAMA_HUB_RPC_PROVIDER__"
+      
+  - paseo:
+      rpc_url: "__WSS_PASEO_RPC_PROVIDER__"
+      validators:
+        [
+          "1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd",
+          "13iiwNL7mzjuS4KxXEHQ2Csx8fETishXWKzeeCfHCig6j2dd",
+        ]
+  - asset_hub_paseo:
+      rpc_url: "__WSS_PASEO_HUB_RPC_PROVIDER__"
+  - people_paseo:
+      rpc_url: "__WSS_PASEO_PEOPLE_RPC_PROVIDER__"
+
 features:
   enable_validators: true
-  enable_collators: true
-  enable_rpcs: false
+  
 themes:
   active: "Suno Dark"
   path: "./themes"
+  
 signer:
   proxy_path: ".proxy_private.json"
+  
 explorer:
     url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
     # A few other explorers commented out below

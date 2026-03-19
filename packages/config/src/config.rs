@@ -56,6 +56,7 @@ pub struct Config {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub rpc_url: String,
+    #[serde(default)]
     pub light_client: bool,
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
@@ -81,8 +82,11 @@ pub struct Command {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Features {
+    #[serde(default)]
     pub enable_validators: bool,
+    #[serde(default)]
     pub enable_collators: bool,
+    #[serde(default)]
     pub enable_rpcs: bool,
 }
 
