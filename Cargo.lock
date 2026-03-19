@@ -4583,7 +4583,7 @@ dependencies = [
 
 [[package]]
 name = "suno"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "color-eyre",
  "suno-tui",
@@ -4592,7 +4592,7 @@ dependencies = [
 
 [[package]]
 name = "suno-actions"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "sp-arithmetic",
  "subxt",
@@ -4602,7 +4602,7 @@ dependencies = [
 
 [[package]]
 name = "suno-asset-hub-kusama"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "log",
  "sp-arithmetic",
@@ -4617,7 +4617,7 @@ dependencies = [
 
 [[package]]
 name = "suno-asset-hub-paseo"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "log",
  "sp-arithmetic",
@@ -4632,7 +4632,7 @@ dependencies = [
 
 [[package]]
 name = "suno-asset-hub-polkadot"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "log",
  "sp-arithmetic",
@@ -4647,7 +4647,7 @@ dependencies = [
 
 [[package]]
 name = "suno-asset-hub-westend"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "log",
  "sp-arithmetic",
@@ -4662,7 +4662,7 @@ dependencies = [
 
 [[package]]
 name = "suno-config"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "clap",
  "lazy_static",
@@ -4679,7 +4679,7 @@ dependencies = [
 
 [[package]]
 name = "suno-error"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "arboard",
  "subxt",
@@ -4693,7 +4693,7 @@ dependencies = [
 
 [[package]]
 name = "suno-kusama"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "subxt",
  "suno-error",
@@ -4703,7 +4703,7 @@ dependencies = [
 
 [[package]]
 name = "suno-paseo"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "hex",
  "subxt",
@@ -4714,7 +4714,7 @@ dependencies = [
 
 [[package]]
 name = "suno-people-kusama"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-recursion",
  "log",
@@ -4726,7 +4726,7 @@ dependencies = [
 
 [[package]]
 name = "suno-people-paseo"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-recursion",
  "log",
@@ -4738,7 +4738,7 @@ dependencies = [
 
 [[package]]
 name = "suno-people-polkadot"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-recursion",
  "log",
@@ -4750,7 +4750,7 @@ dependencies = [
 
 [[package]]
 name = "suno-people-westend"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-recursion",
  "log",
@@ -4762,7 +4762,7 @@ dependencies = [
 
 [[package]]
 name = "suno-polkadot"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "subxt",
  "suno-error",
@@ -4772,7 +4772,7 @@ dependencies = [
 
 [[package]]
 name = "suno-primitives"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "hex",
  "ratatui",
@@ -4789,7 +4789,7 @@ dependencies = [
 
 [[package]]
 name = "suno-signer"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "regex",
  "serde_json",
@@ -4801,7 +4801,7 @@ dependencies = [
 
 [[package]]
 name = "suno-theme"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "ratatui",
  "serde",
@@ -4811,7 +4811,7 @@ dependencies = [
 
 [[package]]
 name = "suno-tui"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "arboard",
  "async-trait",
@@ -4856,7 +4856,7 @@ dependencies = [
 
 [[package]]
 name = "suno-westend"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "subxt",
  "suno-error",
