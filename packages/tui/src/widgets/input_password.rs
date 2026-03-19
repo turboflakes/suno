@@ -2,7 +2,6 @@ use crate::widgets::input_field::InputField;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Position, Rect},
-    style::Styled,
     text::{Line, Span},
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
@@ -53,7 +52,7 @@ impl Widget for &InputPasswordWidget {
             .split(area[0]);
 
         let block = Block::new()
-            .set_style(theme.input.base(state.is_active()))
+            .style(theme.input.base(state.is_active()))
             .padding(Padding::proportional(1));
 
         let mut input_spans = vec![];
@@ -90,7 +89,7 @@ impl Widget for &InputPasswordWidget {
         // Show hotkey when input is valid
         if state.is_valid() {
             let block = Block::new()
-                .set_style(theme.input.base(state.is_active()))
+                .style(theme.input.base(state.is_active()))
                 .padding(Padding::new(0, 2, 1, 1));
 
             let hotkey = Paragraph::new(Line::from(vec![
@@ -110,7 +109,7 @@ impl Widget for &InputPasswordWidget {
         if state.is_invalid() {
             Clear.render(area[1], buf);
             let block = Block::new()
-                .set_style(theme.input.base(state.is_active()))
+                .style(theme.input.base(state.is_active()))
                 .padding(Padding::new(2, 0, 0, 1));
 
             let error = Paragraph::new(Line::from(vec![

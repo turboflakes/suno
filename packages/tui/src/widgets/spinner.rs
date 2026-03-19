@@ -49,11 +49,11 @@ impl Widget for &Spinner {
         let theme = CONFIG.theme();
         let spinner = self.progress();
         let block = Block::new()
-            .style(theme.input.base_active)
+            .style(theme.input.base)
             .padding(Padding::new(0, 2, 1, 1));
         Paragraph::new(spinner)
             .block(block)
-            .style(theme.input.suffix_active)
+            .style(theme.input.suffix)
             .render(area, buf);
     }
 }
