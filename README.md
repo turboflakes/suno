@@ -6,17 +6,17 @@
 
 `suno` -- Yet another way to manage **Su**bstrate **N**ode **O**perations from your terminal. `suno` is a terminal user interface to monitor live data and manage your own or third-party nodes. It supports [Polkadot](https://polkadot.com/), [Kusama](https://kusama.network/), [Paseo](https://paseo.site/), and Westend networks.
 
-## Implementation constraints
- - Runs on the terminal.
- - No backend APIs. No indexers.
- - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
- - Restricted Proxy-Only operations with only three proxy types supported:
-    - Staking, StakingOperator (Asset Hub)
-    - NonTransfer (Relay Chain)
- - Proxy account must be an account with password exported from [PJS/PDS](https://polkadot.js.org/extension/).
+## Why use `suno`
+
+As a node operator, to manage your own or third-party nodes from the terminal.
+
+As a nominator you can just as easily check the validators you nominate.
+
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
+</p>
 
 ## Features
-
 - [&check;] Support Polkadot, Kusama, Paseo and Westend networks all at once on the same view;
 - [&check;] General network stats. Block height, era and epoch progress.
 - [&check;] Total validators and total nominators (active vs waiting).
@@ -38,6 +38,15 @@
  - [] Light client mode
  - [] Multi-proxy setup
  - [] Support for `/kick`, `/nominate` extrinsics
+
+### Implementation constraints / goals
+ - Runs on the terminal.
+ - No backend APIs. No indexers.
+ - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
+ - Restricted Proxy-Only operations with only three proxy types supported:
+    - Staking, StakingOperator (Asset Hub)
+    - NonTransfer (Relay Chain)
+ - Proxy account must be an account with password exported from [PJS/PDS](https://polkadot.js.org/extension/).
  
 ## Installation
 
@@ -57,24 +66,24 @@ The script downloads the latest release, extracts it, and installs the binary in
 An example of the instructions presented:
 ```bash
 > Enter SUNO installation path [default: /home/paulo/suno]:
-√ Output directory /home/paulo/suno
-√ Downloading suno v0.1.2
-suno-aarch64-apple-darwin.tar.gz          100%[=====================================================================================>]  21.12M  17.3MB/s    in 1.2s
-suno-aarch64-apple-darwin.tar.gz.sha256   100%[=====================================================================================>]      99  --.-KB/s    in 0s
-√ Checksum verified
-√ Existing binary backed up to /home/paulo/suno/suno.backup
-√ Checking if suno exists: total 262688
--rwxr-xr-x@ 1 paulo  staff  112007760 Mar 17 12:05 suno
--rw-r--r--@ 1 paulo  staff   22151830 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz
--rw-r--r--@ 1 paulo  staff         99 Mar 17 12:06 suno-aarch64-apple-darwin.tar.gz.sha256
-√ Successfully installed suno v0.1.2 at /home/paulo/suno/suno
+✔︎ Output directory /home/paulo/suno
+✔︎ Downloading suno v0.2.0
+suno-aarch64-apple-darwin.tar.gz    100%[==================================================================>]  13.26M  13.2MB/s    in 1.0s
+suno-aarch64-apple-darwin.tar.gz.sh 100%[==================================================================>]      99  --.-KB/s    in 0s
+✔︎ Checksum verified
+✔︎ Existing binary backed up to /home/paulo/suno/suno.backup
+✔︎ Checking if suno exists: total 90584
+-rwxr-xr-x@ 1 paulo  staff  31678288 Mar 19 15:41 suno
+-rw-r--r--@ 1 paulo  staff  13906374 Mar 19 15:42 suno-aarch64-apple-darwin.tar.gz
+-rw-r--r--@ 1 paulo  staff        99 Mar 19 15:42 suno-aarch64-apple-darwin.tar.gz.sha256
+✔︎ Successfully installed suno v0.2.0 at /home/paulo/suno/suno
 > Would you like to install the DEFAULT configuration file? [y/N]: y
 > Enter the configuration path [default: /home/paulo/suno/.config.yaml]:
-√ Writing /home/paulo/suno/.config.yaml template
-√ Config file saved at /home/paulo/suno/.config.yaml.
--> Edit the config file and replace STASHES and RPC endpoints as you wish.
-√ Installation complete
-— Enjoy suno v0.1.2
+✔︎ Writing /home/paulo/suno/.config.yaml template
+✔︎ Config file saved at /Users/paulo/suno/.config.yaml.
+==> Next edit the config file and replace STASHES and RPC endpoints as you wish.
+✔︎ Installation complete
+— Enjoy suno v0.2.0
 ```
 
 ## Configuration
@@ -234,6 +243,11 @@ themes:
 ```
 
 When you are done, make a [PR](https://github.com/turboflakes/suno/pulls) with your art, I'll thank you :)
+
+<p align="center">
+    <img alt="suno-light" src="https://github.com/turboflakes/suno/blob/main/assets/suno-light.gif?raw=true" />
+</p>
+
 
 ## Development / Build from Source
 
