@@ -24,7 +24,7 @@ read -p "> Enter SUNO installation path [default: $DEFAULT_DIRNAME]: " DIRNAME <
 # Shorthand for "if empty, use default"
 DIRNAME="${DIRNAME:-$DEFAULT_DIRNAME}"
 
-echo "√ Output directory $DIRNAME"
+echo "✔︎ Output directory $DIRNAME"
 
 # Determine the architecture and set the filename accordingly
 ARCH=$(uname -m)
@@ -47,7 +47,7 @@ TARBALL_FILENAME_SHA256=suno-$TARGET.tar.gz.sha256
 URI="https://github.com/turboflakes/suno/releases/download/$LATEST_VERSION/$TARBALL_FILENAME"
 URI_SHA256="https://github.com/turboflakes/suno/releases/download/$LATEST_VERSION/$TARBALL_FILENAME_SHA256"
 
-echo "√ Downloading suno $LATEST_VERSION"
+echo "✔︎ Downloading suno $LATEST_VERSION"
 cd "$TEMPDIR"
 
 wget -q --show-progress "$URI" -O $TARBALL_FILENAME || { echo "ERROR: Failed to download the $TARBALL_FILENAME file"; exit 1; }
@@ -58,19 +58,19 @@ CHECK_CMD="sha256sum"
 if ! command -v sha256sum &> /dev/null; then CHECK_CMD="shasum -a 256"; fi
 
 if $CHECK_CMD -c "$TARBALL_FILENAME_SHA256" 2>&1 | grep -q 'OK'; then
-    echo "√ Checksum verified"
+    echo "✔︎ Checksum verified"
     mkdir -p "$DIRNAME"
 
     # Backup existing binary
     FILENAME="$DIRNAME/suno"
     if [[ -f "$FILENAME" ]]; then
         mv "$FILENAME" "$FILENAME.backup"
-        echo "√ Existing binary backed up to $FILENAME.backup"
+        echo "✔︎ Existing binary backed up to $FILENAME.backup"
     fi
 
     # Extract the tarball
     tar xzf $TEMPDIR/$TARBALL_FILENAME suno
-    echo "√ Checking if suno exists: $(ls -l)"
+    echo "✔︎ Checking if suno exists: $(ls -l)"
 
     if [[ ! -f suno ]]; then
         echo "ERROR: Binary suno does not exist"; exit 1
@@ -79,7 +79,7 @@ if $CHECK_CMD -c "$TARBALL_FILENAME_SHA256" 2>&1 | grep -q 'OK'; then
     # Install suno at $DIRNAME´
     install -m 755 suno "$FILENAME"
 
-    echo "√ Successfully installed suno $LATEST_VERSION at $FILENAME"
+    echo "✔︎ Successfully installed suno $LATEST_VERSION at $FILENAME"
 
 else
     echo "ERROR: SHA256 checksum verification failed";
@@ -97,7 +97,7 @@ if [[ "$INSTALL_CONFIG" == "y" || "$INSTALL_CONFIG" == "Y" ]]; then
     CONFIG="${CONFIG:-$DEFAULT_CONFIG}"
 
     if [ ! -f "$CONFIG" ]; then
-        echo "√ Writing $CONFIG template"
+        echo "✔︎ Writing $CONFIG template"
         cat <<EOF > "$CONFIG"
 chains:
   - polkadot:
@@ -127,14 +127,14 @@ explorer:
   # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
   # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 EOF
-    echo "√ Config file saved at $CONFIG. ";
-    echo "-> Next edit the config file and replace STASHES and RPC endpoints as you wish.";
+    echo "✔︎ Config file saved at $CONFIG. ";
+    echo "==> Next edit the config file and replace STASHES and RPC endpoints as you wish.";
     else
-        echo "√ Config file $CONFIG already exists. Configuration skipped";
+        echo "✔︎ Config file $CONFIG already exists. Configuration skipped";
     fi
 else
-    echo "√ Configuration skipped";
+    echo "✔︎ Configuration skipped";
 fi
 
-echo "√ Installation complete";
+echo "✔︎ Installation complete";
 echo "— Enjoy suno $LATEST_VERSION";
