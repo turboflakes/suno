@@ -65,22 +65,22 @@ The script downloads the latest release, extracts it, and installs the binary in
 
 An example of the instructions presented:
 ```bash
-> Enter SUNO installation path [default: /home/paulo/suno]:
+> Enter SUNO installation path [default: /home/paulo/suno]: 
 ✔︎ Output directory /home/paulo/suno
 ✔︎ Downloading suno v0.2.0
-suno-aarch64-apple-darwin.tar.gz    100%[==================================================================>]  13.26M  13.2MB/s    in 1.0s
-suno-aarch64-apple-darwin.tar.gz.sh 100%[==================================================================>]      99  --.-KB/s    in 0s
+suno-x86_64-unknown-linux-gnu.tar.gz        100%[==================================================================>]  18.01M  25.7MB/s    in 0.7s    
+suno-x86_64-unknown-linux-gnu.tar.gz.sha256 100%[==================================================================>]     103  --.-KB/s    in 0s      
 ✔︎ Checksum verified
 ✔︎ Existing binary backed up to /home/paulo/suno/suno.backup
-✔︎ Checking if suno exists: total 90584
--rwxr-xr-x@ 1 paulo  staff  31678288 Mar 19 15:41 suno
--rw-r--r--@ 1 paulo  staff  13906374 Mar 19 15:42 suno-aarch64-apple-darwin.tar.gz
--rw-r--r--@ 1 paulo  staff        99 Mar 19 15:42 suno-aarch64-apple-darwin.tar.gz.sha256
+✔︎ Checking if suno exists: total 89896
+-rwxr-xr-x 1 paulo paulo 73157832 Mar 19 14:52 suno
+-rw-rw-r-- 1 paulo paulo 18887761 Mar 19 15:42 suno-x86_64-unknown-linux-gnu.tar.gz
+-rw-rw-r-- 1 paulo paulo      103 Mar 19 15:42 suno-x86_64-unknown-linux-gnu.tar.gz.sha256
 ✔︎ Successfully installed suno v0.2.0 at /home/paulo/suno/suno
 > Would you like to install the DEFAULT configuration file? [y/N]: y
-> Enter the configuration path [default: /home/paulo/suno/.config.yaml]:
+> Enter the configuration path [default: /home/paulo/suno/.config.yaml]: 
 ✔︎ Writing /home/paulo/suno/.config.yaml template
-✔︎ Config file saved at /Users/paulo/suno/.config.yaml.
+✔︎ Config file saved at /home/paulo/suno/.config.yaml. 
 ==> Next edit the config file and replace STASHES and RPC endpoints as you wish.
 ✔︎ Installation complete
 — Enjoy suno v0.2.0
@@ -247,7 +247,6 @@ When you are done, make a [PR](https://github.com/turboflakes/suno/pulls) with y
 <p align="center">
     <img alt="suno-light" src="https://github.com/turboflakes/suno/blob/main/assets/suno-light.gif?raw=true" />
 </p>
-
 
 ## Development / Build from Source
 
