@@ -56,7 +56,9 @@ impl Theme {
                 base_active: Style::new().fg(p.color_00),
                 header: Style::new().fg(p.color_12),
                 header_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
-                label: Style::new().fg(p.color_04).add_modifier(Modifier::BOLD),
+                label: Style::new().fg(p.color_05),
+                label_active: Style::new().fg(p.color_05).add_modifier(Modifier::BOLD),
+                label_inverse: Style::new().fg(p.color_14),
                 cell: Style::default(),
                 cell_active: Style::new()
                     .bg(p.selection_background)
@@ -166,6 +168,8 @@ pub struct Paragraph {
     pub header: Style,
     pub header_active: Style,
     pub label: Style,
+    pub label_active: Style,
+    pub label_inverse: Style,
     pub cell: Style,
     pub cell_active: Style,
 }
@@ -184,6 +188,14 @@ impl Paragraph {
             self.header_active
         } else {
             self.header
+        }
+    }
+
+    pub fn label(&self, active: bool) -> Style {
+        if active {
+            self.label_active
+        } else {
+            self.label
         }
     }
 }

@@ -579,12 +579,12 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     let widths = [
         Constraint::Length(2),
-        Constraint::Fill(1),
+        Constraint::Length(20),
         Constraint::Fill(2),
         Constraint::Length(2),
     ];
 
-    let header_labels = vec!["", "extrinsic", "description", ""];
+    let header_labels = vec!["", "command", "description", ""];
 
     let table = Table::new(rows, widths)
         .block(block)
@@ -630,23 +630,23 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
             network_entry.command(),
             spec_version_entry.command()
         ),
-        theme.paragraph.header_active,
+        theme.paragraph.header(true),
     )])
     .alignment(Alignment::Right);
 
     let stash = Line::from(vec![
-        Span::styled("stash ", theme.paragraph.label),
+        Span::styled("stash ", theme.paragraph.label_inverse),
         Span::raw(stash_identity_entry.command()),
     ]);
 
     let method = Line::from(vec![
-        Span::styled("method ", theme.paragraph.label),
+        Span::styled("method ", theme.paragraph.label_inverse),
         Span::raw(call_entry.to_method()),
     ]);
     let method_lines = calculate_text_wrapped_lines(&call_entry.to_method(), area.width);
 
     let proxy = Line::from(vec![
-        Span::styled("proxy account ", theme.paragraph.label),
+        Span::styled("proxy account ", theme.paragraph.label_inverse),
         Span::raw(proxy_identity_entry.command()),
     ]);
 
@@ -656,11 +656,11 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let spaces = available_width.saturating_sub((left_text.len() + 17) as u16);
 
     let call_data_label = Line::from(vec![
-        Span::styled(left_text, theme.paragraph.label),
+        Span::styled(left_text, theme.paragraph.label_inverse),
         Span::raw(" ".repeat(spaces as usize)),
         Span::styled("ctrl+shift+c", theme.paragraph.base),
         Span::raw(" "),
-        Span::styled("copy", theme.paragraph.label),
+        Span::styled("copy", theme.paragraph.label_inverse),
     ]);
 
     let call_data = Line::from(call_entry.to_hex());

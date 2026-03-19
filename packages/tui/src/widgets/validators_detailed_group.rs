@@ -175,7 +175,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),    // Network info
-                Constraint::Fill(2),    // Era / Session info bar
+                Constraint::Length(16), // Era / Session info bar
                 Constraint::Length(24), // Era / Session progress bar
                 Constraint::Length(16), // Countdown
             ])
@@ -346,7 +346,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let mut rows = Vec::new();
 
-        let span_symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label);
+        let span_symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label(false));
 
         for v in validators {
             let text_points = match v.delta_points() {

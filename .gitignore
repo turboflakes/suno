@@ -31,6 +31,7 @@ target/
 
 # Scripts
 bump-version.sh
+*.tape
 
 # Other
 .DS_Store
