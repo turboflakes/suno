@@ -81,15 +81,14 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_chill();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                // TODO: Implement SetKeysAsync and PurgeKeysAsync when ready
-                // Call::SetKeysAsync { keys } => {
-                //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(keys);
-                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
-                // }
-                // Call::PurgeKeysAsync => {
-                //     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
-                //     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
-                // }
+                Call::SetKeysAsync { keys } => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(keys);
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeKeysAsync => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubKusama => match call {

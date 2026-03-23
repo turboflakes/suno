@@ -1,19 +1,11 @@
 use super::node_runtime;
+use crate::utils::map_keys_from_session_keys;
 use crate::{
     constants::{fetch_epoch_duration, fetch_expected_block_time},
     node_runtime::runtime_types::{
-        bounded_collections::bounded_vec::BoundedVec,
-        pallet_proxy::ProxyDefinition,
-        polkadot_primitives::v8::ValidatorIndex,
-        polkadot_primitives::v8::{
-            assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
-        },
-        polkadot_runtime::SessionKeys,
+        bounded_collections::bounded_vec::BoundedVec, pallet_proxy::ProxyDefinition,
+        polkadot_primitives::v9::ValidatorIndex, polkadot_runtime::SessionKeys,
         polkadot_runtime_constants::proxy::ProxyType,
-        sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
-        sp_consensus_babe::app::Public as BabePublic,
-        sp_consensus_beefy::ecdsa_crypto::Public as BeefyPublic,
-        sp_consensus_grandpa::app::Public as GrandpaPublic,
     },
 };
 use std::collections::{HashMap, HashSet};
@@ -23,7 +15,7 @@ use subxt::{
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
-    proxy::SupportedProxy, session::Keys, validator::ValidatorStatus, AccountKey, Epoch, Response,
+    proxy::SupportedProxy, validator::ValidatorStatus, AccountKey, Epoch, Response,
 };
 
 type Index = u64;
@@ -335,15 +327,4 @@ async fn fetch_account_proxies(
         .boxed()?;
 
     Ok(value)
-}
-
-// Helper function to map SessionKeys to Keys
-pub fn map_keys_from_session_keys(session_keys: &SessionKeys) -> Keys {
-    let GrandpaPublic(grandpa) = session_keys.grandpa;
-    let BabePublic(babe) = session_keys.babe;
-    let ValidatorPublic(para) = session_keys.para_validator;
-    let AssignmentPublic(assi) = session_keys.para_assignment;
-    let AuthorityDiscoveryPublic(auth) = session_keys.authority_discovery;
-    let BeefyPublic(beef) = session_keys.beefy;
-    Keys::new(grandpa, babe, para, assi, auth, beef)
 }
