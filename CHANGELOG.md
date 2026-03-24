@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-23
+- Add support for StakingOperator and make commands `/set_keys_async`, `/purge_keys_async` available
+- Update metadata polkadot/2001001
+- Update metadata asset-hub-polkadot/2001001
+- Update metadata people-polkadot/2001001
+- Update metadata westend/1022001
+- Update metadata asset-hub-westend/1022001
+- Update metadata people-westend/1022001
+- 
 ## [0.2.0] - 2026-03-19
 - Add support for default builtin themes [`Suno Dark`, `Suno Light`] and user specific Custom Themes.
 - Add CLI support for custom `--config-path` and `--proxy-path`.
