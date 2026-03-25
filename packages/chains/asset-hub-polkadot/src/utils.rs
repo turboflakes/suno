@@ -27,10 +27,9 @@ pub fn map_payee(payee: Payee) -> RewardDestination<AccountId32> {
 /// Helper function to map SupportedProxy to ProxyType
 pub fn map_supported_proxy(proxy: SupportedProxy) -> Option<ProxyType> {
     match proxy {
-        SupportedProxy::None | SupportedProxy::StakingOperator => None,
+        SupportedProxy::None => None,
         SupportedProxy::NonTransfer => Some(ProxyType::NonTransfer),
         SupportedProxy::Staking => Some(ProxyType::Staking),
-        // TODO: Support StakingOperator proxy when it is available
-        // SupportedProxy::StakingOperator => Some(ProxyType::StakingOperator),
+        SupportedProxy::StakingOperator => Some(ProxyType::StakingOperator),
     }
 }
