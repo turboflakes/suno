@@ -1,6 +1,6 @@
 use crate::node_runtime::runtime_types::{
     paseo_runtime::SessionKeys,
-    polkadot_primitives::v8::{
+    polkadot_primitives::v9::{
         assignment_app::Public as AssignmentPublic, validator_app::Public as ValidatorPublic,
     },
     sp_authority_discovery::app::Public as AuthorityDiscoveryPublic,
