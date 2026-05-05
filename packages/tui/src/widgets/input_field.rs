@@ -127,8 +127,7 @@ impl InputField {
         let mut value = self.input.to_string();
         for v in self.hidden_paste_buffer.iter() {
             let info = pasted_string_info(v);
-            value = value.replace(&info, "");
-            value.push_str(v);
+            value = value.replace(&info, v);
         }
         value
     }

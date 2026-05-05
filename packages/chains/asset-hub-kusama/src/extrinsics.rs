@@ -13,7 +13,12 @@ use subxt::{
     SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{proxy::SupportedProxy, session::Keys, staking::Payee, tx::Bytes};
+use suno_primitives::{
+    proxy::SupportedProxy,
+    session::{Keys, Proof},
+    staking::Payee,
+    tx::Bytes,
+};
 
 pub fn wrap_call_into_proxy(
     api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
@@ -81,10 +86,10 @@ pub fn staking_validate(commission: u32, blocked: bool) -> RuntimeCall {
     })
 }
 
-pub fn staking_rc_client_set_keys(keys: Keys) -> RuntimeCall {
+pub fn staking_rc_client_set_keys(keys: Keys, proof: Proof) -> RuntimeCall {
     RuntimeCall::StakingRcClient(StakingRcClientCall::set_keys {
         keys: keys.into_bytes(),
-        proof: vec![],
+        proof: proof.into_bytes(),
         max_delivery_and_remote_execution_fee: None,
     })
 }
