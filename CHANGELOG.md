@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Implement _Proof_ support for `/set_keys` and `/set_keys_async` on all networks
+- Update metadata polkadot/2002001
+- Update metadata asset-hub-polkadot/2002001
+- Update metadata people-polkadot/2001002
+- Update metadata kusama/2002000
+- Update metadata asset-hub-kusama/2002000
+- Update metadata people-kusama/2002000
+- Update metadata paseo/2002002
+- Update metadata asset-hub-paseo/2002002
+- Update metadata people-paseo/2002002
+- Update metadata westend/1022003
+- Update metadata asset-hub-westend/1022005
+- Update metadata people-westend/1022003
 
 ## [0.3.0] - 2026-03-23
 - Add support for StakingOperator and make commands `/set_keys_async`, `/purge_keys_async` available
