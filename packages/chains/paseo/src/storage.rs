@@ -5,7 +5,7 @@ use crate::{
     node_runtime::runtime_types::{
         bounded_collections::bounded_vec::BoundedVec, pallet_proxy::ProxyDefinition,
         paseo_runtime::SessionKeys, paseo_runtime_constants::proxy::ProxyType,
-        polkadot_primitives::v8::ValidatorIndex,
+        polkadot_primitives::v9::ValidatorIndex,
     },
 };
 use std::collections::{HashMap, HashSet};

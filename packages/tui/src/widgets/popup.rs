@@ -18,7 +18,7 @@ use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::Call,
     entry::{Command, Entry, ToDescription},
-    session::Keys,
+    session::{Keys, Proof},
     staking::Payee,
     Validator,
 };
@@ -268,6 +268,7 @@ impl PopupWidget {
 
             let set_keys = Call::SetKeys {
                 keys: Keys::default(),
+                proof: Proof::default(),
             };
             if p.proxy().can_call(&set_keys) && validator.is_active_or_waiting() {
                 state.options.push(Entry::new(Command::Instruction {
@@ -289,6 +290,7 @@ impl PopupWidget {
 
             let set_keys_async = Call::SetKeysAsync {
                 keys: Keys::default(),
+                proof: Proof::default(),
             };
             if p.proxy().can_call(&set_keys_async) && validator.is_active_or_waiting() {
                 state.options.push(Entry::new(Command::Instruction {

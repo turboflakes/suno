@@ -4775,6 +4775,7 @@ name = "suno-primitives"
 version = "0.3.0"
 dependencies = [
  "hex",
+ "log",
  "ratatui",
  "scale-encode",
  "scale-info",

@@ -156,6 +156,55 @@ impl Keys {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Proof(Vec<u8>);
+
+impl Proof {
+    pub fn new(data: Vec<u8>) -> Self {
+        Proof(data)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl std::fmt::Display for Proof {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{}", hex::encode(self.as_bytes()),)
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ProofError {
+    #[error("No hex provided")]
+    MissingHex,
+    #[error("Invalid hex string: {0}")]
+    InvalidHex(#[from] hex::FromHexError),
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
+impl FromStr for Proof {
+    type Err = ProofError;
+    fn from_str(keys: &str) -> Result<Self, Self::Err> {
+        if keys.is_empty() {
+            return Err(ProofError::MissingHex);
+        }
+        // Strip "0x" prefix if present
+        let hex_str = keys.trim_start_matches("0x");
+
+        // Decode hex to bytes
+        let bytes = hex::decode(hex_str).map_err(ProofError::InvalidHex)?;
+
+        Ok(Self(bytes))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

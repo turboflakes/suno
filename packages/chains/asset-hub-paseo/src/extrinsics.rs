@@ -1,10 +1,9 @@
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
-    asset_hub_paseo_runtime::RuntimeCall,
-    frame_system::pallet::Call as SystemCall,
+    asset_hub_paseo_runtime::RuntimeCall, frame_system::pallet::Call as SystemCall,
     pallet_staking_async::pallet::pallet::Call as StakingCall,
     pallet_staking_async::ValidatorPrefs,
-    // pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
+    pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
     sp_arithmetic::per_things::Perbill,
 };
 use crate::utils::{map_payee, map_supported_proxy};
@@ -14,7 +13,12 @@ use subxt::{
     SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{proxy::SupportedProxy, staking::Payee, tx::Bytes};
+use suno_primitives::{
+    proxy::SupportedProxy,
+    session::{Keys, Proof},
+    staking::Payee,
+    tx::Bytes,
+};
 
 pub fn wrap_call_into_proxy(
     api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
@@ -82,17 +86,16 @@ pub fn staking_validate(commission: u32, blocked: bool) -> RuntimeCall {
     })
 }
 
-// TODO: when ready
-// pub fn staking_rc_client_set_keys(keys: Keys) -> RuntimeCall {
-//     RuntimeCall::StakingRcClient(StakingRcClientCall::set_keys {
-//         keys: keys.into_bytes(),
-//         proof: vec![],
-//         max_delivery_and_remote_execution_fee: None,
-//     })
-// }
+pub fn staking_rc_client_set_keys(keys: Keys, proof: Proof) -> RuntimeCall {
+    RuntimeCall::StakingRcClient(StakingRcClientCall::set_keys {
+        keys: keys.into_bytes(),
+        proof: proof.into_bytes(),
+        max_delivery_and_remote_execution_fee: None,
+    })
+}
 
-// pub fn staking_rc_client_purge_keys() -> RuntimeCall {
-//     RuntimeCall::StakingRcClient(StakingRcClientCall::purge_keys {
-//         max_delivery_and_remote_execution_fee: None,
-//     })
-// }
+pub fn staking_rc_client_purge_keys() -> RuntimeCall {
+    RuntimeCall::StakingRcClient(StakingRcClientCall::purge_keys {
+        max_delivery_and_remote_execution_fee: None,
+    })
+}

@@ -11,7 +11,7 @@ use subxt::{
     SubstrateConfig,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::session::Keys;
+use suno_primitives::session::{Keys, Proof};
 
 type Bytes = Vec<u8>;
 
@@ -39,11 +39,11 @@ pub fn proxy(call: RuntimeCall, proxied_account: &AccountId32) -> RuntimeCall {
     })
 }
 
-pub fn session_set_keys(keys: Keys) -> RuntimeCall {
+pub fn session_set_keys(keys: Keys, proof: Proof) -> RuntimeCall {
     let session_keys = map_session_keys_from_keys(&keys);
     RuntimeCall::Session(SessionCall::set_keys {
         keys: session_keys,
-        proof: vec![],
+        proof: proof.into_bytes(),
     })
 }
 

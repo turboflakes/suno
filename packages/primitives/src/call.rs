@@ -1,5 +1,5 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
-use crate::session::{Keys, KeysError};
+use crate::session::{Keys, KeysError, Proof, ProofError};
 use crate::staking::{Payee, PayeeError};
 use serde::Serialize;
 use sp_arithmetic::Perbill;
@@ -43,10 +43,12 @@ pub enum Call {
     Chill,
     SetKeys {
         keys: Keys,
+        proof: Proof,
     },
     PurgeKeys,
     SetKeysAsync {
         keys: Keys,
+        proof: Proof,
     },
     PurgeKeysAsync, // TODO: implement Kick
 }
@@ -77,6 +79,8 @@ pub enum CallError {
     InvalidPayee(#[from] PayeeError),
     #[error("Invalid keys: {0}")]
     InvalidKeys(#[from] KeysError),
+    #[error("Invalid proof: {0}")]
+    InvalidProof(#[from] ProofError),
 }
 
 impl Call {
@@ -145,20 +149,34 @@ impl Call {
                     let payee = Payee::from_str(args)?;
                     Ok(Self::SetPayee { payee })
                 }
-                "set_keys" => {
-                    let keys = Keys::from_str(args).map_err(|e| match e {
-                        KeysError::MissingHex => CallError::MissingArgumentSilent,
-                        e => CallError::InvalidKeys(e),
-                    })?;
-                    Ok(Self::SetKeys { keys })
-                }
-                "set_keys_async" => {
-                    let keys = Keys::from_str(args).map_err(|e| match e {
-                        KeysError::MissingHex => CallError::MissingArgumentSilent,
-                        e => CallError::InvalidKeys(e),
-                    })?;
-                    Ok(Self::SetKeysAsync { keys })
-                }
+                "set_keys" => match args.split_once(' ') {
+                    None => Err(CallError::MissingArgumentSilent),
+                    Some((keys, proof)) => {
+                        let keys = Keys::from_str(keys).map_err(|e| match e {
+                            KeysError::MissingHex => CallError::MissingArgumentSilent,
+                            e => CallError::InvalidKeys(e),
+                        })?;
+                        let proof = Proof::from_str(proof).map_err(|e| match e {
+                            ProofError::MissingHex => CallError::MissingArgumentSilent,
+                            e => CallError::InvalidProof(e),
+                        })?;
+                        Ok(Self::SetKeys { keys, proof })
+                    }
+                },
+                "set_keys_async" => match args.split_once(' ') {
+                    None => Err(CallError::MissingArgumentSilent),
+                    Some((keys, proof)) => {
+                        let keys = Keys::from_str(keys).map_err(|e| match e {
+                            KeysError::MissingHex => CallError::MissingArgumentSilent,
+                            e => CallError::InvalidKeys(e),
+                        })?;
+                        let proof = Proof::from_str(proof).map_err(|e| match e {
+                            ProofError::MissingHex => CallError::MissingArgumentSilent,
+                            e => CallError::InvalidProof(e),
+                        })?;
+                        Ok(Self::SetKeysAsync { keys, proof })
+                    }
+                },
                 "validate" => match args.split_once(' ') {
                     None => {
                         let commission = parse_percentage(args)?;
@@ -258,7 +276,8 @@ impl ToDescription for Call {
             }
             Self::Chill => "Declare no intention to validate".to_string(),
             Self::SetKeys { .. } | Self::SetKeysAsync { .. } => {
-                "Set session keys from the output of 'author_rotateKeys' call".to_string()
+                "Set session keys from the output of 'author_rotateKeysWithOwner' RPC call"
+                    .to_string()
             }
             Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),
         }
@@ -281,12 +300,10 @@ impl ToPlaceholder for Call {
                 "validate <value-in-percentage> [blocked <yes|no>]".to_string()
             }
             Self::Chill => "chill".to_string(),
-            Self::SetKeys { .. } => {
-                "set_keys <hex-session-keys-from-author-rotate-keys>".to_string()
-            }
+            Self::SetKeys { .. } => "set_keys <hex-session-keys> <hex-proof>".to_string(),
             Self::PurgeKeys => "purge_keys".to_string(),
             Self::SetKeysAsync { .. } => {
-                "set_keys_async <hex-session-keys-from-author-rotate-keys>".to_string()
+                "set_keys_async <hex-session-keys> <hex-proof>".to_string()
             }
             Self::PurgeKeysAsync => "purge_keys_async".to_string(),
         }
@@ -310,12 +327,12 @@ impl ToMethod for Call {
                 commission.deconstruct()
             ),
             Self::Chill => "staking.chill".to_string(),
-            Self::SetKeys { keys } => {
-                format!("session.set_keys {keys}")
+            Self::SetKeys { keys, proof } => {
+                format!("session.set_keys {keys} {proof}")
             }
             Self::PurgeKeys => "session.purge_keys".to_string(),
-            Self::SetKeysAsync { keys } => {
-                format!("staking_rc_client.set_keys {keys}")
+            Self::SetKeysAsync { keys, proof } => {
+                format!("staking_rc_client.set_keys {keys} {proof}")
             }
             Self::PurgeKeysAsync => "staking_rc_client.purge_keys".to_string(),
         }
