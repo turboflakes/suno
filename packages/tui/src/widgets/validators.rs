@@ -385,16 +385,17 @@ impl ValidatorsListWidget {
                             let validator = Validator::new(*chain_name, *stash);
                             self.add_validator(&validator);
                         }
-                        NodeConfig::Detailed { stash, .. } => {
-                            let validator = Validator::new(*chain_name, *stash);
+                        NodeConfig::Detailed {
+                            stash,
+                            host,
+                            commands,
+                        } => {
+                            let mut validator = Validator::new(*chain_name, *stash);
+                            validator.host = host.clone();
+                            if let Some(cmds) = commands {
+                                validator.commands = cmds.clone();
+                            }
                             self.add_validator(&validator);
-
-                            // TODO: Implement command handling
-                            // if let Some(cmds) = commands {
-                            //     for cmd in cmds {
-                            //         println!("  Command: {} ({})", cmd.name, cmd.run);
-                            //     }
-                            // }
                         }
                     }
                 }
@@ -476,6 +477,16 @@ impl ValidatorsListWidget {
         }
         false
     }
+
+    pub fn is_commands_available(&self) -> bool {
+        let state = self.state.read().unwrap();
+        if let Some(v) = state.get_selected() {
+            return v.is_commands_available();
+        }
+        false
+    }
+    
+    
 
     pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         let state = self.state.read().unwrap();

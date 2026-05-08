@@ -1,16 +1,17 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
 use crate::session::{Keys, KeysError, Proof, ProofError};
 use crate::staking::{Payee, PayeeError};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
+use suno_config::CustomCommand;
 
 type Amount = u128;
 type Description = String;
 type Max = Option<(Amount, Description)>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Call {
     Bond {
@@ -51,6 +52,7 @@ pub enum Call {
         proof: Proof,
     },
     PurgeKeysAsync, // TODO: implement Kick
+    Custom(CustomCommand),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -230,6 +232,7 @@ impl std::fmt::Display for Call {
             Self::PurgeKeys => write!(f, "purge_keys"),
             Self::SetKeysAsync { .. } => write!(f, "set_keys_async"),
             Self::PurgeKeysAsync => write!(f, "purge_keys_async"),
+            Self::Custom(custom) => write!(f, "{}", custom.cmd()),
         }
     }
 }
@@ -280,6 +283,7 @@ impl ToDescription for Call {
                     .to_string()
             }
             Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),
+            Self::Custom(custom) => custom.to_string(),
         }
     }
 }
@@ -306,6 +310,7 @@ impl ToPlaceholder for Call {
                 "set_keys_async <hex-session-keys> <hex-proof>".to_string()
             }
             Self::PurgeKeysAsync => "purge_keys_async".to_string(),
+            Self::Custom(custom) => custom.cmd(),
         }
     }
 }
@@ -335,6 +340,7 @@ impl ToMethod for Call {
                 format!("staking_rc_client.set_keys {keys} {proof}")
             }
             Self::PurgeKeysAsync => "staking_rc_client.purge_keys".to_string(),
+            Self::Custom(custom) => format!("custom.{}", custom.cmd()),
         }
     }
 }

@@ -1,14 +1,17 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Keys {
     pub grandpa_bytes: [u8; 32],
     pub babe_bytes: [u8; 32],
     pub para_validator_bytes: [u8; 32],
     pub para_assignment_bytes: [u8; 32],
     pub authority_discovery_bytes: [u8; 32],
-    #[serde(serialize_with = "serialize_beefy_bytes")]
+    #[serde(
+        serialize_with = "serialize_beefy_bytes",
+        deserialize_with = "deserialize_beefy_bytes"
+    )]
     pub beefy_bytes: [u8; 33],
 }
 
@@ -17,6 +20,17 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_bytes(bytes)
+}
+
+fn deserialize_beefy_bytes<'de, D>(deserializer: D) -> Result<[u8; 33], D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    let bytes: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+    bytes
+        .try_into()
+        .map_err(|v: Vec<u8>| D::Error::custom(format!("expected 33 bytes, got {}", v.len())))
 }
 
 impl Default for Keys {
@@ -156,7 +170,7 @@ impl Keys {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

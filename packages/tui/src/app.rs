@@ -788,7 +788,7 @@ impl App {
         }
 
         if self.section == Section::Validators {
-            if !self.validators.is_proxy_valid() {
+            if !self.validators.is_proxy_valid() && !self.validators.is_commands_available() {
                 return;
             }
 

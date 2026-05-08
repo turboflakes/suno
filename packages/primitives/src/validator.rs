@@ -9,7 +9,7 @@ use crate::{
 };
 use ratatui::{layout::Alignment, text::Text, widgets::Row};
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
+use suno_config::{CustomCommand, Host, SupportedRuntime};
 
 type Points = u32;
 
@@ -38,7 +38,7 @@ impl std::fmt::Display for ValidatorStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nominators {
+pub struct Nominator {
     pub stash: AccountId32,
     pub stake: u128,
     pub is_backer: bool,
@@ -47,6 +47,7 @@ pub struct Nominators {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     pub account: NodeAccount,
+    pub host: Option<Host>,
     pub prefs: ValidatorPrefs,
     pub prefs_next: ValidatorPrefs,
     pub stake: StakeOverview,
@@ -54,7 +55,7 @@ pub struct Validator {
     pub payee: Payee,
     pub next_keys: Option<Keys>,
     pub queued_keys: Option<Keys>,
-    pub nominators: Vec<Nominators>,
+    pub nominators: Vec<Nominator>,
     // Track session points from staking_ah_client.validator_points
     pub points: Points,
     // Track old points so it can be better rendered the delta points
@@ -65,6 +66,7 @@ pub struct Validator {
     pub era_points: Points,
     pub is_chilled: bool,
     pub proxies: Vec<ProxyKey>,
+    pub commands: Vec<CustomCommand>,
     pub status: ValidatorStatus,
 }
 
@@ -72,6 +74,7 @@ impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
+            host: None,
             prefs: ValidatorPrefs::default(),
             prefs_next: ValidatorPrefs::default(),
             stake: StakeOverview::default(),
@@ -86,6 +89,7 @@ impl Validator {
             era_points: 0,
             is_chilled: false,
             proxies: Vec::new(),
+            commands: Vec::new(),
             status: ValidatorStatus::default(),
         }
     }
@@ -297,6 +301,18 @@ impl Validator {
             .find(|p| p.runtime == runtime)
             .map(|p| p.proxy)
             .unwrap_or(SupportedProxy::None)
+    }
+
+    pub fn is_shell_command_available(&self) -> bool {
+        self.commands.iter().any(|c| c.is_shell())
+    }
+
+    pub fn is_super_command_available(&self) -> bool {
+        self.commands.iter().any(|c| c.is_super())
+    }
+
+    pub fn is_commands_available(&self) -> bool {
+        !self.commands.is_empty()
     }
 }
 

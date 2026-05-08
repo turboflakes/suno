@@ -154,7 +154,9 @@ impl PopupWidget {
             return;
         };
 
-        if !validator.is_proxy_valid() {
+        warn!("___validator: {}", validator.is_commands_available());
+
+        if !validator.is_proxy_valid() && !validator.is_commands_available() {
             return;
         }
 
@@ -309,6 +311,14 @@ impl PopupWidget {
                     bytes: None,
                 }));
             }
+        });
+
+        // For each custom commands, push the respective calls depending on the validator's status.
+        validator.commands.iter().for_each(|c| {
+            state.options.push(Entry::new(Command::Instruction {
+                call: Call::Custom(c.clone()),
+                bytes: None,
+            }));
         });
     }
 

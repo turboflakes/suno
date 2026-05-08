@@ -6,6 +6,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
@@ -64,20 +65,124 @@ pub struct ChainConfig {
     pub collators: Vec<NodeConfig>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Host(SocketAddr);
+
+impl Host {
+    pub fn http_url(&self) -> String {
+        format!("http://{}", self.0)
+    }
+
+    pub fn ws_url(&self) -> String {
+        format!("ws://{}", self.0)
+    }
+
+    pub fn ip(&self) -> std::net::IpAddr {
+        self.0.ip()
+    }
+
+    pub fn port(&self) -> u16 {
+        self.0.port()
+    }
+}
+
+impl Default for Host {
+    fn default() -> Self {
+        Self(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            9944,
+        ))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum NodeConfig {
     Address(Stash),
     Detailed {
         stash: Stash,
-        commands: Option<Vec<Command>>,
+        #[serde(default)]
+        host: Option<Host>,
+        #[serde(default)]
+        commands: Option<Vec<CustomCommand>>,
     },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Command {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomCommand {
     pub name: String,
-    pub run: String,
+    #[serde(flatten)]
+    pub kind: CommandKind,
+}
+
+impl std::fmt::Display for CustomCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name.as_str())
+    }
+}
+
+impl CustomCommand {
+    pub fn cmd(&self) -> String {
+        warn!("__cmd__",);
+        self.kind.to_string()
+        // if self.kind.to_string() == "ND" {
+        //     return self.name.to_lowercase();
+        // }
+        // self.kind.to_string()
+    }
+
+    pub fn is_shell(&self) -> bool {
+        matches!(self.kind, CommandKind::Shell { .. })
+    }
+
+    pub fn is_super(&self) -> bool {
+        matches!(self.kind, CommandKind::Uses(..))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CommandKind {
+    /// Built-in command: "calls/rotate_keys"
+    Uses(CustomCalls),
+    /// Shell command: "echo test"
+    #[serde(untagged)]
+    Shell {
+        #[serde(default)]
+        cmd: Option<String>, // shown in UI; falls back to `name` if absent
+        run: String, // command to be executed: "echo test", "systemctl restart ..."
+    },
+}
+
+impl std::fmt::Display for CommandKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Shell { cmd, .. } => write!(f, "{}", cmd.as_deref().unwrap_or("ND")),
+            Self::Uses(call) => write!(f, "{}", call.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomCalls {
+    #[serde(rename = "calls/rotate_keys")]
+    RotateKeys,
+}
+
+impl CustomCalls {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::RotateKeys => "rotate_keys",
+        }
+    }
+}
+
+impl std::fmt::Display for CustomCalls {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -272,24 +377,48 @@ mod tests {
     }
 
     #[test]
-    fn test_detailed_with_commands() {
+    fn test_detailed_with_host_and_commands() {
         let yaml = r#"
             stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            host: 10.10.10.1:9944
             commands:
               - name: Ping
+                cmd: ping
                 run: "echo 'Ping'"
+
+              - name: Rotate and Set keys
+                uses: suno/rotate_keys
         "#;
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
         match config {
-            NodeConfig::Detailed { stash, commands } => {
+            NodeConfig::Detailed {
+                stash,
+                host,
+                commands,
+            } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
+                let host = host.unwrap();
+                assert_eq!(host.http_url(), "http://10.10.10.1:9944");
                 let commands = commands.unwrap();
                 assert_eq!(commands[0].name, "Ping");
-                assert_eq!(commands[0].run, "echo 'Ping'");
+                match &commands[0].kind {
+                    CommandKind::Shell { cmd, run } => {
+                        assert_eq!(cmd.as_deref(), Some("ping"));
+                        assert_eq!(run, "echo 'Ping'");
+                    }
+                    _ => panic!("Expected Shell command"),
+                }
+                assert_eq!(commands[1].name, "Rotate and Set keys");
+                match &commands[1].kind {
+                    CommandKind::Uses(cmd) => {
+                        assert!(matches!(cmd, SuperCalls::RotateKeys));
+                    }
+                    _ => panic!("Expected Uses command"),
+                }
             }
             _ => panic!("Expected Detailed variant"),
         }
@@ -303,11 +432,16 @@ mod tests {
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
         match config {
-            NodeConfig::Detailed { stash, commands } => {
+            NodeConfig::Detailed {
+                stash,
+                host,
+                commands,
+            } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
+                assert!(host.is_none());
                 assert!(commands.is_none());
             }
             _ => panic!("Expected Detailed variant"),
