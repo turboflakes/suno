@@ -159,7 +159,7 @@ impl std::fmt::Display for CommandKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Shell { cmd, .. } => write!(f, "{}", cmd.as_deref().unwrap_or("ND")),
-            Self::Uses(call) => write!(f, "{}", call.to_string()),
+            Self::Uses(call) => write!(f, "{}", call),
         }
     }
 }
@@ -415,7 +415,7 @@ mod tests {
                 assert_eq!(commands[1].name, "Rotate and Set keys");
                 match &commands[1].kind {
                     CommandKind::Uses(cmd) => {
-                        assert!(matches!(cmd, SuperCalls::RotateKeys));
+                        assert!(matches!(cmd, CustomCalls::RotateKeys));
                     }
                     _ => panic!("Expected Uses command"),
                 }

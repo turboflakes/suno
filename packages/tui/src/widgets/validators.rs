@@ -485,8 +485,6 @@ impl ValidatorsListWidget {
         }
         false
     }
-    
-    
 
     pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         let state = self.state.read().unwrap();
