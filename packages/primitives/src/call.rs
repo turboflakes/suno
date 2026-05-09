@@ -51,7 +51,7 @@ pub enum Call {
         keys: Keys,
         proof: Proof,
     },
-    PurgeKeysAsync, // TODO: implement Kick
+    PurgeKeysAsync,
     Custom(CustomCommand),
 }
 
@@ -87,14 +87,25 @@ pub enum CallError {
 
 impl Call {
     /// Parses a call from a string representation.
-    pub fn parse(input: &str, decimals: u32) -> Result<Self, CallError> {
+    pub fn parse(
+        input: &str,
+        decimals: u32,
+        custom_commands: &[CustomCommand],
+    ) -> Result<Self, CallError> {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
                 "purge_keys_async" => Ok(Self::PurgeKeysAsync),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
-                _ => Err(CallError::MissingExtrinsic),
+                _ => {
+                    // Match against custom commands by cmd designation or name
+                    custom_commands
+                        .iter()
+                        .find(|c| c.cmd() == input || c.name.to_lowercase() == input)
+                        .map(|c| Self::Custom(c.clone()))
+                        .ok_or(CallError::MissingExtrinsic)
+                }
             },
             Some((extrinsic, args)) => match extrinsic {
                 "bond" => match args.split_once(' ') {

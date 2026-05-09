@@ -2,6 +2,7 @@ use crate::widgets::spinner::Spinner;
 use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
+use suno_config::CustomCommand;
 use suno_primitives::{
     call::{Call, CallError},
     display::pasted_string_info,
@@ -82,11 +83,21 @@ impl std::fmt::Display for Status {
 pub struct Metadata {
     unit: &'static str,
     decimals: u32,
+    custom_commands: Vec<CustomCommand>,
 }
 
 impl Metadata {
     pub fn new(unit: &'static str, decimals: u32) -> Self {
-        Self { unit, decimals }
+        Self {
+            unit,
+            decimals,
+            custom_commands: vec![],
+        }
+    }
+
+    pub fn with_custom_commands(mut self, commands: Vec<CustomCommand>) -> Self {
+        self.custom_commands = commands;
+        self
     }
 }
 
@@ -173,7 +184,12 @@ impl InputField {
             Type::Command => {
                 let value = self.raw_value();
                 let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-                match Call::parse(&value, decimals) {
+                let custom_commands = self
+                    .metadata
+                    .as_ref()
+                    .map(|m| m.custom_commands.as_slice())
+                    .unwrap_or(&[]);
+                match Call::parse(&value, decimals, custom_commands) {
                     Ok(_) => self.status = Status::Valid,
                     Err(e) => match e {
                         CallError::InvalidAddress(_)
@@ -216,7 +232,12 @@ impl InputField {
         if self.is_command() {
             let value = self.raw_value();
             let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-            Call::parse(&value, decimals).ok()
+            let custom_commands = self
+                .metadata
+                .as_ref()
+                .map(|m| m.custom_commands.as_slice())
+                .unwrap_or(&[]);
+            Call::parse(&value, decimals, custom_commands).ok()
         } else {
             None
         }

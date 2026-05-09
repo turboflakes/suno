@@ -154,8 +154,6 @@ impl PopupWidget {
             return;
         };
 
-        warn!("___validator: {}", validator.is_commands_available());
-
         if !validator.is_proxy_valid() && !validator.is_commands_available() {
             return;
         }
@@ -165,7 +163,8 @@ impl PopupWidget {
         // Reset the input field to command mode and set metadata.
         let unit = runtime.token_symbol();
         let decimals = runtime.token_decimals();
-        let metadata = InputFieldMetadata::new(unit, decimals);
+        let metadata = InputFieldMetadata::new(unit, decimals)
+            .with_custom_commands(validator.commands.clone());
         state.input.reset_as_command(Some(metadata));
 
         // For each supported proxy, push the respective calls depending on the validator's status.

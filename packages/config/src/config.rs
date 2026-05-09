@@ -124,12 +124,10 @@ impl std::fmt::Display for CustomCommand {
 
 impl CustomCommand {
     pub fn cmd(&self) -> String {
-        warn!("__cmd__",);
+        if self.kind.to_string() == "ND" {
+            return self.name.to_lowercase();
+        }
         self.kind.to_string()
-        // if self.kind.to_string() == "ND" {
-        //     return self.name.to_lowercase();
-        // }
-        // self.kind.to_string()
     }
 
     pub fn is_shell(&self) -> bool {
