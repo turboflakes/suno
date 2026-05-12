@@ -103,7 +103,7 @@ pub enum NodeConfig {
     Detailed {
         stash: Stash,
         #[serde(default)]
-        host: Option<Host>,
+        rpc_host: Option<Host>,
         #[serde(default)]
         commands: Option<Vec<CustomCommand>>,
     },
@@ -392,14 +392,14 @@ mod tests {
         match config {
             NodeConfig::Detailed {
                 stash,
-                host,
+                rpc_host,
                 commands,
             } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
-                let host = host.unwrap();
+                let host = rpc_host.unwrap();
                 assert_eq!(host.http_url(), "http://10.10.10.1:9944");
                 let commands = commands.unwrap();
                 assert_eq!(commands[0].name, "Ping");
@@ -432,14 +432,14 @@ mod tests {
         match config {
             NodeConfig::Detailed {
                 stash,
-                host,
+                rpc_host,
                 commands,
             } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
-                assert!(host.is_none());
+                assert!(rpc_host.is_none());
                 assert!(commands.is_none());
             }
             _ => panic!("Expected Detailed variant"),
