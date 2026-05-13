@@ -9,7 +9,7 @@ use crate::{
 };
 use ratatui::{layout::Alignment, text::Text, widgets::Row};
 use subxt::utils::AccountId32;
-use suno_config::{CustomCommand, Host, SupportedRuntime};
+use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 
 type Points = u32;
 
@@ -47,7 +47,8 @@ pub struct Nominator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     pub account: NodeAccount,
-    pub host: Option<Host>,
+    pub host_rpc: Host,
+    pub ssh: Option<SshConfig>,
     pub prefs: ValidatorPrefs,
     pub prefs_next: ValidatorPrefs,
     pub stake: StakeOverview,
@@ -74,7 +75,8 @@ impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
-            host: None,
+            host_rpc: Host::default(),
+            ssh: None,
             prefs: ValidatorPrefs::default(),
             prefs_next: ValidatorPrefs::default(),
             stake: StakeOverview::default(),

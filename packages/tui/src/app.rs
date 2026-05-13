@@ -1,4 +1,4 @@
-use crate::bridge::{sync, RuntimeCaller};
+use crate::bridge::{self, sync, RuntimeCaller};
 use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
@@ -946,6 +946,7 @@ impl App {
         match custom.kind {
             CommandKind::Shell { run, .. } => {
                 tokio::spawn(async move {
+                    let run = run.replace("{stash}", &validator.key().stash().to_string());
                     let output = tokio::process::Command::new("sh")
                         .arg("-c")
                         .arg(&run)
@@ -977,7 +978,17 @@ impl App {
             }
             CommandKind::Uses(calls) => match calls {
                 CustomCalls::RotateKeys => {
-                    // info!("TODO");
+                    tokio::spawn(async move {
+                        let result = bridge::customs::rotate_keys_via_ssh(validator).await;
+                        match result {
+                            Ok(keys) => {
+                                info!("__keys: {:?}", keys);
+                            }
+                            Err(e) => {
+                                info!("__error: {:?}", e);
+                            }
+                        }
+                    });
                 }
             },
         }

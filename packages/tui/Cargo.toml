@@ -16,10 +16,12 @@ futures = { workspace = true }
 indoc = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
+openssh = { workspace = true }
 ratatui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+shellexpand = { workspace = true }
 sp-arithmetic = { workspace = true }
 strum = { workspace = true }
 subxt = { workspace = true }

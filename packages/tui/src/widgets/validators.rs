@@ -387,11 +387,14 @@ impl ValidatorsListWidget {
                         }
                         NodeConfig::Detailed {
                             stash,
-                            rpc_host,
+                            host_rpc,
+                            ssh,
                             commands,
+                            ..
                         } => {
                             let mut validator = Validator::new(*chain_name, *stash);
-                            validator.host = rpc_host.clone();
+                            validator.host_rpc = host_rpc.clone();
+                            validator.ssh = ssh.clone();
                             if let Some(cmds) = commands {
                                 validator.commands = cmds.clone();
                             }

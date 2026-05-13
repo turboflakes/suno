@@ -27,16 +27,6 @@ lazy_static! {
 
 type Stash = AccountId32;
 
-/// Provides default value for the configuration file path
-fn default_config_path() -> &'static str {
-    ".config.yaml"
-}
-
-/// Provides default value for the proxy account file path
-fn default_proxy_path() -> String {
-    ".proxy_account.json".to_string()
-}
-
 /// Provides default value for Themes struct
 fn default_themes() -> Themes {
     Themes::default()
@@ -70,6 +60,14 @@ pub struct ChainConfig {
 pub struct Host(SocketAddr);
 
 impl Host {
+    pub fn new(ip: IpAddr, port: u16) -> Self {
+        Self(SocketAddr::new(ip, port))
+    }
+
+    pub fn new_with_port(port: u16) -> Self {
+        Self(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+    }
+
     pub fn http_url(&self) -> String {
         format!("http://{}", self.0)
     }
@@ -85,14 +83,19 @@ impl Host {
     pub fn port(&self) -> u16 {
         self.0.port()
     }
+
+    pub fn into(&self) -> SocketAddr {
+        self.0
+    }
+
+    pub fn as_tuple(&self) -> (IpAddr, u16) {
+        (self.0.ip(), self.0.port())
+    }
 }
 
 impl Default for Host {
     fn default() -> Self {
-        Self(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            9944,
-        ))
+        Self(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 9944))
     }
 }
 
@@ -103,7 +106,9 @@ pub enum NodeConfig {
     Detailed {
         stash: Stash,
         #[serde(default)]
-        rpc_host: Option<Host>,
+        host_rpc: Host,
+        #[serde(default)]
+        ssh: Option<SshConfig>,
         #[serde(default)]
         commands: Option<Vec<CustomCommand>>,
     },
@@ -183,6 +188,21 @@ impl std::fmt::Display for CustomCalls {
     }
 }
 
+/// Default SSH PORT
+fn default_ssh_port() -> u16 {
+    22
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SshConfig {
+    pub host: String,
+    pub user: String,
+    #[serde(default = "default_ssh_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub identity: Option<String>, // path to private key, None = use SSH agent
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Features {
     #[serde(default)]
@@ -201,6 +221,11 @@ impl Default for Features {
             enable_rpcs: false,
         }
     }
+}
+
+/// Provides default value for the proxy account file path
+fn default_proxy_path() -> String {
+    ".proxy_account.json".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -300,6 +325,11 @@ impl Config {
     }
 }
 
+/// Provides default value for the configuration file path
+fn default_config_path() -> &'static str {
+    ".config.yaml"
+}
+
 fn get_config() -> Result<Config, Error> {
     let default_config_path = default_config_path();
 
@@ -392,15 +422,15 @@ mod tests {
         match config {
             NodeConfig::Detailed {
                 stash,
-                rpc_host,
+                host_rpc,
                 commands,
+                ..
             } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
-                let host = rpc_host.unwrap();
-                assert_eq!(host.http_url(), "http://10.10.10.1:9944");
+                assert_eq!(host_rpc.http_url(), "http://10.10.10.1:9944");
                 let commands = commands.unwrap();
                 assert_eq!(commands[0].name, "Ping");
                 match &commands[0].kind {
@@ -431,15 +461,12 @@ mod tests {
 
         match config {
             NodeConfig::Detailed {
-                stash,
-                rpc_host,
-                commands,
+                stash, commands, ..
             } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
-                assert!(rpc_host.is_none());
                 assert!(commands.is_none());
             }
             _ => panic!("Expected Detailed variant"),
