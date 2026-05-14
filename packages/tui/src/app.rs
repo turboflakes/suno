@@ -943,6 +943,7 @@ impl App {
 
     pub fn handle_custom_command(&mut self, custom: CustomCommand, validator: Validator) {
         let tx = self.tx.clone();
+
         match custom.kind {
             CommandKind::Shell { run, .. } => {
                 tokio::spawn(async move {
@@ -978,14 +979,74 @@ impl App {
             }
             CommandKind::Uses(calls) => match calls {
                 CustomCalls::RotateKeys => {
+                    // NOTE: In the future setting session keys will only be available via AH. After successufuly executing /rotate_keys
+                    // the recommended call to execute immediately afterward will be 'set_keys_async'.
+                    // For that reason, the correct runtime to choose here is AH and not RC
+                    let runtime = validator.runtime().asset_hub_runtime();
+
+                    let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                        return;
+                    };
+                    let api = chain.client().clone();
+                    let tx = self.tx.clone();
+                    let stash = validator.key().stash();
+                    let stash_identity = validator.display_name(3);
+                    let proxy_identity = match get_address_from_json_file() {
+                        Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
+                        Err(e) => {
+                            self.error(e.into());
+                            return;
+                        }
+                    };
+                    let supported_proxy = validator.get_proxy(runtime);
+
                     tokio::spawn(async move {
-                        let result = bridge::customs::rotate_keys_via_ssh(validator).await;
+                        let result = bridge::customs::rotate_keys(&validator).await;
                         match result {
-                            Ok(keys) => {
-                                info!("__keys: {:?}", keys);
+                            Ok((keys, proof)) => {
+                                // Instantiate `set_keys_async` as the recommended call to be triggered
+                                let call = Call::SetKeysAsync { keys, proof };
+
+                                let at_block = match api.at_current_block().await.boxed() {
+                                    Ok(client) => client,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_current_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+                                let spec_version = at_block.spec_version();
+
+                                match runtime.build_call_data(
+                                    &at_block,
+                                    &stash,
+                                    call.clone(),
+                                    supported_proxy,
+                                ) {
+                                    Ok(bytes) => {
+                                        let _ =
+                                            tx.send(Action::Popup(PopupAction::ConfirmAndSign(
+                                                runtime,
+                                                spec_version,
+                                                proxy_identity,
+                                                stash_identity,
+                                                Box::new(call),
+                                                bytes,
+                                            )));
+                                    }
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to build_call_data: {}", e),
+                                        )));
+                                    }
+                                }
                             }
                             Err(e) => {
-                                info!("__error: {:?}", e);
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to rotate_keys: {}",
+                                    e
+                                ))));
                             }
                         }
                     });

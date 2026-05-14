@@ -1,60 +1,126 @@
-use openssh::{ForwardType, Session, SessionBuilder};
+use openssh::{Session, SessionBuilder};
 use std::str::FromStr;
-use std::{net::TcpListener, time::Duration};
-use subxt_rpcs::{client::RpcParams, RpcClient};
-use suno_config::{Host, SshConfig};
+use std::time::Duration;
+use suno_config::SshConfig;
 use suno_error::Error;
-use suno_primitives::{session::Keys, Validator};
+use suno_primitives::{
+    session::{Keys, Proof},
+    Validator,
+};
+use tokio::process::Command;
 
-pub async fn rotate_keys_via_ssh(validator: Validator) -> Result<Keys, Error> {
-    let ssh = validator
-        .ssh
-        .ok_or_else(|| Error::Other("SSH not configured".into()))?;
+pub async fn rotate_keys(validator: &Validator) -> Result<(Keys, Proof), Error> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "author_rotateKeysWithOwner",
+        "params": [validator.account.public_key()],
+        "id": 1
+    })
+    .to_string();
 
-    let (tunnel, session) = open_local_ssh_tunnel(ssh, validator.host_rpc).await?;
+    if let Some(ssh) = &validator.ssh {
+        return rotate_keys_via_ssh(ssh, &payload, &validator.host_rpc.http_url()).await;
+    }
 
-    let client = RpcClient::from_insecure_url(&tunnel.http_url())
+    rotate_keys_via_http(&payload, &validator.host_rpc.http_url()).await
+}
+
+pub async fn rotate_keys_via_ssh(
+    ssh: &SshConfig,
+    payload: &str,
+    url: &str,
+) -> Result<(Keys, Proof), Error> {
+    let session = open_ssh_session(&ssh).await?;
+
+    let output = session
+        .command("curl")
+        .arg("-s")
+        .arg("-X")
+        .arg("POST")
+        .arg("-H")
+        .arg("Content-Type: application/json")
+        .arg("-d")
+        .arg(&payload)
+        .arg(url)
+        .output()
         .await
-        .map_err(|e| Error::Other(e.to_string()))?;
+        .map_err(|e| Error::Other(format!("Remote curl failed: {}", e)))?;
 
-    let keys = rotate_keys_with_owner(&client, validator.account.public_key()).await?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Other(format!("curl exited with error: {}", stderr)));
+    }
+
+    let result = parse_rotate_keys_response(&output.stdout)?;
 
     session.close().await.ok();
 
-    Ok(keys)
+    Ok(result)
 }
 
-pub async fn rotate_keys_with_owner(client: &RpcClient, owner: String) -> Result<Keys, Error> {
-    let mut params = RpcParams::new();
-    params
-        .push(owner)
-        .map_err(|e| Error::Other(e.to_string()))?;
-
-    let result: serde_json::Value = client
-        .request("author_rotateKeysWithOwner", params)
+pub async fn rotate_keys_via_http(payload: &str, url: &str) -> Result<(Keys, Proof), Error> {
+    let output = Command::new("curl")
+        .arg("-s")
+        .arg("-X")
+        .arg("POST")
+        .arg("-H")
+        .arg("Content-Type: application/json")
+        .arg("-d")
+        .arg(&payload)
+        .arg(url)
+        .output()
         .await
-        .map_err(|e| Error::Other(e.to_string()))?;
+        .map_err(|e| Error::Other(format!("curl failed: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Other(format!("curl exited with error: {}", stderr)));
+    }
+
+    parse_rotate_keys_response(&output.stdout)
+}
+
+fn parse_rotate_keys_response(stdout: &[u8]) -> Result<(Keys, Proof), Error> {
+    let response: serde_json::Value = serde_json::from_slice(stdout)
+        .map_err(|e| Error::Other(format!("Invalid JSON from curl: {}", e)))?;
+
+    if let Some(err) = response.get("error") {
+        return Err(Error::Other(format!("RPC error: {}", err)));
+    }
+
+    let result = response.get("result").ok_or(Error::Other(
+        "Missing 'result' field in RPC response".into(),
+    ))?;
 
     let keys_hex = result
-        .as_str()
-        .ok_or(Error::Other("Invalid RPC response".into()))?;
+        .get("keys")
+        .and_then(|v| v.as_str())
+        .ok_or(Error::Other("Missing 'keys' field in RPC response".into()))?;
 
-    Keys::from_str(keys_hex).map_err(|e| Error::Other(e.to_string()))
+    let proof_hex = result
+        .get("proof")
+        .and_then(|v| v.as_str())
+        .ok_or(Error::Other("Missing 'proof' field in RPC response".into()))?;
+
+    let keys = Keys::from_str(keys_hex).map_err(|e| Error::Other(e.to_string()))?;
+    let proof = Proof::from_str(proof_hex).map_err(|e| Error::Other(e.to_string()))?;
+
+    Ok((keys, proof))
 }
 
-async fn open_local_ssh_tunnel(ssh: SshConfig, target: Host) -> Result<(Host, Session), Error> {
+async fn open_ssh_session(ssh: &SshConfig) -> Result<Session, Error> {
     let mut builder = SessionBuilder::default();
     builder
         .user(ssh.user.clone())
         .port(ssh.port)
-        .connect_timeout(Duration::from_secs(6))
+        .connect_timeout(Duration::from_secs(15))
         .known_hosts_check(openssh::KnownHosts::Strict);
 
     if let Some(identity) = &ssh.identity {
         builder.keyfile(shellexpand::tilde(identity).as_ref());
     }
 
-    let session = builder.connect(&ssh.host).await.map_err(|e| {
+    builder.connect(&ssh.host).await.map_err(|e| {
         if e.to_string().to_lowercase().contains("authentication") {
             Error::Other(format!(
                 "SSH authentication failed for {}. Run: ssh-add {}",
@@ -64,22 +130,5 @@ async fn open_local_ssh_tunnel(ssh: SshConfig, target: Host) -> Result<(Host, Se
         } else {
             Error::Other(e.to_string())
         }
-    })?;
-
-    let local = Host::new_with_port(get_free_port());
-    session
-        .request_port_forward(ForwardType::Local, local.as_tuple(), target.as_tuple())
-        .await
-        .map_err(|e| Error::Other(e.to_string()))?;
-
-    Ok((local, session))
-}
-
-fn get_free_port() -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to an available port");
-
-    listener
-        .local_addr()
-        .expect("Failed to get local address")
-        .port()
+    })
 }
