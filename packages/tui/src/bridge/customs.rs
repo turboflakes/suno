@@ -34,12 +34,12 @@ pub async fn process(run: &str, validator: &Validator) -> Result<String, Error> 
 }
 
 pub async fn process_via_ssh(ssh: &SshConfig, run: &str) -> Result<String, Error> {
-    let session = open_ssh_session(&ssh).await?;
+    let session = open_ssh_session(ssh).await?;
 
     let output = session
         .command("sh")
         .arg("-c")
-        .arg(&run)
+        .arg(run)
         .output()
         .await
         .map_err(|e| Error::Other(format!("Remote shell failed: {}", e)))?;
@@ -77,7 +77,7 @@ pub async fn rotate_keys_via_ssh(
     payload: &str,
     url: &str,
 ) -> Result<(Keys, Proof), Error> {
-    let session = open_ssh_session(&ssh).await?;
+    let session = open_ssh_session(ssh).await?;
 
     let output = session
         .command("curl")
@@ -87,7 +87,7 @@ pub async fn rotate_keys_via_ssh(
         .arg("-H")
         .arg("Content-Type: application/json")
         .arg("-d")
-        .arg(&payload)
+        .arg(payload)
         .arg(url)
         .output()
         .await
@@ -113,7 +113,7 @@ pub async fn rotate_keys_via_http(payload: &str, url: &str) -> Result<(Keys, Pro
         .arg("-H")
         .arg("Content-Type: application/json")
         .arg("-d")
-        .arg(&payload)
+        .arg(payload)
         .arg(url)
         .output()
         .await
