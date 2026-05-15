@@ -123,14 +123,17 @@ pub struct CustomCommand {
 
 impl std::fmt::Display for CustomCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name.as_str())
+        match &self.kind {
+            CommandKind::Shell { .. } => write!(f, "{}", self.name.as_str()),
+            CommandKind::Uses(custom) => write!(f, "{}", custom.description()),
+        }
     }
 }
 
 impl CustomCommand {
     pub fn cmd(&self) -> String {
         if self.kind.to_string() == "ND" {
-            return self.name.to_lowercase();
+            return self.name.trim().to_lowercase().replace(" ", "_");
         }
         self.kind.to_string()
     }
@@ -161,7 +164,13 @@ pub enum CommandKind {
 impl std::fmt::Display for CommandKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Shell { cmd, .. } => write!(f, "{}", cmd.as_deref().unwrap_or("ND")),
+            Self::Shell { cmd, .. } => {
+                let display = cmd
+                    .as_deref()
+                    .and_then(|s| s.strip_prefix('/'))
+                    .unwrap_or("ND");
+                write!(f, "{}", display)
+            }
             Self::Uses(call) => write!(f, "{}", call),
         }
     }
@@ -178,6 +187,12 @@ impl CustomCalls {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::RotateKeys => "rotate_keys",
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::RotateKeys => "Execute RPC call 'author_rotateKeysWithOwner' and Set sesion keys",
         }
     }
 }

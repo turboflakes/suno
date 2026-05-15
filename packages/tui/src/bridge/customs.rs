@@ -9,6 +9,53 @@ use suno_primitives::{
 };
 use tokio::process::Command;
 
+pub async fn process(run: &str, validator: &Validator) -> Result<String, Error> {
+    let run = run.replace("{stash}", &validator.key().stash().to_string());
+
+    if let Some(ssh) = &validator.ssh {
+        return process_via_ssh(ssh, &run).await;
+    }
+
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(&run)
+        .output()
+        .await
+        .map_err(|e| Error::Other(format!("Shell failed: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Other(format!("shell exited with error: {}", stderr)));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+
+    Ok(stdout)
+}
+
+pub async fn process_via_ssh(ssh: &SshConfig, run: &str) -> Result<String, Error> {
+    let session = open_ssh_session(&ssh).await?;
+
+    let output = session
+        .command("sh")
+        .arg("-c")
+        .arg(&run)
+        .output()
+        .await
+        .map_err(|e| Error::Other(format!("Remote shell failed: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Other(format!("shell exited with error: {}", stderr)));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+
+    session.close().await.ok();
+
+    Ok(stdout)
+}
+
 pub async fn rotate_keys(validator: &Validator) -> Result<(Keys, Proof), Error> {
     let payload = serde_json::json!({
         "jsonrpc": "2.0",

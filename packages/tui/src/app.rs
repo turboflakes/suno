@@ -947,26 +947,11 @@ impl App {
         match custom.kind {
             CommandKind::Shell { run, .. } => {
                 tokio::spawn(async move {
-                    let run = run.replace("{stash}", &validator.key().stash().to_string());
-                    let output = tokio::process::Command::new("sh")
-                        .arg("-c")
-                        .arg(&run)
-                        .output()
-                        .await;
-
-                    match output {
-                        Ok(out) if out.status.success() => {
-                            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                            info!("Command '{}' succeeded: {}", custom.name, stdout.trim());
+                    let result = bridge::customs::process(&run, &validator).await;
+                    match result {
+                        Ok(_) => {
+                            info!("Command '{}' succeeded", custom.name);
                             let _ = tx.send(Action::Popup(PopupAction::Close));
-                        }
-                        Ok(out) => {
-                            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Command '{}' failed: {}",
-                                custom.name,
-                                stderr.trim()
-                            ))));
                         }
                         Err(e) => {
                             let _ = tx.send(Action::System(SystemAction::Error(format!(
