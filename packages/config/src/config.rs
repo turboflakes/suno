@@ -423,14 +423,14 @@ mod tests {
     fn test_detailed_with_host_and_commands() {
         let yaml = r#"
             stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
-            host: 10.10.10.1:9944
+            host_rpc: 10.10.10.1:9944
             commands:
               - name: Ping
                 cmd: ping
                 run: "echo 'Ping'"
 
               - name: Rotate and Set keys
-                uses: suno/rotate_keys
+                uses: calls/rotate_keys
         "#;
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
