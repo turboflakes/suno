@@ -30,7 +30,6 @@ pub enum Mode {
     #[default]
     Menu,
     Confirm,
-    Locked,
     Transaction,
 }
 
@@ -63,8 +62,8 @@ impl Default for PopupState {
 }
 
 impl PopupState {
-    pub fn set_lock(&mut self) {
-        self.mode = Mode::Locked;
+    pub fn set_menu(&mut self) {
+        self.mode = Mode::Menu;
     }
 
     pub fn set_confirm(&mut self) {
@@ -477,10 +476,14 @@ impl PopupWidget {
         state.input.clear_focus();
     }
 
-    pub fn set_lock_mode(&self) {
+    pub fn lock_input(&self) {
         let mut state = self.state.write().unwrap();
-        state.set_lock();
         state.input.lock_input();
+    }
+
+    pub fn set_menu_mode(&self) {
+        let mut state = self.state.write().unwrap();
+        state.set_menu();
     }
 
     pub fn set_confirm_mode(&self) {
@@ -553,7 +556,7 @@ impl Widget for &PopupWidget {
 
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
-            Mode::Confirm | Mode::Locked => render_confirm_and_sign(area, buf, &mut state),
+            Mode::Confirm => render_confirm_and_sign(area, buf, &mut state),
             Mode::Transaction => render_transaction(area, buf, &mut state),
         }
     }

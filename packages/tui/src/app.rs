@@ -222,7 +222,7 @@ impl App {
                 self.focus = Focus::Popup;
             }
             InputAction::Lock => {
-                self.popup.set_lock_mode();
+                self.popup.lock_input();
                 self.focus = Focus::Popup;
             }
             InputAction::AutoComplete => {
@@ -235,8 +235,10 @@ impl App {
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::Error(msg) => {
-                if self.popup.get_mode() == PopupMode::Locked && self.popup.invalidate_input(&msg) {
-                    self.popup.set_confirm_mode();
+                if (self.popup.get_mode() == PopupMode::Menu
+                    || self.popup.get_mode() == PopupMode::Confirm)
+                    && self.popup.invalidate_input(&msg)
+                {
                     self.focus = Focus::Input;
                 }
             }
@@ -1152,7 +1154,7 @@ impl App {
         }
 
         match self.popup.get_mode() {
-            PopupMode::Confirm | PopupMode::Locked => {
+            PopupMode::Confirm => {
                 let Some(bytes_entry) = self.popup.get_selected() else {
                     return;
                 };
