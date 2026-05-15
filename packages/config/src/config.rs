@@ -25,6 +25,24 @@ lazy_static! {
     };
 }
 
+/// Built-in call methods derived from `Call`'s Display implementation.
+/// Must be kept in sync with `suno_primitives::call::Call`.
+const BUILTIN_CALL_NAMES: &[&str] = &[
+    "bond",
+    "bond_extra",
+    "unbond",
+    "rebond",
+    "withdraw_unbonded",
+    "set_payee",
+    "validate",
+    "chill",
+    "set_keys",
+    "purge_keys",
+    "set_keys_async",
+    "purge_keys_async",
+    "rotate_keys", // CustomCalls::RotateKeys
+];
+
 type Stash = AccountId32;
 
 /// Provides default value for Themes struct
@@ -144,6 +162,16 @@ impl CustomCommand {
 
     pub fn is_super(&self) -> bool {
         matches!(self.kind, CommandKind::Uses(..))
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if let CommandKind::Shell { .. } = &self.kind {
+            let cmd = self.cmd();
+            if BUILTIN_CALL_NAMES.contains(&cmd.as_str()) {
+                return Err(Error::InvalidCommand(cmd));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -311,6 +339,23 @@ impl Config {
 
         // Validate themes
         self.themes.validate()?;
+
+        // Validate custom commands don't clash with built-in call names
+        for chain in &self.chains {
+            for chain_config in chain.values() {
+                for node in chain_config.validators.iter() {
+                    if let NodeConfig::Detailed {
+                        commands: Some(commands),
+                        ..
+                    } = node
+                    {
+                        for command in commands {
+                            command.validate()?;
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
