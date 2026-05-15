@@ -44,6 +44,11 @@ impl Widget for &InputCommandWidget {
             h_constraints.push(Constraint::Length(7))
         }
 
+        // Set area to show spinner when input is busy
+        if state.is_busy() {
+            h_constraints.push(Constraint::Length(4))
+        }
+
         let input_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(h_constraints)
@@ -111,6 +116,12 @@ impl Widget for &InputCommandWidget {
             ]))
             .block(block);
             hotkey.render(input_area[2], buf);
+        }
+
+        // Lock and show spinner when input is busy
+        if state.is_busy() {
+            let spinner = state.spinner();
+            spinner.render(input_area[2], buf);
         }
 
         // Show invalid message when input is invalid

@@ -952,17 +952,30 @@ impl App {
                     let result = bridge::customs::process(&run, &validator).await;
                     match result {
                         Ok(_) => {
-                            info!("Command '{}' succeeded", custom.name);
+                            info!(
+                                "Command '{}' succeeded for {}",
+                                custom.name,
+                                validator.display_name(4)
+                            );
                             let _ = tx.send(Action::Popup(PopupAction::Close));
                         }
                         Err(e) => {
                             let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Command '{}' could not run: {}",
-                                custom.name, e
+                                "Command '{}' could not run for {}: {}",
+                                custom.name,
+                                validator.display_name(4),
+                                e
                             ))));
+                            let _ = tx.send(Action::Input(InputAction::Error(
+                                "Something went wrong, check logs and try again".to_string(),
+                            )));
                         }
                     }
                 });
+
+                // Lock input so it can't be changed unless there's an error
+                // and remove focus from the input field and start loading spinner
+                let _ = self.tx.send(Action::Input(InputAction::Lock));
             }
             CommandKind::Uses(calls) => match calls {
                 CustomCalls::RotateKeys => {
