@@ -107,7 +107,7 @@ impl Call {
                         .ok_or(CallError::MissingExtrinsic)
                 }
             },
-            Some((extrinsic, args)) => match extrinsic {
+            Some((command, args)) => match command {
                 "bond" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
@@ -217,7 +217,18 @@ impl Call {
                         }
                     }
                 },
-                _ => Err(CallError::InvalidArgument(input.to_string())),
+                _ => {
+                    // Try matching custom commands that take arguments
+                    // e.g. user typed "upgrade 1.2.3" -> matches cmd "/upgrade {version}"
+                    custom_commands
+                        .iter()
+                        .find(|c| c.base_cmd() == command)
+                        .map(|c| {
+                            let values: Vec<&str> = args.split_whitespace().collect();
+                            Self::Custom(c.with_args(&values))
+                        })
+                        .ok_or(CallError::InvalidArgument(input.to_string()))
+                }
             },
         }
     }
@@ -243,7 +254,7 @@ impl std::fmt::Display for Call {
             Self::PurgeKeys => write!(f, "purge_keys"),
             Self::SetKeysAsync { .. } => write!(f, "set_keys_async"),
             Self::PurgeKeysAsync => write!(f, "purge_keys_async"),
-            Self::Custom(custom) => write!(f, "{}", custom.cmd()),
+            Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
         }
     }
 }
@@ -321,7 +332,7 @@ impl ToPlaceholder for Call {
                 "set_keys_async <hex-session-keys> <hex-proof>".to_string()
             }
             Self::PurgeKeysAsync => "purge_keys_async".to_string(),
-            Self::Custom(custom) => custom.cmd(),
+            Self::Custom(custom) => custom.placeholder(),
         }
     }
 }

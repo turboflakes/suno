@@ -4,7 +4,7 @@ use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
@@ -42,6 +42,9 @@ const BUILTIN_CALL_NAMES: &[&str] = &[
     "purge_keys_async",
     "rotate_keys", // CustomCalls::RotateKeys
 ];
+
+/// Placeholders resolved automatically from the validator context, not from user input.
+const BUILTIN_PLACEHOLDERS: &[&str] = &["stash"];
 
 type Stash = AccountId32;
 
@@ -150,10 +153,12 @@ impl std::fmt::Display for CustomCommand {
 
 impl CustomCommand {
     pub fn cmd(&self) -> String {
-        if self.kind.to_string() == "ND" {
-            return self.name.trim().to_lowercase().replace(" ", "_");
+        match &self.kind {
+            CommandKind::Shell { cmd: None, .. } => {
+                self.name.trim().to_lowercase().replace(" ", "_")
+            }
+            _ => self.kind.to_string(),
         }
-        self.kind.to_string()
     }
 
     pub fn is_shell(&self) -> bool {
@@ -164,9 +169,66 @@ impl CustomCommand {
         matches!(self.kind, CommandKind::Uses(..))
     }
 
+    /// Command name without `{...}` placeholders.
+    /// e.g. "/echo {msg}" -> "msg"
+    pub fn base_cmd(&self) -> String {
+        self.cmd()
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string()
+    }
+
+    /// Display label with `{arg}` placeholders shown as `<arg>` for the UI hint
+    /// e.g. "/echo {msg}" -> "/echo <msg>"
+    pub fn placeholder(&self) -> String {
+        self.cmd().replace("{", "<").replace("}", ">")
+    }
+
+    /// Unique placeholder names in `run`, excluding built-ins like `{stash}`.
+    /// run = "echo {msg}" -> ["msg"]
+    pub fn args(&self) -> Vec<String> {
+        let CommandKind::Shell { run, .. } = &self.kind else {
+            return vec![];
+        };
+        let mut seen = HashSet::new();
+        let mut result = Vec::new();
+        let mut s = run.as_str();
+        while let Some(open) = s.find('{') {
+            s = &s[open + 1..];
+            if let Some(close) = s.find('}') {
+                let name = &s[..close];
+                if !name.is_empty()
+                    && !BUILTIN_PLACEHOLDERS.contains(&name)
+                    && seen.insert(name.to_string())
+                {
+                    result.push(name.to_string());
+                }
+                s = &s[close + 1..];
+            }
+        }
+        result
+    }
+
+    /// Returns a clone with `{name}` placeholders substituted positionally.
+    /// Also substitutes in `cmd` so the display label reflects the resolved value.
+    pub fn with_args(&self, values: &[&str]) -> Self {
+        let mut cloned = self.clone();
+        if let CommandKind::Shell { run, cmd } = &mut cloned.kind {
+            for (name, value) in self.args().iter().zip(values) {
+                let placeholder = format!("{{{}}}", name);
+                *run = run.replace(&placeholder, value);
+                if let Some(c) = cmd.as_mut() {
+                    *c = c.replace(&placeholder, value);
+                }
+            }
+        }
+        cloned
+    }
+
     pub fn validate(&self) -> Result<(), Error> {
         if let CommandKind::Shell { .. } = &self.kind {
-            let cmd = self.cmd();
+            let cmd = self.base_cmd();
             if BUILTIN_CALL_NAMES.contains(&cmd.as_str()) {
                 return Err(Error::InvalidCommand(cmd));
             }
