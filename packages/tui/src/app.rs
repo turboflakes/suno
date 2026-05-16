@@ -1166,26 +1166,23 @@ impl App {
             return;
         }
 
-        match self.popup.get_mode() {
-            PopupMode::Confirm => {
-                let Some(bytes_entry) = self.popup.get_selected() else {
-                    return;
-                };
-                let hex_bytes = bytes_entry.to_hex();
+        if self.popup.get_mode() == PopupMode::Confirm {
+            let Some(bytes_entry) = self.popup.get_selected() else {
+                return;
+            };
+            let hex_bytes = bytes_entry.to_hex();
 
-                let mut clipboard = match Clipboard::new() {
-                    Ok(cb) => cb,
-                    Err(e) => {
-                        self.error(e.into());
-                        return;
-                    }
-                };
-
-                if let Err(e) = clipboard.set_text(hex_bytes) {
+            let mut clipboard = match Clipboard::new() {
+                Ok(cb) => cb,
+                Err(e) => {
                     self.error(e.into());
+                    return;
                 }
+            };
+
+            if let Err(e) = clipboard.set_text(hex_bytes) {
+                self.error(e.into());
             }
-            _ => {}
         }
     }
 }
