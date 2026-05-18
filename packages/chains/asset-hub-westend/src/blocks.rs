@@ -5,6 +5,7 @@ use crate::{
         runtime_types::{
             asset_hub_westend_runtime::RuntimeCall,
             pallet_staking_async::pallet::pallet::Call as StakingCall,
+            pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
         },
         staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet, Withdrawn},
     },
@@ -20,6 +21,7 @@ use subxt::{
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
+    session::Keys,
     staking::{Chunk, ValidatorPrefs},
     Response,
 };
@@ -88,6 +90,20 @@ pub async fn process_block_extrinsics(
                 let payee = map_payee_from_reward_destination(payee.clone());
                 let account_bytes = *stash.as_ref();
                 let res = Response::validator_payee(account_bytes, payee);
+                processed_extrinsics.push(res);
+            } else if let RuntimeCall::StakingRcClient(StakingRcClientCall::set_keys {
+                keys, ..
+            }) = call.as_ref()
+            {
+                let keys = Keys::from_bytes(keys).boxed()?;
+                let account_bytes = *stash.as_ref();
+                let res = Response::validator_next_keys(account_bytes, Some(keys));
+                processed_extrinsics.push(res);
+            } else if let RuntimeCall::StakingRcClient(StakingRcClientCall::purge_keys { .. }) =
+                call.as_ref()
+            {
+                let account_bytes = *stash.as_ref();
+                let res = Response::validator_next_keys(account_bytes, None);
                 processed_extrinsics.push(res);
             }
         }

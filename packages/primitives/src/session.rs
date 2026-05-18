@@ -85,51 +85,10 @@ impl FromStr for Keys {
         // Decode hex to bytes
         let bytes = hex::decode(hex_str).map_err(KeysError::InvalidHex)?;
 
-        // Validate length: 32+32+32+32+32+33 = 193 bytes
-        if bytes.len() != 193 {
-            return Err(KeysError::InvalidHexLength(bytes.len()));
-        }
+        // Parse keys from bytes
+        let keys = parse_keys_from_bytes(&bytes)?;
 
-        // Parse each key from the concatenated bytes
-        let mut offset = 0;
-
-        // Grandpa (32 bytes)
-        let mut grandpa_bytes = [0u8; 32];
-        grandpa_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Babe (32 bytes)
-        let mut babe_bytes = [0u8; 32];
-        babe_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Para Validator (32 bytes)
-        let mut para_validator_bytes = [0u8; 32];
-        para_validator_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Para Assignment (32 bytes)
-        let mut para_assignment_bytes = [0u8; 32];
-        para_assignment_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Authority Discovery (32 bytes)
-        let mut authority_discovery_bytes = [0u8; 32];
-        authority_discovery_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Beefy (33 bytes - ECDSA public key)
-        let mut beefy_bytes = [0u8; 33];
-        beefy_bytes.copy_from_slice(&bytes[offset..offset + 33]);
-
-        Ok(Self {
-            grandpa_bytes,
-            babe_bytes,
-            para_validator_bytes,
-            para_assignment_bytes,
-            authority_discovery_bytes,
-            beefy_bytes,
-        })
+        Ok(keys)
     }
 }
 
@@ -168,6 +127,60 @@ impl Keys {
         ]
         .concat()
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeysError> {
+        let keys = parse_keys_from_bytes(bytes)?;
+
+        Ok(keys)
+    }
+}
+
+fn parse_keys_from_bytes(bytes: &[u8]) -> Result<Keys, KeysError> {
+    // Validate length: 32+32+32+32+32+33 = 193 bytes
+    if bytes.len() != 193 {
+        return Err(KeysError::InvalidHexLength(bytes.len()));
+    }
+
+    // Parse each key from the concatenated bytes
+    let mut offset = 0;
+
+    // Grandpa (32 bytes)
+    let mut grandpa_bytes = [0u8; 32];
+    grandpa_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Babe (32 bytes)
+    let mut babe_bytes = [0u8; 32];
+    babe_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Para Validator (32 bytes)
+    let mut para_validator_bytes = [0u8; 32];
+    para_validator_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Para Assignment (32 bytes)
+    let mut para_assignment_bytes = [0u8; 32];
+    para_assignment_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Authority Discovery (32 bytes)
+    let mut authority_discovery_bytes = [0u8; 32];
+    authority_discovery_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Beefy (33 bytes - ECDSA public key)
+    let mut beefy_bytes = [0u8; 33];
+    beefy_bytes.copy_from_slice(&bytes[offset..offset + 33]);
+
+    Ok(Keys {
+        grandpa_bytes,
+        babe_bytes,
+        para_validator_bytes,
+        para_assignment_bytes,
+        authority_discovery_bytes,
+        beefy_bytes,
+    })
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
