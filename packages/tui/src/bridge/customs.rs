@@ -78,7 +78,7 @@ impl NodeAccess {
             Self::Local => {
                 let output = Command::new("sh")
                     .arg("-c")
-                    .arg(&run)
+                    .arg(run)
                     .output()
                     .await
                     .map_err(|e| Error::Other(format!("Shell failed: {}", e)))?;
