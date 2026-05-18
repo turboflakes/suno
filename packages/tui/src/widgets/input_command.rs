@@ -23,7 +23,7 @@ impl Widget for &InputCommandWidget {
         // Split area into two parts vertically for the main input field
         // and a footer to display error message
         let mut v_constraints = vec![Constraint::Length(3)];
-        if state.is_invalid() {
+        if state.is_invalid() || state.is_success() {
             v_constraints.push(Constraint::Length(2))
         }
 
@@ -136,6 +136,20 @@ impl Widget for &InputCommandWidget {
             ]))
             .block(block);
             error.render(area[1], buf);
+        }
+
+        // Show success mark when input response succeeded
+        if state.is_success() {
+            Clear.render(area[1], buf);
+            let block = Block::new()
+                .style(theme.input.base(state.is_active()))
+                .padding(Padding::new(2, 0, 0, 1));
+
+            let success = Paragraph::new(Line::from(vec![
+                Span::raw(state.status()).style(theme.input.success)
+            ]))
+            .block(block);
+            success.render(area[1], buf);
         }
     }
 }

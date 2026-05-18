@@ -2,58 +2,120 @@ use openssh::{Session, SessionBuilder};
 use std::str::FromStr;
 use std::time::Duration;
 use suno_config::SshConfig;
-use suno_error::Error;
+use suno_error::{Error, ResultExt};
 use suno_primitives::{
-    session::{Keys, Proof},
+    session::{Keys, KeysError, Proof},
     Validator,
 };
 use tokio::process::Command;
 
-pub async fn process(run: &str, validator: &Validator) -> Result<String, Error> {
-    let run = run.replace("{stash}", &validator.key().stash().to_string());
-
-    if let Some(ssh) = &validator.ssh {
-        return process_via_ssh(ssh, &run).await;
-    }
-
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&run)
-        .output()
-        .await
-        .map_err(|e| Error::Other(format!("Shell failed: {}", e)))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Other(format!("shell exited with error: {}", stderr)));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-
-    Ok(stdout)
+pub enum NodeAccess {
+    Local,
+    Ssh(SshConfig),
 }
 
-pub async fn process_via_ssh(ssh: &SshConfig, run: &str) -> Result<String, Error> {
-    let session = open_ssh_session(ssh).await?;
-
-    let output = session
-        .command("sh")
-        .arg("-c")
-        .arg(run)
-        .output()
-        .await
-        .map_err(|e| Error::Other(format!("Remote shell failed: {}", e)))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Other(format!("shell exited with error: {}", stderr)));
+impl NodeAccess {
+    pub fn from_validator(validator: &Validator) -> Self {
+        match &validator.ssh {
+            Some(ssh) => Self::Ssh(ssh.clone()),
+            None => Self::Local,
+        }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    async fn execute_rpc(&self, payload: &str, url: &str) -> Result<Vec<u8>, Error> {
+        match &self {
+            Self::Local => {
+                let output = Command::new("curl")
+                    .arg("-s")
+                    .arg("-X")
+                    .arg("POST")
+                    .arg("-H")
+                    .arg("Content-Type: application/json")
+                    .arg("-d")
+                    .arg(payload)
+                    .arg(url)
+                    .output()
+                    .await
+                    .map_err(|e| Error::Other(format!("curl failed: {}", e)))?;
 
-    session.close().await.ok();
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(Error::Other(format!("curl exited with error: {}", stderr)));
+                }
+                Ok(output.stdout)
+            }
+            Self::Ssh(config) => {
+                let session = open_ssh_session(config).await?;
 
-    Ok(stdout)
+                let output = session
+                    .command("curl")
+                    .arg("-s")
+                    .arg("-X")
+                    .arg("POST")
+                    .arg("-H")
+                    .arg("Content-Type: application/json")
+                    .arg("-d")
+                    .arg(payload)
+                    .arg(url)
+                    .output()
+                    .await
+                    .map_err(|e| Error::Other(format!("Remote curl failed: {}", e)))?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(Error::Other(format!("curl exited with error: {}", stderr)));
+                }
+
+                session.close().await.ok();
+
+                Ok(output.stdout)
+            }
+        }
+    }
+
+    pub async fn execute_shell(&self, run: &str) -> Result<String, Error> {
+        match &self {
+            Self::Local => {
+                let output = Command::new("sh")
+                    .arg("-c")
+                    .arg(&run)
+                    .output()
+                    .await
+                    .map_err(|e| Error::Other(format!("Shell failed: {}", e)))?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(Error::Other(format!("shell exited with error: {}", stderr)));
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+
+                Ok(stdout)
+            }
+            Self::Ssh(config) => {
+                let session = open_ssh_session(config).await?;
+
+                let output = session
+                    .command("sh")
+                    .arg("-c")
+                    .arg(run)
+                    .output()
+                    .await
+                    .map_err(|e| Error::Other(format!("Remote shell failed: {}", e)))?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(Error::Other(format!("shell exited with error: {}", stderr)));
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+
+                session.close().await.ok();
+
+                Ok(stdout)
+            }
+        }
+    }
 }
 
 pub async fn rotate_keys(validator: &Validator) -> Result<(Keys, Proof), Error> {
@@ -64,67 +126,10 @@ pub async fn rotate_keys(validator: &Validator) -> Result<(Keys, Proof), Error> 
         "id": 1
     })
     .to_string();
-
-    if let Some(ssh) = &validator.ssh {
-        return rotate_keys_via_ssh(ssh, &payload, &validator.host_rpc.http_url()).await;
-    }
-
-    rotate_keys_via_http(&payload, &validator.host_rpc.http_url()).await
-}
-
-pub async fn rotate_keys_via_ssh(
-    ssh: &SshConfig,
-    payload: &str,
-    url: &str,
-) -> Result<(Keys, Proof), Error> {
-    let session = open_ssh_session(ssh).await?;
-
-    let output = session
-        .command("curl")
-        .arg("-s")
-        .arg("-X")
-        .arg("POST")
-        .arg("-H")
-        .arg("Content-Type: application/json")
-        .arg("-d")
-        .arg(payload)
-        .arg(url)
-        .output()
-        .await
-        .map_err(|e| Error::Other(format!("Remote curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Other(format!("curl exited with error: {}", stderr)));
-    }
-
-    let result = parse_rotate_keys_response(&output.stdout)?;
-
-    session.close().await.ok();
-
-    Ok(result)
-}
-
-pub async fn rotate_keys_via_http(payload: &str, url: &str) -> Result<(Keys, Proof), Error> {
-    let output = Command::new("curl")
-        .arg("-s")
-        .arg("-X")
-        .arg("POST")
-        .arg("-H")
-        .arg("Content-Type: application/json")
-        .arg("-d")
-        .arg(payload)
-        .arg(url)
-        .output()
-        .await
-        .map_err(|e| Error::Other(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Other(format!("curl exited with error: {}", stderr)));
-    }
-
-    parse_rotate_keys_response(&output.stdout)
+    let stdout = NodeAccess::from_validator(validator)
+        .execute_rpc(&payload, &validator.host_rpc.http_url())
+        .await?;
+    parse_rotate_keys_response(&stdout)
 }
 
 fn parse_rotate_keys_response(stdout: &[u8]) -> Result<(Keys, Proof), Error> {
@@ -153,6 +158,65 @@ fn parse_rotate_keys_response(stdout: &[u8]) -> Result<(Keys, Proof), Error> {
     let proof = Proof::from_str(proof_hex).map_err(|e| Error::Other(e.to_string()))?;
 
     Ok((keys, proof))
+}
+
+pub async fn has_keys(validator: &Validator) -> Result<bool, Error> {
+    let keys = validator
+        .next_keys
+        .as_ref()
+        .ok_or(KeysError::NotSet)
+        .boxed()?;
+
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "author_hasSessionKeys",
+        "params": [keys.to_string()],
+        "id": 1
+    })
+    .to_string();
+    let stdout = NodeAccess::from_validator(validator)
+        .execute_rpc(&payload, &validator.host_rpc.http_url())
+        .await?;
+    parse_has_keys_response(&stdout)
+}
+
+pub async fn has_queued_keys(validator: &Validator) -> Result<bool, Error> {
+    let keys = validator
+        .queued_keys
+        .as_ref()
+        .ok_or(KeysError::NotSet)
+        .boxed()?;
+
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "author_hasSessionKeys",
+        "params": [keys.to_string()],
+        "id": 1
+    })
+    .to_string();
+    let stdout = NodeAccess::from_validator(validator)
+        .execute_rpc(&payload, &validator.host_rpc.http_url())
+        .await?;
+    parse_has_keys_response(&stdout)
+}
+
+fn parse_has_keys_response(stdout: &[u8]) -> Result<bool, Error> {
+    let response: serde_json::Value = serde_json::from_slice(stdout)
+        .map_err(|e| Error::Other(format!("Invalid JSON from curl: {}", e)))?;
+
+    if let Some(err) = response.get("error") {
+        return Err(Error::Other(format!("RPC error: {}", err)));
+    }
+
+    let result = response
+        .get("result")
+        .ok_or(Error::Other(
+            "Missing 'result' field in RPC response".into(),
+        ))?
+        .as_bool()
+        .ok_or(Error::Other("'result' field is not a boolean".into()))?;
+
+    Ok(result)
 }
 
 async fn open_ssh_session(ssh: &SshConfig) -> Result<Session, Error> {

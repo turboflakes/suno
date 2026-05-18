@@ -41,6 +41,8 @@ const BUILTIN_CALL_NAMES: &[&str] = &[
     "set_keys_async",
     "purge_keys_async",
     "rotate_and_set_keys", // CustomCalls::RotateAndSetKeys
+    "has_keys",            // CustomCalls::HasKeys
+    "has_queued_keys",     // CustomCalls::HasQueuedKeys
 ];
 
 /// Placeholders resolved automatically from the validator context, not from user input.
@@ -271,19 +273,29 @@ impl std::fmt::Display for CommandKind {
 pub enum CustomCalls {
     #[serde(rename = "calls/rotate_and_set_keys")]
     RotateAndSetKeys,
+    #[serde(rename = "calls/has_keys")]
+    HasKeys,
+    #[serde(rename = "calls/has_queued_keys")]
+    HasQueuedKeys,
 }
 
 impl CustomCalls {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::RotateAndSetKeys => "rotate_and_set_keys",
+            Self::HasKeys => "has_keys",
+            Self::HasQueuedKeys => "has_queued_keys",
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
             Self::RotateAndSetKeys => {
-                "Execute RPC call 'author_rotateKeysWithOwner' and Set sesion keys"
+                "Execute RPC call 'author_rotateKeysWithOwner' and set session keys"
+            }
+            Self::HasKeys => "Execute RPC call 'author_hasSessionKeys' with current session keys",
+            Self::HasQueuedKeys => {
+                "Execute RPC call 'author_hasSessionKeys' with queued keys for the next session"
             }
         }
     }

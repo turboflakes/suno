@@ -1,4 +1,4 @@
-use crate::bridge::{self, sync, RuntimeCaller};
+use crate::bridge::{customs, sync, RuntimeCaller};
 use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
@@ -224,6 +224,11 @@ impl App {
             InputAction::Lock => {
                 self.popup.lock_input();
                 self.focus = Focus::Popup;
+            }
+            InputAction::Success(msg) => {
+                if self.popup.set_input_success(&msg) {
+                    self.focus = Focus::Input;
+                }
             }
             InputAction::AutoComplete => {
                 self.popup.set_input_autocomplete();
@@ -949,26 +954,31 @@ impl App {
         match custom.kind {
             CommandKind::Shell { run, .. } => {
                 tokio::spawn(async move {
-                    let result = bridge::customs::process(&run, &validator).await;
+                    let run = run.replace("{stash}", &validator.key().stash().to_string());
+                    let access = customs::NodeAccess::from_validator(&validator);
+                    let result = access.execute_shell(&run).await;
                     match result {
                         Ok(_) => {
-                            info!(
-                                "Command '{}' succeeded for {}",
-                                custom.name,
-                                validator.display_name(4)
-                            );
-                            let _ = tx.send(Action::Popup(PopupAction::Close));
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Command '{}' could not run for {}: {}",
+                            let msg = format!(
+                                "Command '{}' succeeded for {} on host {}.",
                                 custom.name,
                                 validator.display_name(4),
-                                e
+                                validator.host(),
+                            );
+                            let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                        }
+                        Err(e) => {
+                            let msg = format!(
+                                "Command '{}' failed for {} on host {}.",
+                                custom.name,
+                                validator.display_name(4),
+                                validator.host(),
+                            );
+                            let _ = tx.send(Action::Input(InputAction::Error(msg.clone())));
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "{}: {}",
+                                msg, e
                             ))));
-                            let _ = tx.send(Action::Input(InputAction::Error(
-                                "Something went wrong, check logs and try again".to_string(),
-                            )));
                         }
                     }
                 });
@@ -988,7 +998,6 @@ impl App {
                         return;
                     };
                     let api = chain.client().clone();
-                    let tx = self.tx.clone();
                     let stash = validator.key().stash();
                     let stash_identity = validator.display_name(3);
                     let proxy_identity = match get_address_from_json_file() {
@@ -1001,7 +1010,7 @@ impl App {
                     let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
-                        let result = bridge::customs::rotate_keys(&validator).await;
+                        let result = customs::rotate_keys(&validator).await;
                         match result {
                             Ok((keys, proof)) => {
                                 // Instantiate `set_keys_async` as the recommended call to be triggered
@@ -1043,13 +1052,80 @@ impl App {
                                 }
                             }
                             Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
                                 let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to rotate_keys: {}",
+                                    "Failed to call rotate_keys: {}",
                                     e
                                 ))));
                             }
                         }
                     });
+                }
+                CustomCalls::HasKeys => {
+                    tokio::spawn(async move {
+                        let result = customs::has_keys(&validator).await;
+                        match result {
+                            Ok(true) => {
+                                let msg = format!(
+                                    "Yes. Host {} contains the current session keys for {}.",
+                                    validator.host(),
+                                    validator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                            }
+                            Ok(false) => {
+                                let msg = format!(
+                                    "No. Host {} does NOT have the current session keys for {}.",
+                                    validator.host(),
+                                    validator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Error(msg)));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to call has_keys: {}",
+                                    e
+                                ))));
+                            }
+                        }
+                    });
+                    // Lock input so it can't be changed unless there's an error
+                    // and remove focus from the input field and start loading spinner
+                    let _ = self.tx.send(Action::Input(InputAction::Lock));
+                }
+                CustomCalls::HasQueuedKeys => {
+                    tokio::spawn(async move {
+                        let result = customs::has_queued_keys(&validator).await;
+                        match result {
+                            Ok(true) => {
+                                let msg = format!(
+                                    "Yes. Host {} has session keys QUEUED for {}",
+                                    validator.host(),
+                                    validator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                            }
+                            Ok(false) => {
+                                let msg = format!(
+                                    "No. Host {} does NOT have session keys QUEUED for {}.",
+                                    validator.host(),
+                                    validator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Error(msg)));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to call has_queued_keys: {}",
+                                    e
+                                ))));
+                            }
+                        }
+                    });
+                    // Lock input so it can't be changed unless there's an error
+                    // and remove focus from the input field and start loading spinner
+                    let _ = self.tx.send(Action::Input(InputAction::Lock));
                 }
             },
         }

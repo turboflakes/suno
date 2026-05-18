@@ -63,6 +63,8 @@ impl std::fmt::Display for Keys {
 
 #[derive(thiserror::Error, Debug)]
 pub enum KeysError {
+    #[error("Keys not set")]
+    NotSet,
     #[error("No hex provided")]
     MissingHex,
     #[error("Invalid hex string: {0}")]

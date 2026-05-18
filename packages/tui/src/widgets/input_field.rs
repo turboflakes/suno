@@ -63,9 +63,11 @@ pub enum Type {
 pub enum Status {
     #[default]
     None, // No text yet
-    Busy,            // Input is being processed
+    Busy,            // Input is being processed (Show a spinner)
     Valid,           // Input text is present/valid either password or command
     Invalid(String), // Some invalid text found
+    Success(String), // Some successfully outcome of the input command
+    Error(String),   // Some error outcome of the input command
 }
 
 impl std::fmt::Display for Status {
@@ -74,7 +76,7 @@ impl std::fmt::Display for Status {
             Self::None => write!(f, "none"),
             Self::Busy => write!(f, "busy"),
             Self::Valid => write!(f, "valid"),
-            Self::Invalid(msg) => write!(f, "{}", msg),
+            Self::Invalid(msg) | Self::Success(msg) | Self::Error(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -343,6 +345,24 @@ impl InputField {
         self.status = Status::Busy;
     }
 
+    pub fn set_success(&mut self, msg: &str) -> bool {
+        if !self.is_locked() {
+            return false;
+        }
+        self.mode = Mode::Editing;
+        self.status = Status::Success(msg.to_string());
+        true
+    }
+
+    pub fn set_error(&mut self, msg: &str) -> bool {
+        if !self.is_locked() {
+            return false;
+        }
+        self.mode = Mode::Editing;
+        self.status = Status::Error(msg.to_string());
+        true
+    }
+
     fn set_focus(&mut self) -> bool {
         if self.is_locked() {
             return false;
@@ -365,6 +385,14 @@ impl InputField {
 
     pub fn is_invalid(&self) -> bool {
         matches!(self.status, Status::Invalid(_))
+    }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self.status, Status::Success(_))
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.status, Status::Error(_))
     }
 
     const fn as_password(&mut self) {
@@ -479,6 +507,16 @@ impl InputFieldWidget {
     pub fn lock_input(&mut self) {
         let mut state = self.state.write().unwrap();
         state.lock_input();
+    }
+
+    pub fn set_success(&mut self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_success(msg)
+    }
+
+    pub fn set_error(&mut self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_error(msg)
     }
 
     pub fn invalidate(&mut self, msg: &str) -> bool {

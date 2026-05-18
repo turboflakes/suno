@@ -481,6 +481,16 @@ impl PopupWidget {
         state.input.lock_input();
     }
 
+    pub fn set_input_success(&self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.input.set_success(msg)
+    }
+
+    pub fn set_input_error(&self, msg: &str) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.input.set_error(msg)
+    }
+
     pub fn set_menu_mode(&self) {
         let mut state = self.state.write().unwrap();
         state.set_menu();
