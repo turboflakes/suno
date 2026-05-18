@@ -40,7 +40,7 @@ const BUILTIN_CALL_NAMES: &[&str] = &[
     "purge_keys",
     "set_keys_async",
     "purge_keys_async",
-    "rotate_keys", // CustomCalls::RotateKeys
+    "rotate_and_set_keys", // CustomCalls::RotateAndSetKeys
 ];
 
 /// Placeholders resolved automatically from the validator context, not from user input.
@@ -240,7 +240,7 @@ impl CustomCommand {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CommandKind {
-    /// Built-in command: "calls/rotate_keys"
+    /// Built-in command: "calls/rotate_and_set_keys"
     Uses(CustomCalls),
     /// Shell command: "echo test"
     #[serde(untagged)]
@@ -269,20 +269,22 @@ impl std::fmt::Display for CommandKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CustomCalls {
-    #[serde(rename = "calls/rotate_keys")]
-    RotateKeys,
+    #[serde(rename = "calls/rotate_and_set_keys")]
+    RotateAndSetKeys,
 }
 
 impl CustomCalls {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::RotateKeys => "rotate_keys",
+            Self::RotateAndSetKeys => "rotate_and_set_keys",
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::RotateKeys => "Execute RPC call 'author_rotateKeysWithOwner' and Set sesion keys",
+            Self::RotateAndSetKeys => {
+                "Execute RPC call 'author_rotateKeysWithOwner' and Set sesion keys"
+            }
         }
     }
 }
@@ -537,7 +539,7 @@ mod tests {
                 run: "echo 'Ping'"
 
               - name: Rotate and Set keys
-                uses: calls/rotate_keys
+                uses: calls/rotate_and_set_keys
         "#;
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
@@ -565,7 +567,7 @@ mod tests {
                 assert_eq!(commands[1].name, "Rotate and Set keys");
                 match &commands[1].kind {
                     CommandKind::Uses(cmd) => {
-                        assert!(matches!(cmd, CustomCalls::RotateKeys));
+                        assert!(matches!(cmd, CustomCalls::RotateAndSetKeys));
                     }
                     _ => panic!("Expected Uses command"),
                 }

@@ -978,7 +978,7 @@ impl App {
                 let _ = self.tx.send(Action::Input(InputAction::Lock));
             }
             CommandKind::Uses(calls) => match calls {
-                CustomCalls::RotateKeys => {
+                CustomCalls::RotateAndSetKeys => {
                     // NOTE: In the future setting session keys will only be available via AH. After successufuly executing /rotate_keys
                     // the recommended call to execute immediately afterward will be 'set_keys_async'.
                     // For that reason, the correct runtime to choose here is AH and not RC
