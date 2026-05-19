@@ -4318,9 +4318,9 @@ dependencies = [
 
 [[package]]
 name = "sp-arithmetic"
-version = "28.0.0"
+version = "28.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5f4755af7cc57f4a2a830e134b403fc832caa5d93dacb970ffc7ac717f38c40"
+checksum = "4e06588d1c43f60b9bb7f989785689842cc4cc8ce0e19d1c47686b1ff5fe9548"
 dependencies = [
  "docify",
  "integer-sqrt",
