@@ -297,11 +297,11 @@ impl ToDescription for Call {
             }
             Self::SetPayee { .. } => "Set reward destination".to_string(),
             Self::Validate { .. } => {
-                "Validate/Change commission or enable/disable nominations".to_string()
+                "Validate or change commission settings, or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
             Self::SetKeys { .. } | Self::SetKeysAsync { .. } => {
-                "Set session keys from the output of 'author_rotateKeysWithOwner' RPC call"
+                "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
             }
             Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),

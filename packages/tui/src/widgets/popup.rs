@@ -318,9 +318,8 @@ impl PopupWidget {
             }
         });
 
-        // Set pop-up label as the validator configured host, only if customs commands
-        // are configured
-        if validator.commands.len() > 0 {
+        // Set pop-up label as configured host, if custom commands are defined
+        if !validator.commands.is_empty() {
             state.label = Some(validator.host());
         }
 
@@ -641,7 +640,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     let widths = [
         Constraint::Length(2),
-        Constraint::Length(20),
+        Constraint::Length(22),
         Constraint::Fill(2),
         Constraint::Length(2),
     ];
