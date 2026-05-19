@@ -1,14 +1,17 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Keys {
     pub grandpa_bytes: [u8; 32],
     pub babe_bytes: [u8; 32],
     pub para_validator_bytes: [u8; 32],
     pub para_assignment_bytes: [u8; 32],
     pub authority_discovery_bytes: [u8; 32],
-    #[serde(serialize_with = "serialize_beefy_bytes")]
+    #[serde(
+        serialize_with = "serialize_beefy_bytes",
+        deserialize_with = "deserialize_beefy_bytes"
+    )]
     pub beefy_bytes: [u8; 33],
 }
 
@@ -17,6 +20,17 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_bytes(bytes)
+}
+
+fn deserialize_beefy_bytes<'de, D>(deserializer: D) -> Result<[u8; 33], D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    let bytes: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+    bytes
+        .try_into()
+        .map_err(|v: Vec<u8>| D::Error::custom(format!("expected 33 bytes, got {}", v.len())))
 }
 
 impl Default for Keys {
@@ -49,6 +63,8 @@ impl std::fmt::Display for Keys {
 
 #[derive(thiserror::Error, Debug)]
 pub enum KeysError {
+    #[error("Keys not set")]
+    NotSet,
     #[error("No hex provided")]
     MissingHex,
     #[error("Invalid hex string: {0}")]
@@ -71,51 +87,10 @@ impl FromStr for Keys {
         // Decode hex to bytes
         let bytes = hex::decode(hex_str).map_err(KeysError::InvalidHex)?;
 
-        // Validate length: 32+32+32+32+32+33 = 193 bytes
-        if bytes.len() != 193 {
-            return Err(KeysError::InvalidHexLength(bytes.len()));
-        }
+        // Parse keys from bytes
+        let keys = parse_keys_from_bytes(&bytes)?;
 
-        // Parse each key from the concatenated bytes
-        let mut offset = 0;
-
-        // Grandpa (32 bytes)
-        let mut grandpa_bytes = [0u8; 32];
-        grandpa_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Babe (32 bytes)
-        let mut babe_bytes = [0u8; 32];
-        babe_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Para Validator (32 bytes)
-        let mut para_validator_bytes = [0u8; 32];
-        para_validator_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Para Assignment (32 bytes)
-        let mut para_assignment_bytes = [0u8; 32];
-        para_assignment_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Authority Discovery (32 bytes)
-        let mut authority_discovery_bytes = [0u8; 32];
-        authority_discovery_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        // Beefy (33 bytes - ECDSA public key)
-        let mut beefy_bytes = [0u8; 33];
-        beefy_bytes.copy_from_slice(&bytes[offset..offset + 33]);
-
-        Ok(Self {
-            grandpa_bytes,
-            babe_bytes,
-            para_validator_bytes,
-            para_assignment_bytes,
-            authority_discovery_bytes,
-            beefy_bytes,
-        })
+        Ok(keys)
     }
 }
 
@@ -154,9 +129,63 @@ impl Keys {
         ]
         .concat()
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeysError> {
+        let keys = parse_keys_from_bytes(bytes)?;
+
+        Ok(keys)
+    }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+fn parse_keys_from_bytes(bytes: &[u8]) -> Result<Keys, KeysError> {
+    // Validate length: 32+32+32+32+32+33 = 193 bytes
+    if bytes.len() != 193 {
+        return Err(KeysError::InvalidHexLength(bytes.len()));
+    }
+
+    // Parse each key from the concatenated bytes
+    let mut offset = 0;
+
+    // Grandpa (32 bytes)
+    let mut grandpa_bytes = [0u8; 32];
+    grandpa_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Babe (32 bytes)
+    let mut babe_bytes = [0u8; 32];
+    babe_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Para Validator (32 bytes)
+    let mut para_validator_bytes = [0u8; 32];
+    para_validator_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Para Assignment (32 bytes)
+    let mut para_assignment_bytes = [0u8; 32];
+    para_assignment_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Authority Discovery (32 bytes)
+    let mut authority_discovery_bytes = [0u8; 32];
+    authority_discovery_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+    offset += 32;
+
+    // Beefy (33 bytes - ECDSA public key)
+    let mut beefy_bytes = [0u8; 33];
+    beefy_bytes.copy_from_slice(&bytes[offset..offset + 33]);
+
+    Ok(Keys {
+        grandpa_bytes,
+        babe_bytes,
+        para_validator_bytes,
+        para_assignment_bytes,
+        authority_discovery_bytes,
+        beefy_bytes,
+    })
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

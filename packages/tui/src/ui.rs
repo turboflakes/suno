@@ -102,7 +102,7 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
             Constraint::Percentage(80),
             Flex::Center,
         ),
-        PopupMode::Confirm | PopupMode::Locked => popup_area(
+        PopupMode::Confirm => popup_area(
             frame.area(),
             Constraint::Percentage(45),
             Constraint::Percentage(80),
@@ -177,11 +177,14 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let mut legend = vec![];
 
     // show how to open popup with extrinsics/commands
-    if app.validators.is_active() && app.validators.is_proxy_valid() && !app.popup.is_visible() {
+    if app.validators.is_active()
+        && (app.validators.is_proxy_valid() || app.validators.is_commands_available())
+        && !app.popup.is_visible()
+    {
         legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled(
-            "show extrinsics".to_string(),
+            "show commands".to_string(),
             theme.paragraph.label,
         ));
     };

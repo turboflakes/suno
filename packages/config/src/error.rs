@@ -15,6 +15,12 @@ pub enum Error {
     Theme(#[from] suno_theme::Error),
     #[error("Invalid theme: {0}")]
     InvalidTheme(String),
+    #[error("Invalid command name. '{0}' is a reserved word")]
+    InvalidCommand(String),
+    #[error("Local execution error: {0}")]
+    LocalExecution(String),
+    #[error("Remote execution error: {0}")]
+    RemoteExecution(String),
     #[error("Other error: {0}")]
     Other(String),
 }

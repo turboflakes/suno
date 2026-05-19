@@ -1,6 +1,6 @@
 use suno_actions::Action;
 use suno_config::SupportedRuntime;
-use suno_primitives::tx::Error as PayloadError;
+use suno_primitives::{session::KeysError, tx::Error as PayloadError};
 use suno_signer::error::Error as SignerError;
 
 /// Suno specific error messages
@@ -32,6 +32,8 @@ pub enum Error {
     Signer(#[from] SignerError),
     #[error("Payload error: {0}")]
     Payload(#[from] Box<PayloadError>),
+    #[error("Keys error: {0}")]
+    Keys(#[from] Box<KeysError>),
     #[error("Genesis hash does not match the expected hash from the configured chain.")]
     Genesis,
     #[error("Unsupported call: {0}")]
@@ -40,6 +42,8 @@ pub enum Error {
     Clipboard(#[from] arboard::Error),
     #[error("Unsupported runtime: {0}")]
     UnsupportedRuntime(SupportedRuntime),
+    #[error("Config error: {0}")]
+    Config(#[from] Box<suno_config::Error>),
     #[error("Other error: {0}")]
     Other(String),
 }

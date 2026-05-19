@@ -1,16 +1,17 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
 use crate::session::{Keys, KeysError, Proof, ProofError};
 use crate::staking::{Payee, PayeeError};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
 use subxt::utils::to_hex;
+use suno_config::CustomCommand;
 
 type Amount = u128;
 type Description = String;
 type Max = Option<(Amount, Description)>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Call {
     Bond {
@@ -50,7 +51,8 @@ pub enum Call {
         keys: Keys,
         proof: Proof,
     },
-    PurgeKeysAsync, // TODO: implement Kick
+    PurgeKeysAsync,
+    Custom(CustomCommand),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -85,16 +87,27 @@ pub enum CallError {
 
 impl Call {
     /// Parses a call from a string representation.
-    pub fn parse(input: &str, decimals: u32) -> Result<Self, CallError> {
+    pub fn parse(
+        input: &str,
+        decimals: u32,
+        custom_commands: &[CustomCommand],
+    ) -> Result<Self, CallError> {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
                 "purge_keys_async" => Ok(Self::PurgeKeysAsync),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
-                _ => Err(CallError::MissingExtrinsic),
+                _ => {
+                    // Match against custom commands by cmd designation or name
+                    custom_commands
+                        .iter()
+                        .find(|c| c.cmd() == input || c.name.to_lowercase() == input)
+                        .map(|c| Self::Custom(c.clone()))
+                        .ok_or(CallError::MissingExtrinsic)
+                }
             },
-            Some((extrinsic, args)) => match extrinsic {
+            Some((command, args)) => match command {
                 "bond" => match args.split_once(' ') {
                     None => {
                         let amount = parse_standard_unit(args, decimals)?;
@@ -204,7 +217,18 @@ impl Call {
                         }
                     }
                 },
-                _ => Err(CallError::InvalidArgument(input.to_string())),
+                _ => {
+                    // Try matching custom commands that take arguments
+                    // e.g. user typed "upgrade 1.2.3" -> matches cmd "/upgrade {version}"
+                    custom_commands
+                        .iter()
+                        .find(|c| c.base_cmd() == command)
+                        .map(|c| {
+                            let values: Vec<&str> = args.split_whitespace().collect();
+                            Self::Custom(c.with_args(&values))
+                        })
+                        .ok_or(CallError::InvalidArgument(input.to_string()))
+                }
             },
         }
     }
@@ -230,6 +254,7 @@ impl std::fmt::Display for Call {
             Self::PurgeKeys => write!(f, "purge_keys"),
             Self::SetKeysAsync { .. } => write!(f, "set_keys_async"),
             Self::PurgeKeysAsync => write!(f, "purge_keys_async"),
+            Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
         }
     }
 }
@@ -272,14 +297,15 @@ impl ToDescription for Call {
             }
             Self::SetPayee { .. } => "Set reward destination".to_string(),
             Self::Validate { .. } => {
-                "Validate/Change commission or enable/disable nominations".to_string()
+                "Validate or change commission settings, or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
             Self::SetKeys { .. } | Self::SetKeysAsync { .. } => {
-                "Set session keys from the output of 'author_rotateKeysWithOwner' RPC call"
+                "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
             }
             Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),
+            Self::Custom(custom) => custom.to_string(),
         }
     }
 }
@@ -306,6 +332,7 @@ impl ToPlaceholder for Call {
                 "set_keys_async <hex-session-keys> <hex-proof>".to_string()
             }
             Self::PurgeKeysAsync => "purge_keys_async".to_string(),
+            Self::Custom(custom) => custom.placeholder(),
         }
     }
 }
@@ -335,6 +362,7 @@ impl ToMethod for Call {
                 format!("staking_rc_client.set_keys {keys} {proof}")
             }
             Self::PurgeKeysAsync => "staking_rc_client.purge_keys".to_string(),
+            Self::Custom(custom) => format!("custom.{}", custom.cmd()),
         }
     }
 }

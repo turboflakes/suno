@@ -89,6 +89,7 @@ pub enum InputAction {
     Unfocus,
     Lock,
     Paste(String),
+    Success(String),
     Error(String),
 }
 

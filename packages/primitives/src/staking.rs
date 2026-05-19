@@ -1,5 +1,5 @@
 use crate::display::{format_millis, to_compact_string};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::{
     str::FromStr,
@@ -169,7 +169,7 @@ impl StakeLedger {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Payee {
     #[default]

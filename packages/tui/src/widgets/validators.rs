@@ -385,16 +385,20 @@ impl ValidatorsListWidget {
                             let validator = Validator::new(*chain_name, *stash);
                             self.add_validator(&validator);
                         }
-                        NodeConfig::Detailed { stash, .. } => {
-                            let validator = Validator::new(*chain_name, *stash);
+                        NodeConfig::Detailed {
+                            stash,
+                            host_rpc,
+                            ssh,
+                            commands,
+                            ..
+                        } => {
+                            let mut validator = Validator::new(*chain_name, *stash);
+                            validator.host_rpc = host_rpc.clone();
+                            validator.ssh = ssh.clone();
+                            if let Some(cmds) = commands {
+                                validator.commands = cmds.clone();
+                            }
                             self.add_validator(&validator);
-
-                            // TODO: Implement command handling
-                            // if let Some(cmds) = commands {
-                            //     for cmd in cmds {
-                            //         println!("  Command: {} ({})", cmd.name, cmd.run);
-                            //     }
-                            // }
                         }
                     }
                 }
@@ -473,6 +477,14 @@ impl ValidatorsListWidget {
         let state = self.state.read().unwrap();
         if let Some(v) = state.get_selected() {
             return v.is_proxy_valid();
+        }
+        false
+    }
+
+    pub fn is_commands_available(&self) -> bool {
+        let state = self.state.read().unwrap();
+        if let Some(v) = state.get_selected() {
+            return v.is_commands_available();
         }
         false
     }

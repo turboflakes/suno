@@ -1,3 +1,5 @@
+use crate::access::SshConfig;
+use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
 use crate::themes::{default_active_theme, Themes};
@@ -6,6 +8,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
@@ -25,16 +28,6 @@ lazy_static! {
 }
 
 type Stash = AccountId32;
-
-/// Provides default value for the configuration file path
-fn default_config_path() -> &'static str {
-    ".config.yaml"
-}
-
-/// Provides default value for the proxy account file path
-fn default_proxy_path() -> String {
-    ".proxy_account.json".to_string()
-}
 
 /// Provides default value for Themes struct
 fn default_themes() -> Themes {
@@ -64,20 +57,63 @@ pub struct ChainConfig {
     pub collators: Vec<NodeConfig>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Host(SocketAddr);
+
+impl Host {
+    pub fn new(ip: IpAddr, port: u16) -> Self {
+        Self(SocketAddr::new(ip, port))
+    }
+
+    pub fn new_with_port(port: u16) -> Self {
+        Self(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+    }
+
+    pub fn http_url(&self) -> String {
+        format!("http://{}", self.0)
+    }
+
+    pub fn ws_url(&self) -> String {
+        format!("ws://{}", self.0)
+    }
+
+    pub fn ip(&self) -> std::net::IpAddr {
+        self.0.ip()
+    }
+
+    pub fn port(&self) -> u16 {
+        self.0.port()
+    }
+
+    pub fn into(&self) -> SocketAddr {
+        self.0
+    }
+
+    pub fn as_tuple(&self) -> (IpAddr, u16) {
+        (self.0.ip(), self.0.port())
+    }
+}
+
+impl Default for Host {
+    fn default() -> Self {
+        Self(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 9944))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum NodeConfig {
     Address(Stash),
     Detailed {
         stash: Stash,
-        commands: Option<Vec<Command>>,
+        #[serde(default)]
+        host_rpc: Host,
+        #[serde(default)]
+        ssh: Option<SshConfig>,
+        #[serde(default)]
+        commands: Option<Vec<CustomCommand>>,
     },
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Command {
-    pub name: String,
-    pub run: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,6 +134,11 @@ impl Default for Features {
             enable_rpcs: false,
         }
     }
+}
+
+/// Provides default value for the proxy account file path
+fn default_proxy_path() -> String {
+    ".proxy_account.json".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -169,6 +210,23 @@ impl Config {
         // Validate themes
         self.themes.validate()?;
 
+        // Validate custom commands don't clash with built-in call names
+        for chain in &self.chains {
+            for chain_config in chain.values() {
+                for node in chain_config.validators.iter() {
+                    if let NodeConfig::Detailed {
+                        commands: Some(commands),
+                        ..
+                    } = node
+                    {
+                        for command in commands {
+                            command.validate()?;
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -195,6 +253,11 @@ impl Config {
     fn set_default_theme(&mut self) {
         self.themes.active = default_active_theme();
     }
+}
+
+/// Provides default value for the configuration file path
+fn default_config_path() -> &'static str {
+    ".config.yaml"
 }
 
 fn get_config() -> Result<Config, Error> {
@@ -252,6 +315,7 @@ fn get_config() -> Result<Config, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::custom::{CommandKind, CustomCalls};
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -272,24 +336,48 @@ mod tests {
     }
 
     #[test]
-    fn test_detailed_with_commands() {
+    fn test_detailed_with_host_and_commands() {
         let yaml = r#"
             stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            host_rpc: 10.10.10.1:9944
             commands:
               - name: Ping
+                cmd: ping
                 run: "echo 'Ping'"
+
+              - name: Rotate and Set keys
+                uses: calls/rotate_and_set_keys
         "#;
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
         match config {
-            NodeConfig::Detailed { stash, commands } => {
+            NodeConfig::Detailed {
+                stash,
+                host_rpc,
+                commands,
+                ..
+            } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
+                assert_eq!(host_rpc.http_url(), "http://10.10.10.1:9944");
                 let commands = commands.unwrap();
                 assert_eq!(commands[0].name, "Ping");
-                assert_eq!(commands[0].run, "echo 'Ping'");
+                match &commands[0].kind {
+                    CommandKind::Shell { cmd, run } => {
+                        assert_eq!(cmd.as_deref(), Some("ping"));
+                        assert_eq!(run, "echo 'Ping'");
+                    }
+                    _ => panic!("Expected Shell command"),
+                }
+                assert_eq!(commands[1].name, "Rotate and Set keys");
+                match &commands[1].kind {
+                    CommandKind::Uses(cmd) => {
+                        assert!(matches!(cmd, CustomCalls::RotateAndSetKeys));
+                    }
+                    _ => panic!("Expected Uses command"),
+                }
             }
             _ => panic!("Expected Detailed variant"),
         }
@@ -303,7 +391,9 @@ mod tests {
         let config: NodeConfig = serde_yaml::from_str(yaml).unwrap();
 
         match config {
-            NodeConfig::Detailed { stash, commands } => {
+            NodeConfig::Detailed {
+                stash, commands, ..
+            } => {
                 assert_eq!(
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"

@@ -44,6 +44,7 @@ hex = "0.4"
 indoc = "2"
 lazy_static = "1.5"
 log = "0.4"
+openssh = { version = "0.11", features = ["native-mux"] }
 ratatui = "0.29.0"
 regex = "1.11"
 scale-encode = "0.10.1"
@@ -52,6 +53,7 @@ secrecy = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.9"
+shellexpand = "3.1.2"
 sp-arithmetic = "28.0.0"
 sp-core = "39.0.0"
 strum = { version = "0.26.3", features = ["derive"] }

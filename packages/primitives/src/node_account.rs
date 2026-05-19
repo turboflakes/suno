@@ -44,6 +44,10 @@ impl NodeAccount {
         self.account_key.stash()
     }
 
+    pub fn public_key(&self) -> String {
+        format!("0x{}", hex::encode(self.account_key.stash()))
+    }
+
     pub fn identity(&self) -> &Option<Identity> {
         &self.identity
     }

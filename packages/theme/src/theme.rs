@@ -80,6 +80,7 @@ impl Theme {
                 suffix: Style::new().fg(p.color_15),
                 suffix_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 error: Style::new().fg(p.color_15).add_modifier(Modifier::ITALIC),
+                success: Style::new().fg(p.color_13).add_modifier(Modifier::ITALIC),
             },
             logo: Logo {
                 base: Style::new().bg(p.background).fg(p.foreground),
@@ -216,6 +217,7 @@ pub struct Input {
     pub suffix: Style,
     pub suffix_active: Style,
     pub error: Style,
+    pub success: Style,
 }
 
 impl Input {
