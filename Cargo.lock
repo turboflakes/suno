@@ -646,6 +646,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 
 [[package]]
+name = "base32"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "022dfe9eb35f19ebbcb51e0b40a5ab759f46ad60cadf7297e0bd085afb50e076"
+
+[[package]]
 name = "base58"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1660,6 +1666,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastbloom"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef975e30683b2d965054bb0a836f8973857c4ebf6acf274fe46617cd285060d8"
+dependencies = [
+ "foldhash 0.2.0",
+ "libm",
+ "portable-atomic",
+ "siphasher",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2054,7 +2072,6 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.1.5",
- "serde",
 ]
 
 [[package]]
@@ -2730,6 +2747,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.16.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
+dependencies = [
+ "hashbrown 0.16.1",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3221,6 +3247,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "portable-atomic"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
+
+[[package]]
 name = "potential_utf"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3371,7 +3403,7 @@ dependencies = [
  "indoc",
  "instability",
  "itertools 0.13.0",
- "lru",
+ "lru 0.12.5",
  "paste",
  "strum",
  "unicode-segmentation",
@@ -4203,13 +4235,14 @@ dependencies = [
 
 [[package]]
 name = "smoldot"
-version = "0.20.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "724ab10d6485cccb4bab080ce436c0b361295274aec7847d7ba84ab1a79a5132"
+checksum = "9879c3b19576797ad597164a07898aab5c6a99d9aed38a7d17120cace4c0f187"
 dependencies = [
  "arrayvec 0.7.6",
  "async-lock",
  "atomic-take",
+ "base32",
  "base64",
  "bip39",
  "blake2-rfc",
@@ -4220,10 +4253,11 @@ dependencies = [
  "ed25519-zebra",
  "either",
  "event-listener",
+ "fastbloom",
  "fnv",
  "futures-lite",
  "futures-util",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.1",
  "hex",
  "hmac 0.12.1",
  "itertools 0.14.0",
@@ -4257,9 +4291,9 @@ dependencies = [
 
 [[package]]
 name = "smoldot-light"
-version = "0.18.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8b4d4971f06f2471f4e57a662dbe8047fa0cc020957764a6211f3fad371f7bd"
+checksum = "e376a31b252053309ef1668c750ef54b2ed82d408beb40d88a018ecd2c0079ae"
 dependencies = [
  "async-channel",
  "async-lock",
@@ -4273,11 +4307,11 @@ dependencies = [
  "futures-channel",
  "futures-lite",
  "futures-util",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.1",
  "hex",
  "itertools 0.14.0",
  "log",
- "lru",
+ "lru 0.16.4",
  "parking_lot",
  "pin-project",
  "rand",
@@ -4545,8 +4579,8 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subxt"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "async-trait",
  "derive-where",
@@ -4585,8 +4619,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-codegen"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "heck",
  "parity-scale-codec",
@@ -4601,8 +4635,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-lightclient"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "futures",
  "futures-util",
@@ -4617,8 +4651,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-macro"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "darling 0.20.11",
  "parity-scale-codec",
@@ -4633,8 +4667,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-metadata"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "frame-decode",
  "frame-metadata",
@@ -4649,8 +4683,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-rpcs"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "derive-where",
  "finito",
@@ -4673,8 +4707,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-signer"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "base64",
  "bip39",
@@ -4701,8 +4735,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-utils-accountid32"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "base58",
  "blake2",
@@ -4716,8 +4750,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-utils-fetchmetadata"
-version = "0.50.0"
-source = "git+https://github.com/paritytech/subxt#0d76d31ec5c7648227e6a2e75a0eab530674b69c"
+version = "0.50.1"
+source = "git+https://github.com/paritytech/subxt#38c35ef1961021502ddb79ac117d3db354a0e8d9"
 dependencies = [
  "hex",
  "parity-scale-codec",
