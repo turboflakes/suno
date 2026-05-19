@@ -46,6 +46,8 @@ pub struct PopupState {
     mode: Mode,
     input: InputFieldWidget,
     spinner: Spinner,
+    title: Option<String>,
+    label: Option<String>,
 }
 
 impl Default for PopupState {
@@ -57,6 +59,8 @@ impl Default for PopupState {
             mode: Mode::default(),
             input: InputFieldWidget::new(),
             spinner: Spinner::default(),
+            title: None,
+            label: None,
         }
     }
 }
@@ -156,6 +160,9 @@ impl PopupWidget {
         if !validator.is_proxy_valid() && !validator.is_commands_available() {
             return;
         }
+
+        // Set pop-up title as the validator selected
+        state.title = Some(validator.display_identity());
 
         let runtime = validator.runtime().asset_hub_runtime();
 
@@ -310,6 +317,12 @@ impl PopupWidget {
                 }));
             }
         });
+
+        // Set pop-up label as the validator configured host, only if customs commands
+        // are configured
+        if validator.commands.len() > 0 {
+            state.label = Some(validator.host());
+        }
 
         // For each custom commands, push the respective calls depending on the validator's status.
         validator.commands.iter().for_each(|c| {
@@ -574,10 +587,6 @@ impl Widget for &PopupWidget {
 
 fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let theme = CONFIG.theme();
-    let block = Block::new()
-        .style(theme.block.active)
-        .padding(Padding::symmetric(0, 1));
-
     let options = state.get_options_filtered();
 
     let rows = options.iter().map(|f| {
@@ -587,19 +596,48 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     // Split the area into top header to show all options, a small central box to show the input field
     // and a bottom footer to show the error message
-    let top_len = (options.len() as u16 + 3).clamp(4, 10);
-    let [details_area, input_area] = Layout::default()
+    let details_len = (options.len() as u16 + 5).clamp(4, 10);
+    let [top_area, details_area, input_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Max(top_len), // Top header
-            Constraint::Length(5),    // InputField as command mode (input (3) + invalid msg (2))
+            Constraint::Length(2),
+            Constraint::Max(details_len), // Top header
+            Constraint::Length(5), // InputField as command mode (input (3) + invalid msg (2))
         ])
         .flex(Flex::End)
         .areas(area);
 
-    // NOTE: Clear top header background and skip the inputfield, since is better
-    // to be managed in the input widget
-    Clear.render(details_area, buf);
+    let block = Block::new()
+        .style(theme.block.active)
+        .padding(Padding::new(1, 1, 1, 0));
+
+    let mut header_line = vec![];
+
+    if state.title.is_some() {
+        let title = Span::styled(
+            state.title.as_deref().unwrap_or_default(),
+            theme.paragraph.header(true),
+        );
+        header_line.push(title);
+    }
+
+    if state.label.is_some() {
+        let label = Span::styled(
+            format!(" ({})", state.label.as_deref().unwrap_or_default()),
+            theme.paragraph.label(true),
+        );
+        header_line.push(label);
+    }
+
+    let header = Line::from(header_line).alignment(Alignment::Right);
+
+    let top = Paragraph::new(header)
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    Clear.render(top_area, buf);
+
+    top.render(top_area, buf);
 
     let widths = [
         Constraint::Length(2),
@@ -608,13 +646,19 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
         Constraint::Length(2),
     ];
 
-    let header_labels = vec!["", "command", "description", ""];
+    let table_labels = vec!["", "command", "description", ""];
+
+    let block = Block::new()
+        .style(theme.block.active)
+        .padding(Padding::bottom(1));
 
     let table = Table::new(rows, widths)
         .block(block)
-        .header(Row::new(header_labels).style(theme.table.header))
+        .header(Row::new(table_labels).style(theme.table.header))
         .style(theme.table.base)
         .row_highlight_style(theme.table.row_highlight(state.is_visible));
+
+    Clear.render(details_area, buf);
 
     StatefulWidget::render(table, details_area, buf, &mut state.table_state);
 

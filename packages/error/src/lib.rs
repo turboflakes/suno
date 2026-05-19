@@ -42,6 +42,8 @@ pub enum Error {
     Clipboard(#[from] arboard::Error),
     #[error("Unsupported runtime: {0}")]
     UnsupportedRuntime(SupportedRuntime),
+    #[error("Config error: {0}")]
+    Config(#[from] Box<suno_config::Error>),
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -1,4 +1,4 @@
-use crate::bridge::{customs, sync, RuntimeCaller};
+use crate::bridge::{custom, sync, RuntimeCaller};
 use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
@@ -22,7 +22,7 @@ use suno_actions::{
     Action, ChainAction, InputAction, NavigationAction, PopupAction, SystemAction, TxAction,
     ValidatorAction,
 };
-use suno_config::{CommandKind, CustomCalls, CustomCommand, SupportedRuntime, CONFIG};
+use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_signer::get_address_from_json_file;
@@ -955,13 +955,13 @@ impl App {
             CommandKind::Shell { run, .. } => {
                 tokio::spawn(async move {
                     let run = run.replace("{stash}", &validator.key().stash().to_string());
-                    let access = customs::NodeAccess::from_validator(&validator);
+                    let access = NodeAccess::from_ssh_config(validator.ssh.as_ref());
                     let result = access.execute_shell(&run).await;
                     match result {
                         Ok(_) => {
                             let msg = format!(
                                 "Command '{}' succeeded for {} on host {}.",
-                                custom.name,
+                                run,
                                 validator.display_name(4),
                                 validator.host(),
                             );
@@ -970,7 +970,7 @@ impl App {
                         Err(e) => {
                             let msg = format!(
                                 "Command '{}' failed for {} on host {}.",
-                                custom.name,
+                                run,
                                 validator.display_name(4),
                                 validator.host(),
                             );
@@ -1010,7 +1010,7 @@ impl App {
                     let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
-                        let result = customs::rotate_keys(&validator).await;
+                        let result = custom::rotate_keys(&validator).await;
                         match result {
                             Ok((keys, proof)) => {
                                 // Instantiate `set_keys_async` as the recommended call to be triggered
@@ -1063,7 +1063,7 @@ impl App {
                 }
                 CustomCalls::HasKeys => {
                     tokio::spawn(async move {
-                        let result = customs::has_keys(&validator).await;
+                        let result = custom::has_keys(&validator).await;
                         match result {
                             Ok(true) => {
                                 let msg = format!(
@@ -1096,7 +1096,7 @@ impl App {
                 }
                 CustomCalls::HasQueuedKeys => {
                     tokio::spawn(async move {
-                        let result = customs::has_queued_keys(&validator).await;
+                        let result = custom::has_queued_keys(&validator).await;
                         match result {
                             Ok(true) => {
                                 let msg = format!(
