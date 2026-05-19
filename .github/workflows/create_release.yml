@@ -14,7 +14,7 @@ jobs:
     name: Build on self-hosted (ubuntu-latest)
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -60,7 +60,7 @@ jobs:
     name: Build on macOS (aarch64-apple-darwin)
     runs-on: macos-latest # GitHub-hosted; use macos-14 for guaranteed Apple Silicon
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -110,7 +110,7 @@ jobs:
       - build-macos-aarch64
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
