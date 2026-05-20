@@ -60,7 +60,7 @@ impl NodeAccess {
             Self::Ssh(config) => {
                 let session = open_ssh_session(config).await?;
 
-                let output = session
+                let output_result = session
                     .command("curl")
                     .arg("-s")
                     .arg("-X")
@@ -72,19 +72,22 @@ impl NodeAccess {
                     .arg(url)
                     .output()
                     .await
-                    .map_err(|e| Error::RemoteExecution(format!("Remote curl failed: {}", e)))?;
+                    .map_err(|e| Error::RemoteExecution(format!("Remote curl failed: {}", e)));
 
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(Error::RemoteExecution(format!(
-                        "curl exited with error: {}",
-                        stderr
-                    )));
-                }
+                let result = match output_result {
+                    Err(e) => Err(e),
+                    Ok(output) if !output.status.success() => {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        Err(Error::RemoteExecution(format!(
+                            "curl exited with error: {}",
+                            stderr
+                        )))
+                    }
+                    Ok(output) => Ok(output.stdout),
+                };
 
                 session.close().await.ok();
-
-                Ok(output.stdout)
+                result
             }
         }
     }
@@ -114,27 +117,29 @@ impl NodeAccess {
             Self::Ssh(config) => {
                 let session = open_ssh_session(config).await?;
 
-                let output = session
+                let output_result = session
                     .command("sh")
                     .arg("-c")
                     .arg(run)
                     .output()
                     .await
-                    .map_err(|e| Error::RemoteExecution(format!("Remote shell failed: {}", e)))?;
+                    .map_err(|e| Error::RemoteExecution(format!("Remote shell failed: {}", e)));
 
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(Error::RemoteExecution(format!(
-                        "shell exited with error: {}",
-                        stderr
-                    )));
-                }
-
-                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let result = match output_result {
+                    Err(e) => Err(e),
+                    Ok(output) if !output.status.success() => {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        Err(Error::RemoteExecution(format!(
+                            "curl exited with error: {}",
+                            stderr
+                        )))
+                    }
+                    Ok(output) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
+                };
 
                 session.close().await.ok();
 
-                Ok(stdout)
+                result
             }
         }
     }
