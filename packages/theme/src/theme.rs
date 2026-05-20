@@ -45,7 +45,7 @@ impl Theme {
             table: Table {
                 base: Style::new().fg(p.color_01),
                 header: Style::new().fg(p.color_13),
-                header_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
+                header_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 row_highlight: Style::default(),
                 row_highlight_active: Style::new()
                     .bg(p.selection_background)
@@ -54,10 +54,10 @@ impl Theme {
             paragraph: Paragraph {
                 base: Style::new().fg(p.color_01),
                 base_active: Style::new().fg(p.color_00),
-                header: Style::new().fg(p.color_12),
-                header_active: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
-                label: Style::new().fg(p.color_05),
-                label_active: Style::new().fg(p.color_05).add_modifier(Modifier::BOLD),
+                header: Style::new().fg(p.color_13),
+                header_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
+                label: Style::new().fg(p.color_04),
+                label_active: Style::new().fg(p.color_04).add_modifier(Modifier::BOLD),
                 label_inverse: Style::new().fg(p.color_14),
                 cell: Style::default(),
                 cell_active: Style::new()
@@ -75,7 +75,7 @@ impl Theme {
                     .add_modifier(Modifier::SLOW_BLINK),
                 label: Style::new().fg(p.color_13).add_modifier(Modifier::BOLD),
                 placeholder: Style::new().fg(p.color_04),
-                prefix: Style::new().fg(p.color_15),
+                prefix: Style::new().fg(p.color_14),
                 prefix_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 suffix: Style::new().fg(p.color_15),
                 suffix_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
