@@ -45,6 +45,9 @@ impl Payload for RawPayload {
 
 impl RawPayload {
     pub fn from_bytes(metadata: &Metadata, bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() < 2 {
+            return Err(Error::InvalidBytes);
+        }
         let pallet = metadata
             .pallet_by_call_index(bytes[0])
             .ok_or(Error::PalletNotFound)?;
@@ -63,6 +66,8 @@ impl RawPayload {
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("Call data must be at least 2 bytes (pallet index + call index)")]
+    InvalidBytes,
     #[error("Pallet not found")]
     PalletNotFound,
     #[error("Call not found")]
