@@ -339,7 +339,7 @@ mod tests {
     fn test_detailed_with_host_and_commands() {
         let yaml = r#"
             stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
-            host_rpc: 10.10.10.1:9944
+            host_rpc: 192.0.2.100:9944
             commands:
               - name: Ping
                 cmd: ping
@@ -361,7 +361,7 @@ mod tests {
                     stash.to_string(),
                     "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
                 );
-                assert_eq!(host_rpc.http_url(), "http://10.10.10.1:9944");
+                assert_eq!(host_rpc.http_url(), "http://192.0.2.100:9944");
                 let commands = commands.unwrap();
                 assert_eq!(commands[0].name, "Ping");
                 match &commands[0].kind {

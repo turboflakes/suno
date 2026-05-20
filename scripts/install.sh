@@ -101,13 +101,13 @@ if [[ "$INSTALL_CONFIG" == "y" || "$INSTALL_CONFIG" == "Y" ]]; then
         cat <<EOF > "$CONFIG"
 chains:
   - polkadot:
-      rpc_url: "ws://10.10.10.1:9944"
+      rpc_url: "ws://192.0.2.1:9944"
       validators:
         - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   - asset_hub_polkadot:
-      rpc_url: "ws://10.10.10.2:9944"
+      rpc_url: "ws://192.0.2.2:9944"
   - people_polkadot:
-      rpc_url: "ws://10.10.10.3:9944"
+      rpc_url: "ws://192.0.2.3:9944"
 
 features:
   enable_validators: true

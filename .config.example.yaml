@@ -1,12 +1,12 @@
 chains:
   - polkadot:
-      rpc_url: "ws://10.10.10.1:9944"
+      rpc_url: "ws://192.0.2.1:9944"
       light_client: false
       validators:
         - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
           # host_rpc: 127.0.0.1:9944 # optional, used in curl RPC calls and falls back to 127.0.0.1:9944
           ssh: # optional, if configured all commands are executed via ssh, otherwise local
-            host: 10.10.10.10
+            host: 192.0.2.100
             user: suno_user
             # port: 22 # optional, default 22
             # identity: "~/.ssh/id_ed25519" # optional, falls back to SSH agent
@@ -29,38 +29,38 @@ chains:
               run: ~/update_stable_node.sh {version}
 
   - asset_hub_polkadot:
-      rpc_url: "ws://10.10.10.2:9944"
+      rpc_url: "ws://192.0.2.2:9944"
       light_client: false
   - people_polkadot:
-      rpc_url: "ws://10.10.10.3:9944"
+      rpc_url: "ws://192.0.2.3:9944"
       light_client: false
 
   # - kusama:
-  #     rpc_url: "ws://10.10.20.1:9944"
+  #     rpc_url: "ws://192.0.2.1:9944"
   #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   # - asset_hub_kusama:
-  #     rpc_url: "ws://10.10.20.2:9944"
+  #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
   # - people_kusama:
-  #     rpc_url: "ws://10.10.20.3:9944"
+  #     rpc_url: "ws://192.0.2.3:9944"
   #     light_client: false
 
   # - paseo:
-  #     rpc_url: "ws://10.10.30.1:9944"
+  #     rpc_url: "ws://192.0.2.1:9944"
   #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   # - asset_hub_paseo:
-  #     rpc_url: "ws://10.10.30.2:9944"
+  #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
   # - people_paseo:
-  #     rpc_url: "ws://10.10.30.3:9944"
+  #     rpc_url: "ws://192.0.2.3:9944"
   #     light_client: false
 
   # - westend:
-  #     rpc_url: "ws://10.10.40.1:9944"
+  #     rpc_url: "ws://192.0.2.1:9944"
   #     light_client: false
   #     validators:
   #       [
@@ -72,7 +72,7 @@ chains:
   #       #     - name: "test"
   #       #       run: "echo test"
   # - asset_hub_westend:
-  #     rpc_url: "ws://10.10.40.2:9944"
+  #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
   #     # collators:
   #     #   - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
