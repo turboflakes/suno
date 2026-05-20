@@ -27,6 +27,7 @@ use suno_error::{Error, ResultExt};
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_signer::get_address_from_json_file;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use zeroize::Zeroizing;
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, TuiError>;
@@ -1159,7 +1160,7 @@ impl App {
         let result = self
             .popup
             .execute_with_password(|password| -> Result<(), TuiError> {
-                let password = password.to_string();
+                let password = Zeroizing::new(password.to_string());
 
                 tokio::spawn(async move {
                     // Use spawn_blocking for CPU-intensive decrypt_json operation
