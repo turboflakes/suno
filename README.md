@@ -29,9 +29,9 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Support [commands](#commands-supported-per-proxy-type) for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
 - [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
+- [&check;] Define and *run* your own custom commands or *use* some of the builtin composed ones: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`
 
 ## Future / Ideas / Work in Progress
- - [] Config custom commands
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
  - [] RPC manual restarts and health check metrics
