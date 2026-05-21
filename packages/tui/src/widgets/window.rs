@@ -162,7 +162,25 @@ impl Window {
                         Span::raw("Purge all session keys from Asset Hub requires `StakingOperator` proxy."),
                     ]),
                     Line::from(Span::raw("")),
+                    Line::from(Span::raw("SUPPORTED CUSTOM COMMANDS").style(theme.paragraph.header(true))),
+                    Line::from(vec![
+                        Span::raw("/rotate_and_set_keys ").style(theme.paragraph.label(true)),
+                        Span::raw("Atomically rotate and set session keys."),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("/has_keys ").style(theme.paragraph.label(true)),
+                        Span::raw("Check whether the host has the current session keys."),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("/has_queued_keys ").style(theme.paragraph.label(true)),
+                        Span::raw("Check whether the host has queued session keys."),
+                    ]),
+                    Line::from(Span::raw("")),
                     Line::from(Span::raw("KEYBINDINGS").style(theme.paragraph.header(true))),
+                    Line::from(vec![
+                        Span::raw("ctrl+e ").style(theme.paragraph.label(true)),
+                        Span::raw("Show commands."),
+                    ]),
                     Line::from(vec![
                         Span::raw("ctrl+w ").style(theme.paragraph.label(true)),
                         Span::raw("Switch window."),
