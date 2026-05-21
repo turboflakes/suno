@@ -197,7 +197,7 @@ impl Validator {
         self.prefs_next.commission() != self.prefs.commission()
     }
 
-    pub fn is_next_keys_changed(&self) -> bool {
+    pub fn is_queued_keys_changed(&self) -> bool {
         self.next_keys != self.queued_keys
     }
 
