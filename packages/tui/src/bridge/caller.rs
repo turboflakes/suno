@@ -81,13 +81,13 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_chill();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::SetKeysAsync { keys, proof } => {
+                Call::SetKeys { keys, proof } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(
                         keys, proof,
                     );
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::PurgeKeysAsync => {
+                Call::PurgeKeys => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
@@ -132,12 +132,12 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_chill();
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::SetKeysAsync { keys, proof } => {
+                Call::SetKeys { keys, proof } => {
                     let rc =
                         suno_asset_hub_kusama::extrinsics::staking_rc_client_set_keys(keys, proof);
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::PurgeKeysAsync => {
+                Call::PurgeKeys => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
@@ -182,12 +182,12 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_chill();
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::SetKeysAsync { keys, proof } => {
+                Call::SetKeys { keys, proof } => {
                     let rc =
                         suno_asset_hub_paseo::extrinsics::staking_rc_client_set_keys(keys, proof);
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::PurgeKeysAsync => {
+                Call::PurgeKeys => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
@@ -232,58 +232,14 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_westend::extrinsics::staking_chill();
                     suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::SetKeysAsync { keys, proof } => {
+                Call::SetKeys { keys, proof } => {
                     let rc =
                         suno_asset_hub_westend::extrinsics::staking_rc_client_set_keys(keys, proof);
                     suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::PurgeKeysAsync => {
+                Call::PurgeKeys => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
-                }
-                _ => Err(Error::UnsupportedCall(call.to_string())),
-            },
-            Runtime::Polkadot => match call {
-                Call::SetKeys { keys, proof } => {
-                    let rc = suno_polkadot::extrinsics::session_set_keys(keys, proof);
-                    suno_polkadot::wrap_call_into_proxy(api, rc, stash)
-                }
-                Call::PurgeKeys => {
-                    let rc = suno_polkadot::extrinsics::session_purge_keys();
-                    suno_polkadot::wrap_call_into_proxy(api, rc, stash)
-                }
-                _ => Err(Error::UnsupportedCall(call.to_string())),
-            },
-            Runtime::Kusama => match call {
-                Call::SetKeys { keys, proof } => {
-                    let rc = suno_kusama::extrinsics::session_set_keys(keys, proof);
-                    suno_kusama::wrap_call_into_proxy(api, rc, stash)
-                }
-                Call::PurgeKeys => {
-                    let rc = suno_kusama::extrinsics::session_purge_keys();
-                    suno_kusama::wrap_call_into_proxy(api, rc, stash)
-                }
-                _ => Err(Error::UnsupportedCall(call.to_string())),
-            },
-            Runtime::Paseo => match call {
-                Call::SetKeys { keys, proof } => {
-                    let rc = suno_paseo::extrinsics::session_set_keys(keys, proof);
-                    suno_paseo::wrap_call_into_proxy(api, rc, stash)
-                }
-                Call::PurgeKeys => {
-                    let rc = suno_paseo::extrinsics::session_purge_keys();
-                    suno_paseo::wrap_call_into_proxy(api, rc, stash)
-                }
-                _ => Err(Error::UnsupportedCall(call.to_string())),
-            },
-            Runtime::Westend => match call {
-                Call::SetKeys { keys, proof } => {
-                    let rc = suno_westend::extrinsics::session_set_keys(keys, proof);
-                    suno_westend::wrap_call_into_proxy(api, rc, stash)
-                }
-                Call::PurgeKeys => {
-                    let rc = suno_westend::extrinsics::session_purge_keys();
-                    suno_westend::wrap_call_into_proxy(api, rc, stash)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
