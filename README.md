@@ -29,7 +29,9 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Support [commands](#commands-supported-per-proxy-type) for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
 - [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
-- [&check;] Define and *run* your own custom commands or *use* some of the builtin composed ones: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`
+- [&check;] Define and **run** user-specific commands linked to each configured validator.
+- [&check;] Explicitly **use** advanced builtin commands: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`.
+- [&check;] Execute custom commands locally or remotely.
 
 ## Future / Ideas / Work in Progress
  - [] Pro / Advanced mode to show validators key insight metrics
@@ -46,7 +48,7 @@ As a nominator you can just as easily check the validators you nominate.
  - Restricted Proxy-Only operations with only three proxy types supported:
     - Staking, StakingOperator (Asset Hub)
     - NonTransfer (Relay Chain)
- - Proxy account must be an account with password exported from [PJS/PDS](https://polkadot.js.org/extension/).
+ - Proxy account must be an account with password exported from [PJS](https://polkadot.js.org/extension/).
  
 ## Installation
 
@@ -106,7 +108,30 @@ chains:
   - kusama:
       rpc_url: "__WSS_KUSAMA_RPC_PROVIDER__"
       validators:
-        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        - stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          ssh: # optional, if configured all commands are executed via ssh, otherwise local
+            host: 192.0.2.100
+            user: suno_user
+            # port: 22 # optional, default 22
+            # identity: "~/.ssh/id_ed25519" # optional, falls back to SSH agent
+          commands:
+            - name: Rotate and Set keys
+              uses: "calls/rotate_and_set_keys"
+
+            - name: Has session keys
+              uses: "calls/has_keys"
+
+            - name: Has queued session keys
+              uses: "calls/has_queued_keys"
+
+            - name: Restart service
+              cmd: /restart
+              run: systemctl restart the-node-01.service
+
+            - name: Upgrade node binary
+              cmd: /upgrade {version}
+              run: ~/update_stable_node.sh {version}
+              
   - asset_hub_kusama:
       rpc_url: "__WSS_KUSAMA_HUB_RPC_PROVIDER__"
       
@@ -168,7 +193,7 @@ To operate and execute extrinsics onchain, a proxy account with at least one of 
 ### Proxy Account configuration
 
 #### Step 1
-Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [PJS/PDS](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
+Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [PJS](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
 ```json
 {
   "encoded": "J2FFcPHAY11Pmq/38eqbwfUv9OPitYJs+oYgahBvlagAAAIAAQAAAAgAAAB5o0DwXCWDblsH+9pc++RaBO4fpHBHzUirHFHFE9yS3sDzgAIQjhgvPqJ3ODrMR2gy7vk0VZg1fyirIvmsrfjGbWnOI8YU0joX0tYytroyWaykFKtZJMmE0pNKcJ5dJmDxscbK53Ac+7ld2UdH07yKPXxmPuYNNw3vKx8cg9CdQgifKfzQxHnC+EUpOoHPLwGlHsFEYtIlQtngqd9n",
