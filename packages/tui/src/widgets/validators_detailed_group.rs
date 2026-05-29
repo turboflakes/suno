@@ -330,6 +330,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
+        let show_host = validators.iter().any(|v| !v.commands.is_empty());
+
         let show_bonded = validators.iter().any(|v| v.self_stake() != v.bounded());
 
         let show_unlocking = validators
@@ -364,25 +366,30 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             };
 
             let mut validator_cells = vec![
-                Cell::from(Text::from(format!("{}", v.status())).alignment(Alignment::Left)),
+                Cell::from(Text::from(v.status().to_string()).alignment(Alignment::Left)),
                 Cell::from(Text::from(v.display_identity()).alignment(Alignment::Left))
                     .style(cell_style),
-                Cell::from(text_points.alignment(Alignment::Right)),
-                Cell::from(
-                    Line::from(vec![
-                        Span::raw(format_planks(staked_total, decimals, 4)),
-                        span_symbol.clone(),
-                    ])
-                    .alignment(Alignment::Right),
-                ),
-                Cell::from(
-                    Line::from(vec![
-                        Span::raw(format_planks(v.self_stake(), decimals, 4)),
-                        span_symbol.clone(),
-                    ])
-                    .alignment(Alignment::Right),
-                ),
             ];
+
+            if show_host {
+                validator_cells.push(Cell::from(Text::from(v.host()).alignment(Alignment::Left)));
+            }
+
+            validator_cells.push(Cell::from(text_points.alignment(Alignment::Right)));
+            validator_cells.push(Cell::from(
+                Line::from(vec![
+                    Span::raw(format_planks(staked_total, decimals, 4)),
+                    span_symbol.clone(),
+                ])
+                .alignment(Alignment::Right),
+            ));
+            validator_cells.push(Cell::from(
+                Line::from(vec![
+                    Span::raw(format_planks(v.self_stake(), decimals, 4)),
+                    span_symbol.clone(),
+                ])
+                .alignment(Alignment::Right),
+            ));
 
             if show_bonded {
                 if v.self_stake() != v.bounded() {
@@ -484,6 +491,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Constraint::Fill(2),
         ];
 
+        if show_host {
+            widths.push(Constraint::Fill(2));
+        }
+
         if show_bonded {
             widths.push(Constraint::Fill(2));
         }
@@ -513,10 +524,17 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("points").alignment(Alignment::Right)),
-            Cell::from(Text::from("total").alignment(Alignment::Right)),
-            Cell::from(Text::from("own-stake").alignment(Alignment::Right)),
         ];
+
+        if show_host {
+            header_cells.push(Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
+
+        header_cells.push(Cell::from(Text::from("points").alignment(Alignment::Right)));
+        header_cells.push(Cell::from(Text::from("total").alignment(Alignment::Right)));
+        header_cells.push(Cell::from(
+            Text::from("own-stake").alignment(Alignment::Right),
+        ));
 
         if show_bonded {
             header_cells.push(Cell::from(
