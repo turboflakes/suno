@@ -892,12 +892,7 @@ impl App {
     }
 
     pub fn handle_extrinsic_calls(&mut self, call: Call, validator: Validator) {
-        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-        let runtime = if call.is_call_on_relay_chain() {
-            validator.runtime().relay_chain()
-        } else {
-            validator.runtime().asset_hub_runtime()
-        };
+        let runtime = validator.runtime().asset_hub_runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
@@ -990,9 +985,6 @@ impl App {
             }
             CommandKind::Uses(calls) => match calls {
                 CustomCalls::RotateAndSetKeys => {
-                    // NOTE: In the future setting session keys will only be available via AH. After successufuly executing /rotate_keys
-                    // the recommended call to execute immediately afterward will be 'set_keys_async'.
-                    // For that reason, the correct runtime to choose here is AH and not RC
                     let runtime = validator.runtime().asset_hub_runtime();
 
                     let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
@@ -1014,8 +1006,7 @@ impl App {
                         let result = custom::rotate_keys(&validator).await;
                         match result {
                             Ok((keys, proof)) => {
-                                // Instantiate `set_keys_async` as the recommended call to be triggered
-                                let call = Call::SetKeysAsync { keys, proof };
+                                let call = Call::SetKeys { keys, proof };
 
                                 let at_block = match api.at_current_block().await.boxed() {
                                     Ok(client) => client,
@@ -1134,16 +1125,7 @@ impl App {
 
     /// Handle enter when popup is in confirmation mode, showing call details and input field as password
     pub fn on_confirm_enter(&mut self, validator: Validator) {
-        let Some(call) = self.popup.get_selected_call() else {
-            return;
-        };
-
-        // NOTE: Specific case where some calls are meant to be sent to RC and not AH
-        let runtime = if call.is_call_on_relay_chain() {
-            validator.runtime().relay_chain()
-        } else {
-            validator.runtime().asset_hub_runtime()
-        };
+        let runtime = validator.runtime().asset_hub_runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;

@@ -294,28 +294,6 @@ impl PopupWidget {
                     bytes: None,
                 }));
             }
-
-            let set_keys_async = Call::SetKeysAsync {
-                keys: Keys::default(),
-                proof: Proof::default(),
-            };
-            if p.proxy().can_call(&set_keys_async) && validator.is_active_or_waiting() {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: set_keys_async,
-                    bytes: None,
-                }));
-            }
-
-            let purge_keys_async = Call::PurgeKeysAsync;
-            if p.proxy().can_call(&purge_keys_async)
-                && validator.is_active_or_waiting()
-                && validator.has_keys()
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: purge_keys_async,
-                    bytes: None,
-                }));
-            }
         });
 
         // Set pop-up label as configured host, if custom commands are defined

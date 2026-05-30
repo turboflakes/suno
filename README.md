@@ -45,9 +45,8 @@ As a nominator you can just as easily check the validators you nominate.
  - Runs on the terminal.
  - No backend APIs. No indexers.
  - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
- - Restricted Proxy-Only operations with only three proxy types supported:
-    - Staking, StakingOperator (Asset Hub)
-    - NonTransfer (Relay Chain)
+ - Restricted Proxy-Only operations on Asset Hub, with only two proxy types supported:
+    - Staking or StakingOperator
  - Proxy account must be an account with password exported from [PJS](https://polkadot.js.org/extension/).
  
 ## Installation

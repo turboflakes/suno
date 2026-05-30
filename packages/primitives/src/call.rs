@@ -47,11 +47,6 @@ pub enum Call {
         proof: Proof,
     },
     PurgeKeys,
-    SetKeysAsync {
-        keys: Keys,
-        proof: Proof,
-    },
-    PurgeKeysAsync,
     Custom(CustomCommand),
 }
 
@@ -96,7 +91,6 @@ impl Call {
             None => match input {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
-                "purge_keys_async" => Ok(Self::PurgeKeysAsync),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
                 _ => {
                     // Match against custom commands by cmd designation or name
@@ -176,20 +170,6 @@ impl Call {
                         Ok(Self::SetKeys { keys, proof })
                     }
                 },
-                "set_keys_async" => match args.split_once(' ') {
-                    None => Err(CallError::MissingArgumentSilent),
-                    Some((keys, proof)) => {
-                        let keys = Keys::from_str(keys).map_err(|e| match e {
-                            KeysError::MissingHex => CallError::MissingArgumentSilent,
-                            e => CallError::InvalidKeys(e),
-                        })?;
-                        let proof = Proof::from_str(proof).map_err(|e| match e {
-                            ProofError::MissingHex => CallError::MissingArgumentSilent,
-                            e => CallError::InvalidProof(e),
-                        })?;
-                        Ok(Self::SetKeysAsync { keys, proof })
-                    }
-                },
                 "validate" => match args.split_once(' ') {
                     None => {
                         let commission = parse_percentage(args)?;
@@ -232,11 +212,6 @@ impl Call {
             },
         }
     }
-
-    /// Returns `true` if the call is meant to be sent to the relay chain.
-    pub fn is_call_on_relay_chain(&self) -> bool {
-        matches!(self, Self::SetKeys { .. } | Self::PurgeKeys)
-    }
 }
 
 impl std::fmt::Display for Call {
@@ -252,8 +227,6 @@ impl std::fmt::Display for Call {
             Self::Chill => write!(f, "chill"),
             Self::SetKeys { .. } => write!(f, "set_keys"),
             Self::PurgeKeys => write!(f, "purge_keys"),
-            Self::SetKeysAsync { .. } => write!(f, "set_keys_async"),
-            Self::PurgeKeysAsync => write!(f, "purge_keys_async"),
             Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
         }
     }
@@ -300,11 +273,11 @@ impl ToDescription for Call {
                 "Validate or change commission settings, or enable/disable nominations".to_string()
             }
             Self::Chill => "Declare no intention to validate".to_string(),
-            Self::SetKeys { .. } | Self::SetKeysAsync { .. } => {
+            Self::SetKeys { .. } => {
                 "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
             }
-            Self::PurgeKeys | Self::PurgeKeysAsync => "Remove all session keys".to_string(),
+            Self::PurgeKeys => "Remove all session keys".to_string(),
             Self::Custom(custom) => custom.to_string(),
         }
     }
@@ -328,10 +301,6 @@ impl ToPlaceholder for Call {
             Self::Chill => "chill".to_string(),
             Self::SetKeys { .. } => "set_keys <hex-session-keys> <hex-proof>".to_string(),
             Self::PurgeKeys => "purge_keys".to_string(),
-            Self::SetKeysAsync { .. } => {
-                "set_keys_async <hex-session-keys> <hex-proof>".to_string()
-            }
-            Self::PurgeKeysAsync => "purge_keys_async".to_string(),
             Self::Custom(custom) => custom.placeholder(),
         }
     }
@@ -355,13 +324,9 @@ impl ToMethod for Call {
             ),
             Self::Chill => "staking.chill".to_string(),
             Self::SetKeys { keys, proof } => {
-                format!("session.set_keys {keys} {proof}")
-            }
-            Self::PurgeKeys => "session.purge_keys".to_string(),
-            Self::SetKeysAsync { keys, proof } => {
                 format!("staking_rc_client.set_keys {keys} {proof}")
             }
-            Self::PurgeKeysAsync => "staking_rc_client.purge_keys".to_string(),
+            Self::PurgeKeys => "staking_rc_client.purge_keys".to_string(),
             Self::Custom(custom) => format!("custom.{}", custom.cmd()),
         }
     }
