@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 - Add support for custom commands defined in the configuration file `config.yaml`. Read implemendation details at [PR7](https://github.com/turboflakes/suno/pull/7)
-- Implement _Proof_ support for `/set_keys` and `/set_keys_async` on all networks
+- Implement _Proof_ support for `/set_keys` on all networks
+- Remove `/set_keys_async` and `/purge_keys_async`. All staking operations are now on Asset Hub by default, meaning `/set_keys` and `/purge_keys` are executed on AH,
+- NonTransfer proxy on the Relay chain is no longer required.
+- The validator `host` is now visible when custom commands are configured.
 - Update metadata polkadot/2002001
 - Update metadata asset-hub-polkadot/2002001
 - Update metadata people-polkadot/2001002

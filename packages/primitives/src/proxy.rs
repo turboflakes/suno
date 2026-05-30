@@ -9,6 +9,8 @@ pub type Proxy = SupportedProxy;
 /// https://docs.polkadot.com/node-infrastructure/run-a-validator/operational-tasks/staking-operator-proxy/#staking-operator-vs-staking-proxy
 pub enum SupportedProxy {
     None,
+    /// TODO: DEPRECATE NonTransfer proxy, all default staking operations are now fully supported on AH
+    ///
     /// NonTransfer proxy must be configured on the Relay chain and is limited to SetKeys/PurgeKeys
     /// extrinsics on the Relay chain
     NonTransfer,
