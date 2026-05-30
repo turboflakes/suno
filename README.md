@@ -164,12 +164,12 @@ explorer:
 ```
 
 ## Signer Account (Proxy-Only)
-To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator`, `NonTransfer` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain, and `NonTransfer` `[NT]` on the Relay chain.
+To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain.
 
 ### Commands supported per Proxy Type
   NOTE: Each `suno` command is intrinsically dependant on its availability within the runtime
 
-- **[S] Staking (Asset Hub)**
+- **[S] Staking**
   - `/bond`
   - `/bond_extra`
   - `/unbond`
@@ -178,16 +178,18 @@ To operate and execute extrinsics onchain, a proxy account with at least one of 
   - `/set_payee`
   - `/validate`
   - `/chill`
-
-- **[SO] StakingOperator (Asset Hub)**
-  - `/validate`
-  - `/chill`
-  - `/set_keys_async`
-  - `/purge_keys_async`
-  
-- **[NT] NonTransfer (Relay Chain)**
   - `/set_keys`
   - `/purge_keys`
+  - `/rotate_and_set_keys`¹
+
+- **[SO] StakingOperator**
+  - `/validate`
+  - `/chill`
+  - `/set_keys`
+  - `/purge_keys`
+  - `/rotate_and_set_keys`¹
+  
+¹ Requires explicit configuration for each validator in the config file.
 
 ### Proxy Account configuration
 
