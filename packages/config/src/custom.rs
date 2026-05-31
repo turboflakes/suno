@@ -180,7 +180,7 @@ impl CustomCalls {
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::RotateAndSetKeys => "Atomically rotate and set session keys",
+            Self::RotateAndSetKeys => "Rotate and set session keys as a single operation",
             Self::HasKeys => "Check whether the host has the current session keys",
             Self::HasQueuedKeys => "Check whether the host has queued session keys",
         }

@@ -165,7 +165,7 @@ impl Window {
                     Line::from(Span::raw("SUPPORTED CUSTOM COMMANDS").style(theme.paragraph.header(true))),
                     Line::from(vec![
                         Span::raw("/rotate_and_set_keys ").style(theme.paragraph.label(true)),
-                        Span::raw("Atomically rotate and set session keys."),
+                        Span::raw("Rotate and set session keys as a single operation."),
                     ]),
                     Line::from(vec![
                         Span::raw("/has_keys ").style(theme.paragraph.label(true)),
