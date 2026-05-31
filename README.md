@@ -227,6 +227,44 @@ signer:
 #### Step 3
 If you end up creating a brand new account, don't forget to transfer some funds to it and set up the proxy types described above for your target stashes you would like to operate via `suno`. This can be done in many other tools already available in the Polkadot ecosystem.
 
+## Custom Commands
+
+Custom commands are user defined commands or a composition of builtin commands. These are defined in the `config.yaml` file and tied to each configured `stash`. 
+
+There are two types of custom commands:
+
+#### 1. **_Shell_**
+User defined commands that are executed on the terminal, can call simple shell commands or bash script files, basically any program that can run in the terminal. As long as the configured commands e.g. `/service_restart`, `/upgrade`, `/reboot` do not clash with existing ones, they can be named anything. 
+
+####  2. **_Uses_**
+Custom calls that are builtin, but is up to the user to enable them. These can be a composition of extrinsics and RPC calls, e.g. a unique command to rotate session keys and automatically set those keys, or a simple command to check if the X host has the current session keys. These special commands are define with a prefix, e.g. `calls/rotate_and_set_keys`
+
+Below is how you can define custom commands in the `config.yaml`:
+
+```
+    validators:
+        - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+          host_rpc: 127.0.0.1:9944 # optional, used in curl RPC calls and falls back to 127.0.0.1:9944 
+
+          ssh: # optional, if configured all commands are executed via SSH, otherwise local
+            host: 192.0.2.100
+            user: suno_user
+            # port: 22 # optional, default 22
+            # identity: "~/.ssh/id_ed25519" # optional, falls back to SSH agent
+
+          commands:
+            - name: "Test custom commands"
+              cmd: /echo
+              run: "echo 'hello world' > hello.txt"
+
+            - name: "Restart service"
+              cmd: /restart
+              run: "systemctl restart the-node-01.service"
+
+            - name: "Rotate and set keys"
+              uses: "calls/rotate_and_set_keys"
+```
+
 ## Usage
 From your favourite terminal, simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
 
@@ -248,6 +286,7 @@ Options:
 ### List of keybindings
 
 ```bash
+'ctrl+e' to show list of enabled commands for the selected vaidator
 'ctrl+w' to switch window
 'ctrl+c' to quit suno
 'esc' to close popup or unfocus from input field

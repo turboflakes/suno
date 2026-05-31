@@ -5,28 +5,28 @@ chains:
       validators:
         - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
           # host_rpc: 127.0.0.1:9944 # optional, used in curl RPC calls and falls back to 127.0.0.1:9944
-          ssh: # optional, if configured all commands are executed via ssh, otherwise local
+          ssh: # optional, if configured all commands are executed via SSH, otherwise local
             host: 192.0.2.100
             user: suno_user
             # port: 22 # optional, default 22
             # identity: "~/.ssh/id_ed25519" # optional, falls back to SSH agent
           commands:
-            - name: Rotate and Set keys
+            - name: "Rotate and Set keys"
               uses: "calls/rotate_and_set_keys"
 
-            - name: Has session keys
+            - name: "Has session keys"
               uses: "calls/has_keys"
 
-            - name: Has queued session keys
+            - name: "Has queued session keys"
               uses: "calls/has_queued_keys"
 
-            - name: Restart service
+            - name: "Restart service"
               cmd: /restart
-              run: systemctl restart the-node-01.service
+              run: "systemctl restart the-node-01.service"
 
-            - name: Upgrade node binary
+            - name: "Upgrade node binary"
               cmd: /upgrade {version}
-              run: ~/update_stable_node.sh {version}
+              run: "~/update_stable_node.sh {version}"
 
   - asset_hub_polkadot:
       rpc_url: "ws://192.0.2.2:9944"
