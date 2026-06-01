@@ -65,7 +65,7 @@ subxt-signer = { git = "https://github.com/paritytech/subxt", package = "subxt-s
 subxt-rpcs = { git = "https://github.com/paritytech/subxt", package = "subxt-rpcs" }
 tempfile = "3.2"
 thiserror = "2.0"
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 toml = "1.0.7"
 tui-logger = "0.14"
 unicode-width = "0.2.0"
