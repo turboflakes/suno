@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.1] - 2026-06-02
+- Review `has_keys` and `has_queued_keys` descriptions and only show next keys when set
+
+## [0.4.0] - 2026-06-01
 - Add support for custom commands defined in the configuration file `config.yaml`. Read implemendation details at [PR7](https://github.com/turboflakes/suno/pull/7)
 - Implement _Proof_ support for `/set_keys` on all networks
 - Remove `/set_keys_async` and `/purge_keys_async`. All staking operations are now on Asset Hub by default, meaning `/set_keys` and `/purge_keys` are executed on AH,
