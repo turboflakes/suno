@@ -240,8 +240,8 @@ User defined commands that are executed on the terminal, can call simple shell c
 Custom calls that are builtin, but is up to the user to enable them. These can be a composition of extrinsics and RPC calls, e.g. a unique command to rotate session keys and automatically set those keys, or a simple command to check if the X host has the current session keys. Currently these special commands are: 
 
 - Use `calls/rotate_and_set_keys` to rotate and set session keys as a single operation (requires a proxy to be already set up).
-- Use `calls/has_keys` to check whether the host has the current session keys.
-- Use `calls/has_queued_keys` to check whether the host has queued session keys.
+- Use `calls/has_keys` to check whether the host has the next session keys.
+- Use `calls/has_queued_keys` to check whether the host has the queued session keys.
 
 **NOTE**: `curl` must be available on the host machine for RPC calls to execute successfully.
 

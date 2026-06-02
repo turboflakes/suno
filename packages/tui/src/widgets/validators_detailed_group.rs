@@ -344,7 +344,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let show_next_commission = validators.iter().any(|v| v.is_commission_changed());
 
-        let show_queued_keys = validators.iter().any(|v| v.is_queued_keys_changed());
+        let show_next_keys = validators.iter().any(|v| v.is_next_keys_changed());
 
         let mut rows = Vec::new();
 
@@ -460,12 +460,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ));
 
             validator_cells.push(Cell::from(
-                Text::from(v.display_next_keys(6)).alignment(Alignment::Right),
+                Text::from(v.display_queued_keys(6)).alignment(Alignment::Right),
             ));
 
-            if show_queued_keys && v.is_queued_keys_changed() {
+            if show_next_keys && v.is_next_keys_changed() {
                 validator_cells.push(Cell::from(
-                    Text::from(v.display_queued_keys(6)).alignment(Alignment::Left),
+                    Text::from(v.display_next_keys(6)).alignment(Alignment::Left),
                 ));
             }
 
@@ -517,7 +517,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         // queued_keys
         widths.push(Constraint::Fill(2));
 
-        if show_queued_keys {
+        if show_next_keys {
             widths.push(Constraint::Length(10));
         }
 
@@ -569,10 +569,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         header_cells.push(Cell::from(Text::from("keys").alignment(Alignment::Right)));
 
-        if show_queued_keys {
-            header_cells.push(Cell::from(
-                Text::from("(queued)").alignment(Alignment::Left),
-            ));
+        if show_next_keys {
+            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
         }
 
         // Note: If selected validator is in this group, add a column for the highlight symbol

@@ -1059,7 +1059,7 @@ impl App {
                         match result {
                             Ok(true) => {
                                 let msg = format!(
-                                    "Yes. Host {} contains the current session keys for {}.",
+                                    "Yes. Host {} contains the next session keys for {}.",
                                     validator.host(),
                                     validator.display_name(4),
                                 );
@@ -1067,7 +1067,7 @@ impl App {
                             }
                             Ok(false) => {
                                 let msg = format!(
-                                    "No. Host {} does NOT have the current session keys for {}.",
+                                    "No. Host {} does NOT have the next session keys for {}.",
                                     validator.host(),
                                     validator.display_name(4),
                                 );
@@ -1092,7 +1092,7 @@ impl App {
                         match result {
                             Ok(true) => {
                                 let msg = format!(
-                                    "Yes. Host {} has session keys QUEUED for {}",
+                                    "Yes. Host {} contains the queued session keys for {}",
                                     validator.host(),
                                     validator.display_name(4),
                                 );
@@ -1100,7 +1100,7 @@ impl App {
                             }
                             Ok(false) => {
                                 let msg = format!(
-                                    "No. Host {} does NOT have session keys QUEUED for {}.",
+                                    "No. Host {} does NOT have the queued session keys for {}.",
                                     validator.host(),
                                     validator.display_name(4),
                                 );

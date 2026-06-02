@@ -197,8 +197,8 @@ impl Validator {
         self.prefs_next.commission() != self.prefs.commission()
     }
 
-    pub fn is_queued_keys_changed(&self) -> bool {
-        self.queued_keys.is_some() && self.next_keys != self.queued_keys
+    pub fn is_next_keys_changed(&self) -> bool {
+        self.next_keys.is_some() && self.next_keys != self.queued_keys
     }
 
     pub fn is_next_authority(&self) -> bool {

@@ -169,7 +169,7 @@ impl Window {
                     ]),
                     Line::from(vec![
                         Span::raw("/has_keys ").style(theme.paragraph.label(true)),
-                        Span::raw("Check whether the host has the current session keys."),
+                        Span::raw("Check whether the host has the next session keys."),
                     ]),
                     Line::from(vec![
                         Span::raw("/has_queued_keys ").style(theme.paragraph.label(true)),
