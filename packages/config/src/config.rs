@@ -2,9 +2,10 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
+use crate::signer::Signer;
 use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -136,38 +137,6 @@ impl Default for Features {
     }
 }
 
-/// Provides default value for the proxy account file path
-fn default_proxy_path() -> String {
-    ".proxy_account.json".to_string()
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Signer {
-    #[serde(default = "default_proxy_path")]
-    proxy_path: String,
-}
-
-impl Signer {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let path = path.as_ref();
-
-        if !path.exists() {
-            warn!("Proxy path does not exist: {}", path.display());
-            return Err(Error::InvalidPath(path.display().to_string()));
-        }
-
-        let content = fs::read_to_string(path)?;
-        if content.is_empty() {
-            warn!("Proxy path content is empty: {}", path.display());
-            return Err(Error::InvalidContent(path.display().to_string()));
-        }
-
-        Ok(Signer {
-            proxy_path: path.to_string_lossy().into_owned(),
-        })
-    }
-}
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Explorer {
     url: Option<String>,
@@ -190,7 +159,7 @@ impl Config {
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
-            let signer = Signer::from_file(signer.proxy_path).ok();
+            let signer = Signer::from_file(signer.path()).ok();
             config.signer = signer;
         }
 
@@ -231,7 +200,16 @@ impl Config {
     }
 
     pub fn signer_path(&self) -> Option<String> {
-        self.signer.as_ref().map(|s| s.proxy_path.clone())
+        self.signer
+            .as_ref()
+            .map(|s| s.path().to_string_lossy().into_owned())
+    }
+
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        self.signer
+            .as_ref()
+            .ok_or_else(|| Error::SignerPathNotFound("signer".to_string()))?
+            .account_id()
     }
 
     pub fn set_signer_path(&mut self, path: &str) {

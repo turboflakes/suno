@@ -2,9 +2,7 @@ pub mod error;
 
 use crate::error::Error;
 use regex::Regex;
-use serde_json::Value;
 use std::str::FromStr;
-use subxt::utils::AccountId32;
 use subxt_signer::{polkadot_js_compat::decrypt_json, sr25519::Keypair, SecretUri};
 use suno_config::CONFIG;
 
@@ -28,30 +26,6 @@ fn load_keypair_from_json_file(password: &str) -> Result<Keypair, Error> {
     let a = decrypt_json(&raw_data, password)?;
 
     Ok(a)
-}
-
-pub fn get_address_from_json_file() -> Result<AccountId32, Error> {
-    let config = CONFIG.clone();
-
-    // Load the signer json path
-    let signer_path = config
-        .signer_path()
-        .ok_or(Error::SignerPathNotFound("json".into()))?;
-
-    // Read data from json file
-    let raw_data = std::fs::read_to_string(signer_path)?;
-
-    let json: Value = serde_json::from_str(&raw_data)
-        .map_err(|err| Error::Other(format!("Failed to parse JSON: {}", err)))?;
-
-    let address = json["address"]
-        .as_str()
-        .ok_or_else(|| Error::Other("json file does not contain public 'address'".to_string()))?;
-
-    let account =
-        AccountId32::from_str(address).map_err(|_| Error::InvalidAddress(address.to_string()))?;
-
-    Ok(account)
 }
 
 /// Helper function to generate a keypair from the content of the seed file

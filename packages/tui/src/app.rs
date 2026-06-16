@@ -25,7 +25,6 @@ use suno_actions::{
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
-use suno_signer::get_address_from_json_file;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use zeroize::Zeroizing;
 
@@ -252,6 +251,7 @@ impl App {
     }
 
     fn handle_chain_actions(&mut self, action: ChainAction) {
+        let config = CONFIG.clone();
         match action {
             ChainAction::UpdateConnectionState(chain_key, connection_state) => {
                 let is_updated = self
@@ -295,7 +295,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Ok(proxy) = get_address_from_json_file() {
+                                if let Ok(proxy) = config.signer_account_id() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,
@@ -355,7 +355,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Ok(proxy) = get_address_from_json_file() {
+                                if let Ok(proxy) = config.signer_account_id() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,
@@ -892,6 +892,7 @@ impl App {
     }
 
     pub fn handle_extrinsic_calls(&mut self, call: Call, validator: Validator) {
+        let config = CONFIG.clone();
         let runtime = validator.runtime().asset_hub_runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
@@ -901,7 +902,7 @@ impl App {
         let tx = self.tx.clone();
         let stash = validator.key().stash();
         let stash_identity = validator.display_name(3);
-        let proxy_identity = match get_address_from_json_file() {
+        let proxy_identity = match config.signer_account_id().boxed() {
             Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
             Err(e) => {
                 self.error(e.into());
@@ -945,6 +946,7 @@ impl App {
     }
 
     pub fn handle_custom_command(&mut self, custom: CustomCommand, validator: Validator) {
+        let config = CONFIG.clone();
         let tx = self.tx.clone();
 
         match custom.kind {
@@ -993,7 +995,7 @@ impl App {
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
                     let stash_identity = validator.display_name(3);
-                    let proxy_identity = match get_address_from_json_file() {
+                    let proxy_identity = match config.signer_account_id().boxed() {
                         Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
                         Err(e) => {
                             self.error(e.into());
