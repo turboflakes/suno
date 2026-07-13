@@ -831,9 +831,9 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     details.render(details_area, buf);
 
-    Clear.render(sign_area, buf);
-
     if config.is_qrcode_enabled() {
+        Clear.render(sign_area, buf);
+
         // Split the sign area into QR code and scanner camera area
         let [qrcode_area, scanner_area] = Layout::default()
             .direction(Direction::Horizontal)
