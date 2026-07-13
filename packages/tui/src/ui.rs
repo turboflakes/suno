@@ -96,23 +96,17 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
 fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     let area = match &app.popup.get_mode() {
-        PopupMode::Menu => popup_area(
-            frame.area(),
-            Constraint::Percentage(45),
-            Constraint::Percentage(80),
-            Flex::Center,
-        ),
-        PopupMode::Confirm => popup_area(
-            frame.area(),
-            Constraint::Percentage(45),
-            Constraint::Percentage(80),
-            Flex::Center,
-        ),
-        PopupMode::Transaction => popup_area(
+        PopupMode::Transaction => flex_area(
             area,
             Constraint::Percentage(100),
             Constraint::Length(3),
             Flex::End,
+        ),
+        _ => flex_area(
+            frame.area(),
+            Constraint::Percentage(54),
+            Constraint::Percentage(80),
+            Flex::Center,
         ),
     };
     frame.render_widget(&app.popup, area);
@@ -123,11 +117,9 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     }
 }
 
-fn popup_area(area: Rect, x: Constraint, y: Constraint, flex: Flex) -> Rect {
-    let horizontal = Layout::horizontal([x]).flex(flex);
-    let vertical = Layout::vertical([y]).flex(flex);
-    let [area] = vertical.areas(area);
-    let [area] = horizontal.areas(area);
+fn flex_area(area: Rect, horizontal: Constraint, vertical: Constraint, flex: Flex) -> Rect {
+    let [area] = Layout::horizontal([horizontal]).flex(flex).areas(area);
+    let [area] = Layout::vertical([vertical]).flex(flex).areas(area);
     area
 }
 
@@ -212,7 +204,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("close".to_string(), theme.paragraph.label));
             }
-            PopupMode::Confirm => {
+            PopupMode::Confirmation => {
                 legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled(

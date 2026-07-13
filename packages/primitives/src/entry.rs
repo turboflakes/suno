@@ -32,6 +32,7 @@ pub trait AsBytes {
 pub enum Command<T> {
     Text(String),
     Instruction { call: T, bytes: Option<Bytes> },
+    Data(Bytes),
 }
 
 impl<T: Display> Display for Command<T> {
@@ -39,6 +40,7 @@ impl<T: Display> Display for Command<T> {
         match self {
             Self::Text(s) => write!(f, "{}", s),
             Self::Instruction { call, .. } => write!(f, "{}", call),
+            Self::Data(d) => write!(f, "{}", to_hex(d)),
         }
     }
 }
@@ -48,6 +50,7 @@ impl<T: Display + ToPlaceholder> Command<T> {
         match self {
             Self::Text(s) => s.clone(),
             Self::Instruction { call, .. } => call.placeholder(),
+            Self::Data(_) => String::new(),
         }
     }
 }
@@ -57,6 +60,7 @@ impl<T: Display + ToDescription> Command<T> {
         match self {
             Self::Text(_) => String::new(),
             Self::Instruction { call, .. } => call.description(),
+            Self::Data(_) => String::new(),
         }
     }
 }
@@ -66,6 +70,7 @@ impl<T: Display + ToJson> Command<T> {
         match self {
             Self::Text(s) => serde_json::to_string_pretty(s).unwrap_or_default(),
             Self::Instruction { call, .. } => call.to_json(),
+            Self::Data(_) => String::new(),
         }
     }
 }
@@ -75,6 +80,7 @@ impl<T: Display + ToMethod> Command<T> {
         match self {
             Self::Text(_) => String::new(),
             Self::Instruction { call, .. } => call.to_method(),
+            Self::Data(_) => String::new(),
         }
     }
 }
@@ -84,6 +90,7 @@ impl<T: Display + ToHex> Command<T> {
         match self {
             Self::Text(s) => to_hex(s.as_bytes()),
             Self::Instruction { bytes, .. } => to_hex(bytes.clone().unwrap_or_default()),
+            Self::Data(d) => to_hex(d),
         }
     }
 }
@@ -93,6 +100,7 @@ impl<T: Display + AsBytes> Command<T> {
         match self {
             Self::Text(s) => s.as_bytes().to_vec(),
             Self::Instruction { bytes, .. } => bytes.clone().unwrap_or_default(),
+            Self::Data(d) => d.clone(),
         }
     }
 }

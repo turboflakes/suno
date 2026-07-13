@@ -3,6 +3,7 @@ members = [
     "packages/actions",
     "packages/config",
     "packages/error",
+    "packages/qrcode",
     "packages/primitives",
     "packages/signer",
     "packages/suno",
@@ -41,12 +42,18 @@ color-eyre = "0.6.3"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.31"
 hex = "0.4"
+image = "0.25"
 indoc = "2"
 lazy_static = "1.5"
 log = "0.4"
+
+nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
+qrcodegen = "1.8"
 ratatui = "0.29.0"
+ratatui-image  = { version = "9", default-features = false, features = ["image-defaults", "crossterm"] }
 regex = "1.11"
+rxing = "0.5"
 scale-encode = "0.10.1"
 scale-info = "2.11.6"
 secrecy = "0.8"

@@ -9,12 +9,10 @@ pub enum Error {
     KeypairError(#[from] subxt_signer::sr25519::Error),
     #[error("Decrypt error: {0}")]
     DecryptError(#[from] subxt_signer::polkadot_js_compat::Error),
-    // #[error("SS58 error: {0}")]
-    // FromSs58Error(#[from] subxt_utils_accountid32::FromSs58Error),
     #[error("Invalid address {0}")]
     InvalidAddress(String),
-    #[error("Signer {0} path not specified")]
-    SignerPathNotFound(String),
+    #[error("Path not found")]
+    PathNotFound,
     #[error("Other error: {0}")]
     Other(String),
 }

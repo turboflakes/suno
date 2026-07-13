@@ -508,7 +508,7 @@ pub fn spawn_fetch_account_balance(
 // ----
 // Caller tasks
 // ----
-pub fn spawn_sign_and_submit(
+pub fn spawn_sign_and_submit_call_data(
     api: &OnlineClient<SubstrateConfig>,
     runtime: SupportedRuntime,
     signer: &Keypair,
@@ -544,6 +544,78 @@ pub fn spawn_sign_and_submit(
         }
     });
 }
+
+pub fn spawn_submit_call_data_with_signature(
+    api: &OnlineClient<SubstrateConfig>,
+    runtime: SupportedRuntime,
+    signer: &AccountId32,
+    call_data: &[u8],
+    signature: &[u8],
+    tx: &UnboundedSender<Action>,
+) {
+    let api = api.clone();
+    let tx = tx.clone();
+    let signer = *signer;
+    let call_data = call_data.to_owned();
+    let signature = signature.to_owned();
+
+    let _ = tx.send(Action::Transaction(TxAction::Processing));
+
+    tokio::spawn(async move {
+        let result = runtime
+            .submit_call_data_with_signature(&api, &signer, &call_data, &signature)
+            .await;
+        match result {
+            Ok(response) => {
+                if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Dispatch error: {}",
+                        e
+                    ))));
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                    "Signing error: {}",
+                    e
+                ))));
+            }
+        }
+    });
+}
+
+// pub fn spawn_submit_transaction(
+//     api: &OnlineClient<SubstrateConfig>,
+//     runtime: SupportedRuntime,
+//     signed_tx: String,
+//     tx: &UnboundedSender<Action>,
+// ) {
+//     let api = api.clone();
+//     let tx = tx.clone();
+//     let signed_tx = signed_tx.clone();
+
+//     let _ = tx.send(Action::Transaction(TxAction::Processing));
+
+//     tokio::spawn(async move {
+//         let result = runtime.submit_transaction(&api, signed_tx).await;
+//         match result {
+//             Ok(response) => {
+//                 if let Err(e) = dispatch_response_action(response, runtime, &tx) {
+//                     let _ = tx.send(Action::System(SystemAction::Error(format!(
+//                         "Dispatch error: {}",
+//                         e
+//                     ))));
+//                 }
+//             }
+//             Err(e) => {
+//                 let _ = tx.send(Action::System(SystemAction::Error(format!(
+//                     "Signing error: {}",
+//                     e
+//                 ))));
+//             }
+//         }
+//     });
+// }
 
 // ----
 // Processor tasks

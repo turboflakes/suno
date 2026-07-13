@@ -159,8 +159,11 @@ impl Config {
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
-            let signer = Signer::from_file(signer.path()).ok();
-            config.signer = signer;
+            config.signer = if signer.is_proxy_account_setup() {
+                Some(signer)
+            } else {
+                Signer::from_file(signer.path()).ok()
+            };
         }
 
         // Load themes
@@ -208,8 +211,15 @@ impl Config {
     pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
         self.signer
             .as_ref()
-            .ok_or_else(|| Error::SignerPathNotFound("signer".to_string()))?
+            .ok_or(Error::SignerNotDefined)?
             .account_id()
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        self.signer
+            .as_ref()
+            .map(|s| s.is_qrcode_enabled())
+            .unwrap_or(false)
     }
 
     pub fn set_signer_path(&mut self, path: &str) {
@@ -491,6 +501,31 @@ explorer:
         assert_eq!(config.chains.len(), 3);
         assert!(config.features.enable_validators);
         assert!(config.features.enable_collators);
+    }
+
+    #[test]
+    fn test_config_proxy_account() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+    enable_validators: true
+    enable_collators: true
+    enable_rpcs: false
+signer:
+  proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+explorer:
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 1);
+        assert!(config.is_qrcode_enabled());
     }
 
     // Helper function to create temporary file with content

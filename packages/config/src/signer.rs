@@ -12,9 +12,17 @@ fn default_proxy_path() -> String {
     ".proxy_account.json".to_string()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Provides default value for the qrcode enable flag
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Signer {
+    #[serde(default)]
     proxy_account: Option<AccountId32>,
+    #[serde(default = "default_true")]
+    enable_qrcode: bool,
     #[serde(default = "default_proxy_path")]
     proxy_path: String,
 }
@@ -24,13 +32,17 @@ impl Signer {
     /// otherwise reading it from `proxy_path`.
     pub fn account_id(&self) -> Result<AccountId32, Error> {
         if let Some(account) = &self.proxy_account {
-            return Ok(account.clone());
+            return Ok(*account);
         }
         Self::parse_account_from_path(self.path())
     }
 
-    pub fn uses_polkadot_vault(&self) -> bool {
+    pub fn is_proxy_account_setup(&self) -> bool {
         self.proxy_account.is_some()
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        self.enable_qrcode
     }
 
     pub fn path(&self) -> &Path {
@@ -45,9 +57,11 @@ impl Signer {
             warn!("Failed to load signer from {}: {}", path.display(), e);
             e
         })?;
+        // NOTE: enable_qrcode is set to false and signing will be done via password
         Ok(Signer {
             proxy_account: Some(account),
             proxy_path: path.to_string_lossy().into_owned(),
+            enable_qrcode: false,
         })
     }
 

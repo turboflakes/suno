@@ -21,8 +21,8 @@ pub enum Error {
     LocalExecution(String),
     #[error("Invalid address {0}")]
     InvalidAddress(String),
-    #[error("Signer {0} path not specified")]
-    SignerPathNotFound(String),
+    #[error("Signer not defined")]
+    SignerNotDefined,
     #[error("Remote execution error: {0}")]
     RemoteExecution(String),
     #[error("Other error: {0}")]

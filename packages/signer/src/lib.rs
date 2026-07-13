@@ -16,9 +16,7 @@ fn load_keypair_from_json_file(password: &str) -> Result<Keypair, Error> {
     let config = CONFIG.clone();
 
     // Load the signer json path
-    let signer_path = config
-        .signer_path()
-        .ok_or(Error::SignerPathNotFound("json".into()))?;
+    let signer_path = config.signer_path().ok_or(Error::PathNotFound)?;
 
     // Read data from json file
     let raw_data = std::fs::read_to_string(signer_path)?;
@@ -33,9 +31,7 @@ fn _load_keypair_from_seed_file(password: Option<String>) -> Result<Keypair, Err
     let config = CONFIG.clone();
 
     // Load the signer seed path
-    let signer_path = config
-        .signer_path()
-        .ok_or(Error::SignerPathNotFound("seed".into()))?;
+    let signer_path = config.signer_path().ok_or(Error::PathNotFound)?;
 
     // Read data from seed file
     let raw_data = std::fs::read_to_string(signer_path)?;

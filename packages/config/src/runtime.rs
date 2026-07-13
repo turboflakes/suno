@@ -141,7 +141,7 @@ impl SupportedRuntime {
                     .expect("Invalid genesis hash")
             }
             Self::Paseo => {
-                H256::from_str("0x77afd6190f1554ad45fd0d31aee62aacc33c6db0ea801129acb813f913e0764f")
+                H256::from_str("0x374057be67b355151f271ff70c3db98308c62c8adc48dc6724b6a009a1a014fd")
                     .expect("Invalid genesis hash")
             }
             Self::PeoplePolkadot => {

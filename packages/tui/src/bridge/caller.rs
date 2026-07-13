@@ -1,7 +1,9 @@
 use async_trait::async_trait;
+use subxt::ext::codec::Decode;
 use subxt::{
     client::{ClientAtBlock, OnlineClientAtBlockImpl},
-    utils::AccountId32,
+    config::DefaultExtrinsicParamsBuilder,
+    utils::{AccountId32, MultiSignature},
     OnlineClient, SubstrateConfig,
 };
 use subxt_signer::sr25519::Keypair;
@@ -29,6 +31,14 @@ pub trait RuntimeCaller {
         api: &OnlineClient<SubstrateConfig>,
         proxy_signer: &Keypair,
         call_data: &[u8],
+    ) -> Result<Response, Error>;
+
+    async fn submit_call_data_with_signature(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        proxy_signer: &AccountId32,
+        call_data: &[u8],
+        signature: &[u8],
     ) -> Result<Response, Error>;
 }
 
@@ -266,4 +276,41 @@ impl RuntimeCaller for Runtime {
 
         Ok(Response::transaction_submitted(response))
     }
+
+    async fn submit_call_data_with_signature(
+        &self,
+        api: &OnlineClient<SubstrateConfig>,
+        proxy_signer: &AccountId32,
+        call_data: &[u8],
+        signature: &[u8],
+    ) -> Result<Response, Error> {
+        let at_block = api.at_current_block().await.boxed()?;
+        let metadata = at_block.metadata();
+        let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
+
+        let nonce = at_block.tx().account_nonce(proxy_signer).await.boxed()?;
+        let params = DefaultExtrinsicParamsBuilder::new().nonce(nonce).build();
+
+        let mut signable = at_block
+            .tx()
+            .create_signable_offline(&payload, params)
+            .boxed()?;
+
+        let signature = extract_signature(signature)?;
+
+        let response = signable
+            .sign_with_account_and_signature(proxy_signer, &signature)
+            .boxed()?
+            .submit_and_watch()
+            .await
+            .boxed()?;
+
+        Ok(Response::transaction_submitted(response))
+    }
+}
+
+fn extract_signature(bytes: &[u8]) -> Result<MultiSignature, Error> {
+    let mut input = bytes;
+
+    MultiSignature::decode(&mut input).map_err(Error::InvalidSignature)
 }

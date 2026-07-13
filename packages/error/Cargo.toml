@@ -9,6 +9,7 @@ edition.workspace = true
 
 [dependencies]
 arboard = { workspace = true }
+hex = { workspace = true }
 subxt = { workspace = true }
 suno-actions = { path = "../actions" }
 suno-config = { path = "../config" }
