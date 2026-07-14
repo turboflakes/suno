@@ -32,13 +32,14 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Define and **run** user-specific commands linked to each configured validator.
 - [&check;] Explicitly **use** advanced builtin commands: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`.
 - [&check;] Execute custom commands locally or remotely.
+- [&check;] Sign transactions using **Polkadot Vault**.
+- [&check;] Support **Multi-proxy** setup
 
 ## Future / Ideas / Work in Progress
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
  - [] RPC manual restarts and health check metrics
  - [] Light client mode
- - [] Multi-proxy setup
  - [] Support for `/kick`, `/nominate` extrinsics
 
 ### Implementation constraints / goals
@@ -47,7 +48,6 @@ As a nominator you can just as easily check the validators you nominate.
  - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
  - Restricted Proxy-Only operations on Asset Hub, with only two proxy types supported:
     - Staking or StakingOperator
- - Proxy account must be an account with password exported from [PJS](https://polkadot.js.org/extension/).
  
 ## Installation
 
@@ -99,8 +99,12 @@ chains:
       validators:
         - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         - "1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd"
+        
   - asset_hub_polkadot:
       rpc_url: "__WSS_POLKADOT_HUB_RPC_PROVIDER__"
+      signer:
+        proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        
   - people_polkadot:
       rpc_url: "__WSS_POLKADOT_PEOPLE_RPC_PROVIDER__"
       
@@ -143,6 +147,9 @@ chains:
         ]
   - asset_hub_paseo:
       rpc_url: "__WSS_PASEO_HUB_RPC_PROVIDER__"
+      signer:
+        proxy_account: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+        
   - people_paseo:
       rpc_url: "__WSS_PASEO_PEOPLE_RPC_PROVIDER__"
 
@@ -152,8 +159,8 @@ features:
 themes:
   active: "Suno Dark"
   path: "./themes"
-  
-signer:
+
+signer: # global signer configuration, overridden by chain-specific signer config
   proxy_path: ".proxy_account.json"
   
 explorer:
@@ -191,10 +198,28 @@ To operate and execute extrinsics onchain, a proxy account with at least one of 
   
 ¹ Requires explicit configuration for each validator in the config file.
 
-### Proxy Account configuration
+### Signing and Multi-Proxy Accounts configuration
 
-#### Step 1
-Currently, to setup the proxy account on `suno`, the ONLY supported, recommended and easiest way, is to create a new account on the [PJS](https://polkadot.js.org/extension/) and than click **Export Account**. You should get a json file with the content similar to the one below:
+You have two options for signing transactions: either by using Polkadot Vault (recommended) with air-gapped QR codes, or by using a proxy account configured in a local JSON file exported from [PJS](https://polkadot.js.org/extension/).
+
+You can also configure multiple proxy accounts for different chains using the signer section in the configuration file, or configure a single proxy account that is shared across all chains.
+
+#### Option 1
+The `proxy_account` field accepts a proxy account address, allowing `suno` to sign transactions via Polkadot Vault. `suno` generates the call data as QR codes and requests access to your webcam to scan the signed QR code from Polkadot Vault.
+
+Add the signer section to your config file as a global setting or as a chain-specific setting:
+```yaml
+signer:
+  proxy_account: "5CfWTDh7XxJ2yrayqQ2aJnnZAH5v5XaF1oJFfH5QCpbfP9v8"
+```
+
+Alternatively, you can specify a global proxy account using the `--proxy-account` flag when launching suno from the terminal. For example:
+```bash
+suno --proxy-account 5CfWTDh7XxJ2yrayqQ2aJnnZAH5v5XaF1oJFfH5QCpbfP9v8
+```
+
+#### Option 2
+Create a new account on the [PJS](https://polkadot.js.org/extension/) and than click **Export Account**. This will generate a JSON file similar to the one below:
 ```json
 {
   "encoded": "J2FFcPHAY11Pmq/38eqbwfUv9OPitYJs+oYgahBvlagAAAIAAQAAAAgAAAB5o0DwXCWDblsH+9pc++RaBO4fpHBHzUirHFHFE9yS3sDzgAIQjhgvPqJ3ODrMR2gy7vk0VZg1fyirIvmsrfjGbWnOI8YU0joX0tYytroyWaykFKtZJMmE0pNKcJ5dJmDxscbK53Ac+7ld2UdH07yKPXxmPuYNNw3vKx8cg9CdQgifKfzQxHnC+EUpOoHPLwGlHsFEYtIlQtngqd9n",
@@ -212,20 +237,21 @@ Currently, to setup the proxy account on `suno`, the ONLY supported, recommended
 }
 ```
 
-#### Step 2
-You can rename the file to `.proxy_account.json`, since it is the one built-in by default and is expected to live alongside the binary. Alternatively, you can rename it and move the file to a directory of your choice. If you choose a different name and path, you have 2 options:
+You can rename the file to `.proxy_account.json`, which is the default filename expected by `suno` and this file should reside alongside the `suno` binary.
 
-**Option 1** specify the new **proxy_path** under the **signer** section in the configuration file. For example:
+Alternatively, you can rename the file and move it to a directory of your choice. Specify its path using the **proxy_path** field under the **signer** section in the configuration file. For example:
 
 ```yaml
 signer:
   proxy_path: ".proxy_account.json"
 ```
 
-**Option 2** via the `--proxy-path` flag when calling `suno` from the terminal, eg. `suno --proxy-path /home/suno/suno-proxy-account.json`
+You can also specify the global proxy account file using the `--proxy-path` flag when calling `suno` from the terminal. For example:
+```bash
+suno --proxy-path /home/suno/suno-proxy-account.json
+```
 
-#### Step 3
-If you end up creating a brand new account, don't forget to transfer some funds to it and set up the proxy types described above for your target stashes you would like to operate via `suno`. This can be done in many other tools already available in the Polkadot ecosystem.
+**NOTE:** If you create a brand new account, don't forget to transfer some funds to it and configure the appropriate proxy types for the target stash accounts you want to manage with `suno`. This can be done using any other tool in the Polkadot ecosystem that supports proxy management.
 
 ## Custom Commands
 
