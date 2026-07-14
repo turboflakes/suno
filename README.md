@@ -309,22 +309,23 @@ Yet another way to manage Substrate Node Operations from your terminal.
 Usage: suno [OPTIONS]
 
 Options:
-  -c, --config-path <FILE>  Sets a custom config file path. [default: .config.yaml]
-  -p, --proxy-path <FILE>   Sets a custom proxy account file path.
-  -h, --help                Print help
-  -V, --version             Print version
+  -c, --config-path <FILE>       Sets a custom config file path. [default: .config.yaml]
+  -p, --proxy-path <FILE>        Sets a global proxy account file path. [default: .proxy_account.json]
+  -a, --proxy-account <ADDRESS>  Sets a global proxy account used by Polkadot Vault.
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
 ### List of keybindings
 
 ```bash
-'ctrl+e' to show list of enabled commands for the selected vaidator
-'ctrl+w' to switch window
-'ctrl+c' to quit suno
-'esc' to close popup or unfocus from input field
-'ctrl+h / ctrl+l / left / right' to navigate between pane sections
 'tab' to input focus, to command autocomplete or just to navigate between pane sections
+'esc' to close popup or unfocus from input field
+'ctrl+e' to show list of enabled commands for the selected validator
+'ctrl+w' to switch window
+'ctrl+h / ctrl+l / left / right' to navigate between pane sections
 'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
+'ctrl+c' to quit suno
 ```
 
 ### Change or Build your own **theme**
