@@ -8,8 +8,13 @@ use std::str::FromStr;
 use subxt::utils::AccountId32;
 
 /// Provides default value for the proxy account file path
-fn default_proxy_path() -> String {
-    ".proxy_account.json".to_string()
+pub fn default_proxy_path() -> &'static str {
+    ".proxy_account.json"
+}
+
+/// Provides default value for the proxy account file path
+fn _default_proxy_path() -> Option<String> {
+    Some(default_proxy_path().to_string())
 }
 
 /// Provides default value for the qrcode enable flag
@@ -23,8 +28,8 @@ pub struct Signer {
     proxy_account: Option<AccountId32>,
     #[serde(default = "default_true")]
     enable_qrcode: bool,
-    #[serde(default = "default_proxy_path")]
-    proxy_path: String,
+    #[serde(default = "_default_proxy_path")]
+    proxy_path: Option<String>,
 }
 
 impl Signer {
@@ -46,7 +51,7 @@ impl Signer {
     }
 
     pub fn path(&self) -> &Path {
-        Path::new(&self.proxy_path)
+        Path::new(self.proxy_path.as_deref().unwrap_or(default_proxy_path()))
     }
 
     /// Constructs a `Signer` by eagerly parsing the proxy account from the
@@ -60,8 +65,18 @@ impl Signer {
         // NOTE: enable_qrcode is set to false and signing will be done via password
         Ok(Signer {
             proxy_account: Some(account),
-            proxy_path: path.to_string_lossy().into_owned(),
+            proxy_path: Some(path.to_string_lossy().into_owned()),
             enable_qrcode: false,
+        })
+    }
+
+    pub fn from_address(address: &str) -> Result<Self, Error> {
+        let account = AccountId32::from_str(address)
+            .map_err(|_| Error::InvalidAddress(address.to_string()))?;
+        Ok(Signer {
+            proxy_account: Some(account),
+            proxy_path: None,
+            enable_qrcode: true,
         })
     }
 

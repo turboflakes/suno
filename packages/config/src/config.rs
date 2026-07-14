@@ -2,7 +2,7 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
-use crate::signer::Signer;
+use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
 use log::info;
@@ -255,6 +255,11 @@ impl Config {
         self.signer = signer;
     }
 
+    pub fn set_signer_account(&mut self, address: &str) {
+        let signer = Signer::from_address(address).ok();
+        self.signer = signer;
+    }
+
     pub fn explorer_url(&self, chain: &str, block_hash: &str) -> Option<String> {
         self.explorer.url.as_ref().map(|url| {
             url.replace("{chain}", chain)
@@ -278,6 +283,7 @@ fn default_config_path() -> &'static str {
 
 fn get_config() -> Result<Config, Error> {
     let default_config_path = default_config_path();
+    let default_proxy_path = default_proxy_path();
 
     let matches = clap::Command::new("suno")
         .version(env!("CARGO_PKG_VERSION"))
@@ -296,7 +302,15 @@ fn get_config() -> Result<Config, Error> {
                 .short('p')
                 .long("proxy-path")
                 .value_name("FILE")
-                .help("Sets a custom proxy account file path."),
+                .default_value(default_proxy_path)
+                .help("Sets a global proxy account file path."),
+        )
+        .arg(
+            clap::Arg::new("proxy-account")
+                .short('a')
+                .long("proxy-account")
+                .value_name("ADDRESS")
+                .help("Sets a global proxy account used by Polkadot Vault."),
         )
         .get_matches();
 
@@ -315,6 +329,10 @@ fn get_config() -> Result<Config, Error> {
     if config.signer.is_none() {
         if let Some(path) = matches.get_one::<String>("proxy-path") {
             config.set_signer_path(path.as_str());
+        }
+
+        if let Some(account) = matches.get_one::<String>("proxy-account") {
+            config.set_signer_account(account.as_str());
         }
     }
 
