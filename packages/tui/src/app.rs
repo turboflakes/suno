@@ -16,19 +16,18 @@ use crate::{
 use arboard::Clipboard;
 use log::{error, info};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io;
+use std::{io, thread, time::Duration};
 use suno_actions::network::ConnectionState;
 use suno_actions::{
-    Action, ChainAction, InputAction, NavigationAction, PopupAction, SystemAction, TxAction,
-    ValidatorAction,
+    Action, ChainAction, ConfirmationContext, InputAction, NavigationAction, PopupAction,
+    ScannerAction, SystemAction, ThreadAction, TxAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
-use suno_signer::get_address_from_json_file;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
+use tokio::sync::mpsc;
 use zeroize::Zeroizing;
-
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, TuiError>;
 
@@ -40,12 +39,17 @@ const TICK_RATE: u64 = 250;
 pub enum Focus {
     #[default]
     Main, // Arrows move the sections and tabs
-    Input, // Arrows move the cursor in the input/password fields
-    Popup, // Esc/Tab change mode state
+    Input,   // Arrows move the cursor in the input/password fields
+    Scanner, // Esc/Tab change mode state
+    Popup,   // Esc/Tab change mode state
+}
+
+/// Thread control messages, useful for controlling threads from the app, eg. stopping a scanner thread.
+pub enum ThreadControl {
+    Stop,
 }
 
 /// Application.
-#[derive(Debug)]
 pub struct App {
     /// Is the application running?
     pub running: bool,
@@ -64,9 +68,9 @@ pub struct App {
     /// The popup widget.
     pub popup: PopupWidget,
     /// The sender to send actions to update the state to the app.
-    pub tx: UnboundedSender<Action>,
+    pub tx: mpsc::UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
-    pub rx: UnboundedReceiver<Action>,
+    pub rx: mpsc::UnboundedReceiver<Action>,
 }
 
 impl Default for App {
@@ -79,7 +83,7 @@ impl App {
     /// Constructs a new instance of [`App`].
     pub fn new() -> Self {
         // Define the channel to send actions to update the app state.
-        let (tx, rx) = unbounded_channel::<Action>();
+        let (tx, rx) = mpsc::unbounded_channel::<Action>();
 
         Self {
             running: true,
@@ -157,6 +161,7 @@ impl App {
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
+                Action::Scanner(act) => self.handle_scanner_actions(act),
             }
         }
     }
@@ -186,22 +191,8 @@ impl App {
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
-            PopupAction::ConfirmAndSign(
-                runtime,
-                spec_version,
-                proxy_identity,
-                stash_identity,
-                call,
-                bytes,
-            ) => {
-                self.confirm_and_sign_popup(
-                    runtime,
-                    spec_version,
-                    proxy_identity,
-                    stash_identity,
-                    *call,
-                    bytes,
-                );
+            PopupAction::ConfirmAndSign(ctx) => {
+                self.confirm_and_sign_popup(&ctx);
             }
             PopupAction::Close => self.close_popup(),
             PopupAction::Cancel => self.cancel(),
@@ -241,9 +232,7 @@ impl App {
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::Error(msg) => {
-                if (self.popup.get_mode() == PopupMode::Menu
-                    || self.popup.get_mode() == PopupMode::Confirm)
-                    && self.popup.invalidate_input(&msg)
+                if (self.popup.is_menu_or_confirmation_mode()) && self.popup.invalidate_input(&msg)
                 {
                     self.focus = Focus::Input;
                 }
@@ -294,17 +283,6 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
-
-                                if let Ok(proxy) = get_address_from_json_file() {
-                                    sync::spawn_fetch_validators_proxy_status(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &proxy,
-                                        &self.tx,
-                                    );
-                                };
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -355,7 +333,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Ok(proxy) = get_address_from_json_file() {
+                                if let Ok(proxy) = runtime.signer_account_id() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,
@@ -701,6 +679,62 @@ impl App {
         }
     }
 
+    fn handle_scanner_actions(&mut self, action: ScannerAction) {
+        match action {
+            ScannerAction::Init => {
+                // Switch app focus to scanner while rendering QR Code and Webcam
+                self.focus = Focus::Scanner;
+
+                let tx = self.tx.clone();
+                let (ctrl_tx, mut ctrl_rx) = mpsc::unbounded_channel::<ThreadAction>();
+                thread::spawn(move || {
+                    let mut scanner = match Scanner::new() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            let _ = tx.send(Action::Scanner(ScannerAction::Error(e.to_string())));
+                            return;
+                        }
+                    };
+                    if let Err(e) = scanner.open() {
+                        let _ = tx.send(Action::Scanner(ScannerAction::Error(e.to_string())));
+                        return;
+                    }
+                    loop {
+                        // Stop on an explicit Stop, or when the app drops the sender.
+                        match ctrl_rx.try_recv() {
+                            Ok(ThreadAction::Stop)
+                            | Err(mpsc::error::TryRecvError::Disconnected) => break,
+                            Err(mpsc::error::TryRecvError::Empty) => {}
+                        }
+                        match scanner.scan_frame() {
+                            Ok((Some(bytes), frame)) => {
+                                let _ = tx.send(Action::Scanner(ScannerAction::Decoded(bytes)));
+                                let _ = tx.send(Action::Scanner(ScannerAction::Frame(frame)));
+                                break;
+                            }
+                            Ok((None, frame)) => {
+                                let _ = tx.send(Action::Scanner(ScannerAction::Frame(frame)));
+                            }
+                            Err(e) => {
+                                let _ =
+                                    tx.send(Action::Scanner(ScannerAction::Error(e.to_string())));
+                            }
+                        }
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                });
+                self.popup.start_scanner(ctrl_tx);
+            }
+            ScannerAction::Decoded(bytes) => {
+                self.on_qr_decoded_signature(&bytes);
+            }
+            ScannerAction::Frame(frame) => {
+                self.popup.update_scanner_frame(frame);
+            }
+            ScannerAction::Error(e) => error!("{e}"),
+        }
+    }
+
     /// Handles application errors.
     pub fn error(&self, err: Error) {
         error!("{}", err);
@@ -815,36 +849,27 @@ impl App {
                 return;
             };
 
-            self.popup.show_extrinsics(active_era.index(), validator);
+            self.popup.show_commands(active_era.index(), &validator);
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         };
     }
 
     /// Open confirm and sign popup
-    pub fn confirm_and_sign_popup(
-        &mut self,
-        runtime: SupportedRuntime,
-        spec_version: u32,
-        proxy_identity: String,
-        stash_identity: String,
-        call: Call,
-        bytes: Vec<u8>,
-    ) {
+    pub fn confirm_and_sign_popup(&mut self, ctx: &ConfirmationContext) {
         if !self.popup.is_visible() {
             return;
         }
 
-        self.popup.init_confirm_and_sign(
-            runtime,
-            spec_version,
-            proxy_identity,
-            stash_identity,
-            call,
-            bytes,
-        );
-        // Dispatch focus to the input field
-        let _ = self.tx.send(Action::Input(InputAction::Editing));
+        self.popup.show_confirm_and_sign(ctx);
+
+        // If configured for QR signing, dispatch action to initialize scanner.
+        // Otherwise, change focus to the input field for password signing.
+        if ctx.runtime.is_qrcode_enabled() {
+            let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
+        } else {
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        }
     }
 
     /// Close menu popup
@@ -871,7 +896,7 @@ impl App {
                 PopupMode::Menu => {
                     self.on_menu_enter(validator);
                 }
-                PopupMode::Confirm => {
+                PopupMode::Confirmation => {
                     self.on_confirm_enter(validator);
                 }
                 _ => {}
@@ -900,15 +925,16 @@ impl App {
         let api = chain.client().clone();
         let tx = self.tx.clone();
         let stash = validator.key().stash();
-        let stash_identity = validator.display_name(3);
-        let proxy_identity = match get_address_from_json_file() {
-            Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
+        let proxy_account_id = match runtime.signer_account_id().boxed() {
+            Ok(address) => address,
             Err(e) => {
                 self.error(e.into());
                 return;
             }
         };
         let supported_proxy = validator.get_proxy(runtime);
+        let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
+        let stash_identity = validator.display_name(3);
 
         tokio::spawn(async move {
             let at_block = match api.at_current_block().await.boxed() {
@@ -921,26 +947,42 @@ impl App {
                     return;
                 }
             };
-            let spec_version = at_block.spec_version();
 
-            match runtime.build_call_data(&at_block, &stash, call.clone(), supported_proxy) {
-                Ok(bytes) => {
-                    let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(
-                        runtime,
-                        spec_version,
-                        proxy_identity,
-                        stash_identity,
-                        Box::new(call),
-                        bytes,
-                    )));
-                }
+            let call_data_bytes =
+                match runtime.build_call_data(&at_block, &stash, call.clone(), supported_proxy) {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to build call data: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                };
+
+            let qr_bytes = match build_qrcode(&at_block, &proxy_account_id, &call_data_bytes).await
+            {
+                Ok(qr_bytes) => qr_bytes,
                 Err(e) => {
                     let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to build_call_data: {}",
+                        "Failed to build QR data: {}",
                         e
                     ))));
+                    return;
                 }
-            }
+            };
+
+            let spec_version = at_block.spec_version();
+            let ctx = ConfirmationContext {
+                runtime,
+                spec_version,
+                proxy_identity,
+                stash_identity,
+                call,
+                call_data_bytes,
+                qr_bytes,
+            };
+            let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(Box::new(ctx))));
         });
     }
 
@@ -992,14 +1034,16 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
-                    let stash_identity = validator.display_name(3);
-                    let proxy_identity = match get_address_from_json_file() {
-                        Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
+                    let proxy_account_id = match runtime.signer_account_id().boxed() {
+                        Ok(address) => address,
                         Err(e) => {
                             self.error(e.into());
                             return;
                         }
                     };
+                    let stash_identity = validator.display_name(3);
+                    let proxy_identity =
+                        to_compact_string(&proxy_account_id, runtime.account_format(), 6);
                     let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
@@ -1017,31 +1061,51 @@ impl App {
                                         return;
                                     }
                                 };
-                                let spec_version = at_block.spec_version();
 
-                                match runtime.build_call_data(
+                                let call_data_bytes = match runtime.build_call_data(
                                     &at_block,
                                     &stash,
                                     call.clone(),
                                     supported_proxy,
                                 ) {
-                                    Ok(bytes) => {
-                                        let _ =
-                                            tx.send(Action::Popup(PopupAction::ConfirmAndSign(
-                                                runtime,
-                                                spec_version,
-                                                proxy_identity,
-                                                stash_identity,
-                                                Box::new(call),
-                                                bytes,
-                                            )));
-                                    }
+                                    Ok(bytes) => bytes,
                                     Err(e) => {
                                         let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Failed to build_call_data: {}", e),
+                                            format!("Failed to build call data: {}", e),
                                         )));
+                                        return;
                                     }
-                                }
+                                };
+
+                                let qr_bytes = match build_qrcode(
+                                    &at_block,
+                                    &proxy_account_id,
+                                    &call_data_bytes,
+                                )
+                                .await
+                                {
+                                    Ok(qr_bytes) => qr_bytes,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to build QR data: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                let spec_version = at_block.spec_version();
+                                let ctx = ConfirmationContext {
+                                    runtime,
+                                    spec_version,
+                                    proxy_identity,
+                                    stash_identity,
+                                    call,
+                                    call_data_bytes,
+                                    qr_bytes,
+                                };
+                                let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(
+                                    Box::new(ctx),
+                                )));
                             }
                             Err(e) => {
                                 let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
@@ -1123,6 +1187,44 @@ impl App {
         }
     }
 
+    /// Handle decoded bytes from qr code when popup is in confirmation mode
+    pub fn on_qr_decoded_signature(&mut self, signature_bytes: &[u8]) {
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        if self.section == Section::Validators {
+            let Some(validator) = self.validators.get_selected() else {
+                return;
+            };
+
+            if self.popup.is_confirmation_mode() {
+                let runtime = validator.runtime().asset_hub_runtime();
+                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                    return;
+                };
+                let Some(entry) = self.popup.get_selected() else {
+                    return;
+                };
+
+                let bytes = entry.as_bytes();
+                let api = chain.client().clone();
+                let tx = self.tx.clone();
+
+                if let Ok(signer) = runtime.signer_account_id() {
+                    sync::spawn_submit_call_data_with_signature(
+                        &api,
+                        runtime,
+                        &signer,
+                        &bytes,
+                        signature_bytes,
+                        &tx,
+                    );
+                }
+            }
+        };
+    }
+
     /// Handle enter when popup is in confirmation mode, showing call details and input field as password
     pub fn on_confirm_enter(&mut self, validator: Validator) {
         let runtime = validator.runtime().asset_hub_runtime();
@@ -1152,7 +1254,9 @@ impl App {
 
                     match signer_result {
                         Ok(Ok(signer)) => {
-                            sync::spawn_sign_and_submit(&api, runtime, &signer, &bytes, &tx);
+                            sync::spawn_sign_and_submit_call_data(
+                                &api, runtime, &signer, &bytes, &tx,
+                            );
                         }
                         Ok(Err(e)) => {
                             let _ = tx.send(Action::System(SystemAction::Error(format!(
@@ -1204,11 +1308,12 @@ impl App {
 
     /// Cancel instruction.
     pub fn cancel(&mut self) {
-        match self.popup.get_mode() {
-            PopupMode::Menu | PopupMode::Confirm => {
-                self.close_popup();
-            }
-            _ => {}
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        if self.popup.is_menu_or_confirmation_mode() {
+            self.close_popup();
         }
     }
 
@@ -1225,7 +1330,7 @@ impl App {
             return;
         }
 
-        if self.popup.get_mode() == PopupMode::Confirm {
+        if self.popup.is_confirmation_mode() {
             let Some(bytes_entry) = self.popup.get_selected() else {
                 return;
             };

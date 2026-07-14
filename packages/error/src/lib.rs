@@ -44,6 +44,8 @@ pub enum Error {
     UnsupportedRuntime(SupportedRuntime),
     #[error("Config error: {0}")]
     Config(#[from] Box<suno_config::Error>),
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(#[from] subxt::ext::codec::Error),
     #[error("Other error: {0}")]
     Other(String),
 }

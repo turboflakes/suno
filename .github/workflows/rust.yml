@@ -40,6 +40,13 @@ jobs:
     name: Cargo clippy
     runs-on: self-hosted
     steps:
+      - name: Install system dependencies # required since `nokhwa` uses `v4l2` syscalls
+        run: |
+          sudo apt update
+          sudo apt install -y clang \
+            libclang-dev libv4l-dev libudev-dev \
+            pkg-config
+
       - name: Checkout sources
         uses: actions/checkout@v4
 
@@ -62,6 +69,13 @@ jobs:
     name: Cargo doc
     runs-on: self-hosted
     steps:
+      - name: Install system dependencies # required since `nokhwa` uses `v4l2` syscalls
+        run: |
+          sudo apt update
+          sudo apt install -y clang \
+            libclang-dev libv4l-dev libudev-dev \
+            pkg-config
+
       - name: Checkout sources
         uses: actions/checkout@v4
 
@@ -92,6 +106,14 @@ jobs:
       #   if: runner.os == 'Windows'
       # - run: vcpkg install openssl:x64-windows-static-md
       #   if: runner.os == 'Windows'
+
+      - name: Install system dependencies # required since `nokhwa` uses `v4l2` syscalls
+        run: |
+          sudo apt update
+          sudo apt install -y clang \
+            libclang-dev libv4l-dev libudev-dev \
+            pkg-config
+
       - name: Checkout sources
         uses: actions/checkout@v4
 

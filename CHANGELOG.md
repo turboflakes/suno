@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Add support for Polkadot-Vault see PR [#20](https://github.com/turboflakes/suno/pull/20)
+- Update paseo genesis hash
+- Add Multi-proxy setup, different proxy for each network
+- Update metadata polkadot/2003000
+- Update metadata asset-hub-polkadot/2003001
+- Update metadata people-polkadot/2003000
+- Update metadata kusama/2003000
+- Update metadata asset-hub-kusama/2003000
+- Update metadata people-kusama/2003000
+- Update metadata paseo/2003001
+- Update metadata asset-hub-paseo/2003002
+- Update metadata people-paseo/2003001
+- Update metadata westend/1024001
+- Update metadata asset-hub-westend/1024001
+- Update metadata people-westend/1024001
+
 
 ## [0.4.1] - 2026-06-02
 - Review `has_keys` and `has_queued_keys` descriptions and only show next keys when set

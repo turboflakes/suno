@@ -14,7 +14,15 @@ jobs:
     name: Build on self-hosted (ubuntu-latest)
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - name: Install system dependencies # required since `nokhwa` uses `v4l2` syscalls
+        run: |
+          sudo apt update
+          sudo apt install -y clang \
+            libclang-dev libv4l-dev libudev-dev \
+            pkg-config
+
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -60,7 +68,8 @@ jobs:
     name: Build on macOS (aarch64-apple-darwin)
     runs-on: macos-latest # GitHub-hosted; use macos-14 for guaranteed Apple Silicon
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -110,7 +119,8 @@ jobs:
       - build-macos-aarch64
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable

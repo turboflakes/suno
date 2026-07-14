@@ -104,10 +104,6 @@ impl Window {
                     Line::from(Span::raw("")),
                     Line::from(Span::raw("SUPPORTED PROXIES").style(theme.paragraph.header(true))),
                     Line::from(vec![
-                        Span::raw("[NT] ").style(theme.paragraph.label(true)),
-                        Span::raw("NonTransfer. Must be configured on the Relay Chain."),
-                    ]),
-                    Line::from(vec![
                         Span::raw("[S] ").style(theme.paragraph.label(true)),
                         Span::raw("Staking. Must be configured on Asset Hub Chain."),
                     ]),
@@ -147,25 +143,17 @@ impl Window {
                     ]),
                     Line::from(vec![
                         Span::raw("/set_keys ").style(theme.paragraph.label(true)),
-                        Span::raw("Set session keys requires `NonTransfer` proxy."),
+                        Span::raw("Set session keys requires one of `Staking` or `StakingOperator` proxy."),
                     ]),
                     Line::from(vec![
                         Span::raw("/purge_keys ").style(theme.paragraph.label(true)),
-                        Span::raw("Purge session keys requires `NonTransfer` proxy."),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("/set_keys_async ").style(theme.paragraph.label(true)),
-                        Span::raw("Set session keys from Asset Hub requires `StakingOperator` proxy."),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("/purge_keys_async ").style(theme.paragraph.label(true)),
-                        Span::raw("Purge all session keys from Asset Hub requires `StakingOperator` proxy."),
+                        Span::raw("Purge session keys requires one of `Staking` or `StakingOperator` proxy."),
                     ]),
                     Line::from(Span::raw("")),
                     Line::from(Span::raw("SUPPORTED CUSTOM COMMANDS").style(theme.paragraph.header(true))),
                     Line::from(vec![
                         Span::raw("/rotate_and_set_keys ").style(theme.paragraph.label(true)),
-                        Span::raw("Rotate and set session keys as a single operation."),
+                        Span::raw("Rotate and set session keys as a single operation. Requires proxy configured."),
                     ]),
                     Line::from(vec![
                         Span::raw("/has_keys ").style(theme.paragraph.label(true)),
@@ -177,6 +165,14 @@ impl Window {
                     ]),
                     Line::from(Span::raw("")),
                     Line::from(Span::raw("KEYBINDINGS").style(theme.paragraph.header(true))),
+                    Line::from(vec![
+                        Span::raw("tab ").style(theme.paragraph.label(true)),
+                        Span::raw("Input focus, Autocomplete or Navigate between pane sections."),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("esc ").style(theme.paragraph.label(true)),
+                        Span::raw("Close popup or Go back."),
+                    ]),
                     Line::from(vec![
                         Span::raw("ctrl+e ").style(theme.paragraph.label(true)),
                         Span::raw("Show commands."),
@@ -190,16 +186,8 @@ impl Window {
                         Span::raw("Quit suno."),
                     ]),
                     Line::from(vec![
-                        Span::raw("esc ").style(theme.paragraph.label(true)),
-                        Span::raw("Close popup or Go back."),
-                    ]),
-                    Line::from(vec![
                         Span::raw("ctrl+h/ctrl+l/left/right ").style(theme.paragraph.label(true)),
                         Span::raw("Navigate between pane sections."),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("tab ").style(theme.paragraph.label(true)),
-                        Span::raw("Input focus, Autocomplete or Navigate between pane sections."),
                     ]),
                     Line::from(vec![
                         Span::raw("ctrl+j/ctrl+k/up/down ").style(theme.paragraph.label(true)),

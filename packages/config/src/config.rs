@@ -2,9 +2,10 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::runtime::SupportedRuntime;
+use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -49,12 +50,40 @@ pub struct Config {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub rpc_url: String,
+    pub signer: Option<Signer>,
     #[serde(default)]
     pub light_client: bool,
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
+}
+
+impl ChainConfig {
+    pub fn signer_path(&self) -> Option<String> {
+        self.signer
+            .as_ref()
+            .map(|s| s.path().to_string_lossy().into_owned())
+    }
+
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        self.signer
+            .as_ref()
+            .ok_or(Error::SignerNotDefined)?
+            .account_id()
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        self.signer
+            .as_ref()
+            .map(|s| s.is_qrcode_enabled())
+            .unwrap_or(false)
+    }
+
+    pub fn set_signer_path(&mut self, path: &str) {
+        let signer = Signer::from_file(path).ok();
+        self.signer = signer;
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -136,38 +165,6 @@ impl Default for Features {
     }
 }
 
-/// Provides default value for the proxy account file path
-fn default_proxy_path() -> String {
-    ".proxy_account.json".to_string()
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Signer {
-    #[serde(default = "default_proxy_path")]
-    proxy_path: String,
-}
-
-impl Signer {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let path = path.as_ref();
-
-        if !path.exists() {
-            warn!("Proxy path does not exist: {}", path.display());
-            return Err(Error::InvalidPath(path.display().to_string()));
-        }
-
-        let content = fs::read_to_string(path)?;
-        if content.is_empty() {
-            warn!("Proxy path content is empty: {}", path.display());
-            return Err(Error::InvalidContent(path.display().to_string()));
-        }
-
-        Ok(Signer {
-            proxy_path: path.to_string_lossy().into_owned(),
-        })
-    }
-}
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Explorer {
     url: Option<String>,
@@ -190,8 +187,11 @@ impl Config {
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
-            let signer = Signer::from_file(signer.proxy_path).ok();
-            config.signer = signer;
+            config.signer = if signer.is_proxy_account_setup() {
+                Some(signer)
+            } else {
+                Signer::from_file(signer.path()).ok()
+            };
         }
 
         // Load themes
@@ -231,11 +231,32 @@ impl Config {
     }
 
     pub fn signer_path(&self) -> Option<String> {
-        self.signer.as_ref().map(|s| s.proxy_path.clone())
+        self.signer
+            .as_ref()
+            .map(|s| s.path().to_string_lossy().into_owned())
+    }
+
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        self.signer
+            .as_ref()
+            .ok_or(Error::SignerNotDefined)?
+            .account_id()
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        self.signer
+            .as_ref()
+            .map(|s| s.is_qrcode_enabled())
+            .unwrap_or(false)
     }
 
     pub fn set_signer_path(&mut self, path: &str) {
         let signer = Signer::from_file(path).ok();
+        self.signer = signer;
+    }
+
+    pub fn set_signer_account(&mut self, address: &str) {
+        let signer = Signer::from_address(address).ok();
         self.signer = signer;
     }
 
@@ -262,6 +283,7 @@ fn default_config_path() -> &'static str {
 
 fn get_config() -> Result<Config, Error> {
     let default_config_path = default_config_path();
+    let default_proxy_path = default_proxy_path();
 
     let matches = clap::Command::new("suno")
         .version(env!("CARGO_PKG_VERSION"))
@@ -280,7 +302,15 @@ fn get_config() -> Result<Config, Error> {
                 .short('p')
                 .long("proxy-path")
                 .value_name("FILE")
-                .help("Sets a custom proxy account file path."),
+                .default_value(default_proxy_path)
+                .help("Sets a global proxy account file path."),
+        )
+        .arg(
+            clap::Arg::new("proxy-account")
+                .short('a')
+                .long("proxy-account")
+                .value_name("ADDRESS")
+                .help("Sets a global proxy account used by Polkadot Vault."),
         )
         .get_matches();
 
@@ -299,6 +329,10 @@ fn get_config() -> Result<Config, Error> {
     if config.signer.is_none() {
         if let Some(path) = matches.get_one::<String>("proxy-path") {
             config.set_signer_path(path.as_str());
+        }
+
+        if let Some(account) = matches.get_one::<String>("proxy-account") {
+            config.set_signer_account(account.as_str());
         }
     }
 
@@ -513,6 +547,64 @@ explorer:
         assert_eq!(config.chains.len(), 3);
         assert!(config.features.enable_validators);
         assert!(config.features.enable_collators);
+    }
+
+    #[test]
+    fn test_config_global_proxy_account_enables_qrcode() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      light_client: false
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+    enable_validators: true
+    enable_collators: true
+    enable_rpcs: false
+signer:
+  proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+explorer:
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 1);
+        assert!(config.is_qrcode_enabled());
+    }
+
+    #[test]
+    fn test_config_chain_proxy_account_enables_qrcode() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      signer:
+        proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+    enable_validators: true
+explorer:
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 1);
+        let chain_config = config.chains[0]
+            .get(&SupportedRuntime::Polkadot)
+            .expect("polkadot chain should be present");
+
+        assert_eq!(
+            chain_config.signer_account_id().unwrap().to_string(),
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        );
+        assert!(
+            chain_config.is_qrcode_enabled(),
+            "proxy_account should enable qrcode signing"
+        );
     }
 
     // Helper function to create temporary file with content

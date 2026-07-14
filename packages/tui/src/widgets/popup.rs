@@ -2,6 +2,7 @@ use crate::widgets::{
     input_field::{InputFieldWidget, Metadata as InputFieldMetadata},
     spinner::Spinner,
 };
+use image::DynamicImage;
 use log::warn;
 use ratatui::{
     buffer::Buffer,
@@ -12,9 +13,11 @@ use ratatui::{
         Wrap,
     },
 };
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_actions::{ConfirmationContext, ThreadAction};
+use suno_config::CONFIG;
 use suno_primitives::{
     call::Call,
     entry::{Command, Entry, ToDescription},
@@ -22,32 +25,93 @@ use suno_primitives::{
     staking::Payee,
     Validator,
 };
+use suno_qrcode::{QrCodeWidget, QrScannerWidget};
+use tokio::sync::mpsc::UnboundedSender;
+
 use unicode_width::UnicodeWidthStr;
 
-/// Popup modes.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum Mode {
-    #[default]
-    Menu,
-    Confirm,
+#[derive(Clone, Default, PartialEq, Eq)]
+struct MenuContext {
+    era: ActiveEra,
+    validator: Option<Validator>,
+}
+
+// #[derive(Clone, PartialEq, Eq)]
+// pub struct ConfirmationContext {
+//     runtime: SupportedRuntime,
+//     spec_version: u32,
+//     proxy_identity: String,
+//     stash_identity: String,
+//     call: Call,
+//     bytes: Vec<u8>,
+//     qr_bytes: Vec<u8>,
+// }
+
+/// Context holds the initialization data for a popup. Carries the heavy, mode-specific
+/// payload only while building the popup; it is not stored in state.
+enum Context {
+    Menu(Box<MenuContext>),
+    Confirmation(Box<ConfirmationContext>),
     Transaction,
 }
 
-#[derive(Debug, Clone, Default)]
+impl Context {
+    fn mode(&self) -> Mode {
+        match self {
+            Context::Menu(_) => Mode::Menu,
+            Context::Confirmation(_) => Mode::Confirmation,
+            Context::Transaction => Mode::Transaction,
+        }
+    }
+}
+
+/// Popup status_modes.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub enum Mode {
+    #[default]
+    Hidden,
+    Menu,
+    Confirmation,
+    Transaction,
+}
+
+#[derive(Clone, Default)]
 pub struct PopupWidget {
     pub state: Arc<RwLock<PopupState>>,
 }
 
-#[derive(Debug)]
+/// Per-session scanner state. Exists only while the popup is showing the scanner.
+/// Dropping this (e.g. on `close`) drops `_ctrl`, which disconnects the scanner
+/// thread's receiver and stops it.
+pub struct ScannerSession {
+    _ctrl: UnboundedSender<ThreadAction>,
+    _picker: Picker,
+    frame_protocol: Option<StatefulProtocol>,
+}
+
+impl ScannerSession {
+    pub fn new(ctrl: UnboundedSender<ThreadAction>, picker: Picker) -> Self {
+        Self {
+            _ctrl: ctrl,
+            _picker: picker,
+            frame_protocol: None,
+        }
+    }
+
+    pub fn set_frame(&mut self, frame: DynamicImage) {
+        self.frame_protocol = Some(self._picker.new_resize_protocol(frame));
+    }
+}
+
 pub struct PopupState {
     options: Vec<Entry<Call>>,
     table_state: TableState,
-    is_visible: bool,
     mode: Mode,
     input: InputFieldWidget,
     spinner: Spinner,
     title: Option<String>,
     label: Option<String>,
+    scanner: Option<ScannerSession>,
 }
 
 impl Default for PopupState {
@@ -55,23 +119,23 @@ impl Default for PopupState {
         Self {
             options: Vec::new(),
             table_state: TableState::default(),
-            is_visible: false,
             mode: Mode::default(),
             input: InputFieldWidget::new(),
             spinner: Spinner::default(),
             title: None,
             label: None,
+            scanner: None,
         }
     }
 }
 
 impl PopupState {
-    pub fn set_menu(&mut self) {
-        self.mode = Mode::Menu;
+    fn is_hidden(&self) -> bool {
+        matches!(self.mode, Mode::Hidden)
     }
 
-    pub fn set_confirm(&mut self) {
-        self.mode = Mode::Confirm;
+    fn is_visible(&self) -> bool {
+        !self.is_hidden()
     }
 
     pub fn get_input_cursor_position(&self) -> Option<Position> {
@@ -128,23 +192,17 @@ impl PopupState {
 type ActiveEra = u32;
 
 impl PopupWidget {
-    pub fn on_init(&self, mode: Mode, context: Option<(ActiveEra, Validator)>) {
+    fn on_init(&self, context: Context) {
         let mut state = self.state.write().unwrap();
         state.options.clear();
-        match mode {
-            Mode::Menu => self.init_menu(&mut state, context),
-            Mode::Transaction => self.init_transaction(&mut state),
-            _ => {}
-        }
-        state.mode = mode;
 
-        // Select the first option.
-        if !state.options.is_empty() {
-            state.table_state.select(Some(0));
+        match &context {
+            Context::Menu(ctx) => self.init_menu(&mut state, ctx),
+            Context::Confirmation(ctx) => self.init_confirmation(&mut state, ctx),
+            Context::Transaction => self.init_transaction(&mut state),
         }
 
-        // Make popup visible.
-        state.is_visible = true;
+        state.mode = context.mode();
     }
 
     fn _on_err(&self, err: Box<dyn std::error::Error>) {
@@ -152,8 +210,10 @@ impl PopupWidget {
         // TODO: Set chain state to error
     }
 
-    fn init_menu(&self, state: &mut PopupState, context: Option<(ActiveEra, Validator)>) {
-        let Some((active_era, validator)) = context else {
+    fn init_menu(&self, state: &mut PopupState, context: &MenuContext) {
+        let active_era = context.era;
+
+        let Some(validator) = &context.validator else {
             return;
         };
 
@@ -308,42 +368,45 @@ impl PopupWidget {
                 bytes: None,
             }));
         });
+
+        // Select the first option.
+        if !state.options.is_empty() {
+            state.table_state.select(Some(0));
+        }
     }
 
-    pub fn init_confirm_and_sign(
-        &self,
-        runtime: SupportedRuntime,
-        spec_version: u32,
-        proxy_identity: String,
-        stash_identity: String,
-        call: Call,
-        bytes: Vec<u8>,
-    ) {
-        let mut state = self.state.write().unwrap();
-        state.options.clear();
+    fn init_confirmation(&self, state: &mut PopupState, context: &ConfirmationContext) {
+        state.options.push(Entry::new(Command::Text(
+            context.runtime.as_str_long().to_string(),
+        )));
         state
             .options
-            .push(Entry::new(Command::Text(runtime.as_str_long().to_string())));
+            .push(Entry::new(Command::Text(context.spec_version.to_string())));
         state
             .options
-            .push(Entry::new(Command::Text(spec_version.to_string())));
+            .push(Entry::new(Command::Text(context.proxy_identity.clone())));
         state
             .options
-            .push(Entry::new(Command::Text(proxy_identity)));
-        state
-            .options
-            .push(Entry::new(Command::Text(stash_identity)));
-        // NOTE: Instruction with the previusly selcted call and respective call_data
+            .push(Entry::new(Command::Text(context.stash_identity.clone())));
+
+        // Instruction with the previously selected call and respective call_data_bytes
         state.options.push(Entry::new(Command::Instruction {
-            call,
-            bytes: Some(bytes),
+            call: context.call.clone(),
+            bytes: Some(context.call_data_bytes.clone()),
         }));
+
         // NOTE: Rather than having a specific field to hold the call data bytes,
         // we just select the option in position 4th which is where it is being added.
         // Makes it easier to retrieve the selected option later to copy it to the clipboard;
         state.table_state.select(Some(4));
-        // Change popup mode to confirmation mode
-        state.mode = Mode::Confirm;
+
+        // NOTE: Make QR Data available only if qrcode signing is enabled
+        if context.runtime.is_qrcode_enabled() {
+            state
+                .options
+                .push(Entry::new(Command::Data(context.qr_bytes.clone())));
+        }
+
         // Reset the input field as a password field
         state.input.reset_as_password();
     }
@@ -353,6 +416,34 @@ impl PopupWidget {
         state.options.push(Entry::new(Command::Text(
             "processing transaction".to_string(),
         )));
+    }
+
+    pub fn show_commands(&self, active_era: ActiveEra, validator: &Validator) {
+        let menu = MenuContext {
+            era: active_era,
+            validator: Some(validator.clone()),
+        };
+        let ctx = Context::Menu(Box::new(menu));
+        self.on_init(ctx);
+    }
+
+    pub fn show_confirm_and_sign(&self, ctx: &ConfirmationContext) {
+        let ctx = Context::Confirmation(Box::new(ctx.clone()));
+        self.on_init(ctx);
+    }
+
+    pub fn show_transaction_status(&self) {
+        self.on_init(Context::Transaction);
+    }
+
+    pub fn is_hidden(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_hidden()
+    }
+
+    pub fn is_visible(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_visible()
     }
 
     pub fn move_down(&self) -> Option<Entry<Call>> {
@@ -393,28 +484,16 @@ impl PopupWidget {
         }
     }
 
-    pub fn is_visible(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_visible
-    }
-
-    pub fn is_menu_visible(&self) -> bool {
-        let state = self.state.read().unwrap();
-        matches!(state.mode, Mode::Menu)
-    }
-
-    pub fn is_transaction_visible(&self) -> bool {
-        let state = self.state.read().unwrap();
-        matches!(state.mode, Mode::Transaction)
-    }
-
-    pub fn show_extrinsics(&self, active_era: ActiveEra, validator: Validator) {
-        self.on_init(Mode::Menu, Some((active_era, validator)));
-    }
-
     pub fn close(&self) {
         let mut state = self.state.write().unwrap();
-        state.is_visible = false;
+        state.mode = Mode::Hidden;
+        state.scanner = None;
+    }
+
+    pub fn start_scanner(&self, ctrl: UnboundedSender<ThreadAction>) {
+        let mut state = self.state.write().unwrap();
+        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+        state.scanner = Some(ScannerSession::new(ctrl, picker));
     }
 
     pub fn get_selected(&self) -> Option<Entry<Call>> {
@@ -442,8 +521,19 @@ impl PopupWidget {
         state.mode.clone()
     }
 
-    pub fn show_transaction_status(&self) {
-        self.on_init(Mode::Transaction, None);
+    pub fn is_confirmation_mode(&self) -> bool {
+        let state = self.state.read().unwrap();
+        matches!(state.mode, Mode::Confirmation)
+    }
+
+    pub fn is_menu_mode(&self) -> bool {
+        let state = self.state.read().unwrap();
+        matches!(state.mode, Mode::Menu)
+    }
+
+    pub fn is_menu_or_confirmation_mode(&self) -> bool {
+        let state = self.state.read().unwrap();
+        matches!(state.mode, Mode::Menu | Mode::Confirmation)
     }
 
     pub fn update_transaction_status(&self, message: &str) {
@@ -453,6 +543,13 @@ impl PopupWidget {
         state
             .options
             .push(Entry::new(Command::Text(message.to_string())));
+    }
+
+    pub fn update_scanner_frame(&self, frame: DynamicImage) {
+        let mut state = self.state.write().unwrap();
+        if let Some(scanner) = &mut state.scanner {
+            scanner.set_frame(frame);
+        }
     }
 
     // Input actions
@@ -479,16 +576,6 @@ impl PopupWidget {
     pub fn set_input_error(&self, msg: &str) -> bool {
         let mut state = self.state.write().unwrap();
         state.input.set_error(msg)
-    }
-
-    pub fn set_menu_mode(&self) {
-        let mut state = self.state.write().unwrap();
-        state.set_menu();
-    }
-
-    pub fn set_confirm_mode(&self) {
-        let mut state = self.state.write().unwrap();
-        state.set_confirm();
     }
 
     pub fn invalidate_input(&self, msg: &str) -> bool {
@@ -548,16 +635,17 @@ impl PopupWidget {
 
 impl Widget for &PopupWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
-
-        if !state.is_visible {
+        if !self.is_visible() {
             return; // Do not render if popup is not active.
         }
 
+        let mut state = self.state.write().unwrap();
+
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
-            Mode::Confirm => render_confirm_and_sign(area, buf, &mut state),
+            Mode::Confirmation => render_confirm_and_sign(area, buf, &mut state),
             Mode::Transaction => render_transaction(area, buf, &mut state),
+            _ => {}
         }
     }
 }
@@ -633,7 +721,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
         .block(block)
         .header(Row::new(table_labels).style(theme.table.header))
         .style(theme.table.base)
-        .row_highlight_style(theme.table.row_highlight(state.is_visible));
+        .row_highlight_style(theme.table.row_highlight(true));
 
     Clear.render(details_area, buf);
 
@@ -645,7 +733,8 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 }
 
 fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
+    let config = CONFIG.clone();
+    let theme = config.theme();
     let block = Block::new()
         .style(theme.block.active)
         .padding(Padding::proportional(1));
@@ -711,12 +800,18 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let call_data = Line::from(call_entry.to_hex());
     let call_data_lines = calculate_text_wrapped_lines(&call_entry.to_hex(), area.width);
 
-    // Split the area into header to show transaction details and password input area
-    let [details_area, input_area] = Layout::default()
+    // Note: The QR code entry is only available if QR code signing is enabled
+    // If it's not available, we default to the standard sign mode
+    let is_qrcode_enabled = state.options.get(5).is_some();
+    // Calculate the area height based on the sign mode
+    let area_height = if is_qrcode_enabled { 31 } else { 5 };
+
+    // Split the area into header to show transaction details and sign area (password / QR code)
+    let [details_area, sign_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Max(8 + method_lines + call_data_lines), // Details
-            Constraint::Length(5), // InputField as password mode (input (3) + invalid msg (2))
+            Constraint::Length(area_height),
         ])
         .flex(Flex::End)
         .areas(area);
@@ -736,8 +831,40 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     details.render(details_area, buf);
 
-    // Render input area
-    state.input.as_password().render(input_area, buf);
+    if is_qrcode_enabled {
+        Clear.render(sign_area, buf);
+
+        // Split the sign area into QR code and scanner camera area
+        let [qrcode_area, scanner_area] = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Fill(1)])
+            .areas(sign_area);
+
+        let block = Block::default().style(theme.qrcode.base);
+
+        // Get QR code bytes from the options
+        let Some(qr_bytes_entry) = state.options.get(5) else {
+            return;
+        };
+        // Render qrcode
+        let qr_bytes = qr_bytes_entry.as_bytes();
+        QrCodeWidget::new(&qr_bytes)
+            .block(block)
+            .set_style(theme.qrcode.base)
+            .render(qrcode_area, buf);
+
+        // Render qrscanner (camera)
+        if let Some(ref mut scanner) = state.scanner {
+            if let Some(ref mut frame) = scanner.frame_protocol {
+                QrScannerWidget::new(frame)
+                    .set_style(theme.qrcode.base)
+                    .render(scanner_area, buf);
+            }
+        }
+    } else {
+        // Render input area
+        state.input.as_password().render(sign_area, buf);
+    }
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
@@ -794,7 +921,7 @@ pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> 
             }
             _ => Row::new(vec![t.to_string()]),
         },
-        // _ => Row::new(vec!["".to_string()]),
+        _ => Row::new(vec!["".to_string()]),
     }
 }
 

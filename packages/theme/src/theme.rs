@@ -22,6 +22,7 @@ pub struct Theme {
     pub scrollbar: Scrollbar,
     pub input: Input,
     pub logo: Logo,
+    pub qrcode: Qrcode,
 }
 
 impl Default for Theme {
@@ -87,6 +88,9 @@ impl Theme {
                 base_dark: Style::new().bg(p.foreground).fg(p.background),
                 with_shadow: Style::new().bg(p.color_13).fg(p.foreground),
                 only_shadow: Style::new().bg(p.background).fg(p.color_13),
+            },
+            qrcode: Qrcode {
+                base: Style::new().bg(p.foreground).fg(p.background),
             },
         }
     }
@@ -252,4 +256,9 @@ pub struct Logo {
     pub base_dark: Style,
     pub with_shadow: Style,
     pub only_shadow: Style,
+}
+
+#[derive(Debug)]
+pub struct Qrcode {
+    pub base: Style,
 }

@@ -13,10 +13,14 @@ arboard = { workspace = true }
 async-trait = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
+image = { workspace = true }
 indoc = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
 ratatui = { workspace = true }
+ratatui-image = { workspace = true }
+rxing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
@@ -32,6 +36,7 @@ suno-asset-hub-kusama = { path = "../chains/asset-hub-kusama" }
 suno-asset-hub-westend = { path = "../chains/asset-hub-westend" }
 suno-config = { path = "../config" }
 suno-error = { path = "../error" }
+suno-qrcode = { path = "../qrcode" }
 suno-paseo = { path = "../chains/paseo" }
 suno-polkadot = { path = "../chains/polkadot" }
 suno-kusama = { path = "../chains/kusama" }

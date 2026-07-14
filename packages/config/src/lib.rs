@@ -3,6 +3,7 @@ mod config;
 mod custom;
 mod error;
 mod runtime;
+mod signer;
 mod themes;
 
 pub use crate::access::{NodeAccess, SshConfig};

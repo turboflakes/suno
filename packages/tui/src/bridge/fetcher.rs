@@ -600,18 +600,6 @@ impl RuntimeFetcher for Runtime {
         proxy: &AccountId32,
     ) -> Result<Vec<Response>, Error> {
         match self {
-            Runtime::Polkadot => {
-                suno_polkadot::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
-            }
-            Runtime::Kusama => {
-                suno_kusama::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
-            }
-            Runtime::Paseo => {
-                suno_paseo::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
-            }
-            Runtime::Westend => {
-                suno_westend::fetch_and_validate_proxy_account(api, block_hash, stash, proxy).await
-            }
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_and_validate_proxy_account(
                     api, block_hash, stash, proxy,

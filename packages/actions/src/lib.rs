@@ -1,6 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
+use image::DynamicImage;
 use sp_arithmetic::Permill;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
@@ -25,7 +26,7 @@ type Points = u32;
 type Counter = u32;
 
 /// Application actions.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Navigation actions
     Navigation(NavigationAction),
@@ -41,6 +42,9 @@ pub enum Action {
     Transaction(TxAction),
     //TODO: Collator actions
     // Collator(CollatorAction),
+    ///
+    /// QrScanner actions
+    Scanner(ScannerAction),
     /// System actions
     System(SystemAction),
 }
@@ -60,19 +64,25 @@ pub enum NavigationAction {
 type SpecVersion = u32;
 type ProxyIdentity = String;
 type StashIdentity = String;
-type Bytes = Vec<u8>;
+type CallDataBytes = Vec<u8>;
+type QrBytes = Vec<u8>;
+type QrSignature = Vec<u8>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfirmationContext {
+    pub runtime: SupportedRuntime,
+    pub spec_version: SpecVersion,
+    pub proxy_identity: ProxyIdentity,
+    pub stash_identity: StashIdentity,
+    pub call: Call,
+    pub call_data_bytes: CallDataBytes,
+    pub qr_bytes: QrBytes,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
     Open,
-    ConfirmAndSign(
-        SupportedRuntime,
-        SpecVersion,
-        ProxyIdentity,
-        StashIdentity,
-        Box<Call>,
-        Bytes,
-    ),
+    ConfirmAndSign(Box<ConfirmationContext>),
     Close,
     Cancel,
 }
@@ -145,4 +155,18 @@ pub enum SystemAction {
     Tick,
     Noop,
     Error(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScannerAction {
+    Init,
+    Decoded(QrSignature),
+    Frame(DynamicImage),
+    Error(String),
+}
+
+/// Thread action messages, useful to be used in private channels and controlling threads from the app,
+/// eg. stopping a scanner thread.
+pub enum ThreadAction {
+    Stop,
 }

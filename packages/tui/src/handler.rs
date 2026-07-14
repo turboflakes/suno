@@ -50,7 +50,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
 fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) -> Action {
     match app_focus {
         Focus::Main => handle_main_key_events(key_event),
-        Focus::Popup => handle_popup_key_events(key_event),
+        Focus::Popup | Focus::Scanner => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
         // _ => Action::System(SystemAction::Noop),
     }

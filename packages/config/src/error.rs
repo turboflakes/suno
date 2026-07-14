@@ -19,6 +19,10 @@ pub enum Error {
     InvalidCommand(String),
     #[error("Local execution error: {0}")]
     LocalExecution(String),
+    #[error("Invalid address {0}")]
+    InvalidAddress(String),
+    #[error("Signer not defined")]
+    SignerNotDefined,
     #[error("Remote execution error: {0}")]
     RemoteExecution(String),
     #[error("Other error: {0}")]

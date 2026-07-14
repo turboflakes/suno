@@ -31,6 +31,9 @@ chains:
   - asset_hub_polkadot:
       rpc_url: "ws://192.0.2.2:9944"
       light_client: false
+      signer:
+        proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+
   - people_polkadot:
       rpc_url: "ws://192.0.2.3:9944"
       light_client: false
@@ -40,25 +43,29 @@ chains:
   #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+  #
   # - asset_hub_kusama:
   #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
+  #
   # - people_kusama:
   #     rpc_url: "ws://192.0.2.3:9944"
   #     light_client: false
-
+  #
   # - paseo:
   #     rpc_url: "ws://192.0.2.1:9944"
   #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+  #
   # - asset_hub_paseo:
   #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
+  #
   # - people_paseo:
   #     rpc_url: "ws://192.0.2.3:9944"
   #     light_client: false
-
+  #
   # - westend:
   #     rpc_url: "ws://192.0.2.1:9944"
   #     light_client: false
@@ -71,6 +78,7 @@ chains:
   #       #   commands:
   #       #     - name: "test"
   #       #       run: "echo test"
+  #
   # - asset_hub_westend:
   #     rpc_url: "ws://192.0.2.2:9944"
   #     light_client: false
@@ -86,7 +94,7 @@ themes:
   active: "Suno Dark" # Builtin themes: ["Suno Dark", "Suno Light"]
   path: "themes"
 
-signer:
+signer: # global signer configuration, overridden by chain-specific signer config
   proxy_path: ".proxy_private.json"
 
 explorer:

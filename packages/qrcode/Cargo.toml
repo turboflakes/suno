@@ -1,5 +1,5 @@
 [package]
-name = "suno-actions"
+name = "suno-qrcode"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,8 +9,13 @@ edition.workspace = true
 
 
 [dependencies]
+hex = { workspace = true }
 image = { workspace = true }
-sp-arithmetic = { workspace = true }
+nokhwa = { workspace = true }
+qrcodegen = { workspace = true }
+ratatui = { workspace = true }
+ratatui-image = { workspace = true }
+rxing = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
-suno-primitives = { path = "../primitives" }
+thiserror = { workspace = true }
