@@ -19,32 +19,47 @@ pub struct ValidatorsCompactWidget {
 impl Widget for &ValidatorsCompactWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let theme = CONFIG.theme();
+
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
             .set_style(theme.block.pane_body(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
-        let rows = state.validators_iter();
+        let proxies_available = state.proxies_available();
 
+        let rows = state.validators_iter().map(|v| {
+            let mut row = vec![
+                Text::from(""),
+                Text::from(format!("{}/{}", v.runtime(), v.display_name(4),)),
+            ];
+
+            if proxies_available {
+                row.push(Text::from(v.proxies_as_str()).alignment(Alignment::Right));
+            }
+
+            row.push(Text::from(""));
+            Row::new(row)
+        });
+
+        // Define widths
         let mut widths = vec![Constraint::Length(1), Constraint::Fill(1)];
+        if proxies_available {
+            widths.push(Constraint::Length(7));
+        }
+        widths.push(Constraint::Length(1));
 
+        // Define header cells
         let mut header_cells = vec![
             Cell::from(""),
             Cell::from(Text::from("validators").alignment(Alignment::Left)),
         ];
-
-        if CONFIG.signer.is_some() {
+        if proxies_available {
             header_cells.push(Cell::from(
                 Text::from("proxies").alignment(Alignment::Right),
             ));
-            header_cells.push(Cell::from(""));
-            widths.push(Constraint::Length(7));
-            widths.push(Constraint::Length(1));
-        } else {
-            widths.push(Constraint::Length(1));
-            header_cells.push(Cell::from(""))
         }
+        header_cells.push(Cell::from(""));
 
         let table = Table::new(rows, widths)
             .block(block)

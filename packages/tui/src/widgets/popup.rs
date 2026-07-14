@@ -395,18 +395,18 @@ impl PopupWidget {
             bytes: Some(context.call_data_bytes.clone()),
         }));
 
-        // Make QR Data avaialable
-        state
-            .options
-            .push(Entry::new(Command::Data(context.qr_bytes.clone())));
-        // TODO:Make the latest camera frame available
-        state
-            .options
-            .push(Entry::new(Command::Data(context.qr_bytes.clone())));
         // NOTE: Rather than having a specific field to hold the call data bytes,
         // we just select the option in position 4th which is where it is being added.
         // Makes it easier to retrieve the selected option later to copy it to the clipboard;
         state.table_state.select(Some(4));
+
+        // NOTE: Make QR Data available only if qrcode signing is enabled
+        if context.runtime.is_qrcode_enabled() {
+            state
+                .options
+                .push(Entry::new(Command::Data(context.qr_bytes.clone())));
+        }
+
         // Reset the input field as a password field
         state.input.reset_as_password();
     }
@@ -757,9 +757,6 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let Some(call_entry) = state.options.get(4) else {
         return;
     };
-    let Some(qr_bytes_entry) = state.options.get(5) else {
-        return;
-    };
 
     let network = Line::from(vec![Span::styled(
         format!(
@@ -803,8 +800,11 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let call_data = Line::from(call_entry.to_hex());
     let call_data_lines = calculate_text_wrapped_lines(&call_entry.to_hex(), area.width);
 
+    // Note: The QR code entry is only available if QR code signing is enabled
+    // If it's not available, we default to the standard sign mode
+    let is_qrcode_enabled = state.options.get(5).is_some();
     // Calculate the area height based on the sign mode
-    let area_height = if config.is_qrcode_enabled() { 31 } else { 5 };
+    let area_height = if is_qrcode_enabled { 31 } else { 5 };
 
     // Split the area into header to show transaction details and sign area (password / QR code)
     let [details_area, sign_area] = Layout::default()
@@ -831,7 +831,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     details.render(details_area, buf);
 
-    if config.is_qrcode_enabled() {
+    if is_qrcode_enabled {
         Clear.render(sign_area, buf);
 
         // Split the sign area into QR code and scanner camera area
@@ -842,6 +842,10 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
         let block = Block::default().style(theme.qrcode.base);
 
+        // Get QR code bytes from the options
+        let Some(qr_bytes_entry) = state.options.get(5) else {
+            return;
+        };
         // Render qrcode
         let qr_bytes = qr_bytes_entry.as_bytes();
         QrCodeWidget::new(&qr_bytes)

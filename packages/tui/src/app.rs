@@ -241,7 +241,6 @@ impl App {
     }
 
     fn handle_chain_actions(&mut self, action: ChainAction) {
-        let config = CONFIG.clone();
         match action {
             ChainAction::UpdateConnectionState(chain_key, connection_state) => {
                 let is_updated = self
@@ -284,17 +283,6 @@ impl App {
                                     &validator_keys,
                                     &self.tx,
                                 );
-
-                                if let Ok(proxy) = config.signer_account_id() {
-                                    sync::spawn_fetch_validators_proxy_status(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &proxy,
-                                        &self.tx,
-                                    );
-                                };
                             }
                         }
                         SupportedRuntime::AssetHubPolkadot
@@ -345,7 +333,7 @@ impl App {
                                     &self.tx,
                                 );
 
-                                if let Ok(proxy) = config.signer_account_id() {
+                                if let Ok(proxy) = runtime.signer_account_id() {
                                     sync::spawn_fetch_validators_proxy_status(
                                         &api,
                                         block_hash,
@@ -876,8 +864,7 @@ impl App {
 
         // If configured for QR signing, dispatch action to initialize scanner.
         // Otherwise, change focus to the input field for password signing.
-        let config = CONFIG.clone();
-        if config.is_qrcode_enabled() {
+        if ctx.runtime.is_qrcode_enabled() {
             let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
         } else {
             let _ = self.tx.send(Action::Input(InputAction::Editing));
@@ -929,7 +916,6 @@ impl App {
     }
 
     pub fn handle_extrinsic_calls(&mut self, call: Call, validator: Validator) {
-        let config = CONFIG.clone();
         let runtime = validator.runtime().asset_hub_runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
@@ -938,7 +924,7 @@ impl App {
         let api = chain.client().clone();
         let tx = self.tx.clone();
         let stash = validator.key().stash();
-        let proxy_account_id = match config.signer_account_id().boxed() {
+        let proxy_account_id = match runtime.signer_account_id().boxed() {
             Ok(address) => address,
             Err(e) => {
                 self.error(e.into());
@@ -1000,7 +986,6 @@ impl App {
     }
 
     pub fn handle_custom_command(&mut self, custom: CustomCommand, validator: Validator) {
-        let config = CONFIG.clone();
         let tx = self.tx.clone();
 
         match custom.kind {
@@ -1048,7 +1033,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
-                    let proxy_account_id = match config.signer_account_id().boxed() {
+                    let proxy_account_id = match runtime.signer_account_id().boxed() {
                         Ok(address) => address,
                         Err(e) => {
                             self.error(e.into());
@@ -1056,13 +1041,8 @@ impl App {
                         }
                     };
                     let stash_identity = validator.display_name(3);
-                    let proxy_identity = match config.signer_account_id().boxed() {
-                        Ok(address) => to_compact_string(&address, runtime.account_format(), 6),
-                        Err(e) => {
-                            self.error(e.into());
-                            return;
-                        }
-                    };
+                    let proxy_identity =
+                        to_compact_string(&proxy_account_id, runtime.account_format(), 6);
                     let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
@@ -1208,7 +1188,6 @@ impl App {
 
     /// Handle decoded bytes from qr code when popup is in confirmation mode
     pub fn on_qr_decoded_signature(&mut self, signature_bytes: &[u8]) {
-        let config = CONFIG.clone();
         if !self.popup.is_visible() {
             return;
         }
@@ -1231,7 +1210,7 @@ impl App {
                 let api = chain.client().clone();
                 let tx = self.tx.clone();
 
-                if let Ok(signer) = config.signer_account_id() {
+                if let Ok(signer) = runtime.signer_account_id() {
                     sync::spawn_submit_call_data_with_signature(
                         &api,
                         runtime,

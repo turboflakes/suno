@@ -1,9 +1,10 @@
 use crate::config::CONFIG;
+use crate::error::Error;
 use log::info;
 use serde::{Deserialize, Serialize};
-use serde_json::{Result, Value};
+use serde_json::Value;
 use std::str::FromStr;
-use subxt::utils::H256;
+use subxt::utils::{AccountId32, H256};
 
 pub const POLKADOT_SPEC: &str = include_str!("../chain-specs/polkadot.json");
 pub const ASSET_HUB_POLKADOT_SPEC: &str = include_str!("../chain-specs/asset-hub-polkadot.json");
@@ -360,6 +361,33 @@ impl SupportedRuntime {
             info!("{url}");
         };
     }
+
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        let config = CONFIG.clone();
+        for chain in config.chains.iter() {
+            for (chain_name, chain_config) in chain {
+                if self == chain_name {
+                    let Ok(account_id) = chain_config.signer_account_id() else {
+                        return config.signer_account_id();
+                    };
+                    return Ok(account_id);
+                }
+            }
+        }
+        return Err(Error::SignerNotDefined);
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        let config = CONFIG.clone();
+        for chain in config.chains.iter() {
+            for (chain_name, chain_config) in chain {
+                if self == chain_name {
+                    return chain_config.is_qrcode_enabled();
+                }
+            }
+        }
+        return false;
+    }
 }
 
 impl std::fmt::Display for SupportedRuntime {
@@ -369,7 +397,7 @@ impl std::fmt::Display for SupportedRuntime {
 }
 
 fn get_state_root_hash(chain_specs: &str) -> H256 {
-    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    let spec: serde_json::Result<Value> = serde_json::from_str(chain_specs);
     match spec {
         Ok(json) => {
             let state_root = json["genesis"]["stateRootHash"]
@@ -382,7 +410,7 @@ fn get_state_root_hash(chain_specs: &str) -> H256 {
 }
 
 fn get_ss58_format(chain_specs: &str) -> u16 {
-    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    let spec: serde_json::Result<Value> = serde_json::from_str(chain_specs);
     match spec {
         Ok(json) => {
             let value = json["properties"]["ss58Format"]
@@ -395,7 +423,7 @@ fn get_ss58_format(chain_specs: &str) -> u16 {
 }
 
 fn get_symbol(chain_specs: &str) -> String {
-    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    let spec: serde_json::Result<Value> = serde_json::from_str(chain_specs);
     match spec {
         Ok(json) => {
             let value = json["properties"]["tokenSymbol"]
@@ -408,7 +436,7 @@ fn get_symbol(chain_specs: &str) -> String {
 }
 
 fn get_decimals(chain_specs: &str) -> u32 {
-    let spec: Result<Value> = serde_json::from_str(chain_specs);
+    let spec: serde_json::Result<Value> = serde_json::from_str(chain_specs);
     match spec {
         Ok(json) => {
             let value = json["properties"]["tokenDecimals"]

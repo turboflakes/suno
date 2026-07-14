@@ -50,12 +50,40 @@ pub struct Config {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub rpc_url: String,
+    pub signer: Option<Signer>,
     #[serde(default)]
     pub light_client: bool,
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
+}
+
+impl ChainConfig {
+    pub fn signer_path(&self) -> Option<String> {
+        self.signer
+            .as_ref()
+            .map(|s| s.path().to_string_lossy().into_owned())
+    }
+
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        self.signer
+            .as_ref()
+            .ok_or(Error::SignerNotDefined)?
+            .account_id()
+    }
+
+    pub fn is_qrcode_enabled(&self) -> bool {
+        self.signer
+            .as_ref()
+            .map(|s| s.is_qrcode_enabled())
+            .unwrap_or(false)
+    }
+
+    pub fn set_signer_path(&mut self, path: &str) {
+        let signer = Signer::from_file(path).ok();
+        self.signer = signer;
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -504,7 +532,7 @@ explorer:
     }
 
     #[test]
-    fn test_config_proxy_account() {
+    fn test_config_global_proxy_account_enables_qrcode() {
         let yaml = r#"
 chains:
   - polkadot:
@@ -526,6 +554,39 @@ explorer:
 
         assert_eq!(config.chains.len(), 1);
         assert!(config.is_qrcode_enabled());
+    }
+
+    #[test]
+    fn test_config_chain_proxy_account_enables_qrcode() {
+        let yaml = r#"
+chains:
+  - polkadot:
+      rpc_url: "wss://rpc.polkadot.io"
+      signer:
+        proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+      validators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+features:
+    enable_validators: true
+explorer:
+    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert_eq!(config.chains.len(), 1);
+        let chain_config = config.chains[0]
+            .get(&SupportedRuntime::Polkadot)
+            .expect("polkadot chain should be present");
+
+        assert_eq!(
+            chain_config.signer_account_id().unwrap().to_string(),
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        );
+        assert!(
+            chain_config.is_qrcode_enabled(),
+            "proxy_account should enable qrcode signing"
+        );
     }
 
     // Helper function to create temporary file with content

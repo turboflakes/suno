@@ -7,7 +7,6 @@ use crate::{
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
-use ratatui::{layout::Alignment, text::Text, widgets::Row};
 use subxt::utils::AccountId32;
 use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 
@@ -274,6 +273,10 @@ impl Validator {
         })
     }
 
+    pub fn has_proxies(&self) -> bool {
+        !self.proxies.is_empty()
+    }
+
     pub fn proxies_as_str(&self) -> String {
         let mut proxies = self
             .proxies
@@ -333,16 +336,5 @@ impl AccountDisplay for Validator {
 
     fn account_format(&self) -> u16 {
         self.account.account_format()
-    }
-}
-
-impl From<&Validator> for Row<'_> {
-    fn from(v: &Validator) -> Self {
-        Row::new(vec![
-            Text::from(""),
-            Text::from(format!("{}/{}", v.runtime(), v.display_name(4),)),
-            Text::from(v.proxies_as_str()).alignment(Alignment::Right),
-            Text::from(""),
-        ])
     }
 }

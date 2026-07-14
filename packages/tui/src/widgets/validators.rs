@@ -236,6 +236,13 @@ impl ValidatorsListState {
             .filter_map(move |key| self.validators.get(key))
     }
 
+    /// Returns true if any validator has proxies available
+    pub fn proxies_available(&self) -> bool {
+        self.validators_order
+            .iter()
+            .any(|key| self.validators.get(key).map_or(false, |v| v.has_proxies()))
+    }
+
     /// Get all AccountKeys for a specific runtime
     pub fn get_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         self.validators_order
