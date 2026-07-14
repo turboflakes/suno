@@ -710,6 +710,7 @@ impl App {
                             Ok((Some(bytes), frame)) => {
                                 let _ = tx.send(Action::Scanner(ScannerAction::Decoded(bytes)));
                                 let _ = tx.send(Action::Scanner(ScannerAction::Frame(frame)));
+                                break;
                             }
                             Ok((None, frame)) => {
                                 let _ = tx.send(Action::Scanner(ScannerAction::Frame(frame)));

@@ -382,11 +382,15 @@ impl SupportedRuntime {
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
                 if self == chain_name {
-                    return chain_config.is_qrcode_enabled();
+                    return if chain_config.signer.is_some() {
+                        chain_config.is_qrcode_enabled()
+                    } else {
+                        config.is_qrcode_enabled()
+                    };
                 }
             }
         }
-        false
+        config.is_qrcode_enabled()
     }
 }
 

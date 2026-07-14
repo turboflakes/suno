@@ -6132,7 +6132,6 @@ name = "suno-error"
 version = "0.4.1"
 dependencies = [
  "arboard",
- "hex",
  "subxt",
  "suno-actions",
  "suno-config",
@@ -6297,7 +6296,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sp-arithmetic",
- "sp-core",
  "strum",
  "subxt",
  "subxt-rpcs",
