@@ -240,7 +240,7 @@ impl ValidatorsListState {
     pub fn proxies_available(&self) -> bool {
         self.validators_order
             .iter()
-            .any(|key| self.validators.get(key).map_or(false, |v| v.has_proxies()))
+            .any(|key| self.validators.get(key).is_some_and(|v| v.has_proxies()))
     }
 
     /// Get all AccountKeys for a specific runtime

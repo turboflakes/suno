@@ -374,7 +374,7 @@ impl SupportedRuntime {
                 }
             }
         }
-        return Err(Error::SignerNotDefined);
+        Err(Error::SignerNotDefined)
     }
 
     pub fn is_qrcode_enabled(&self) -> bool {
@@ -386,7 +386,7 @@ impl SupportedRuntime {
                 }
             }
         }
-        return false;
+        false
     }
 }
 
