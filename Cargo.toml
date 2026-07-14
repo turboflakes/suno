@@ -46,7 +46,6 @@ image = "0.25"
 indoc = "2"
 lazy_static = "1.5"
 log = "0.4"
-
 nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
 qrcodegen = "1.8"
