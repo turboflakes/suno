@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 - Add support for Polkadot-Vault see PR [#20](https://github.com/turboflakes/suno/pull/20)
+- Update paseo genesis hash
 - Update metadata polkadot/2003000
 - Update metadata asset-hub-polkadot/2003001
 - Update metadata people-polkadot/2003000
