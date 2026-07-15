@@ -77,7 +77,9 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("description ").style(theme.paragraph.label(true)),
-                Span::raw("Yet another way to manage substrate node operations from your terminal. Available for Polkadot, Kusama, Paseo and Westend Networks."),
+                Span::raw(
+                    "Yet another way to manage substrate node operations from your terminal.",
+                ),
             ]),
             Line::from(vec![
                 Span::raw("repo ").style(theme.paragraph.label(true)),
@@ -147,13 +149,17 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("/purge_keys ").style(theme.paragraph.label(true)),
-                Span::raw("Purge session keys requires one of `Staking` or `StakingOperator` proxy."),
+                Span::raw(
+                    "Purge session keys requires one of `Staking` or `StakingOperator` proxy.",
+                ),
             ]),
             Line::from(Span::raw("")),
             Line::from(Span::raw("SUPPORTED CUSTOM COMMANDS").style(theme.paragraph.header(true))),
             Line::from(vec![
                 Span::raw("/rotate_and_set_keys ").style(theme.paragraph.label(true)),
-                Span::raw("Rotate and set session keys as a single operation. Requires proxy configured."),
+                Span::raw(
+                    "Rotate and set session keys as a single operation. Requires proxy configured.",
+                ),
             ]),
             Line::from(vec![
                 Span::raw("/has_keys ").style(theme.paragraph.label(true)),
@@ -191,7 +197,9 @@ impl Window {
             ]),
             Line::from(vec![
                 Span::raw("ctrl+j/ctrl+k/up/down ").style(theme.paragraph.label(true)),
-                Span::raw("Select a chain, validator, or extrinsic depending on the highlighted area."),
+                Span::raw(
+                    "Select a chain, validator, or extrinsic depending on the highlighted area.",
+                ),
             ]),
             Line::from(vec![
                 Span::raw("ctrl+c ").style(theme.paragraph.label(true)),
