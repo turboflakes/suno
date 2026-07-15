@@ -340,7 +340,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label(false));
 
-        let columns = Columns::new(validators, era.index(), &features);
+        let columns = Columns::new(validators, era.index(), features);
 
         let widths = columns.widths();
 
@@ -375,6 +375,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         StatefulWidget::render(table, area, buf, table_state);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_validator_rows(
         &self,
         validators: &[&Validator],
@@ -391,6 +392,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn validator_row(
         &self,
         validator: &Validator,
@@ -404,6 +406,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         Row::new(self.validator_cells(validator, selected, columns, era, masked, theme, symbol))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn validator_cells(
         &self,
         validator: &Validator,
@@ -548,6 +551,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 cells.push(Cell::from(
                     Text::from(validator.display_next_keys(6)).alignment(Alignment::Left),
                 ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
             }
         }
 
@@ -663,15 +668,14 @@ impl Columns {
     }
 
     fn widths(&self) -> Vec<Constraint> {
-        let mut widths = vec![
-            Constraint::Length(3),
-            Constraint::Length(24),
-            Constraint::Fill(2),
-        ];
+        let mut widths = vec![Constraint::Length(3), Constraint::Length(24)];
 
         if self.host {
             widths.push(Constraint::Fill(2));
         }
+
+        // points
+        widths.push(Constraint::Fill(2));
 
         if self.nominators_counter {
             widths.push(Constraint::Fill(2));
