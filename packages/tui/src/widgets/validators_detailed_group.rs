@@ -117,6 +117,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
 }
 
 impl<'a> ValidatorsDetailedGroupWidget<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn render_group(
         &self,
         runtime: SupportedRuntime,
@@ -308,6 +309,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         countdown_info.render(countdown_area, buf);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_table_body(
         &self,
         runtime: SupportedRuntime,
