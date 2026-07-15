@@ -67,6 +67,8 @@ pub struct App {
     pub collators: CollatorsListWidget,
     /// The popup widget.
     pub popup: PopupWidget,
+    /// Is any sensitive data masked?
+    pub masked: bool,
     /// The sender to send actions to update the state to the app.
     pub tx: mpsc::UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
@@ -94,6 +96,7 @@ impl App {
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
+            masked: false,
             tx,
             rx,
         }
@@ -109,6 +112,10 @@ impl App {
         //     let tx = self.tx.clone();
         //     self.collators.on_chain_selected(chain.clone(), tx);
         // }
+    }
+
+    fn is_masked(&self) -> bool {
+        self.masked
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
@@ -185,6 +192,7 @@ impl App {
             NavigationAction::PrevWindow => self.prev_window(),
             NavigationAction::Reset => self.reset_selection(),
             NavigationAction::Copy => self.copy_to_clipboard(),
+            NavigationAction::ToggleMask => self.toggle_mask(),
         }
     }
 
@@ -823,6 +831,13 @@ impl App {
         self.window = self.window.next();
     }
 
+    /// Toggles the masked state of the application.
+    fn toggle_mask(&mut self) {
+        self.masked = !self.masked;
+        self.validators.toggle_mask();
+        self.popup.toggle_mask();
+    }
+
     /// Open menu popup
     pub fn open_popup(&mut self) {
         if self.popup.is_visible() {
@@ -988,6 +1003,7 @@ impl App {
 
     pub fn handle_custom_command(&mut self, custom: CustomCommand, validator: Validator) {
         let tx = self.tx.clone();
+        let masked = self.is_masked();
 
         match custom.kind {
             CommandKind::Shell { run, .. } => {
@@ -1001,7 +1017,7 @@ impl App {
                                 "Command '{}' succeeded for {} on host {}.",
                                 run,
                                 validator.display_name(4),
-                                validator.host(),
+                                validator.host(masked),
                             );
                             let _ = tx.send(Action::Input(InputAction::Success(msg)));
                         }
@@ -1010,7 +1026,7 @@ impl App {
                                 "Command '{}' failed for {} on host {}.",
                                 run,
                                 validator.display_name(4),
-                                validator.host(),
+                                validator.host(masked),
                             );
                             let _ = tx.send(Action::Input(InputAction::Error(msg.clone())));
                             let _ = tx.send(Action::System(SystemAction::Error(format!(
@@ -1124,7 +1140,7 @@ impl App {
                             Ok(true) => {
                                 let msg = format!(
                                     "Yes. Host {} contains the next session keys for {}.",
-                                    validator.host(),
+                                    validator.host(masked),
                                     validator.display_name(4),
                                 );
                                 let _ = tx.send(Action::Input(InputAction::Success(msg)));
@@ -1132,7 +1148,7 @@ impl App {
                             Ok(false) => {
                                 let msg = format!(
                                     "No. Host {} does NOT have the next session keys for {}.",
-                                    validator.host(),
+                                    validator.host(masked),
                                     validator.display_name(4),
                                 );
                                 let _ = tx.send(Action::Input(InputAction::Error(msg)));
@@ -1157,7 +1173,7 @@ impl App {
                             Ok(true) => {
                                 let msg = format!(
                                     "Yes. Host {} contains the queued session keys for {}",
-                                    validator.host(),
+                                    validator.host(masked),
                                     validator.display_name(4),
                                 );
                                 let _ = tx.send(Action::Input(InputAction::Success(msg)));
@@ -1165,7 +1181,7 @@ impl App {
                             Ok(false) => {
                                 let msg = format!(
                                     "No. Host {} does NOT have the queued session keys for {}.",
-                                    validator.host(),
+                                    validator.host(masked),
                                     validator.display_name(4),
                                 );
                                 let _ = tx.send(Action::Input(InputAction::Error(msg)));

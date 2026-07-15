@@ -19,6 +19,15 @@ pub struct SshConfig {
     pub identity: Option<String>, // path to private key, None = use SSH agent
 }
 
+impl SshConfig {
+    pub fn host(&self, masked: bool) -> String {
+        if masked {
+            return "X.X.X.X".to_string();
+        }
+        self.host.to_string()
+    }
+}
+
 pub enum NodeAccess {
     Local,
     Ssh(SshConfig),

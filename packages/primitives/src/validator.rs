@@ -300,12 +300,12 @@ impl Validator {
         )
     }
 
-    pub fn host(&self) -> String {
+    pub fn host(&self, masked: bool) -> String {
         if let Some(config) = self.ssh.as_ref() {
-            return config.host.to_string();
+            return config.host(masked).to_string();
         }
 
-        self.host_rpc.ip().to_string()
+        self.host_rpc.host(masked)
     }
 
     pub fn get_proxy(&self, runtime: SupportedRuntime) -> SupportedProxy {

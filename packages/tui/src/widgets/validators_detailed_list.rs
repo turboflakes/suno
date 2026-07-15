@@ -21,7 +21,7 @@ impl Widget for &ValidatorsDetailedListWidget {
         let theme = CONFIG.theme();
         let mut state = self.state.write().unwrap();
 
-        let (table_style, highlight_style) = match state.is_active {
+        let (table_style, highlight_style) = match state.is_active() {
             true => (
                 Style::default().fg(Color::White),
                 Style::default().fg(Color::Black).bg(Color::White),
