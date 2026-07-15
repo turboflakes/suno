@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update metadata asset-hub-kusama/2003000
 - Update metadata people-kusama/2003000
 - Update metadata paseo/2003001
-- Update metadata asset-hub-paseo/2003002
-- Update metadata people-paseo/2003001
+- Update metadata asset-hub-paseo/2004000
+- Update metadata people-paseo/2004000
 - Update metadata westend/1024001
 - Update metadata asset-hub-westend/1024001
 - Update metadata people-westend/1024001
