@@ -323,6 +323,7 @@ Options:
 'esc' to close popup or unfocus from input field
 'ctrl+e' to show list of enabled commands for the selected validator
 'ctrl+w' to switch window
+'ctrl+m' to mask or unmask hosts
 'ctrl+h / ctrl+l / left / right' to navigate between pane sections
 'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
 'ctrl+c' to quit suno

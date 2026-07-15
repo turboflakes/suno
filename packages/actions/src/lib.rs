@@ -59,6 +59,7 @@ pub enum NavigationAction {
     PrevWindow,
     Reset,
     Copy,
+    ToggleMask,
 }
 
 type SpecVersion = u32;

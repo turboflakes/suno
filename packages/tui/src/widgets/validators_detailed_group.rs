@@ -31,7 +31,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
         state.set_viewport_height(area.height);
         let validators_grouped = state.get_validators_grouped_by_runtime();
         let total_height = state.total_detailed_group_height();
-        let is_scroll_visible = state.is_active && area.height < total_height;
+        let is_scroll_visible = state.is_active() && area.height < total_height;
         let area_width = if is_scroll_visible {
             area.width.saturating_sub(1)
         } else {
@@ -51,7 +51,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
 
             // Get selected validator if one of the validators in the current section
             let selected_validator = match state.get_selected_ref() {
-                Some(selected) if validators.contains(&selected) && state.is_active => {
+                Some(selected) if validators.contains(&selected) && state.is_active() => {
                     Some(selected)
                 }
                 _ => None,
@@ -64,6 +64,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
                 group_area,
                 &mut full_content_buf,
                 &mut state.table_state.clone(),
+                state.is_masked(),
             );
 
             current_y_group += group_height;
@@ -95,7 +96,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
         }
 
         // Render scrollbar when active
-        if state.is_active && area.height < total_height {
+        if state.is_active() && area.height < total_height {
             let selected_pos = state.table_state.selected().unwrap_or_default();
 
             let scrollbar_area = Rect {
@@ -116,6 +117,7 @@ impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
 }
 
 impl<'a> ValidatorsDetailedGroupWidget<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn render_group(
         &self,
         runtime: SupportedRuntime,
@@ -124,6 +126,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
+        is_masked: bool,
     ) {
         // Split area into header and body
         let [header_area, body_area] = Layout::default()
@@ -145,6 +148,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             body_area,
             buf,
             table_state,
+            is_masked,
         );
     }
 
@@ -305,6 +309,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         countdown_info.render(countdown_area, buf);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_table_body(
         &self,
         runtime: SupportedRuntime,
@@ -313,6 +318,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
+        is_masked: bool,
     ) {
         let theme = CONFIG.theme();
         let Some(ah_chain) = self
@@ -372,7 +378,9 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ];
 
             if show_host {
-                validator_cells.push(Cell::from(Text::from(v.host()).alignment(Alignment::Left)));
+                validator_cells.push(Cell::from(
+                    Text::from(v.host(is_masked)).alignment(Alignment::Left),
+                ));
             }
 
             validator_cells.push(Cell::from(text_points.alignment(Alignment::Right)));

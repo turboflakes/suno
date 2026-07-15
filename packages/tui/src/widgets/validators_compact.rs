@@ -23,7 +23,7 @@ impl Widget for &ValidatorsCompactWidget {
         let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(theme.block.pane_body(state.is_active))
+            .set_style(theme.block.pane_body(state.is_active()))
             .padding(Padding::symmetric(0, 1));
 
         let proxies_available = state.proxies_available();
@@ -63,15 +63,15 @@ impl Widget for &ValidatorsCompactWidget {
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active)))
+            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active())))
             .style(theme.table.base)
-            .row_highlight_style(theme.table.row_highlight(state.is_active))
-            .highlight_symbol(theme.table.highlight_symbol(state.is_active));
+            .row_highlight_style(theme.table.row_highlight(state.is_active()))
+            .highlight_symbol(theme.table.highlight_symbol(state.is_active()));
 
         StatefulWidget::render(table, area, buf, &mut state.table_state);
 
         // Render scrollbar when active
-        if state.is_active && state.validators.len() >= area.height.saturating_sub(2) as usize {
+        if state.is_active() && state.validators.len() >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,

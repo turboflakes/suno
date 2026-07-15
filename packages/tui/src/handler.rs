@@ -26,6 +26,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Select next main window/tab
                 KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
+                // Mask/Unmask Host IP addresses
+                KeyCode::Char('m') => Action::Navigation(NavigationAction::ToggleMask),
                 _ => match app_focus {
                     Focus::Main => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),

@@ -112,6 +112,7 @@ pub struct PopupState {
     title: Option<String>,
     label: Option<String>,
     scanner: Option<ScannerSession>,
+    masked: bool,
 }
 
 impl Default for PopupState {
@@ -125,6 +126,7 @@ impl Default for PopupState {
             title: None,
             label: None,
             scanner: None,
+            masked: false,
         }
     }
 }
@@ -136,6 +138,10 @@ impl PopupState {
 
     fn is_visible(&self) -> bool {
         !self.is_hidden()
+    }
+
+    fn is_masked(&self) -> bool {
+        self.masked
     }
 
     pub fn get_input_cursor_position(&self) -> Option<Position> {
@@ -358,7 +364,7 @@ impl PopupWidget {
 
         // Set pop-up label as configured host, if custom commands are defined
         if !validator.commands.is_empty() {
-            state.label = Some(validator.host());
+            state.label = Some(validator.host(state.is_masked()));
         }
 
         // For each custom commands, push the respective calls depending on the validator's status.
@@ -534,6 +540,16 @@ impl PopupWidget {
     pub fn is_menu_or_confirmation_mode(&self) -> bool {
         let state = self.state.read().unwrap();
         matches!(state.mode, Mode::Menu | Mode::Confirmation)
+    }
+
+    pub fn is_masked(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_masked()
+    }
+
+    pub fn toggle_mask(&self) {
+        let mut state = self.state.write().unwrap();
+        state.masked = !state.is_masked();
     }
 
     pub fn update_transaction_status(&self, message: &str) {

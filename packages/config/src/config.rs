@@ -107,6 +107,19 @@ impl Host {
         format!("ws://{}", self.0)
     }
 
+    pub fn host(&self, masked: bool) -> String {
+        let ip = self.0.ip();
+
+        if masked {
+            match ip {
+                IpAddr::V4(_) => "X.X.X.X".to_string(),
+                IpAddr::V6(_) => "X:X:X:X:X:X:X:X".to_string(),
+            }
+        } else {
+            ip.to_string()
+        }
+    }
+
     pub fn ip(&self) -> std::net::IpAddr {
         self.0.ip()
     }

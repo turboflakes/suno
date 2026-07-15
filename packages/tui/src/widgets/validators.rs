@@ -30,7 +30,8 @@ pub struct ValidatorsListState {
     pub table_state: TableState,
     pub scroll_offset: u16,
     pub viewport_height: u16,
-    pub is_active: bool,
+    active: bool,
+    masked: bool,
 }
 
 impl ValidatorsListState {
@@ -207,7 +208,11 @@ impl ValidatorsListState {
     }
 
     pub fn is_active(&self) -> bool {
-        self.is_active
+        self.active
+    }
+
+    pub fn is_masked(&self) -> bool {
+        self.masked
     }
 
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
@@ -472,7 +477,17 @@ impl ValidatorsListWidget {
 
     pub fn set_active(&self, active: bool) {
         let mut state = self.state.write().unwrap();
-        state.is_active = active;
+        state.active = active;
+    }
+
+    pub fn is_masked(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_masked()
+    }
+
+    pub fn toggle_mask(&self) {
+        let mut state = self.state.write().unwrap();
+        state.masked = !state.is_masked();
     }
 
     pub fn get_selected(&self) -> Option<Validator> {
