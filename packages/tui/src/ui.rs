@@ -31,19 +31,19 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .split(container[0]);
 
     let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
-    if config.features.enable_validators {
+    if config.features.validators_enabled() {
         constraints.push(Constraint::Fill(1));
     } else {
         constraints.push(Constraint::Length(0));
     }
 
-    if config.features.enable_collators {
+    if config.features.collators_enabled() {
         constraints.push(Constraint::Fill(1));
     } else {
         constraints.push(Constraint::Length(0));
     }
 
-    if config.features.enable_rpcs {
+    if config.features.rpcs_enabled() {
         constraints.push(Constraint::Fill(1));
     } else {
         constraints.push(Constraint::Length(0));
@@ -57,15 +57,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Display configurable features on the left layout.
     render_chains_widget(app, frame, left_layout[0]);
 
-    if config.features.enable_validators {
+    if config.features.validators_enabled() {
         render_validators_widget(app, frame, left_layout[1]);
     }
 
-    if config.features.enable_collators {
+    if config.features.collators_enabled() {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
-    if config.features.enable_rpcs {
+    if config.features.rpcs_enabled() {
         render_rpcs_widget(app, frame, left_layout[3]);
     }
 

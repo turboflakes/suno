@@ -22,9 +22,9 @@ impl Section {
     }
 
     fn up_from_chains(features: &Features) -> Self {
-        if features.enable_rpcs {
+        if features.rpcs_enabled() {
             Self::Rpcs
-        } else if features.enable_collators {
+        } else if features.collators_enabled() {
             Self::Collators
         } else {
             Self::Validators
@@ -32,7 +32,7 @@ impl Section {
     }
 
     fn up_from_collators(features: &Features) -> Self {
-        if features.enable_validators {
+        if features.validators_enabled() {
             Self::Validators
         } else {
             Self::Chains
@@ -40,9 +40,9 @@ impl Section {
     }
 
     fn up_from_rpcs(features: &Features) -> Self {
-        if features.enable_collators {
+        if features.collators_enabled() {
             Self::Collators
-        } else if features.enable_validators {
+        } else if features.validators_enabled() {
             Self::Validators
         } else {
             Self::Chains
@@ -61,9 +61,9 @@ impl Section {
     }
 
     fn down_from_chains(features: &Features) -> Self {
-        if features.enable_validators {
+        if features.validators_enabled() {
             Self::Validators
-        } else if features.enable_collators {
+        } else if features.collators_enabled() {
             Self::Collators
         } else {
             Self::Rpcs
@@ -71,9 +71,9 @@ impl Section {
     }
 
     fn down_from_validators(features: &Features) -> Self {
-        if features.enable_collators {
+        if features.collators_enabled() {
             Self::Collators
-        } else if features.enable_rpcs {
+        } else if features.rpcs_enabled() {
             Self::Rpcs
         } else {
             Self::Chains
@@ -81,7 +81,7 @@ impl Section {
     }
 
     fn down_from_collators(features: &Features) -> Self {
-        if features.enable_rpcs {
+        if features.rpcs_enabled() {
             Self::Rpcs
         } else {
             Self::Chains

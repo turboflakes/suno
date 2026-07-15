@@ -6360,6 +6360,7 @@ dependencies = [
  "suno-primitives",
  "suno-qrcode",
  "suno-signer",
+ "suno-theme",
  "suno-westend",
  "tempfile",
  "thiserror 2.0.18",
