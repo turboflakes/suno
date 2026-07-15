@@ -63,12 +63,9 @@ shellexpand = "3.1.2"
 sp-arithmetic = "28.0.1"
 sp-core = "39.0.0"
 strum = { version = "0.26.3", features = ["derive"] }
-# subxt = { version = "0.50.0", features = ["reconnecting-rpc-client"] }
-# subxt-signer = { version = "0.50.0", features = ["polkadot-js-compat"] }
-# subxt-rpcs = { version = "0.50.0" }
-subxt = { git = "https://github.com/paritytech/subxt", features = ["reconnecting-rpc-client"] }
-subxt-signer = { git = "https://github.com/paritytech/subxt", package = "subxt-signer", features = ["subxt", "polkadot-js-compat"] }
-subxt-rpcs = { git = "https://github.com/paritytech/subxt", package = "subxt-rpcs" }
+subxt = { version = "0.50.2", features = ["reconnecting-rpc-client"] }
+subxt-signer = { version = "0.50.2", features = ["polkadot-js-compat"] }
+subxt-rpcs = { version = "0.50.2" }
 tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
