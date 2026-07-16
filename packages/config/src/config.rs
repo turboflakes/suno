@@ -35,13 +35,25 @@ fn default_themes() -> Themes {
     Themes::default()
 }
 
+/// Provides default value for Features struct
+fn default_features() -> Features {
+    Features::default()
+}
+
+/// Provides default value for Explorer struct
+fn default_explorer() -> Explorer {
+    Explorer::default()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
     // TODO: Add support for RPCs
     // rpcs: Vec<HashMap<String, Vec<String>>>,
+    #[serde(default = "default_features")]
     pub features: Features,
     pub signer: Option<Signer>,
+    #[serde(default = "default_explorer")]
     pub explorer: Explorer,
     #[serde(default = "default_themes")]
     themes: Themes,
@@ -158,25 +170,29 @@ pub enum NodeConfig {
     },
 }
 
+fn default_enable() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Features {
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     enable_validators: bool,
     #[serde(default)]
     enable_collators: bool,
     #[serde(default)]
     enable_rpcs: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     show_nominators_counter: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     show_nominators_stake: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     show_own_stake: bool,
     #[serde(default)]
     show_commission: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     show_payee: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     show_keys: bool,
 }
 
