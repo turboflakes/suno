@@ -155,6 +155,12 @@ chains:
 
 features:
   enable_validators: true
+  show_nominators_counter: true
+  show_nominators_stake: true
+  show_own_stake: true
+  show_commission: false
+  show_payee: true
+  show_keys: true
   
 themes:
   active: "Suno Dark"

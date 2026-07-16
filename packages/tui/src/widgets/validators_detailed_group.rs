@@ -9,11 +9,12 @@ use ratatui::{
     widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::sync::{Arc, RwLock};
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_blocks, format_planks},
     validator::Validator,
 };
+use suno_theme::Theme;
 
 pub const GROUP_HEADER_HEIGHT: u16 = 6;
 pub const PADDING: u16 = 4;
@@ -321,6 +322,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         is_masked: bool,
     ) {
         let theme = CONFIG.theme();
+        let features = CONFIG.features();
         let Some(ah_chain) = self
             .chains
             .get_chain_by_runtime(runtime.asset_hub_runtime())
@@ -330,256 +332,29 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let Some(active_era) = ah_chain.era() else {
+        let Some(era) = ah_chain.era() else {
             let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
         };
 
-        let show_host = validators.iter().any(|v| !v.commands.is_empty());
+        let symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label(false));
 
-        let show_bonded = validators.iter().any(|v| v.self_stake() != v.bounded());
+        let columns = Columns::new(validators, era.index(), features);
 
-        let show_unlocking = validators
-            .iter()
-            .any(|v| v.unlocking(active_era.index()) > 0);
+        let widths = columns.widths();
 
-        let show_unlocked = validators
-            .iter()
-            .any(|v| v.unlocked(active_era.index()) > 0);
+        let header = columns.header();
 
-        let show_next_commission = validators.iter().any(|v| v.is_commission_changed());
-
-        let show_next_keys = validators.iter().any(|v| v.is_next_keys_changed());
-
-        let mut rows = Vec::new();
-
-        let span_symbol = Span::raw(runtime.token_symbol()).style(theme.paragraph.label(false));
-
-        for v in validators {
-            let text_points = match v.delta_points() {
-                Some(d) => Text::from(format!("+{}", d))
-                    .style(Style::default().add_modifier(Modifier::BOLD)),
-                None => Text::from(v.total_points().to_string()),
-            };
-
-            let decimals = v.runtime().token_decimals();
-            let staked_total = if v.is_active() { v.stake.total() } else { 0 };
-
-            let (cell_style, _highlight_symbol) = match selected_validator {
-                Some(ref selected) if v == selected => (theme.paragraph.cell_active, "❯"),
-                _ => (theme.paragraph.cell, ""),
-            };
-
-            let mut validator_cells = vec![
-                Cell::from(Text::from(v.status().to_string()).alignment(Alignment::Left)),
-                Cell::from(Text::from(v.display_identity()).alignment(Alignment::Left))
-                    .style(cell_style),
-            ];
-
-            if show_host {
-                validator_cells.push(Cell::from(
-                    Text::from(v.host(is_masked)).alignment(Alignment::Left),
-                ));
-            }
-
-            validator_cells.push(Cell::from(text_points.alignment(Alignment::Right)));
-            validator_cells.push(Cell::from(
-                Line::from(vec![
-                    Span::raw(format_planks(staked_total, decimals, 4)),
-                    span_symbol.clone(),
-                ])
-                .alignment(Alignment::Right),
-            ));
-            validator_cells.push(Cell::from(
-                Line::from(vec![
-                    Span::raw(format_planks(v.self_stake(), decimals, 4)),
-                    span_symbol.clone(),
-                ])
-                .alignment(Alignment::Right),
-            ));
-
-            if show_bonded {
-                if v.self_stake() != v.bounded() {
-                    validator_cells.push(Cell::from(
-                        Line::from(vec![
-                            Span::raw(format_planks(v.bounded(), decimals, 4)),
-                            span_symbol.clone(),
-                        ])
-                        .alignment(Alignment::Left),
-                    ));
-                } else {
-                    validator_cells.push(Cell::from(Text::from("")));
-                }
-            }
-
-            if show_unlocking {
-                let unlocking: u128 = v.unlocking(active_era.index());
-
-                if unlocking > 0 {
-                    validator_cells.push(Cell::from(
-                        Line::from(vec![
-                            Span::raw(format_planks(unlocking, decimals, 4)),
-                            span_symbol.clone(),
-                        ])
-                        .alignment(Alignment::Right),
-                    ));
-                } else {
-                    validator_cells.push(Cell::from(Text::from("")));
-                }
-            }
-
-            if show_unlocked {
-                let unlocked: u128 = v.unlocked(active_era.index());
-
-                if unlocked > 0 {
-                    validator_cells.push(Cell::from(
-                        Line::from(vec![
-                            Span::raw(format_planks(unlocked, decimals, 4)),
-                            span_symbol.clone(),
-                        ])
-                        .alignment(Alignment::Right),
-                    ));
-                } else {
-                    validator_cells.push(Cell::from(Text::from("")));
-                }
-            }
-
-            validator_cells.push(Cell::from(
-                Text::from(v.stake.nominators_count().to_string()).alignment(Alignment::Right),
-            ));
-
-            validator_cells.push(Cell::from(
-                Text::from(v.commission_as_percentage(2)).alignment(Alignment::Right),
-            ));
-
-            if show_next_commission {
-                if v.is_commission_changed() {
-                    validator_cells.push(Cell::from(
-                        Text::from(v.next_commission_as_percentage(2)).alignment(Alignment::Left),
-                    ));
-                } else {
-                    validator_cells.push(Cell::from(Text::from("")));
-                }
-            }
-
-            validator_cells.push(Cell::from(
-                Text::from(v.payee_as_compact(3)).alignment(Alignment::Right),
-            ));
-
-            validator_cells.push(Cell::from(
-                Text::from(v.display_queued_keys(6)).alignment(Alignment::Right),
-            ));
-
-            if show_next_keys && v.is_next_keys_changed() {
-                validator_cells.push(Cell::from(
-                    Text::from(v.display_next_keys(6)).alignment(Alignment::Left),
-                ));
-            }
-
-            // if selected_validator.is_some() {
-            //     validator_cells.insert(
-            //         1,
-            //         Cell::from(
-            //             Text::from(format!("{}", highlight_symbol)).alignment(Alignment::Left),
-            //         )
-            //         .style(cell_style),
-            //     );
-            // }
-            rows.push(Row::new(validator_cells));
-        }
-
-        let mut widths = vec![
-            Constraint::Length(3),
-            Constraint::Length(24),
-            Constraint::Fill(2),
-            Constraint::Fill(2),
-            Constraint::Fill(2),
-            Constraint::Fill(2),
-            Constraint::Fill(2),
-        ];
-
-        if show_host {
-            widths.push(Constraint::Fill(2));
-        }
-
-        if show_bonded {
-            widths.push(Constraint::Fill(2));
-        }
-
-        if show_unlocking {
-            widths.push(Constraint::Fill(2));
-        }
-
-        if show_unlocked {
-            widths.push(Constraint::Fill(2));
-        }
-
-        if show_next_commission {
-            widths.push(Constraint::Fill(1));
-        }
-
-        // payee
-        widths.push(Constraint::Fill(2));
-
-        // queued_keys
-        widths.push(Constraint::Fill(2));
-
-        if show_next_keys {
-            widths.push(Constraint::Length(10));
-        }
-
-        let mut header_cells = vec![
-            Cell::from(Text::from("◈").alignment(Alignment::Center)),
-            Cell::from(Text::from("identity").alignment(Alignment::Left)),
-        ];
-
-        if show_host {
-            header_cells.push(Cell::from(Text::from("host").alignment(Alignment::Left)));
-        }
-
-        header_cells.push(Cell::from(Text::from("points").alignment(Alignment::Right)));
-        header_cells.push(Cell::from(Text::from("total").alignment(Alignment::Right)));
-        header_cells.push(Cell::from(
-            Text::from("own-stake").alignment(Alignment::Right),
-        ));
-
-        if show_bonded {
-            header_cells.push(Cell::from(
-                Text::from("(bonded)").alignment(Alignment::Left),
-            ));
-        }
-
-        if show_unlocking {
-            header_cells.push(Cell::from(
-                Text::from("unlocking").alignment(Alignment::Right),
-            ));
-        }
-
-        if show_unlocked {
-            header_cells.push(Cell::from(
-                Text::from("unlocked").alignment(Alignment::Right),
-            ));
-        }
-
-        header_cells.push(Cell::from(
-            Text::from("nominators").alignment(Alignment::Right),
-        ));
-        header_cells.push(Cell::from(
-            Text::from("commission").alignment(Alignment::Right),
-        ));
-
-        if show_next_commission {
-            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
-        }
-
-        header_cells.push(Cell::from(Text::from("payee").alignment(Alignment::Right)));
-
-        header_cells.push(Cell::from(Text::from("keys").alignment(Alignment::Right)));
-
-        if show_next_keys {
-            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
-        }
+        let rows = self.build_validator_rows(
+            validators,
+            selected_validator,
+            &columns,
+            era.index(),
+            is_masked,
+            theme,
+            &symbol,
+        );
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {
@@ -595,8 +370,368 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let block = Block::new().set_style(theme.block.main);
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(theme.table.header));
+            .header(header.set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_validator_rows(
+        &self,
+        validators: &[&Validator],
+        selected: Option<&Validator>,
+        columns: &Columns,
+        era: u32,
+        masked: bool,
+        theme: &Theme,
+        symbol: &Span<'static>,
+    ) -> Vec<Row<'static>> {
+        validators
+            .iter()
+            .map(|v| self.validator_row(v, selected, columns, era, masked, theme, symbol))
+            .collect()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn validator_row(
+        &self,
+        validator: &Validator,
+        selected: Option<&Validator>,
+        columns: &Columns,
+        era: u32,
+        masked: bool,
+        theme: &Theme,
+        symbol: &Span<'static>,
+    ) -> Row<'static> {
+        Row::new(self.validator_cells(validator, selected, columns, era, masked, theme, symbol))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn validator_cells(
+        &self,
+        validator: &Validator,
+        selected: Option<&Validator>,
+        columns: &Columns,
+        era: u32,
+        masked: bool,
+        theme: &Theme,
+        symbol: &Span<'static>,
+    ) -> Vec<Cell<'static>> {
+        let decimals = validator.runtime().token_decimals();
+
+        let (cell_style, _highlight_symbol) = match selected {
+            Some(selected) if validator == selected => (theme.paragraph.cell_active, "❯"),
+            _ => (theme.paragraph.cell, ""),
+        };
+
+        let mut cells = vec![
+            Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
+            Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
+                .style(cell_style),
+        ];
+
+        if columns.host {
+            cells.push(Cell::from(
+                Text::from(validator.host(masked)).alignment(Alignment::Left),
+            ));
+        }
+
+        let points = match validator.delta_points() {
+            Some(d) => {
+                Text::from(format!("+{}", d)).style(Style::default().add_modifier(Modifier::BOLD))
+            }
+            None => Text::from(validator.total_points().to_string()),
+        };
+        cells.push(Cell::from(points.alignment(Alignment::Right)));
+
+        if columns.nominators_counter {
+            cells.push(Cell::from(
+                Text::from(validator.stake.nominators_count().to_string())
+                    .alignment(Alignment::Right),
+            ));
+        }
+
+        if columns.nominators_stake {
+            let staked_total = if validator.is_active() {
+                validator.stake.total()
+            } else {
+                0
+            };
+            cells.push(amount_cell(
+                staked_total,
+                decimals,
+                symbol.clone(),
+                Alignment::Right,
+            ));
+        }
+
+        if columns.own_stake {
+            cells.push(amount_cell(
+                validator.self_stake(),
+                decimals,
+                symbol.clone(),
+                Alignment::Right,
+            ));
+        }
+
+        if columns.bonded {
+            if validator.self_stake() != validator.bounded() {
+                cells.push(amount_cell(
+                    validator.bounded(),
+                    decimals,
+                    symbol.clone(),
+                    Alignment::Left,
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        if columns.unlocking {
+            let unlocking: u128 = validator.unlocking(era);
+
+            if unlocking > 0 {
+                cells.push(amount_cell(
+                    unlocking,
+                    decimals,
+                    symbol.clone(),
+                    Alignment::Right,
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        if columns.unlocked {
+            let unlocked: u128 = validator.unlocked(era);
+
+            if unlocked > 0 {
+                cells.push(amount_cell(
+                    unlocked,
+                    decimals,
+                    symbol.clone(),
+                    Alignment::Right,
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        if columns.commission {
+            cells.push(Cell::from(
+                Text::from(validator.commission_as_percentage(2)).alignment(Alignment::Right),
+            ));
+        }
+
+        if columns.next_commission {
+            if validator.is_commission_changed() {
+                cells.push(Cell::from(
+                    Text::from(validator.next_commission_as_percentage(2))
+                        .alignment(Alignment::Left),
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        if columns.payee {
+            cells.push(Cell::from(
+                Text::from(validator.payee_as_compact(3)).alignment(Alignment::Right),
+            ));
+        }
+
+        if columns.keys {
+            cells.push(Cell::from(
+                Text::from(validator.display_queued_keys(6)).alignment(Alignment::Right),
+            ));
+        }
+
+        if columns.next_keys {
+            if validator.is_next_keys_changed() {
+                cells.push(Cell::from(
+                    Text::from(validator.display_next_keys(6)).alignment(Alignment::Left),
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        cells
+    }
+}
+
+struct Columns {
+    host: bool,
+    nominators_counter: bool,
+    nominators_stake: bool,
+    own_stake: bool,
+    bonded: bool,
+    unlocking: bool,
+    unlocked: bool,
+    commission: bool,
+    next_commission: bool,
+    payee: bool,
+    keys: bool,
+    next_keys: bool,
+}
+
+impl Columns {
+    fn new(val: &[&Validator], era: u32, feat: &Features) -> Self {
+        Self {
+            host: val.iter().any(|v| !v.commands.is_empty()),
+            nominators_counter: feat.nominators_counter_visible(),
+            nominators_stake: feat.nominators_stake_visible(),
+            own_stake: feat.own_stake_visible(),
+            bonded: feat.own_stake_visible() && val.iter().any(|v| v.self_stake() != v.bounded()),
+            unlocking: feat.own_stake_visible() && val.iter().any(|v| v.unlocking(era) > 0),
+            unlocked: feat.own_stake_visible() && val.iter().any(|v| v.unlocked(era) > 0),
+            commission: feat.commission_visible(),
+            next_commission: feat.commission_visible()
+                && val.iter().any(|v| v.is_commission_changed()),
+            payee: feat.payee_visible(),
+            keys: feat.keys_visible(),
+            next_keys: feat.keys_visible() && val.iter().any(|v| v.is_next_keys_changed()),
+        }
+    }
+
+    fn header(&self) -> Row<'static> {
+        let mut cells = vec![
+            Cell::from(Text::from("◈").alignment(Alignment::Center)),
+            Cell::from(Text::from("identity").alignment(Alignment::Left)),
+        ];
+
+        if self.host {
+            cells.push(Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
+
+        cells.push(Cell::from(Text::from("points").alignment(Alignment::Right)));
+
+        if self.nominators_counter {
+            cells.push(Cell::from(
+                Text::from("nominators").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.nominators_stake {
+            cells.push(Cell::from(
+                Text::from("nom-stake").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.own_stake {
+            cells.push(Cell::from(
+                Text::from("own-stake").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.bonded {
+            cells.push(Cell::from(
+                Text::from("(bonded)").alignment(Alignment::Left),
+            ));
+        }
+
+        if self.unlocking {
+            cells.push(Cell::from(
+                Text::from("unlocking").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.unlocked {
+            cells.push(Cell::from(
+                Text::from("unlocked").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.commission {
+            cells.push(Cell::from(
+                Text::from("commission").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.next_commission {
+            cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
+        }
+
+        if self.payee {
+            cells.push(Cell::from(Text::from("payee").alignment(Alignment::Right)));
+        }
+
+        if self.keys {
+            cells.push(Cell::from(Text::from("keys").alignment(Alignment::Right)));
+        }
+
+        if self.next_keys {
+            cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
+        }
+
+        Row::new(cells)
+    }
+
+    fn widths(&self) -> Vec<Constraint> {
+        let mut widths = vec![Constraint::Length(3), Constraint::Length(24)];
+
+        if self.host {
+            widths.push(Constraint::Fill(2));
+        }
+
+        // points
+        widths.push(Constraint::Fill(2));
+
+        if self.nominators_counter {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.nominators_stake {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.own_stake {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.bonded {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.unlocking {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.unlocked {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.commission {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.next_commission {
+            widths.push(Constraint::Fill(1));
+        }
+
+        if self.payee {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.keys {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.next_keys {
+            widths.push(Constraint::Fill(1));
+        }
+
+        widths
+    }
+}
+
+fn amount_cell(
+    value: u128,
+    decimals: u32,
+    symbol: Span<'static>,
+    alignment: Alignment,
+) -> Cell<'static> {
+    Cell::from(
+        Line::from(vec![Span::raw(format_planks(value, decimals, 4)), symbol]).alignment(alignment),
+    )
 }

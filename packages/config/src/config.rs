@@ -161,11 +161,23 @@ pub enum NodeConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Features {
     #[serde(default)]
-    pub enable_validators: bool,
+    enable_validators: bool,
     #[serde(default)]
-    pub enable_collators: bool,
+    enable_collators: bool,
     #[serde(default)]
-    pub enable_rpcs: bool,
+    enable_rpcs: bool,
+    #[serde(default)]
+    show_nominators_counter: bool,
+    #[serde(default)]
+    show_nominators_stake: bool,
+    #[serde(default)]
+    show_own_stake: bool,
+    #[serde(default)]
+    show_commission: bool,
+    #[serde(default)]
+    show_payee: bool,
+    #[serde(default)]
+    show_keys: bool,
 }
 
 impl Default for Features {
@@ -174,7 +186,55 @@ impl Default for Features {
             enable_validators: true,
             enable_collators: false,
             enable_rpcs: false,
+            show_nominators_counter: true,
+            show_nominators_stake: true,
+            show_own_stake: true,
+            show_commission: false,
+            show_payee: true,
+            show_keys: true,
         }
+    }
+}
+
+impl Features {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn validators_enabled(&self) -> bool {
+        self.enable_validators
+    }
+
+    pub fn collators_enabled(&self) -> bool {
+        self.enable_collators
+    }
+
+    pub fn rpcs_enabled(&self) -> bool {
+        self.enable_rpcs
+    }
+
+    pub fn nominators_counter_visible(&self) -> bool {
+        self.show_nominators_counter
+    }
+
+    pub fn nominators_stake_visible(&self) -> bool {
+        self.show_nominators_stake
+    }
+
+    pub fn own_stake_visible(&self) -> bool {
+        self.show_own_stake
+    }
+
+    pub fn commission_visible(&self) -> bool {
+        self.show_commission
+    }
+
+    pub fn payee_visible(&self) -> bool {
+        self.show_payee
+    }
+
+    pub fn keys_visible(&self) -> bool {
+        self.show_keys
     }
 }
 
@@ -282,6 +342,10 @@ impl Config {
 
     pub fn theme(&self) -> &Theme {
         self.themes.theme()
+    }
+
+    pub fn features(&self) -> &Features {
+        &self.features
     }
 
     fn set_default_theme(&mut self) {
