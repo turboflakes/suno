@@ -788,9 +788,8 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     let method = Line::from(vec![
         Span::styled("method ", theme.paragraph.label_inverse),
-        Span::raw(call_entry.to_method()),
+        Span::raw(call_entry.to_method_truncated(32)),
     ]);
-    let method_lines = calculate_text_wrapped_lines(&call_entry.to_method(), area.width);
 
     let proxy = Line::from(vec![
         Span::styled("proxy account ", theme.paragraph.label_inverse),
@@ -824,7 +823,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     let [details_area, sign_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Max(6 + method_lines), // Details
+            Constraint::Max(7), // Details
             Constraint::Length(area_height),
         ])
         .flex(Flex::End)
@@ -936,7 +935,7 @@ pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> 
     }
 }
 
-fn calculate_text_wrapped_lines(text: &str, area_width: u16) -> u16 {
+fn _calculate_text_wrapped_lines(text: &str, area_width: u16) -> u16 {
     let mut total_lines = 0;
 
     for line in text.lines() {

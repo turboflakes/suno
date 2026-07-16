@@ -24,6 +24,7 @@ use suno_actions::{
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
+use suno_primitives::entry::ToMethod;
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
 use tokio::sync::mpsc;
@@ -975,6 +976,7 @@ impl App {
                     }
                 };
 
+            info!("method: {}", call.to_method());
             info!("call_data: 0x{}", hex::encode(&call_data_bytes));
 
             let qr_bytes = match build_qrcode(&at_block, &proxy_account_id, &call_data_bytes).await

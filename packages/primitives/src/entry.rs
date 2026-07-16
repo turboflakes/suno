@@ -150,6 +150,15 @@ impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + ToHex + As
         self.command.to_method()
     }
 
+    pub fn to_method_truncated(&self, max_length: usize) -> String {
+        let method = self.command.to_method();
+        if method.len() > max_length {
+            format!("{}..", method.chars().take(max_length).collect::<String>())
+        } else {
+            method
+        }
+    }
+
     pub fn to_hex(&self) -> String {
         self.command.to_hex()
     }
