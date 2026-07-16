@@ -607,14 +607,12 @@ impl Columns {
         cells.push(Cell::from(Text::from("points").alignment(Alignment::Right)));
 
         if self.nominators_counter {
-            cells.push(Cell::from(
-                Text::from("nominators").alignment(Alignment::Right),
-            ));
+            cells.push(Cell::from(Text::from("noms").alignment(Alignment::Right)));
         }
 
         if self.nominators_stake {
             cells.push(Cell::from(
-                Text::from("nom-stake").alignment(Alignment::Right),
+                Text::from("noms-stake").alignment(Alignment::Right),
             ));
         }
 
