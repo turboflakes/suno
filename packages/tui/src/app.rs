@@ -975,6 +975,8 @@ impl App {
                     }
                 };
 
+            info!("call_data: 0x{}", hex::encode(&call_data_bytes));
+
             let qr_bytes = match build_qrcode(&at_block, &proxy_account_id, &call_data_bytes).await
             {
                 Ok(qr_bytes) => qr_bytes,

@@ -91,6 +91,7 @@ impl Theme {
             },
             qrcode: Qrcode {
                 base: Style::new().bg(p.foreground).fg(p.background),
+                scanner: Style::new().bg(p.color_08),
             },
         }
     }
@@ -261,4 +262,5 @@ pub struct Logo {
 #[derive(Debug)]
 pub struct Qrcode {
     pub base: Style,
+    pub scanner: Style,
 }

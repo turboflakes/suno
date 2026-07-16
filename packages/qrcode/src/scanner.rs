@@ -11,8 +11,8 @@ use rxing::{
 };
 
 /// Max display size sent to the UI thread — keep small for fast encoding.
-const DISPLAY_W: u32 = 640;
-const DISPLAY_H: u32 = 480;
+const DISPLAY_W: u32 = 480;
+const DISPLAY_H: u32 = 360;
 
 pub struct Scanner {
     camera: Camera,

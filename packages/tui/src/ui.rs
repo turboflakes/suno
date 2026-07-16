@@ -104,8 +104,8 @@ fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
         ),
         _ => flex_area(
             frame.area(),
-            Constraint::Percentage(54),
-            Constraint::Percentage(80),
+            Constraint::Percentage(70),
+            Constraint::Percentage(90),
             Flex::Center,
         ),
     };

@@ -154,6 +154,17 @@ impl<T: Display + ToDescription + ToPlaceholder + ToJson + ToMethod + ToHex + As
         self.command.to_hex()
     }
 
+    pub fn to_hex_truncated(&self, max_length: usize) -> String {
+        format!(
+            "0x{}..",
+            self.command
+                .to_hex()
+                .chars()
+                .take(max_length)
+                .collect::<String>()
+        )
+    }
+
     pub fn as_bytes(&self) -> Vec<u8> {
         self.command.as_bytes()
     }

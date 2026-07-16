@@ -689,7 +689,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
         .areas(area);
 
     let block = Block::new()
-        .style(theme.block.active)
+        .style(theme.block.pane_body)
         .padding(Padding::new(1, 1, 1, 0));
 
     let mut header_line = vec![];
@@ -730,7 +730,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let table_labels = vec!["", "command", "description", ""];
 
     let block = Block::new()
-        .style(theme.block.active)
+        .style(theme.block.pane_body)
         .padding(Padding::bottom(1));
 
     let table = Table::new(rows, widths)
@@ -751,9 +751,6 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let config = CONFIG.clone();
     let theme = config.theme();
-    let block = Block::new()
-        .style(theme.block.active)
-        .padding(Padding::proportional(1));
 
     // Get all required data from 'state.options' based on the indices established
     // in `init_menu`.
@@ -802,46 +799,44 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     // Calculate spaces needed to show the `ctrl+shift+c copy on the right`
     let available_width = area.width.saturating_sub(4);
-    let left_text = "call data";
-    let spaces = available_width.saturating_sub((left_text.len() + 17) as u16);
+    let left_text = format!("call data {}", call_entry.to_hex_truncated(24));
+    let right_len = "ctrl+shift+c copy".len() as u16; // 17
+    let spaces = available_width
+        .saturating_sub(left_text.len() as u16)
+        .saturating_sub(right_len);
 
-    let call_data_label = Line::from(vec![
-        Span::styled(left_text, theme.paragraph.label_inverse),
+    let call_data = Line::from(vec![
+        Span::styled("call data ", theme.paragraph.label_inverse),
+        Span::raw(call_entry.to_hex_truncated(24)),
         Span::raw(" ".repeat(spaces as usize)),
         Span::styled("ctrl+shift+c", theme.paragraph.base),
         Span::raw(" "),
         Span::styled("copy", theme.paragraph.label_inverse),
     ]);
 
-    let call_data = Line::from(call_entry.to_hex());
-    let call_data_lines = calculate_text_wrapped_lines(&call_entry.to_hex(), area.width);
-
     // Note: The QR code entry is only available if QR code signing is enabled
     // If it's not available, we default to the standard sign mode
     let is_qrcode_enabled = state.options.get(5).is_some();
     // Calculate the area height based on the sign mode
-    let area_height = if is_qrcode_enabled { 31 } else { 5 };
+    let area_height = if is_qrcode_enabled { 50 } else { 5 };
 
     // Split the area into header to show transaction details and sign area (password / QR code)
     let [details_area, sign_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Max(8 + method_lines + call_data_lines), // Details
+            Constraint::Max(6 + method_lines), // Details
             Constraint::Length(area_height),
         ])
         .flex(Flex::End)
         .areas(area);
 
-    let details = Paragraph::new(vec![
-        network,
-        stash,
-        method,
-        proxy,
-        call_data_label,
-        call_data,
-    ])
-    .block(block)
-    .wrap(Wrap { trim: false });
+    let block = Block::new()
+        .style(theme.block.pane_body)
+        .padding(Padding::proportional(1));
+
+    let details = Paragraph::new(vec![network, stash, method, proxy, call_data])
+        .block(block)
+        .wrap(Wrap { trim: false });
 
     Clear.render(details_area, buf);
 
@@ -853,7 +848,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         // Split the sign area into QR code and scanner camera area
         let [qrcode_area, scanner_area] = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Fill(1)])
+            .constraints([Constraint::Percentage(70), Constraint::Fill(1)])
             .areas(sign_area);
 
         let block = Block::default().style(theme.qrcode.base);
@@ -873,7 +868,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         if let Some(ref mut scanner) = state.scanner {
             if let Some(ref mut frame) = scanner.frame_protocol {
                 QrScannerWidget::new(frame)
-                    .set_style(theme.qrcode.base)
+                    .set_style(theme.qrcode.scanner)
                     .render(scanner_area, buf);
             }
         }
