@@ -23,7 +23,7 @@ type Points = u32;
 type Amount = u128;
 type ValidatorKey = AccountKey;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ValidatorsListState {
     pub validators: HashMap<ValidatorKey, Validator>,
     pub validators_order: Vec<ValidatorKey>,
@@ -32,6 +32,20 @@ pub struct ValidatorsListState {
     pub viewport_height: u16,
     active: bool,
     masked: bool,
+}
+
+impl Default for ValidatorsListState {
+    fn default() -> Self {
+        Self {
+            validators: HashMap::new(),
+            validators_order: Vec::new(),
+            table_state: TableState::default(),
+            scroll_offset: 0,
+            viewport_height: 0,
+            active: false,
+            masked: true,
+        }
+    }
 }
 
 impl ValidatorsListState {

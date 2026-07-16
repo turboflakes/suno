@@ -96,7 +96,7 @@ impl App {
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
-            masked: false,
+            masked: true,
             tx,
             rx,
         }

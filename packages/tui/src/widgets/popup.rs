@@ -126,7 +126,7 @@ impl Default for PopupState {
             title: None,
             label: None,
             scanner: None,
-            masked: false,
+            masked: true,
         }
     }
 }
