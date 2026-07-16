@@ -867,6 +867,8 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         if let Some(ref mut scanner) = state.scanner {
             if let Some(ref mut frame) = scanner.frame_protocol {
                 QrScannerWidget::new(frame)
+                    .set_title("QR Reader")
+                    .set_title_style(theme.qrcode.title)
                     .set_style(theme.qrcode.scanner)
                     .render(scanner_area, buf);
             }
