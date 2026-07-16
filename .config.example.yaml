@@ -87,8 +87,12 @@ chains:
 
 features:
   enable_validators: true
-  enable_collators: false
-  enable_rpcs: false
+  show_nominators_counter: true # default true
+  show_nominators_stake: true # default true
+  show_own_stake: true # default true
+  show_commission: false # default false
+  show_payee: true # default true
+  show_keys: true # default true
 
 themes:
   active: "Suno Dark" # Builtin themes: ["Suno Dark", "Suno Light"]

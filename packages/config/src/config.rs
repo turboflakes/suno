@@ -167,17 +167,17 @@ pub struct Features {
     #[serde(default)]
     enable_rpcs: bool,
     #[serde(default)]
-    enable_nominators_counter: bool,
+    show_nominators_counter: bool,
     #[serde(default)]
-    enable_nominators_stake: bool,
+    show_nominators_stake: bool,
     #[serde(default)]
-    enable_own_stake: bool,
+    show_own_stake: bool,
     #[serde(default)]
-    enable_commission: bool,
+    show_commission: bool,
     #[serde(default)]
-    enable_payee: bool,
+    show_payee: bool,
     #[serde(default)]
-    enable_keys: bool,
+    show_keys: bool,
 }
 
 impl Default for Features {
@@ -186,12 +186,12 @@ impl Default for Features {
             enable_validators: true,
             enable_collators: false,
             enable_rpcs: false,
-            enable_nominators_counter: true,
-            enable_nominators_stake: true,
-            enable_own_stake: true,
-            enable_commission: false,
-            enable_payee: true,
-            enable_keys: true,
+            show_nominators_counter: true,
+            show_nominators_stake: true,
+            show_own_stake: true,
+            show_commission: false,
+            show_payee: true,
+            show_keys: true,
         }
     }
 }
@@ -213,28 +213,28 @@ impl Features {
         self.enable_rpcs
     }
 
-    pub fn nominators_counter_enabled(&self) -> bool {
-        self.enable_nominators_counter
+    pub fn nominators_counter_visible(&self) -> bool {
+        self.show_nominators_counter
     }
 
-    pub fn nominators_stake_enabled(&self) -> bool {
-        self.enable_nominators_stake
+    pub fn nominators_stake_visible(&self) -> bool {
+        self.show_nominators_stake
     }
 
-    pub fn own_stake_enabled(&self) -> bool {
-        self.enable_own_stake
+    pub fn own_stake_visible(&self) -> bool {
+        self.show_own_stake
     }
 
-    pub fn commission_enabled(&self) -> bool {
-        self.enable_commission
+    pub fn commission_visible(&self) -> bool {
+        self.show_commission
     }
 
-    pub fn payee_enabled(&self) -> bool {
-        self.enable_payee
+    pub fn payee_visible(&self) -> bool {
+        self.show_payee
     }
 
-    pub fn keys_enabled(&self) -> bool {
-        self.enable_keys
+    pub fn keys_visible(&self) -> bool {
+        self.show_keys
     }
 }
 

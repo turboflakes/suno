@@ -579,18 +579,18 @@ impl Columns {
     fn new(val: &[&Validator], era: u32, feat: &Features) -> Self {
         Self {
             host: val.iter().any(|v| !v.commands.is_empty()),
-            nominators_counter: feat.nominators_counter_enabled(),
-            nominators_stake: feat.nominators_stake_enabled(),
-            own_stake: feat.own_stake_enabled(),
-            bonded: feat.own_stake_enabled() && val.iter().any(|v| v.self_stake() != v.bounded()),
-            unlocking: feat.own_stake_enabled() && val.iter().any(|v| v.unlocking(era) > 0),
-            unlocked: feat.own_stake_enabled() && val.iter().any(|v| v.unlocked(era) > 0),
-            commission: feat.commission_enabled(),
-            next_commission: feat.commission_enabled()
+            nominators_counter: feat.nominators_counter_visible(),
+            nominators_stake: feat.nominators_stake_visible(),
+            own_stake: feat.own_stake_visible(),
+            bonded: feat.own_stake_visible() && val.iter().any(|v| v.self_stake() != v.bounded()),
+            unlocking: feat.own_stake_visible() && val.iter().any(|v| v.unlocking(era) > 0),
+            unlocked: feat.own_stake_visible() && val.iter().any(|v| v.unlocked(era) > 0),
+            commission: feat.commission_visible(),
+            next_commission: feat.commission_visible()
                 && val.iter().any(|v| v.is_commission_changed()),
-            payee: feat.payee_enabled(),
-            keys: feat.keys_enabled(),
-            next_keys: feat.keys_enabled() && val.iter().any(|v| v.is_next_keys_changed()),
+            payee: feat.payee_visible(),
+            keys: feat.keys_visible(),
+            next_keys: feat.keys_visible() && val.iter().any(|v| v.is_next_keys_changed()),
         }
     }
 
