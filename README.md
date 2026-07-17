@@ -180,10 +180,6 @@ explorer:
     # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 ```
 
-<p align="center">
-    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun-qrcode.gif?raw=true" />
-</p>
-
 ## Signer Account (Proxy-Only)
 To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain.
 
