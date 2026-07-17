@@ -13,7 +13,7 @@ As a node operator, to manage your own or third-party nodes from the terminal.
 As a nominator you can just as easily check the validators you nominate.
 
 <p align="center">
-    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun-qrcode.gif?raw=true" />
 </p>
 
 ## Features
@@ -48,7 +48,7 @@ As a nominator you can just as easily check the validators you nominate.
  - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
  - Restricted Proxy-Only operations on Asset Hub, with only two proxy types supported:
     - Staking or StakingOperator
- 
+
 ## Installation
 
 **Note: Binary release available for Linux and macOS**
@@ -88,6 +88,10 @@ suno-x86_64-unknown-linux-gnu.tar.gz.sha256 100%[===============================
 ```
 
 ## Configuration
+
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
+</p>
 
 ### Validator **stashes** and **RPCs**
 Most configuration is done via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
@@ -176,6 +180,10 @@ explorer:
     # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 ```
 
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun-qrcode.gif?raw=true" />
+</p>
+
 ## Signer Account (Proxy-Only)
 To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain.
 
@@ -262,6 +270,10 @@ suno --proxy-path /home/suno/suno-proxy-account.json
 ## Custom Commands
 
 Custom commands are user defined commands or a composition of builtin commands. These are defined in the `config.yaml` file and tied to each configured `stash`. 
+
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun.gif?raw=true" />
+</p>
 
 There are two types of custom commands:
 
