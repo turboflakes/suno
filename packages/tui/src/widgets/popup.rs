@@ -749,8 +749,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 }
 
 fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let config = CONFIG.clone();
-    let theme = config.theme();
+    let theme = CONFIG.theme();
 
     // Get all required data from 'state.options' based on the indices established
     // in `init_menu`.
@@ -813,22 +812,6 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         Span::styled("copy", theme.paragraph.label_inverse),
     ]);
 
-    // Note: The QR code entry is only available if QR code signing is enabled
-    // If it's not available, we default to the standard sign mode
-    let is_qrcode_enabled = state.options.get(5).is_some();
-    // Calculate the area height based on the sign mode
-    let area_height = if is_qrcode_enabled { 50 } else { 5 };
-
-    // Split the area into header to show transaction details and sign area (password / QR code)
-    let [details_area, sign_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Max(7), // Details
-            Constraint::Length(area_height),
-        ])
-        .flex(Flex::End)
-        .areas(area);
-
     let block = Block::new()
         .style(theme.block.pane_body)
         .padding(Padding::proportional(1));
@@ -837,46 +820,82 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         .block(block)
         .wrap(Wrap { trim: false });
 
+    // Note: The QR code entry is only available if QR code signing is enabled
+    // If it's not available, we default to the standard sign mode
+    match state.options.get(5) {
+        Some(qr) => render_qr_sign(qr.as_bytes(), details, area, buf, state),
+        None => render_password_sign(details, area, buf, state),
+    }
+}
+
+fn render_qr_sign(
+    qr_bytes: Vec<u8>,
+    details: Paragraph,
+    area: Rect,
+    buf: &mut Buffer,
+    state: &mut PopupState,
+) {
+    let theme = CONFIG.theme();
+
+    // Render qrcode
+    let qr_code = QrCodeWidget::new(&qr_bytes);
+
+    // Split the area into header to show transaction details and sign area (password / QR code)
+    let [details_area, sign_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(7), // Details
+            Constraint::Length(qr_code.height()),
+        ])
+        .flex(Flex::End)
+        .areas(area);
+
     Clear.render(details_area, buf);
+    Clear.render(sign_area, buf);
 
     details.render(details_area, buf);
 
-    if is_qrcode_enabled {
-        Clear.render(sign_area, buf);
+    // Split the sign area into QR code and scanner camera area
+    let [qrcode_area, scanner_area] = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Fill(1)])
+        .areas(sign_area);
 
-        // Split the sign area into QR code and scanner camera area
-        let [qrcode_area, scanner_area] = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Fill(1)])
-            .areas(sign_area);
+    let block = Block::default().style(theme.qrcode.base);
 
-        let block = Block::default().style(theme.qrcode.base);
+    qr_code
+        .block(block)
+        .set_style(theme.qrcode.base)
+        .render(qrcode_area, buf);
 
-        // Get QR code bytes from the options
-        let Some(qr_bytes_entry) = state.options.get(5) else {
-            return;
-        };
-        // Render qrcode
-        let qr_bytes = qr_bytes_entry.as_bytes();
-        QrCodeWidget::new(&qr_bytes)
-            .block(block)
-            .set_style(theme.qrcode.base)
-            .render(qrcode_area, buf);
-
-        // Render qrscanner (camera)
-        if let Some(ref mut scanner) = state.scanner {
-            if let Some(ref mut frame) = scanner.frame_protocol {
-                QrScannerWidget::new(frame)
-                    .set_title("QR Reader")
-                    .set_title_style(theme.qrcode.title)
-                    .set_style(theme.qrcode.scanner)
-                    .render(scanner_area, buf);
-            }
+    // Render qrscanner (camera)
+    if let Some(ref mut scanner) = state.scanner {
+        if let Some(ref mut frame) = scanner.frame_protocol {
+            QrScannerWidget::new(frame)
+                .set_title("QR Reader")
+                .set_title_style(theme.qrcode.title)
+                .set_style(theme.qrcode.scanner)
+                .render(scanner_area, buf);
         }
-    } else {
-        // Render input area
-        state.input.as_password().render(sign_area, buf);
     }
+}
+
+fn render_password_sign(details: Paragraph, area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let [details_area, sign_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(7), // Details
+            Constraint::Length(5),
+        ])
+        .flex(Flex::End)
+        .areas(area);
+
+    Clear.render(details_area, buf);
+    Clear.render(sign_area, buf);
+
+    details.render(details_area, buf);
+    // Render input area
+    state.input.as_password().render(sign_area, buf);
 }
 
 fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {

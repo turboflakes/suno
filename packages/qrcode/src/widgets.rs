@@ -8,21 +8,22 @@ use ratatui::{
 };
 use ratatui_image::{protocol::StatefulProtocol, FilterType, Resize, StatefulImage};
 
+const QUIET: i32 = 4;
+
 /// Renders QrCode data as a QR code image within the render area.
 pub struct QrCodeWidget<'a> {
-    data: &'a [u8],
+    qr: Option<QrCode>,
     block: Option<Block<'a>>,
     style: Style,
-    ecc: QrCodeEcc,
 }
 
 impl<'a> QrCodeWidget<'a> {
     pub fn new(data: &'a [u8]) -> Self {
+        let qr = QrCode::encode_binary(data, QrCodeEcc::Low).ok();
         Self {
-            data,
+            qr,
             block: None,
             style: Style::default(),
-            ecc: QrCodeEcc::Low,
         }
     }
 
@@ -36,14 +37,31 @@ impl<'a> QrCodeWidget<'a> {
         self
     }
 
-    pub fn ecc(mut self, ecc: QrCodeEcc) -> Self {
-        self.ecc = ecc;
-        self
+    pub fn width(&self) -> u16 {
+        match &self.qr {
+            Some(qr) => (qr.size() + QUIET * 2) as u16,
+            None => 0,
+        }
     }
+
+    pub fn height(&self) -> u16 {
+        let w = self.width() as i32;
+        ((w + 1) / 2) as u16
+    }
+
+    // pub fn ecc(mut self, ecc: QrCodeEcc) -> Self {
+    //     self.ecc = ecc;
+    //     self
+    // }
 }
 
 impl Widget for QrCodeWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let qr = match self.qr {
+            Some(qr) => qr,
+            None => return,
+        };
+
         let inner = match self.block {
             Some(b) => {
                 b.clone().render(area, buf);
@@ -52,19 +70,11 @@ impl Widget for QrCodeWidget<'_> {
             None => area,
         };
 
-        let qr = match QrCode::encode_binary(self.data, self.ecc) {
-            Ok(q) => q,
-            Err(_) => return,
-        };
-
-        // qrcodegen's get_module() returns false (white) for any out-of-bounds
+        // NOTE: qrcodegen's get_module() returns false (white) for any out-of-bounds
         // coordinate, so iterating -QUIET..size+QUIET gives the quiet zone for free.
-        const QUIET: i32 = 4;
-        let size = qr.size(); // i32, symbol modules only (no quiet zone)
-        let padded = size + QUIET * 2; // total columns/rows to render
-
         // The QR occupies `padded` columns and ceil(padded/2) rows (half-blocks
         // pack two module-rows per terminal row). Center that within `inner`.
+        let padded = qr.size() + QUIET * 2; // total columns/rows to render
         let width = padded as u16;
         let height = ((padded + 1) / 2) as u16;
         let inner = centered_area(inner, width, height);
