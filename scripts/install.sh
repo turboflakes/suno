@@ -106,6 +106,8 @@ chains:
         - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   - asset_hub_polkadot:
       rpc_url: "ws://192.0.2.2:9944"
+      # signer:
+      #   proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
   - people_polkadot:
       rpc_url: "ws://192.0.2.3:9944"
 
