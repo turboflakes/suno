@@ -49,8 +49,8 @@ log = "0.4"
 nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
 qrcodegen = "1.8"
-ratatui = "0.29.0"
-ratatui-image  = { version = "9", default-features = false, features = ["image-defaults", "crossterm"] }
+ratatui = "0.30.2"
+ratatui-image  = { version = "11.0.6", default-features = false, features = ["image-defaults", "crossterm"] }
 regex = "1.11"
 rxing = "0.5"
 scale-encode = "0.10.1"
@@ -70,7 +70,7 @@ tempfile = "3.2"
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
 toml = "1.0.7"
-tui-logger = "0.14"
+tui-logger = "0.18.3"
 unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }
 
