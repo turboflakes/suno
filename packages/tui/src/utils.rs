@@ -57,7 +57,7 @@ pub async fn create_rpc_client_from_config(
         (true, true, _) => {
             let (lc, rpc) =
                 create_light_client_from_relay_chain_specs(runtime.chain_specs()).await?;
-            Ok((rpc.into(), Some((runtime.clone(), lc))))
+            Ok((rpc.into(), Some((*runtime, lc))))
         }
         (false, _, Some((relay_runtime, lc))) if relay_runtime == runtime.relay_chain() => {
             let rpc = lc.parachain(runtime.chain_specs())?;
