@@ -1,7 +1,6 @@
 chains:
+  # Example chain configuration with connection via smoldot
   - polkadot:
-      rpc_url: "ws://192.0.2.1:9944"
-      light_client: false
       validators:
         - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
           # host_rpc: 127.0.0.1:9944 # optional, used in curl RPC calls and falls back to 127.0.0.1:9944
@@ -29,46 +28,36 @@ chains:
               run: "~/update_stable_node.sh {version}"
 
   - asset_hub_polkadot:
-      rpc_url: "ws://192.0.2.2:9944"
-      light_client: false
       signer:
         proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
 
   - people_polkadot:
-      rpc_url: "ws://192.0.2.3:9944"
-      light_client: false
 
+  # Example chain configuration with connection via Trusted RPCs
   # - kusama:
   #     rpc_url: "ws://192.0.2.1:9944"
-  #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   #
   # - asset_hub_kusama:
   #     rpc_url: "ws://192.0.2.2:9944"
-  #     light_client: false
   #
   # - people_kusama:
   #     rpc_url: "ws://192.0.2.3:9944"
-  #     light_client: false
   #
   # - paseo:
   #     rpc_url: "ws://192.0.2.1:9944"
-  #     light_client: false
   #     validators:
   #       - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
   #
   # - asset_hub_paseo:
   #     rpc_url: "ws://192.0.2.2:9944"
-  #     light_client: false
   #
   # - people_paseo:
   #     rpc_url: "ws://192.0.2.3:9944"
-  #     light_client: false
   #
   # - westend:
   #     rpc_url: "ws://192.0.2.1:9944"
-  #     light_client: false
   #     validators:
   #       [
   #         "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n",
@@ -81,7 +70,6 @@ chains:
   #
   # - asset_hub_westend:
   #     rpc_url: "ws://192.0.2.2:9944"
-  #     light_client: false
   #     # collators:
   #     #   - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
 
@@ -98,8 +86,8 @@ themes:
   active: "Suno Dark" # Builtin themes: ["Suno Dark", "Suno Light"]
   path: "themes"
 
-signer: # global signer configuration, overridden by chain-specific signer config
-  proxy_path: ".proxy_private.json"
+# signer: # global signer configuration, overridden by chain-specific signer config
+#  proxy_path: ".proxy_private.json"
 
 explorer:
   url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
