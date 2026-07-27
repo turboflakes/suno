@@ -35,7 +35,6 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Sign transactions using **Polkadot Vault**.
 - [&check;] Support **Multi-proxy** setup
 - [&check;] Default to **Smoldot** for chain connections.
-- 
 ## Future / Ideas / Work in Progress
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
