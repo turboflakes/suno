@@ -4,9 +4,9 @@
 # chmod +x ./update-chain-specs.sh
 #
 # > subxt-cli must be installed to update metadata
-# cargo install subxt-cli --force
+# cargo install subxt-cli --force --features chain-spec-pruning
 
-BASE="../packages/config"
+BASE="packages/config"
 
 fetch_chain_specs() {
   local chain="$1"      # e.g. "westend"

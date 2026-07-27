@@ -6,7 +6,7 @@
 # > subxt-cli must be installed to update metadata
 # cargo install subxt-cli --force
 
-BASE="../packages/chains"
+BASE="packages/chains"
 RC_PALLETS="Session,StakingAhClient,Proxy,Babe,ParasShared"
 AH_PALLETS="System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
 PEOPLE_PALLETS="Identity"
