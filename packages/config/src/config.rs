@@ -52,6 +52,7 @@ pub struct Config {
     // rpcs: Vec<HashMap<String, Vec<String>>>,
     #[serde(default = "default_features")]
     pub features: Features,
+    #[serde(default)]
     pub signer: Option<Signer>,
     #[serde(default = "default_explorer")]
     pub explorer: Explorer,
@@ -61,10 +62,10 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
-    pub rpc_url: String,
-    pub signer: Option<Signer>,
     #[serde(default)]
-    pub light_client: bool,
+    pub rpc_url: String,
+    #[serde(default)]
+    pub signer: Option<Signer>,
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
     #[serde(default)]

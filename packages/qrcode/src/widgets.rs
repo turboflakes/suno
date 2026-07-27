@@ -179,7 +179,7 @@ impl Widget for QrScannerWidget<'_> {
 
         let fitted = self
             .protocol
-            .size_for(Resize::Fit(Some(self.filter)), inner);
+            .size_for(Resize::Fit(Some(self.filter)), inner.as_size());
         let centered = centered_area(inner, fitted.width, fitted.height);
 
         let [title_area, scanner_area] = Layout::default()

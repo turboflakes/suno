@@ -16,8 +16,8 @@ mod widgets;
 
 pub async fn start() -> AppResult<()> {
     // Initialize logs
-    init_logger(LevelFilter::Debug)?;
-    set_default_level(LevelFilter::Debug);
+    init_logger(LevelFilter::Info)?;
+    set_default_level(LevelFilter::Info);
 
     // Create an application.
     let mut app = App::new();

@@ -1,5 +1,5 @@
 use crate::bridge::subscribe::{subscribe_best_block, subscribe_finalized_block};
-use crate::utils::create_substrate_rpc_client_from_url;
+use crate::utils::create_rpc_client_from_config;
 use crate::widgets::scrollbar::render_scrollbar;
 use log::debug;
 use ratatui::{
@@ -13,7 +13,7 @@ use sp_arithmetic::Permill;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use subxt::{utils::H256, OnlineClient, SubstrateConfig};
+use subxt::{lightclient::LightClient, utils::H256, OnlineClient, SubstrateConfig};
 use suno_actions::{network::ConnectionState, Action, SystemAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_error::Error;
@@ -345,24 +345,37 @@ impl ChainsListWidget {
     /// Initialize OnlineClients for each configured chain.
     pub async fn on_init(&self) {
         let config = CONFIG.clone();
+        let mut relay_lc: Option<(SupportedRuntime, LightClient)> = None;
         for chain in config.chains.iter() {
-            for (chain_name, chain_config) in chain {
-                match create_substrate_rpc_client_from_url(&chain_config.rpc_url).await {
-                    Ok(rpc_client) => {
-                        match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
-                            Ok(client) => {
-                                let mut chain = Chain::new(*chain_name, client);
-                                if let Err(err) = chain.validate_genesis() {
-                                    self.error(err.into());
-                                }
-                                self.add_chain(&chain);
-                                self.subscribe(&chain);
-                            }
-                            Err(err) => self.error(err.into()),
+            for (runtime, chain_config) in chain {
+                let (rpc_client, new_relay_lc) =
+                    match create_rpc_client_from_config(runtime, chain_config, relay_lc.clone())
+                        .await
+                    {
+                        Ok(result) => result,
+                        Err(err) => {
+                            self.error(err);
+                            continue;
                         }
-                    }
-                    Err(err) => self.error(err),
+                    };
+
+                relay_lc = new_relay_lc.or(relay_lc);
+
+                let client =
+                    match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
+                        Ok(client) => client,
+                        Err(err) => {
+                            self.error(err.into());
+                            continue;
+                        }
+                    };
+
+                let mut chain = Chain::new(*runtime, client);
+                if let Err(err) = chain.validate_genesis() {
+                    self.error(err.into());
                 }
+                self.add_chain(&chain);
+                self.subscribe(&chain);
             }
         }
         self.init_table();

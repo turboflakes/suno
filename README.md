@@ -34,12 +34,11 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Execute custom commands locally or remotely.
 - [&check;] Sign transactions using **Polkadot Vault**.
 - [&check;] Support **Multi-proxy** setup
-
+- [&check;] Default to **Smoldot** for chain connections.
 ## Future / Ideas / Work in Progress
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
  - [] RPC manual restarts and health check metrics
- - [] Light client mode
  - [] Support for `/kick`, `/nominate` extrinsics
 
 ### Implementation constraints / goals
@@ -99,21 +98,17 @@ Most configuration is done via a config file. Here is a full example [.config.ex
 ```yaml
 chains:
   - polkadot:
-      rpc_url: "__WSS_POLKADOT_RPC_PROVIDER__"
       validators:
         - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         - "1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd"
         
   - asset_hub_polkadot:
-      rpc_url: "__WSS_POLKADOT_HUB_RPC_PROVIDER__"
       signer:
         proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         
   - people_polkadot:
-      rpc_url: "__WSS_POLKADOT_PEOPLE_RPC_PROVIDER__"
       
   - kusama:
-      rpc_url: "__WSS_KUSAMA_RPC_PROVIDER__"
       validators:
         - stash: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
           ssh: # optional, if configured all commands are executed via ssh, otherwise local
@@ -140,7 +135,6 @@ chains:
               run: ~/update_stable_node.sh {version}
               
   - asset_hub_kusama:
-      rpc_url: "__WSS_KUSAMA_HUB_RPC_PROVIDER__"
       
   - paseo:
       rpc_url: "__WSS_PASEO_RPC_PROVIDER__"
@@ -171,7 +165,8 @@ themes:
   path: "./themes"
 
 signer: # global signer configuration, overridden by chain-specific signer config
-  proxy_path: ".proxy_account.json"
+  proxy_account: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+  # proxy_path: ".proxy_account.json"
   
 explorer:
     url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
