@@ -1,6 +1,9 @@
 use log::{info, warn};
 use std::time::Duration;
-use subxt::ext::jsonrpsee::ws_client::PingConfig;
+use subxt::{
+    ext::jsonrpsee::ws_client::PingConfig,
+    lightclient::{LightClient, LightClientError, LightClientRpc},
+};
 use subxt_rpcs::{
     client::{
         reconnecting_rpc_client::{ExponentialBackoff, RpcClient as ReconnectingRpcClient},
@@ -8,6 +11,7 @@ use subxt_rpcs::{
     },
     utils::validate_url_is_secure,
 };
+use suno_config::{ChainConfig, SupportedRuntime};
 
 pub async fn _create_substrate_rpc_client_from_url(
     url: &str,
@@ -38,4 +42,38 @@ pub async fn create_substrate_rpc_client_from_url(
         .await?;
     info!("Connected to RPC endpoint {}", url);
     Ok(rpc)
+}
+
+pub async fn create_rpc_client_from_config(
+    runtime: &SupportedRuntime,
+    chain_config: &ChainConfig,
+    relay_optional: Option<(SupportedRuntime, LightClient)>,
+) -> Result<(RpcClient, Option<(SupportedRuntime, LightClient)>), Box<dyn std::error::Error>> {
+    match (
+        runtime.is_relay_chain(),
+        chain_config.rpc_url.is_empty(),
+        relay_optional,
+    ) {
+        (true, true, _) => {
+            let (lc, rpc) =
+                create_light_client_from_relay_chain_specs(runtime.chain_specs()).await?;
+            Ok((rpc.into(), Some((runtime.clone(), lc))))
+        }
+        (false, _, Some((relay_runtime, lc))) if relay_runtime == runtime.relay_chain() => {
+            let rpc = lc.parachain(runtime.chain_specs())?;
+            Ok((rpc.into(), None))
+        }
+        _ => {
+            let rpc = create_substrate_rpc_client_from_url(&chain_config.rpc_url).await?;
+            Ok((rpc.into(), None))
+        }
+    }
+}
+
+async fn create_light_client_from_relay_chain_specs(
+    chain_specs: &str,
+) -> Result<(LightClient, LightClientRpc), LightClientError> {
+    let (lc, rpc) = LightClient::relay_chain(chain_specs)?;
+
+    Ok((lc, rpc))
 }

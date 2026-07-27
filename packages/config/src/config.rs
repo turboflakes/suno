@@ -61,10 +61,9 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
+    #[serde(default)]
     pub rpc_url: String,
     pub signer: Option<Signer>,
-    #[serde(default)]
-    pub light_client: bool,
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
     #[serde(default)]
