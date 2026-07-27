@@ -56,12 +56,3 @@ fetch_metadata "people-polkadot" "people-polkadot.rpc.turboflakes.io" "$PEOPLE_P
 # subxt codegen --url wss://sys.turboflakes.io:443/people-paseo | rustfmt --edition=2018 --emit=stdout > people_paseo_runtime.rs
 # subxt codegen --url wss://asset-hub-polkadot.rpc.turboflakes.io:443 | rustfmt --edition=2018 --emit=stdout > packages/chains/asset-hub-polkadot/artifacts/metadata/asset_hub_polkadot_metadata_small.rs
 # ```
-
-# Generate relay chain specs from subxt to be used under lightclient
-
-# ```bash
-# cargo run --features chain-spec-pruning --bin subxt chain-spec --url wss://rpc.turboflakes.io:443/westend --output-file artifacts/demo_chain_specs/westend.json --state-root-hash --remove-substitutes
-# cargo run --features chain-spec-pruning --bin subxt chain-spec --url wss://rpc.turboflakes.io:443/kusama --output-file artifacts/demo_chain_specs/kusama.json --state-root-hash --remove-substitutes
-# cargo run --features chain-spec-pruning --bin subxt chain-spec --url wss://rpc.turboflakes.io:443/polkadot --output-file artifacts/demo_chain_specs/polkadot.json --state-root-hash --remove-substitutes
-# cargo run --features chain-spec-pruning --bin subxt chain-spec --url wss://rpc.turboflakes.io:443/paseo --output-file artifacts/demo_chain_specs/paseo.json --state-root-hash --remove-substitutes
-# ```
