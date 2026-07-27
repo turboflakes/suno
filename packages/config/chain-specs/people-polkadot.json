@@ -3,9 +3,11 @@
   "id": "people-polkadot",
   "chainType": "Live",
   "bootNodes": [
+    "/dns/polkadot-people-connect-0.polkadot.io/tcp/30334/p2p/12D3KooWP7BoJ7nAF9QnsreN8Eft1yHNUhvhxFiQyKFEUePi9mu3",
+    "/dns/polkadot-people-connect-1.polkadot.io/tcp/30334/p2p/12D3KooWSSfWY3fTGJvGkuNUNBSNVCdLLNJnwkZSNQt7GCRYXu4o",
     "/dns/polkadot-people-connect-0.polkadot.io/tcp/443/wss/p2p/12D3KooWP7BoJ7nAF9QnsreN8Eft1yHNUhvhxFiQyKFEUePi9mu3",
     "/dns/polkadot-people-connect-1.polkadot.io/tcp/443/wss/p2p/12D3KooWSSfWY3fTGJvGkuNUNBSNVCdLLNJnwkZSNQt7GCRYXu4o",
-    "/dns/people-polkadot-bootnode.turboflakes.io/tcp/30740/wss/p2p/12D3KooWBpZs5BE7yozig2HhfNqhy6uuq2cirFtEY2T13gF7m5hf"
+    "/dns/boot-people-polkadot.stakeworld.io/tcp/443/wss/p2p/12D3KooWCS5ENtYsyHMSpK7LjvhKrKF7hVas7qDBQvRSUtCNnd1Z"
   ],
   "telemetryEndpoints": null,
   "protocolId": null,
