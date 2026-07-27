@@ -21,11 +21,17 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout sources
         uses: actions/checkout@v4
 
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+
       - name: Install subxt
-        run: cargo install subxt-cli --features chain-spec-pruning
+        run: cargo install subxt-cli --locked --features chain-spec-pruning
 
       - name: Run update-metadata script
         run: bash scripts/update-metadata.sh
