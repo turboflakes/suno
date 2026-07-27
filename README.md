@@ -103,7 +103,7 @@ chains:
         - "1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd"
         
   - asset_hub_polkadot:
-     signer:
+      signer:
         proxy_account: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         
   - people_polkadot:
