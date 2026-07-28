@@ -17,7 +17,20 @@ fetch_chain_specs() {
   local out_dir="$BASE/chain-specs"
 
   mkdir -p "$out_dir"
-  subxt chain-spec --url wss://$host:443 --output-file "$out_dir/$filename" --state-root-hash --remove-substitutes
+
+  # Retry fetching metadata up to $max_attempts times
+  local max_attempts=3
+  local attempt=1
+  until subxt chain-spec --url wss://$host:443 --output-file "$out_dir/$filename" --state-root-hash --remove-substitutes; do
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "ERROR: failed to fetch metadata for $chain after $max_attempts attempts"
+      return 1
+    fi
+    echo "Attempt $attempt failed for $chain, retrying in 10s..."
+    attempt=$((attempt + 1))
+    sleep 10
+  done
+
 }
 
 # Relay Chains

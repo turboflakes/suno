@@ -21,7 +21,19 @@ fetch_metadata() {
   local out_dir="$BASE/$chain/artifacts/metadata"
 
   mkdir -p "$out_dir"
-  subxt metadata --url "wss://$host:443" --pallets "$pallets" -f bytes > "$out_dir/$filename"
+
+  # Retry fetching metadata up to $max_attempts times
+  local max_attempts=3
+  local attempt=1
+  until subxt metadata --url "wss://$host:443" --pallets "$pallets" -f bytes > "$out_dir/$filename"; do
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "ERROR: failed to fetch metadata for $chain after $max_attempts attempts"
+      return 1
+    fi
+    echo "Attempt $attempt failed for $chain, retrying in 10s..."
+    attempt=$((attempt + 1))
+    sleep 10
+  done
 }
 
 # Relay Chains
