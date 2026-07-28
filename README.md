@@ -1,4 +1,4 @@
-# suno &middot; [![latest commit](https://github.com/turboflakes/suno/actions/workflows/rust.yml/badge.svg)](https://github.com/turboflakes/suno/actions/workflows/rust.yml) ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
+# suno &middot; [![latest commit](https://github.com/turboflakes/suno/actions/workflows/dev.yml/badge.svg)](https://github.com/turboflakes/suno/actions/workflows/dev.yml) ![latest release](https://github.com/turboflakes/suno/actions/workflows/create_release.yml/badge.svg)
 
 <p align="center">
   <img src="https://github.com/turboflakes/suno/blob/main/assets/suno-github-header.webp?raw=true">
