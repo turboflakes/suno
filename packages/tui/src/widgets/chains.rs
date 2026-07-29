@@ -381,6 +381,12 @@ impl ChainsListWidget {
         self.init_table();
     }
 
+    fn error(&self, err: Box<dyn std::error::Error>) {
+        self.tx
+            .send(Action::System(SystemAction::Error(err.to_string())))
+            .expect("Failed to send error message");
+    }
+
     fn add_chain(&self, chain: &Chain) {
         let mut state = self.state.write().unwrap();
         state.add_chain(chain.clone());
@@ -393,10 +399,12 @@ impl ChainsListWidget {
         }
     }
 
-    fn error(&self, err: Box<dyn std::error::Error>) {
-        self.tx
-            .send(Action::System(SystemAction::Error(err.to_string())))
-            .expect("Failed to send error message");
+    pub fn subscribe_best_block(&self, chain: &Chain) {
+        subscribe_best_block(chain, self.tx.clone());
+    }
+
+    pub fn subscribe_finalized_block(&self, chain: &Chain) {
+        subscribe_finalized_block(chain, self.tx.clone());
     }
 
     pub fn move_down(&self) -> Option<Chain> {

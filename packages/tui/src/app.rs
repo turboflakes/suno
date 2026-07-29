@@ -14,7 +14,7 @@ use crate::{
     tui::Tui,
 };
 use arboard::Clipboard;
-use log::{error, info};
+use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
 use suno_actions::network::ConnectionState;
@@ -256,122 +256,142 @@ impl App {
                     .chains
                     .update_connection_state(&chain_key, connection_state.clone());
 
-                if is_updated && connection_state == ConnectionState::Connected {
-                    let runtime = chain_key;
-                    let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
-                    match runtime {
-                        SupportedRuntime::Polkadot
-                        | SupportedRuntime::Kusama
-                        | SupportedRuntime::Paseo
-                        | SupportedRuntime::Westend => {
-                            if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(runtime)
-                            {
-                                sync::spawn_fetch_epoch_data(&api, block_hash, runtime, &self.tx);
+                match (is_updated, connection_state) {
+                    (true, ConnectionState::Connected) => {
+                        let runtime = chain_key;
+                        let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
+                        match runtime {
+                            SupportedRuntime::Polkadot
+                            | SupportedRuntime::Kusama
+                            | SupportedRuntime::Paseo
+                            | SupportedRuntime::Westend => {
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    sync::spawn_fetch_epoch_data(
+                                        &api, block_hash, runtime, &self.tx,
+                                    );
 
-                                sync::spawn_fetch_validators_authority_status(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                sync::spawn_fetch_validators_queued_keys(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                sync::spawn_fetch_validators_next_keys(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-                            }
-                        }
-                        SupportedRuntime::AssetHubPolkadot
-                        | SupportedRuntime::AssetHubKusama
-                        | SupportedRuntime::AssetHubPaseo
-                        | SupportedRuntime::AssetHubWestend => {
-                            if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(runtime)
-                            {
-                                sync::spawn_fetch_era_data(&api, block_hash, runtime, &self.tx);
-
-                                sync::spawn_fetch_total_validators_count(
-                                    &api, block_hash, runtime, &self.tx,
-                                );
-                                sync::spawn_fetch_total_nominators_count(
-                                    &api, block_hash, runtime, &self.tx,
-                                );
-
-                                sync::spawn_fetch_validators_prefs_next(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                sync::spawn_fetch_validators_staking_ledger(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                sync::spawn_fetch_validators_payee(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                sync::spawn_fetch_account_balance(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
-
-                                if let Ok(proxy) = runtime.signer_account_id() {
-                                    sync::spawn_fetch_validators_proxy_status(
+                                    sync::spawn_fetch_validators_authority_status(
                                         &api,
                                         block_hash,
                                         runtime,
                                         &validator_keys,
-                                        &proxy,
                                         &self.tx,
                                     );
-                                };
+
+                                    sync::spawn_fetch_validators_queued_keys(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+
+                                    sync::spawn_fetch_validators_next_keys(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+                                }
                             }
-                        }
-                        SupportedRuntime::PeoplePolkadot
-                        | SupportedRuntime::PeopleKusama
-                        | SupportedRuntime::PeoplePaseo
-                        | SupportedRuntime::PeopleWestend => {
-                            if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(runtime)
-                            {
-                                sync::spawn_fetch_validators_identity(
-                                    &api,
-                                    block_hash,
-                                    runtime,
-                                    &validator_keys,
-                                    &self.tx,
-                                );
+                            SupportedRuntime::AssetHubPolkadot
+                            | SupportedRuntime::AssetHubKusama
+                            | SupportedRuntime::AssetHubPaseo
+                            | SupportedRuntime::AssetHubWestend => {
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    sync::spawn_fetch_era_data(&api, block_hash, runtime, &self.tx);
+
+                                    sync::spawn_fetch_total_validators_count(
+                                        &api, block_hash, runtime, &self.tx,
+                                    );
+                                    sync::spawn_fetch_total_nominators_count(
+                                        &api, block_hash, runtime, &self.tx,
+                                    );
+
+                                    sync::spawn_fetch_validators_prefs_next(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+
+                                    sync::spawn_fetch_validators_staking_ledger(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+
+                                    sync::spawn_fetch_validators_payee(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+
+                                    sync::spawn_fetch_account_balance(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+
+                                    if let Ok(proxy) = runtime.signer_account_id() {
+                                        sync::spawn_fetch_validators_proxy_status(
+                                            &api,
+                                            block_hash,
+                                            runtime,
+                                            &validator_keys,
+                                            &proxy,
+                                            &self.tx,
+                                        );
+                                    };
+                                }
                             }
+                            SupportedRuntime::PeoplePolkadot
+                            | SupportedRuntime::PeopleKusama
+                            | SupportedRuntime::PeoplePaseo
+                            | SupportedRuntime::PeopleWestend => {
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    sync::spawn_fetch_validators_identity(
+                                        &api,
+                                        block_hash,
+                                        runtime,
+                                        &validator_keys,
+                                        &self.tx,
+                                    );
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    (true, ConnectionState::BestBlockSubcriptionDropped(e)) => {
+                        warn!("{}", e);
+                        if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
+                            self.chains.subscribe_best_block(&chain);
+                        }
+                    }
+                    (true, ConnectionState::FinalizedSubscriptionDropped(e)) => {
+                        warn!("{}", e);
+                        if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
+                            self.chains.subscribe_finalized_block(&chain);
+                        }
+                    }
+                    (_, ConnectionState::Error(e)) => {
+                        error!("{}", e);
+                    }
+                    _ => {}
                 }
             }
             ChainAction::UpdateBestBlock(chain_key, block_number) => {

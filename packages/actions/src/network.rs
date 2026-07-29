@@ -10,6 +10,8 @@ pub enum ConnectionState {
     Reconnecting,
     Connected,
     Validated,
+    BestBlockSubcriptionDropped(String),
+    FinalizedSubscriptionDropped(String),
     Error(String),
 }
 
@@ -21,6 +23,8 @@ impl std::fmt::Display for ConnectionState {
             Self::Validated => write!(f, "✓ "),
             Self::Connected => write!(f, ""),
             Self::Reconnecting => write!(f, "↺ "),
+            Self::BestBlockSubcriptionDropped(_) => write!(f, "❗ "),
+            Self::FinalizedSubscriptionDropped(_) => write!(f, "❗ "),
             Self::Error(_) => write!(f, "❗ "),
         }
     }

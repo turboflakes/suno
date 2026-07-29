@@ -1,13 +1,15 @@
 use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_events};
 use crate::widgets::chains::Chain;
-use log::error;
+use log::{error, info};
 use suno_actions::{network::ConnectionState, Action, ChainAction};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Background task that subscribes head block and sends response over channel.
 pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
+    info!("Subscribing to best block for chain: {}", chain.name());
     let api = chain.client().clone();
     let runtime = chain.runtime();
+
     tokio::spawn(async move {
         match api.stream_best_blocks().await {
             Ok(mut blocks_sub) => {
@@ -20,22 +22,21 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             )));
                         }
                         Err(e) => {
-                            // TODO: handle disconnection
-                            // if e.is_disconnected_will_reconnect() {
-                            //     warn!("Lost connection to {} reconnecting...", runtime);
-                            //     let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                            //         runtime,
-                            //         ConnectionState::Reconnecting,
-                            //     )));
-                            //     continue;
-                            // }
-                            error!("subscribe_best result error: {}", e);
+                            let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                                runtime,
+                                ConnectionState::BestBlockSubcriptionDropped(e.to_string()),
+                            )));
+                            break;
                         }
                     }
                 }
             }
             Err(e) => {
-                error!("subscribe_best error: {:?}", e);
+                error!("Failed to stream best blocks: {}", e);
+                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                    runtime,
+                    ConnectionState::BestBlockSubcriptionDropped(e.to_string()),
+                )));
             }
         }
     });
@@ -43,6 +44,7 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
 
 /// Background task that subscribes finalized block and sends response over channel.
 pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
+    info!("Subscribing to finalized block for chain: {}", chain.name());
     let api = chain.client().clone();
     let runtime = chain.runtime();
     tokio::spawn(async move {
@@ -103,22 +105,21 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             );
                         }
                         Err(e) => {
-                            // TODO: handle disconnection
-                            // if e.is_disconnected_will_reconnect() {
-                            //     info!("Lost connection to {} reconnecting...", runtime.clone());
-                            //     let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
-                            //         runtime,
-                            //         ConnectionState::Reconnecting,
-                            //     )));
-                            //     continue;
-                            // }
-                            error!("subscribe_finalized result error: {}", e);
+                            let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                                runtime,
+                                ConnectionState::FinalizedSubscriptionDropped(e.to_string()),
+                            )));
+                            break;
                         }
                     }
                 }
             }
             Err(e) => {
-                error!("subscribe_finalized error: {:?}", e);
+                error!("Failed to stream finalized blocks: {}", e);
+                let _ = tx.send(Action::Chain(ChainAction::UpdateConnectionState(
+                    runtime,
+                    ConnectionState::FinalizedSubscriptionDropped(e.to_string()),
+                )));
             }
         }
     });
