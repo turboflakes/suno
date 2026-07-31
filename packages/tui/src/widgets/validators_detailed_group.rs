@@ -716,7 +716,7 @@ impl Columns {
         }
 
         if self.next_keys {
-            widths.push(Constraint::Fill(1));
+            widths.push(Constraint::Length(10));
         }
 
         widths

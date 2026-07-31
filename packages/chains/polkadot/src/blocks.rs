@@ -10,15 +10,16 @@ use subxt::{
     events::Events,
     extrinsics::{ExtrinsicEvents, Extrinsics},
     utils::{MultiAddress, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::Response;
 
 pub async fn process_runtime_events(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
-    events: Events<SubstrateConfig>,
+    events: Events<CustomConfig>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
     for event in events.iter() {
@@ -36,9 +37,9 @@ pub async fn process_runtime_events(
 }
 
 pub async fn process_block_extrinsics(
-    _api: &OnlineClient<SubstrateConfig>,
+    _api: &OnlineClient<CustomConfig>,
     _block_hash: H256,
-    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_extrinsics: Vec<Response> = Vec::new();
     for ext in extrinsics.find::<Proxy>() {
@@ -61,7 +62,7 @@ pub async fn process_block_extrinsics(
 }
 
 pub fn process_transaction_events(
-    events: ExtrinsicEvents<SubstrateConfig>,
+    events: ExtrinsicEvents<CustomConfig>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
     for event in events.iter() {

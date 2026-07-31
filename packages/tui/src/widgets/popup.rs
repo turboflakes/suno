@@ -890,11 +890,8 @@ fn render_password_sign(details: Paragraph, area: Rect, buf: &mut Buffer, state:
         .flex(Flex::End)
         .areas(area);
 
-    Clear.render(details_area, buf);
-    Clear.render(sign_area, buf);
-
     details.render(details_area, buf);
-    // Render input area
+
     state.input.as_password().render(sign_area, buf);
 }
 

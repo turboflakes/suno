@@ -4,9 +4,9 @@ use subxt::{
     events::Events,
     extrinsics::{ExtrinsicEvents, Extrinsics},
     utils::H256,
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
-use suno_config::Runtime;
+use suno_config::{CustomConfig, Runtime};
 use suno_error::Error;
 use suno_primitives::Response;
 
@@ -14,21 +14,21 @@ use suno_primitives::Response;
 pub trait RuntimeProcessor {
     fn process_transaction_events(
         &self,
-        events: ExtrinsicEvents<SubstrateConfig>,
+        events: ExtrinsicEvents<CustomConfig>,
     ) -> Result<Vec<Response>, Error>;
 
     async fn process_runtime_events(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
-        events: Events<SubstrateConfig>,
+        events: Events<CustomConfig>,
     ) -> Result<Vec<Response>, Error>;
 
     async fn process_block_extrinsics(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
-        extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+        extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<Response>, Error>;
 }
 
@@ -36,7 +36,7 @@ pub trait RuntimeProcessor {
 impl RuntimeProcessor for Runtime {
     fn process_transaction_events(
         &self,
-        events: ExtrinsicEvents<SubstrateConfig>,
+        events: ExtrinsicEvents<CustomConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
             Runtime::Polkadot => suno_polkadot::process_transaction_events(events),
@@ -55,9 +55,9 @@ impl RuntimeProcessor for Runtime {
 
     async fn process_runtime_events(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
-        events: Events<SubstrateConfig>,
+        events: Events<CustomConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
             Runtime::Polkadot => {
@@ -84,9 +84,9 @@ impl RuntimeProcessor for Runtime {
 
     async fn process_block_extrinsics(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
-        extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+        extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
             Runtime::Polkadot => {

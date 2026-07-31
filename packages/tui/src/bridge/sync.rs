@@ -9,18 +9,18 @@ use subxt::{
     extrinsics::Extrinsics,
     tx::{TransactionInBlock, TransactionProgress, TransactionStatus},
     utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
-use suno_config::SupportedRuntime;
+use suno_config::{CustomConfig, SupportedRuntime};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Default spawner for making asynchronous fetch requests.
 struct DefaultSpawner {
-    api: OnlineClient<SubstrateConfig>,
+    api: OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     tx: UnboundedSender<Action>,
@@ -28,7 +28,7 @@ struct DefaultSpawner {
 
 impl DefaultSpawner {
     fn new(
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         runtime: SupportedRuntime,
         tx: &UnboundedSender<Action>,
@@ -43,7 +43,7 @@ impl DefaultSpawner {
 
     fn spawn<F, Fut>(self, fetch_fn: F)
     where
-        F: Fn(OnlineClient<SubstrateConfig>, H256) -> Fut + Send + 'static,
+        F: Fn(OnlineClient<CustomConfig>, H256) -> Fut + Send + 'static,
         Fut: Future<Output = Result<Response, Error>> + Send,
     {
         let Self {
@@ -77,7 +77,7 @@ impl DefaultSpawner {
 
 /// Validator spawner for making asynchronous fetch requests.
 struct ValidatorSpawner {
-    api: OnlineClient<SubstrateConfig>,
+    api: OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: Vec<AccountKey>,
@@ -86,7 +86,7 @@ struct ValidatorSpawner {
 
 impl ValidatorSpawner {
     fn new(
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         runtime: SupportedRuntime,
         validator_keys: &[AccountKey],
@@ -103,7 +103,7 @@ impl ValidatorSpawner {
 
     fn spawn_unordered<F, Fut>(self, fetch_fn: F, n: usize)
     where
-        F: Fn(OnlineClient<SubstrateConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClient<CustomConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Response, Error>> + Send,
     {
         let Self {
@@ -146,7 +146,7 @@ impl ValidatorSpawner {
 
     fn spawn_unordered_multi<F, Fut>(self, fetch_fn: F, n: usize)
     where
-        F: Fn(OnlineClient<SubstrateConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClient<CustomConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
         let Self {
@@ -191,7 +191,7 @@ impl ValidatorSpawner {
 
     fn spawn_batch<F, Fut>(self, fetch_fn: F)
     where
-        F: Fn(OnlineClient<SubstrateConfig>, H256, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClient<CustomConfig>, H256, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
         let Self {
@@ -231,7 +231,7 @@ impl ValidatorSpawner {
 // ----
 
 pub fn spawn_fetch_era_data(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
@@ -241,7 +241,7 @@ pub fn spawn_fetch_era_data(
 }
 
 pub fn spawn_fetch_epoch_data(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
@@ -251,7 +251,7 @@ pub fn spawn_fetch_epoch_data(
 }
 
 pub fn spawn_fetch_total_staked(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -262,7 +262,7 @@ pub fn spawn_fetch_total_staked(
 }
 
 pub fn spawn_fetch_active_validators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -276,7 +276,7 @@ pub fn spawn_fetch_active_validators_count(
 }
 
 pub fn spawn_fetch_active_nominators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -290,7 +290,7 @@ pub fn spawn_fetch_active_nominators_count(
 }
 
 pub fn spawn_fetch_total_validators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
@@ -300,7 +300,7 @@ pub fn spawn_fetch_total_validators_count(
 }
 
 pub fn spawn_fetch_total_nominators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
@@ -314,7 +314,7 @@ pub fn spawn_fetch_total_nominators_count(
 // ----
 //
 pub fn spawn_fetch_validators_era_points(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -331,7 +331,7 @@ pub fn spawn_fetch_validators_era_points(
 }
 
 pub fn spawn_fetch_validators_authority_status(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -347,7 +347,7 @@ pub fn spawn_fetch_validators_authority_status(
 }
 
 pub fn spawn_fetch_validators_queued_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -359,7 +359,7 @@ pub fn spawn_fetch_validators_queued_keys(
 }
 
 pub fn spawn_fetch_validators_stake_overview(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -377,7 +377,7 @@ pub fn spawn_fetch_validators_stake_overview(
 }
 
 pub fn spawn_fetch_validators_staking_ledger(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -390,7 +390,7 @@ pub fn spawn_fetch_validators_staking_ledger(
 }
 
 pub fn spawn_fetch_validators_points(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -403,7 +403,7 @@ pub fn spawn_fetch_validators_points(
 }
 
 pub fn spawn_fetch_validators_prefs(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     era_index: u32,
@@ -421,7 +421,7 @@ pub fn spawn_fetch_validators_prefs(
 }
 
 pub fn spawn_fetch_validators_prefs_next(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -437,7 +437,7 @@ pub fn spawn_fetch_validators_prefs_next(
 }
 
 pub fn spawn_fetch_validators_payee(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -450,7 +450,7 @@ pub fn spawn_fetch_validators_payee(
 }
 
 pub fn spawn_fetch_validators_next_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -462,7 +462,7 @@ pub fn spawn_fetch_validators_next_keys(
 }
 
 pub fn spawn_fetch_validators_identity(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -474,7 +474,7 @@ pub fn spawn_fetch_validators_identity(
 }
 
 pub fn spawn_fetch_validators_proxy_status(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -493,7 +493,7 @@ pub fn spawn_fetch_validators_proxy_status(
 }
 
 pub fn spawn_fetch_account_balance(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
@@ -509,7 +509,7 @@ pub fn spawn_fetch_account_balance(
 // Caller tasks
 // ----
 pub fn spawn_sign_and_submit_call_data(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     runtime: SupportedRuntime,
     signer: &Keypair,
     call_data: &[u8],
@@ -546,7 +546,7 @@ pub fn spawn_sign_and_submit_call_data(
 }
 
 pub fn spawn_submit_call_data_with_signature(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     runtime: SupportedRuntime,
     signer: &AccountId32,
     call_data: &[u8],
@@ -585,7 +585,7 @@ pub fn spawn_submit_call_data_with_signature(
 }
 
 // pub fn spawn_submit_transaction(
-//     api: &OnlineClient<SubstrateConfig>,
+//     api: &OnlineClient<CustomConfig>,
 //     runtime: SupportedRuntime,
 //     signed_tx: String,
 //     tx: &UnboundedSender<Action>,
@@ -622,7 +622,7 @@ pub fn spawn_submit_call_data_with_signature(
 // ----
 pub fn spawn_process_transaction_progress(
     runtime: SupportedRuntime,
-    progress: TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    progress: TransactionProgress<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let mut progress = progress;
@@ -639,7 +639,7 @@ pub fn spawn_process_transaction_progress(
 
 async fn process_transaction_progress(
     runtime: SupportedRuntime,
-    progress: &mut TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    progress: &mut TransactionProgress<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     while let Some(status) = progress.next().await {
@@ -673,7 +673,7 @@ async fn process_transaction_progress(
 
 fn spawn_process_transaction_wait_for_success(
     runtime: SupportedRuntime,
-    in_block: TransactionInBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    in_block: TransactionInBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let mut in_block = in_block;
@@ -690,7 +690,7 @@ fn spawn_process_transaction_wait_for_success(
 
 async fn process_transaction_wait_for_success(
     runtime: SupportedRuntime,
-    in_block: &mut TransactionInBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    in_block: &mut TransactionInBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
 ) -> Result<(), Error> {
     match in_block.wait_for_success().await {
@@ -727,10 +727,10 @@ async fn process_transaction_wait_for_success(
 }
 
 pub fn spawn_process_runtime_events(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    events: Events<SubstrateConfig>,
+    events: Events<CustomConfig>,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();
@@ -762,10 +762,10 @@ pub fn spawn_process_runtime_events(
 }
 
 pub fn spawn_process_block_extrinsics(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     runtime: SupportedRuntime,
-    extrinsics: Extrinsics<'_, SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
 ) {
     let api = api.clone();

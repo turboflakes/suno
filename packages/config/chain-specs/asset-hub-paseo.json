@@ -10,7 +10,7 @@
   "telemetryEndpoints": null,
   "protocolId": "ah-pas",
   "properties": {
-    "ss58Format": 0,
+    "ss58Format": 42,
     "tokenDecimals": 10,
     "tokenSymbol": "PAS"
   },

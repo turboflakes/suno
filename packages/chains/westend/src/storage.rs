@@ -12,8 +12,9 @@ use crate::{
 use std::collections::{HashMap, HashSet};
 use subxt::{
     utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     proxy::SupportedProxy, validator::ValidatorStatus, AccountKey, Epoch, Response,
@@ -24,7 +25,7 @@ type BlockNumber = u32;
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
 pub async fn fetch_and_validate_proxy_account(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
     proxy: &AccountId32,
@@ -55,7 +56,7 @@ pub async fn fetch_and_validate_proxy_account(
 
 /// Fetch validator points at the specified block hash
 pub async fn fetch_validator_points(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -81,7 +82,7 @@ pub async fn fetch_validator_points(
 
 /// Fetch epoch data at the specified block hash
 pub async fn fetch_epoch_data(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
     let duration = fetch_epoch_duration(api, block_hash).await?;
@@ -96,7 +97,7 @@ pub async fn fetch_epoch_data(
 
 /// Fetch validators authority status
 pub async fn fetch_validators_authority_status(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
@@ -127,7 +128,7 @@ pub async fn fetch_validators_authority_status(
 
 /// Fetch validators queued keys
 pub async fn fetch_validators_queued_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
@@ -159,7 +160,7 @@ pub async fn fetch_validators_queued_keys(
 
 /// Fetch validator next session key
 pub async fn fetch_validator_next_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -174,7 +175,7 @@ pub async fn fetch_validator_next_keys(
 
 /// Fetch babe epoch index at the specified block hash
 async fn fetch_epoch_index(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Index, Error> {
     let addr = node_runtime::storage().babe().epoch_index();
@@ -195,7 +196,7 @@ async fn fetch_epoch_index(
 
 /// Fetch babe epoch start at the specified block hash
 async fn fetch_epoch_start(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<(BlockNumber, BlockNumber), Error> {
     let addr = node_runtime::storage().babe().epoch_start();
@@ -216,7 +217,7 @@ async fn fetch_epoch_start(
 
 /// Fetch session validators at the specified block hash
 async fn fetch_session_validators(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Vec<AccountId32>, Error> {
     let addr = node_runtime::storage().session().validators();
@@ -237,7 +238,7 @@ async fn fetch_session_validators(
 
 /// Fetch active validator indices at the specified block hash
 async fn fetch_active_validator_indices(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Vec<ValidatorIndex>, Error> {
     let addr = node_runtime::storage()
@@ -260,7 +261,7 @@ async fn fetch_active_validator_indices(
 
 /// Fetch queued keys for the next session for a stash at the specified block hash
 async fn fetch_session_next_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<SessionKeys>, Error> {
@@ -283,7 +284,7 @@ async fn fetch_session_next_keys(
 
 /// Fetch queued keys for the next session at the specified block hash
 async fn fetch_session_queued_keys(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Vec<(AccountId32, SessionKeys)>, Error> {
     let addr = node_runtime::storage().session().queued_keys();
@@ -304,7 +305,7 @@ async fn fetch_session_queued_keys(
 
 /// Fetch proxies for a given account at the specified block hash
 async fn fetch_account_proxies(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<

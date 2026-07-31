@@ -8,15 +8,15 @@ use node_runtime::runtime_types::{
 use subxt::{
     client::{ClientAtBlock, OnlineClientAtBlockImpl},
     utils::AccountId32,
-    SubstrateConfig,
 };
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::session::{Keys, Proof};
 
 type Bytes = Vec<u8>;
 
 pub fn wrap_call_into_proxy(
-    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     call: RuntimeCall,
     proxied_account: &AccountId32,
 ) -> Result<Bytes, Error> {

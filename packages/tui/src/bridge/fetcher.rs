@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use subxt::{
     utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
-use suno_config::Runtime;
+use suno_config::{CustomConfig, Runtime};
 use suno_error::Error;
 use suno_primitives::{AccountKey, Response};
 
@@ -11,52 +11,52 @@ use suno_primitives::{AccountKey, Response};
 pub trait RuntimeFetcher {
     async fn fetch_era_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error>;
 
     async fn fetch_epoch_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error>;
 
     async fn fetch_total_staked(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error>;
 
     async fn fetch_active_validators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error>;
 
     async fn fetch_active_nominators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error>;
 
     async fn fetch_total_validators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error>;
 
     async fn fetch_total_nominators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error>;
 
     async fn fetch_validators_era_points(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         validator_keys: &[AccountKey],
@@ -64,35 +64,35 @@ pub trait RuntimeFetcher {
 
     async fn fetch_validator_points(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_validators_authority_status(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
     async fn fetch_validators_queued_keys(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
     async fn fetch_validator_next_keys(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_stake_overview(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         stash: &AccountId32,
@@ -100,14 +100,14 @@ pub trait RuntimeFetcher {
 
     async fn fetch_stake_ledger(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_validator_prefs(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         stash: &AccountId32,
@@ -115,28 +115,28 @@ pub trait RuntimeFetcher {
 
     async fn fetch_validator_prefs_next(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_validator_payee(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_validator_identity(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_and_validate_proxy_account(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
         proxy: &AccountId32,
@@ -144,7 +144,7 @@ pub trait RuntimeFetcher {
 
     async fn fetch_account_balance(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
@@ -154,7 +154,7 @@ pub trait RuntimeFetcher {
 impl RuntimeFetcher for Runtime {
     async fn fetch_era_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error> {
         match &self {
@@ -172,7 +172,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_epoch_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
@@ -186,7 +186,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_total_staked(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error> {
@@ -209,7 +209,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_active_validators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error> {
@@ -236,7 +236,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_active_nominators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
     ) -> Result<Response, Error> {
@@ -263,7 +263,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_total_validators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
@@ -285,7 +285,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_total_nominators_count(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
@@ -307,7 +307,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validators_era_points(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         validator_keys: &[AccountKey],
@@ -355,7 +355,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_points(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -372,7 +372,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validators_authority_status(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
@@ -398,7 +398,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validators_queued_keys(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
@@ -421,7 +421,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_next_keys(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -440,7 +440,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_stake_overview(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         stash: &AccountId32,
@@ -476,7 +476,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_stake_ledger(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -500,7 +500,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_prefs(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         era_index: u32,
         stash: &AccountId32,
@@ -527,7 +527,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_prefs_next(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -550,7 +550,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_payee(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -573,7 +573,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_validator_identity(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
@@ -594,7 +594,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_and_validate_proxy_account(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
         proxy: &AccountId32,
@@ -631,7 +631,7 @@ impl RuntimeFetcher for Runtime {
 
     async fn fetch_account_balance(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error> {
