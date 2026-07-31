@@ -383,6 +383,16 @@ fn get_config() -> Result<Config, Error> {
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
+        .subcommand(
+            clap::Command::new("update")
+                .about("Update SUNO latest or specified version for your host platform")
+                .arg(
+                    clap::Arg::new("version")
+                        .index(1)
+                        .value_name("VERSION")
+                        .help("If given a version argument then `update` command updates the specified version, otherwise installs latest."),
+                ),
+        )
         .arg(
             clap::Arg::new("config-path")
                 .short('c')
@@ -407,6 +417,17 @@ fn get_config() -> Result<Config, Error> {
                 .help("Sets a global proxy account used by Polkadot Vault."),
         )
         .get_matches();
+
+    match matches.subcommand() {
+        Some(("update", update_matches)) => {
+            let version = update_matches
+                .get_one::<String>("version")
+                .map(|s| s.as_str());
+
+            // TODO: Implement update logic
+        }
+        _ => {}
+    }
 
     let config_path = matches
         .get_one::<String>("config-path")
