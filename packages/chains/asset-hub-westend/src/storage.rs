@@ -18,8 +18,9 @@ use std::collections::HashSet;
 use subxt::{
     ext::futures::StreamExt,
     utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     balance::Balance,
@@ -32,7 +33,7 @@ use suno_primitives::{
 
 /// Fetch balance for a given stash at the specified block hash
 pub async fn fetch_balance(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -52,7 +53,7 @@ pub async fn fetch_balance(
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
 pub async fn fetch_and_validate_proxy_account(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
     proxy: &AccountId32,
@@ -89,7 +90,7 @@ pub async fn fetch_and_validate_proxy_account(
 
 /// Fetch validator prefs
 pub async fn fetch_validator_prefs(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
@@ -106,7 +107,7 @@ pub async fn fetch_validator_prefs(
 
 /// Fetch validator next prefs
 pub async fn fetch_validator_prefs_next(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -118,7 +119,7 @@ pub async fn fetch_validator_prefs_next(
 
 /// Fetch validator stake overview
 pub async fn fetch_validator_stake_overview(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
@@ -136,7 +137,7 @@ pub async fn fetch_validator_stake_overview(
 }
 
 pub async fn fetch_validator_staking_ledger(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -156,7 +157,7 @@ pub async fn fetch_validator_staking_ledger(
 
 /// Fetch validators era points
 pub async fn fetch_validators_era_points(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
     validator_keys: &[AccountKey],
@@ -181,7 +182,7 @@ pub async fn fetch_validators_era_points(
 
 /// Fetch era data at the specified block hash
 pub async fn fetch_era_data(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
     let sessions_per_era = fetch_sessions_per_era(api, block_hash).await?;
@@ -203,7 +204,7 @@ pub async fn fetch_era_data(
 
 /// Fetch active validators and nominators at the specified block hash
 pub async fn fetch_active_nominators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
 ) -> Result<Response, Error> {
@@ -251,7 +252,7 @@ pub async fn fetch_active_nominators_count(
 
 /// Fetch active validators at the specified block hash
 pub async fn fetch_active_validators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
 ) -> Result<Response, Error> {
@@ -272,7 +273,7 @@ pub async fn fetch_active_validators_count(
 
 /// Fetch total validators at the specified block hash
 pub async fn fetch_total_validators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_validators();
@@ -293,7 +294,7 @@ pub async fn fetch_total_validators_count(
 
 /// Fetch total nominators at the specified block hash
 pub async fn fetch_total_nominators_count(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_nominators();
@@ -314,7 +315,7 @@ pub async fn fetch_total_nominators_count(
 
 /// Fetch total total staked for a specific era at the specified block hash
 pub async fn fetch_total_staked(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
 ) -> Result<Response, Error> {
@@ -336,7 +337,7 @@ pub async fn fetch_total_staked(
 
 /// Fetch validator payee for a specific stash at the specified block hash
 pub async fn fetch_validator_payee(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -353,7 +354,7 @@ pub async fn fetch_validator_payee(
 
 /// Fetch bonded eras at the specified block hash
 async fn fetch_bonded_eras(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<BoundedVec<(u32, u32)>, Error> {
     let addr = node_runtime::storage().staking().bonded_eras();
@@ -374,7 +375,7 @@ async fn fetch_bonded_eras(
 
 /// Fetch eras total stake for a specific era at the specified block hash
 async fn fetch_eras_total_stake(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
 ) -> Result<u128, Error> {
@@ -396,7 +397,7 @@ async fn fetch_eras_total_stake(
 
 /// Fetch total issuance for at the specified block hash
 async fn fetch_total_issuance(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().total_issuance();
@@ -417,7 +418,7 @@ async fn fetch_total_issuance(
 
 /// Fetch inactive issuance for at the specified block hash
 async fn fetch_inactive_issuance(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().inactive_issuance();
@@ -438,7 +439,7 @@ async fn fetch_inactive_issuance(
 
 /// Fetch validator prefs at the specified block hash
 async fn fetch_validators(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<ValidatorPrefs, Error> {
@@ -460,7 +461,7 @@ async fn fetch_validators(
 
 /// Fetch validator prefs at the specified block hash and era
 async fn fetch_eras_validator_prefs(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
@@ -484,7 +485,7 @@ async fn fetch_eras_validator_prefs(
 
 /// Fetch staking ledger at the specified block hash
 async fn fetch_staking_ledger(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<StakingLedger>, Error> {
@@ -507,7 +508,7 @@ async fn fetch_staking_ledger(
 
 /// Fetch active era at the specified block hash
 pub async fn fetch_active_era_info(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<ActiveEraInfo, Error> {
     let addr = node_runtime::storage().staking().active_era();
@@ -528,7 +529,7 @@ pub async fn fetch_active_era_info(
 
 /// Fetch era reward points at the specified block hash
 async fn fetch_era_reward_points(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
 ) -> Result<Option<EraRewardPoints>, Error> {
@@ -551,7 +552,7 @@ async fn fetch_era_reward_points(
 
 /// Fetch eras_stakers_overview at the specified block hash for the given era and stash
 async fn fetch_eras_stakers_overview(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     era: u32,
     stash: &AccountId32,
@@ -575,7 +576,7 @@ async fn fetch_eras_stakers_overview(
 
 /// Fetch nominators at the specified block hash
 async fn _fetch_nominators(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Nominations, Error> {
@@ -597,7 +598,7 @@ async fn _fetch_nominators(
 
 /// Fetch payee at the specified block hash
 pub async fn fetch_payee(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<RewardDestination<AccountId32>, Error> {
@@ -619,7 +620,7 @@ pub async fn fetch_payee(
 
 /// Fetch proxies for a given account at the specified block hash
 async fn fetch_account_proxies(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<
@@ -647,7 +648,7 @@ async fn fetch_account_proxies(
 
 /// Fetch balance for a given account at the specified block hash
 async fn fetch_system_account(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<AccountInfo<u32, AccountData<u128>>, Error> {

@@ -10,6 +10,7 @@ edition.workspace = true
 [dependencies]
 hex = { workspace = true }
 subxt = { workspace = true }
+suno-config = { path = "../../config" }
 suno-error = { path = "../../error" }
 suno-primitives = { path = "../../primitives" }
 suno-signer = { path = "../../signer" }

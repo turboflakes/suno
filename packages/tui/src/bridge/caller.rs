@@ -2,12 +2,11 @@ use async_trait::async_trait;
 use subxt::ext::codec::Decode;
 use subxt::{
     client::{ClientAtBlock, OnlineClientAtBlockImpl},
-    config::DefaultExtrinsicParamsBuilder,
     utils::{AccountId32, MultiSignature},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
 use subxt_signer::sr25519::Keypair;
-use suno_config::Runtime;
+use suno_config::{CustomConfig, CustomExtrinsicParamsBuilder, Runtime};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call,
@@ -20,7 +19,7 @@ use suno_primitives::{
 pub trait RuntimeCaller {
     fn build_call_data(
         &self,
-        api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+        api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
         stash: &AccountId32,
         call: Call,
         supported_proxy: SupportedProxy,
@@ -28,14 +27,14 @@ pub trait RuntimeCaller {
 
     async fn sign_and_submit_call_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         proxy_signer: &Keypair,
         call_data: &[u8],
     ) -> Result<Response, Error>;
 
     async fn submit_call_data_with_signature(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         proxy_signer: &AccountId32,
         call_data: &[u8],
         signature: &[u8],
@@ -46,7 +45,7 @@ pub trait RuntimeCaller {
 impl RuntimeCaller for Runtime {
     fn build_call_data(
         &self,
-        api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+        api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
         stash: &AccountId32,
         call: Call,
         supported_proxy: SupportedProxy,
@@ -259,7 +258,7 @@ impl RuntimeCaller for Runtime {
 
     async fn sign_and_submit_call_data(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         proxy_signer: &Keypair,
         call_data: &[u8],
     ) -> Result<Response, Error> {
@@ -279,7 +278,7 @@ impl RuntimeCaller for Runtime {
 
     async fn submit_call_data_with_signature(
         &self,
-        api: &OnlineClient<SubstrateConfig>,
+        api: &OnlineClient<CustomConfig>,
         proxy_signer: &AccountId32,
         call_data: &[u8],
         signature: &[u8],
@@ -289,7 +288,7 @@ impl RuntimeCaller for Runtime {
         let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
 
         let nonce = at_block.tx().account_nonce(proxy_signer).await.boxed()?;
-        let params = DefaultExtrinsicParamsBuilder::new().nonce(nonce).build();
+        let params = CustomExtrinsicParamsBuilder::new().nonce(nonce).build();
 
         let mut signable = at_block
             .tx()

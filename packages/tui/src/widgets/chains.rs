@@ -13,9 +13,9 @@ use sp_arithmetic::Permill;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use subxt::{lightclient::LightClient, utils::H256, OnlineClient, SubstrateConfig};
+use subxt::{lightclient::LightClient, utils::H256, OnlineClient};
 use suno_actions::{network::ConnectionState, Action, SystemAction};
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_config::{CustomConfig, SupportedRuntime, CONFIG};
 use suno_error::Error;
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
@@ -31,7 +31,7 @@ pub struct Chain {
     // Chain runtime details
     runtime: SupportedRuntime,
     // Api client details
-    client: OnlineClient<SubstrateConfig>,
+    client: OnlineClient<CustomConfig>,
     // Best block number
     best_block: BlockNumber,
     // Finalized block number
@@ -59,7 +59,7 @@ pub struct Chain {
 }
 
 impl Chain {
-    pub fn new(runtime: SupportedRuntime, client: OnlineClient<SubstrateConfig>) -> Self {
+    pub fn new(runtime: SupportedRuntime, client: OnlineClient<CustomConfig>) -> Self {
         Self {
             runtime,
             client,
@@ -90,7 +90,7 @@ impl Chain {
         self.runtime
     }
 
-    pub fn client(&self) -> &OnlineClient<SubstrateConfig> {
+    pub fn client(&self) -> &OnlineClient<CustomConfig> {
         &self.client
     }
 
@@ -361,14 +361,13 @@ impl ChainsListWidget {
 
                 relay_lc = new_relay_lc.or(relay_lc);
 
-                let client =
-                    match OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client).await {
-                        Ok(client) => client,
-                        Err(err) => {
-                            self.error(err.into());
-                            continue;
-                        }
-                    };
+                let client = match OnlineClient::<CustomConfig>::from_rpc_client(rpc_client).await {
+                    Ok(client) => client,
+                    Err(err) => {
+                        self.error(err.into());
+                        continue;
+                    }
+                };
 
                 let mut chain = Chain::new(*runtime, client);
                 if let Err(err) = chain.validate_genesis() {
@@ -475,7 +474,7 @@ impl ChainsListWidget {
     pub fn get_api_and_block_hash(
         &self,
         runtime: SupportedRuntime,
-    ) -> Option<(OnlineClient<SubstrateConfig>, H256)> {
+    ) -> Option<(OnlineClient<CustomConfig>, H256)> {
         let chain = self.get_chain_by_runtime(runtime)?;
 
         if !chain.is_connected() {

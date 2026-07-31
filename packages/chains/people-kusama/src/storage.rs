@@ -7,13 +7,14 @@ use node_runtime::runtime_types::{
 use std::result::Result;
 use subxt::{
     utils::{AccountId32, H256},
-    OnlineClient, SubstrateConfig,
+    OnlineClient,
 };
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{identity::Identity, Response};
 
 pub async fn fetch_identity(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
@@ -24,7 +25,7 @@ pub async fn fetch_identity(
 
 #[async_recursion]
 pub async fn get_identity(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
     sub_account_name: Option<String>,
@@ -53,7 +54,7 @@ pub async fn get_identity(
 }
 
 async fn fetch_identity_of(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<Registration<u128, IdentityInfo>>, Error> {
@@ -75,7 +76,7 @@ async fn fetch_identity_of(
 }
 
 async fn fetch_super_of(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
     stash: &AccountId32,
 ) -> Result<Option<(AccountId32, Data)>, Error> {

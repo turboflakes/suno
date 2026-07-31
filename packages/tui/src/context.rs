@@ -1,11 +1,11 @@
 use crate::call::Call;
-use subxt::{OnlineClient, SubstrateConfig};
-use suno_config::SupportedRuntime;
+use subxt::OnlineClient;
+use suno_config::{CustomConfig, SupportedRuntime};
 use suno_primitives::Validator;
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    pub api: OnlineClient<SubstrateConfig>,
+    pub api: OnlineClient<CustomConfig>,
     pub runtime: SupportedRuntime,
     pub validator: Validator,
     pub call: Option<Call>,
@@ -13,7 +13,7 @@ pub struct Context {
 
 impl Context {
     pub fn new(
-        api: OnlineClient<SubstrateConfig>,
+        api: OnlineClient<CustomConfig>,
         runtime: SupportedRuntime,
         validator: Validator,
         call: Option<Call>,

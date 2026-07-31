@@ -9,9 +9,8 @@ use crate::{
 };
 use sp_arithmetic::Permill;
 use std::fmt::Debug;
-use subxt::{
-    client::OnlineClientAtBlockImpl, tx::TransactionProgress, utils::H256, SubstrateConfig,
-};
+use subxt::{client::OnlineClientAtBlockImpl, tx::TransactionProgress, utils::H256};
+use suno_config::CustomConfig;
 
 type AccountBytes = [u8; 32];
 type Points = u32;
@@ -141,9 +140,7 @@ pub enum Response {
     ActiveNominators(Data<u32>),
     TotalValidators(Data<u32>),
     TotalNominators(Data<u32>),
-    TxSubmitted(
-        Data<TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>>,
-    ),
+    TxSubmitted(Data<TransactionProgress<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>>),
     TxValidated,
     TxBroadcasted,
     TxNoLongerInBestBlock,
@@ -234,7 +231,7 @@ impl Response {
     }
 
     pub fn transaction_submitted(
-        progress: TransactionProgress<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+        progress: TransactionProgress<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Self {
         Response::TxSubmitted(Data::new(progress))
     }

@@ -1,10 +1,11 @@
 use super::node_runtime;
-use subxt::{utils::H256, OnlineClient, SubstrateConfig};
+use subxt::{utils::H256, OnlineClient};
+use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 
 /// Fetch staking sessions per era
 pub async fn fetch_sessions_per_era(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<u32, Error> {
     let addr = node_runtime::constants().staking().sessions_per_era();
@@ -16,7 +17,7 @@ pub async fn fetch_sessions_per_era(
 
 /// Fetch staking bonding duration
 pub async fn fetch_bonding_duration(
-    api: &OnlineClient<SubstrateConfig>,
+    api: &OnlineClient<CustomConfig>,
     block_hash: H256,
 ) -> Result<u32, Error> {
     let addr = node_runtime::constants().staking().bonding_duration();

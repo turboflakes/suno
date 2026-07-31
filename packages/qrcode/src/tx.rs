@@ -1,15 +1,13 @@
 use crate::error::{Error, ResultExt};
+use subxt::client::{ClientAtBlock, OnlineClientAtBlockImpl};
 use subxt::ext::codec::{Compact, Encode};
 use subxt::utils::AccountId32;
-use subxt::{
-    client::{ClientAtBlock, OnlineClientAtBlockImpl},
-    SubstrateConfig,
-};
+use suno_config::CustomConfig;
 
 /// Build a transaction QR code according to the UOS spec:
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
 pub async fn build_qrcode(
-    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     signer: &AccountId32, // signer's account ID
     bytes: &[u8],         // raw call data bytes
 ) -> Result<Vec<u8>, Error> {
@@ -57,7 +55,7 @@ fn wrap_single_frame(content: &[u8]) -> Vec<u8> {
 }
 
 async fn encode_extensions(
-    api: &ClientAtBlock<SubstrateConfig, OnlineClientAtBlockImpl<SubstrateConfig>>,
+    api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     signer: &AccountId32,
     genesis_hash_bytes: &[u8],
 ) -> Result<Vec<u8>, Error> {
