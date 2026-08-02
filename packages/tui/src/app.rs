@@ -187,6 +187,7 @@ impl App {
     fn handle_system_actions(&mut self, action: SystemAction) {
         match action {
             SystemAction::Quit => self.quit(),
+            SystemAction::Update => self.run_update(),
             SystemAction::Tick => self.tick(),
             SystemAction::Noop => self.noop(),
             SystemAction::Error(err) => error!("{err}"),
@@ -783,6 +784,17 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    /// Updates the application to the latest version.
+    pub fn run_update(&self) {
+        tokio::spawn(async move {
+            let res = suno_update::run(None).await;
+            match res {
+                Ok(_) => warn!("✔︎ Update completed. Restart to initialize the latest version."),
+                Err(e) => error!("Update failed: {e}"),
+            }
+        });
     }
 
     /// Moves row selection up.

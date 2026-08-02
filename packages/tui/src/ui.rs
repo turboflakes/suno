@@ -258,6 +258,16 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     legend.push(Span::raw(" "));
     legend.push(Span::styled("quit".to_string(), theme.paragraph.label));
 
+    if let Some(v) = app.new_version.as_deref() {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+u".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled(
+            format!("update ({} available)", v),
+            theme.paragraph.header,
+        ));
+    }
+
     let footer = Paragraph::new(Line::from(legend))
         .block(block)
         .right_aligned();

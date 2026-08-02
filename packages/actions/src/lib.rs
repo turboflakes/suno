@@ -153,6 +153,7 @@ pub enum TxAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SystemAction {
     Quit,
+    Update,
     Tick,
     Noop,
     Error(String),

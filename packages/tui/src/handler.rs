@@ -22,6 +22,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
             match key_event.code {
                 // Exit application on ctrl-c`
                 KeyCode::Char('c') => Action::System(SystemAction::Quit),
+                // Update application on ctrl-u`
+                KeyCode::Char('u') => Action::System(SystemAction::Update),
                 // Open popup on `ctrl-e` within the active section
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Select next main window/tab

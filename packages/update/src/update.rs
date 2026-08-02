@@ -35,7 +35,7 @@ pub async fn check_for_update() -> Result<String, Error> {
     let release = fetch_release(&client, None).await?;
 
     let current = env!("CARGO_PKG_VERSION");
-    if release.tag_name.trim_start_matches('v') == current {
+    if release.tag_name.trim_start_matches('v') != current {
         return Ok(release.tag_name);
     }
 
