@@ -1,9 +1,9 @@
 use crate::bridge::{custom, sync, RuntimeCaller};
-use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsListWidget,
     collators::CollatorsListWidget,
+    logs::LogsState,
     popup::{Mode as PopupMode, PopupWidget},
     validators::ValidatorsListWidget,
     window::Window,
@@ -14,7 +14,6 @@ use crate::{
     tui::Tui,
 };
 use arboard::Clipboard;
-use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
 use suno_actions::network::ConnectionState;
@@ -27,10 +26,13 @@ use suno_error::{Error, ResultExt};
 use suno_primitives::entry::ToMethod;
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
+use suno_tracing::LogEntry;
 use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 use zeroize::Zeroizing;
+
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, TuiError>;
+pub type AppResult<T> = std::result::Result<T, Error>;
 
 // Constants
 const TICK_RATE: u64 = 250;
@@ -68,6 +70,8 @@ pub struct App {
     pub collators: CollatorsListWidget,
     /// The popup widget.
     pub popup: PopupWidget,
+    /// Logs state.
+    pub logs: LogsState,
     /// Is any sensitive data masked?
     pub masked: bool,
     /// The sender to send actions to update the state to the app.
@@ -76,15 +80,9 @@ pub struct App {
     pub rx: mpsc::UnboundedReceiver<Action>,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new() -> Self {
+    pub fn new(rx_logs: mpsc::UnboundedReceiver<LogEntry>) -> Self {
         // Define the channel to send actions to update the app state.
         let (tx, rx) = mpsc::unbounded_channel::<Action>();
 
@@ -97,6 +95,7 @@ impl App {
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
+            logs: LogsState::new(rx_logs),
             masked: true,
             tx,
             rx,
@@ -131,6 +130,8 @@ impl App {
 
         // Start the main loop.
         while self.running {
+            // Drain tracing events
+            self.logs.update();
             // Render the user interface.
             tui.draw(self)?;
             // Handle events.
@@ -764,11 +765,6 @@ impl App {
         }
     }
 
-    /// Handles application errors.
-    pub fn error(&self, err: Error) {
-        error!("{}", err);
-    }
-
     /// Handles the noop event of the terminal.
     pub fn noop(&self) {}
 
@@ -964,7 +960,7 @@ impl App {
         let proxy_account_id = match runtime.signer_account_id().boxed() {
             Ok(address) => address,
             Err(e) => {
-                self.error(e.into());
+                error!("{}", e);
                 return;
             }
         };
@@ -1077,7 +1073,7 @@ impl App {
                     let proxy_account_id = match runtime.signer_account_id().boxed() {
                         Ok(address) => address,
                         Err(e) => {
-                            self.error(e.into());
+                            error!("{}", e);
                             return;
                         }
                     };
@@ -1283,7 +1279,7 @@ impl App {
 
         let result = self
             .popup
-            .execute_with_password(|password| -> Result<(), TuiError> {
+            .execute_with_password(|password| -> AppResult<()> {
                 let password = Zeroizing::new(password.to_string());
 
                 tokio::spawn(async move {
@@ -1379,13 +1375,13 @@ impl App {
             let mut clipboard = match Clipboard::new() {
                 Ok(cb) => cb,
                 Err(e) => {
-                    self.error(e.into());
+                    error!("{}", e);
                     return;
                 }
             };
 
             if let Err(e) = clipboard.set_text(hex_bytes) {
-                self.error(e.into());
+                error!("{}", e);
             }
         }
     }

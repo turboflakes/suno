@@ -6,11 +6,13 @@ mod runtime;
 mod signer;
 mod substrate;
 mod themes;
+mod update;
 
 pub use crate::access::{NodeAccess, SshConfig};
-pub use crate::config::{ChainConfig, Config, Features, Host, NodeConfig, CONFIG};
+pub use crate::config::{ChainConfig, Config, Features, Host, NodeConfig, Subcommand, CONFIG};
 pub use crate::custom::{CommandKind, CustomCalls, CustomCommand};
 pub use crate::error::Error;
 pub use crate::runtime::{Runtime, SupportedRuntime};
 pub use crate::substrate::{CustomConfig, CustomExtrinsicParamsBuilder};
 pub use crate::themes::Themes;
+pub use crate::update::run_update;

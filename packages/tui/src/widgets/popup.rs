@@ -3,7 +3,6 @@ use crate::widgets::{
     spinner::Spinner,
 };
 use image::DynamicImage;
-use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
@@ -27,6 +26,7 @@ use suno_primitives::{
 };
 use suno_qrcode::{QrCodeWidget, QrScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::warn;
 
 use unicode_width::UnicodeWidthStr;
 

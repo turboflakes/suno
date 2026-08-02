@@ -11,18 +11,25 @@ edition.workspace = true
 [dependencies]
 clap = { workspace = true }
 codec = { workspace = true }
+flate2 = { workspace = true }
 lazy_static = { workspace = true }
 openssh = { workspace = true }
+reqwest = { workspace = true }
 scale-info = { workspace = true }
+self-replace = { workspace = true }
 serde = { workspace = true }
+semver = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sha2 = { workspace = true }
 shellexpand = { workspace = true }
 subxt = { workspace = true }
 suno-theme = { path = "../theme" }
+tar = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 
 
 [dev-dependencies]

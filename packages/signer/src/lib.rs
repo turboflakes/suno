@@ -1,6 +1,6 @@
 pub mod error;
 
-use crate::error::Error;
+pub use crate::error::Error;
 use regex::Regex;
 use std::str::FromStr;
 use subxt_signer::{polkadot_js_compat::decrypt_json, sr25519::Keypair, SecretUri};

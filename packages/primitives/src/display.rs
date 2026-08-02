@@ -2,6 +2,7 @@ use sp_core::crypto::{Ss58AddressFormat, Ss58Codec};
 use sp_core::sr25519::Public;
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::utils::AccountId32;
+use time::{macros::format_description, OffsetDateTime};
 
 /// Format milliseconds to human-readable string (e.g., "6.5s")
 pub fn format_millis(millis: u64) -> String {
@@ -28,6 +29,32 @@ pub fn format_millis(millis: u64) -> String {
             }
         }
     }
+}
+
+/// Format date to human-readable string (e.g., "2021-01-01 12:34:56")
+pub fn format_date(timestamp: u128) -> String {
+    let secs = (timestamp / 1000) as i64;
+    let nanos = ((timestamp % 1000) * 1_000_000) as i128;
+
+    OffsetDateTime::from_unix_timestamp_nanos(secs as i128 * 1_000_000_000 + nanos)
+        .map(|dt| {
+            let fmt = format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+            dt.format(fmt).unwrap_or_else(|_| "invalid".to_string())
+        })
+        .unwrap_or_else(|_| "invalid timestamp".to_string())
+}
+
+/// Format time to human-readable string (e.g., "12:34:56")
+pub fn format_time(timestamp: u128) -> String {
+    let secs = (timestamp / 1000) as i64;
+    let nanos = ((timestamp % 1000) * 1_000_000) as i128;
+
+    OffsetDateTime::from_unix_timestamp_nanos(secs as i128 * 1_000_000_000 + nanos)
+        .map(|dt| {
+            let fmt = format_description!("[hour]:[minute]:[second]");
+            dt.format(fmt).unwrap_or_else(|_| "invalid".to_string())
+        })
+        .unwrap_or_else(|_| "invalid timestamp".to_string())
 }
 
 /// Format planks to human-readable string (e.g., "1.5K")

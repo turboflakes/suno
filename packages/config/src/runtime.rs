@@ -1,10 +1,10 @@
 use crate::config::CONFIG;
 use crate::error::Error;
-use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use subxt::utils::{AccountId32, H256};
+use tracing::info;
 
 pub const POLKADOT_SPEC: &str = include_str!("../chain-specs/polkadot.json");
 pub const ASSET_HUB_POLKADOT_SPEC: &str = include_str!("../chain-specs/asset-hub-polkadot.json");

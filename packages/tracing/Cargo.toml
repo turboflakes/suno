@@ -1,5 +1,5 @@
 [package]
-name = "suno-people-paseo"
+name = "suno-tracing"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,11 +7,10 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 
+
 [dependencies]
-async-recursion = { workspace = true }
-subxt = { workspace = true }
-suno-config = { path = "../../config" }
-suno-error = { path = "../../error" }
-suno-primitives = { path = "../../primitives" }
+suno-config = { path = "../config" }
+tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

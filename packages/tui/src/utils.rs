@@ -1,4 +1,3 @@
-use log::{info, warn};
 use std::time::Duration;
 use subxt::{
     ext::jsonrpsee::ws_client::PingConfig,
@@ -12,6 +11,7 @@ use subxt_rpcs::{
     utils::validate_url_is_secure,
 };
 use suno_config::{ChainConfig, SupportedRuntime};
+use tracing::{info, warn};
 
 pub async fn _create_substrate_rpc_client_from_url(
     url: &str,

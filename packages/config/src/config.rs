@@ -5,7 +5,7 @@ use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
 use lazy_static::lazy_static;
-use log::info;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -45,11 +45,22 @@ fn default_explorer() -> Explorer {
     Explorer::default()
 }
 
+/// Provides default value for Logs struct
+fn default_logs() -> Logs {
+    Logs::default()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Subcommand {
+    Update { version: Option<String> },
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub subcommand: Option<Subcommand>,
+    #[serde(default)]
     pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
-    // TODO: Add support for RPCs
-    // rpcs: Vec<HashMap<String, Vec<String>>>,
     #[serde(default = "default_features")]
     pub features: Features,
     #[serde(default)]
@@ -58,6 +69,22 @@ pub struct Config {
     pub explorer: Explorer,
     #[serde(default = "default_themes")]
     themes: Themes,
+    #[serde(default = "default_logs")]
+    pub logs: Logs,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            subcommand: None,
+            chains: Vec::new(),
+            features: default_features(),
+            signer: None,
+            explorer: default_explorer(),
+            themes: default_themes(),
+            logs: Logs::default(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -260,6 +287,30 @@ pub struct Explorer {
     url: Option<String>,
 }
 
+fn default_max_entries() -> usize {
+    2000
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Logs {
+    #[serde(default = "default_max_entries")]
+    max_entries: usize,
+}
+
+impl Default for Logs {
+    fn default() -> Self {
+        Self {
+            max_entries: default_max_entries(),
+        }
+    }
+}
+
+impl Logs {
+    pub fn max_entries(&self) -> usize {
+        self.max_entries
+    }
+}
+
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref();
@@ -270,7 +321,7 @@ impl Config {
 
         let content = fs::read_to_string(path)?;
         if content.is_empty() {
-            return Err(Error::InvalidContent(path.display().to_string()));
+            return Ok(Self::default());
         }
 
         let mut config: Config = serde_yaml::from_str(&content)?;
@@ -357,6 +408,10 @@ impl Config {
         })
     }
 
+    pub fn subcommand(&self) -> Option<&Subcommand> {
+        self.subcommand.as_ref()
+    }
+
     pub fn theme(&self) -> &Theme {
         self.themes.theme()
     }
@@ -368,6 +423,10 @@ impl Config {
     fn set_default_theme(&mut self) {
         self.themes.active = default_active_theme();
     }
+
+    pub fn logs_max_entries(&self) -> usize {
+        self.logs.max_entries
+    }
 }
 
 /// Provides default value for the configuration file path
@@ -375,11 +434,12 @@ fn default_config_path() -> &'static str {
     ".config.yaml"
 }
 
-fn get_config() -> Result<Config, Error> {
+/// Builds the CLI application
+fn build_cli() -> clap::Command {
     let default_config_path = default_config_path();
     let default_proxy_path = default_proxy_path();
 
-    let matches = clap::Command::new("suno")
+    clap::Command::new("suno")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
@@ -416,31 +476,51 @@ fn get_config() -> Result<Config, Error> {
                 .value_name("ADDRESS")
                 .help("Sets a global proxy account used by Polkadot Vault."),
         )
-        .get_matches();
+}
 
-    match matches.subcommand() {
-        Some(("update", update_matches)) => {
-            let version = update_matches
-                .get_one::<String>("version")
-                .map(|s| s.as_str());
+/// Validates a semantic version string (e.g. `1.2.3`, `v1.2.3`, `1.2.3-beta.1`).
+/// Returns the normalized version without the `v` prefix on success.
+fn validate_semver(input: &str) -> Result<Version, Error> {
+    Version::parse(input.trim().trim_start_matches('v')).map_err(Error::InvalidVersion)
+}
 
-            // TODO: Implement update logic
-        }
-        _ => {}
-    }
+/// Loads the configuration from default paths and CLI arguments explicitly
+/// overriding the default values.
+fn get_config() -> Result<Config, Error> {
+    let default_config_path = default_config_path();
+
+    let matches = build_cli().get_matches();
 
     let config_path = matches
         .get_one::<String>("config-path")
         .map(|s| s.as_str())
         .unwrap_or(default_config_path);
 
-    info!("Loading configuration from {}", config_path);
-
     // Read and parse the config file
     let mut config = Config::from_file(config_path)?;
 
+    // Process the subcommand
+    let subcommand = match matches.subcommand() {
+        Some(("update", sub)) => {
+            let version = sub
+                .get_one::<String>("version")
+                .map(|s| validate_semver(s).map(|v| v.to_string()))
+                .transpose()?;
+
+            if version.is_none() {
+                Some(Subcommand::Update { version })
+            } else {
+                Some(Subcommand::Update { version: None })
+            }
+        }
+        _ => None,
+    };
+
+    // Add the subcommand to the config
+    config.subcommand = subcommand;
+
     // If not specified in the config file, load the signer proxy path
-    // from the command line argument, otherwise try to load the default
+    // from the CLI, otherwise try to load the default
     if config.signer.is_none() {
         if let Some(path) = matches.get_one::<String>("proxy-path") {
             config.set_signer_path(path.as_str());
@@ -451,6 +531,7 @@ fn get_config() -> Result<Config, Error> {
         }
     }
 
+    // Validate the theme and set the default if necessary
     if config.themes.active.is_empty() {
         config.set_default_theme();
     }
@@ -574,11 +655,13 @@ mod tests {
     #[test]
     fn test_config_validation_empty_chains() {
         let config = Config {
+            subcommand: None,
             chains: vec![],
             features: Features::default(),
             signer: None,
             explorer: Explorer::default(),
             themes: Themes::default(),
+            logs: Logs::default(),
         };
         assert!(config.validate().is_err());
     }
@@ -720,6 +803,23 @@ explorer:
             chain_config.is_qrcode_enabled(),
             "proxy_account should enable qrcode signing"
         );
+    }
+
+    #[test]
+    fn test_valid_semver() {
+        assert!(validate_semver("1.2.3").is_ok());
+        assert!(validate_semver("v1.2.3").is_ok());
+        assert!(validate_semver("1.2.3-beta.1").is_ok());
+        assert!(validate_semver("1.2.3-alpha+build.42").is_ok());
+    }
+
+    #[test]
+    fn test_invalid_semver() {
+        assert!(validate_semver("").is_err());
+        assert!(validate_semver("1.2").is_err());
+        assert!(validate_semver("1.2.3.4").is_err());
+        assert!(validate_semver("1.x.3").is_err());
+        assert!(validate_semver("01.2.3").is_err());
     }
 
     // Helper function to create temporary file with content

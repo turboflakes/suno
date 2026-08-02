@@ -9,6 +9,7 @@ members = [
     "packages/suno",
     "packages/theme",
     "packages/tui",
+    "packages/tracing",
     "packages/chains/asset-hub-paseo",
     "packages/chains/asset-hub-polkadot",
     "packages/chains/asset-hub-kusama",
@@ -41,25 +42,29 @@ clap = "4.6.0"
 codec = { package = "parity-scale-codec", version = "3.7.5" }
 color-eyre = "0.6.3"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
+flate2 = "1.1.9"
 futures = "0.3.31"
 hex = "0.4"
 image = "0.25"
 indoc = "2"
 lazy_static = "1.5"
-log = "0.4"
 nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
 qrcodegen = "1.8"
 ratatui = "0.30.2"
 ratatui-image  = { version = "11.0.6", default-features = false, features = ["image-defaults", "crossterm"] }
 regex = "1.11"
+reqwest = { version = "0.12", features = ["json"] }
 rxing = "0.5"
 scale-encode = "0.10.1"
 scale-info = "2.11.6"
 secrecy = "0.8"
+self-replace = "1.5.0"
+semver = "1.0.28"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.9"
+sha2 = "0.11.0"
 shellexpand = "3.1.2"
 sp-arithmetic = "28.0.1"
 sp-core = "39.0.0"
@@ -67,10 +72,14 @@ strum = { version = "0.26.3", features = ["derive"] }
 subxt = { git = "https://github.com/paritytech/subxt", rev="6f86195dbc80693d52f1f8f9aa6b5acdc73b4a34", features = ["reconnecting-rpc-client", "light-client", "jsonrpsee"] }
 subxt-signer = { git = "https://github.com/paritytech/subxt", rev="6f86195dbc80693d52f1f8f9aa6b5acdc73b4a34", features = ["polkadot-js-compat"] }
 subxt-rpcs = { git = "https://github.com/paritytech/subxt", rev="6f86195dbc80693d52f1f8f9aa6b5acdc73b4a34" }
+tar = "0.4"
 tempfile = "3.2"
+time = { version = "0.3", features = ["formatting", "macros"] }
 thiserror = "2.0"
 tokio = { version = "1.43.0", features = ["full"] }
 toml = "1.0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.23", features = ["fmt","env-filter"] }
 tui-logger = "0.18.3"
 unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }

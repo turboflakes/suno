@@ -1,7 +1,6 @@
 use suno_actions::Action;
 use suno_config::SupportedRuntime;
 use suno_primitives::{session::KeysError, tx::Error as PayloadError};
-use suno_signer::error::Error as SignerError;
 
 /// Suno specific error messages
 #[derive(thiserror::Error, Debug)]
@@ -29,7 +28,7 @@ pub enum Error {
     #[error("Send error: {0}")]
     Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
     #[error("Signer error: {0}")]
-    Signer(#[from] SignerError),
+    Signer(#[from] suno_signer::Error),
     #[error("Payload error: {0}")]
     Payload(#[from] Box<PayloadError>),
     #[error("Keys error: {0}")]
@@ -46,6 +45,12 @@ pub enum Error {
     Config(#[from] Box<suno_config::Error>),
     #[error("Invalid signature: {0}")]
     InvalidSignature(#[from] subxt::ext::codec::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Logger error: {0}")]
+    Tracing(#[from] suno_tracing::Error),
+    #[error("Logger error: {0}")]
+    TuiLogger(#[from] tui_logger::TuiLoggerError),
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -1,5 +1,6 @@
 use crate::app::App;
 use crate::section::Section;
+use crate::widgets::logs::LogsWidget;
 use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -72,7 +73,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Switch between main body window.
     match app.window {
         Window::Main => render_body_widget(app, frame, outer_layout[1]),
-        Window::Logs | Window::Help => {
+        Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
+        Window::Help => {
             frame.render_widget(&app.window, outer_layout[1]);
         }
     }
@@ -158,6 +160,15 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block_area = block.inner(area);
     frame.render_widget(block, area);
     frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
+}
+
+fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = CONFIG.theme();
+    let block = Block::default()
+        .style(theme.block.main)
+        .padding(Padding::proportional(1));
+    let logs = LogsWidget::new().block(block);
+    frame.render_stateful_widget(logs, area, &mut app.logs);
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
