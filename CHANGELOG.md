@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - Add support for smoldot see PR [#23](https://github.com/turboflakes/suno/pull/23)
 - Add tracing support
-- 
 
 ## [0.5.0] - 2026-07-17
 - Add support for Polkadot-Vault see PR [#20](https://github.com/turboflakes/suno/pull/20)

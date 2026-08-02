@@ -47,6 +47,7 @@ suno-kusama = { path = "../chains/kusama" }
 suno-signer = { path = "../signer" }
 suno-theme = { path = "../theme" }
 suno-tracing = { path = "../tracing" }
+suno-update = { path = "../update" }
 suno-westend = { path = "../chains/westend" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

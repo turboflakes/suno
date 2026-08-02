@@ -27,8 +27,6 @@ pub enum Error {
     RemoteExecution(String),
     #[error("Invalid version: {0}")]
     InvalidVersion(semver::Error),
-    #[error("Invalid version: {0}")]
-    RequestError(reqwest::Error),
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -44,12 +42,5 @@ impl From<&str> for Error {
 impl From<String> for Error {
     fn from(error: String) -> Self {
         Self::Other(error)
-    }
-}
-
-/// Convert reqwest::Error to Error
-impl From<reqwest::Error> for Error {
-    fn from(error: reqwest::Error) -> Self {
-        Self::RequestError(error)
     }
 }

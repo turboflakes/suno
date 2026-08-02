@@ -74,6 +74,8 @@ pub struct App {
     pub logs: LogsState,
     /// Is any sensitive data masked?
     pub masked: bool,
+    /// New version available
+    pub new_version: Option<String>,
     /// The sender to send actions to update the state to the app.
     pub tx: mpsc::UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
@@ -97,12 +99,14 @@ impl App {
             popup: PopupWidget::default(),
             logs: LogsState::new(rx_logs),
             masked: true,
+            new_version: None,
             tx,
             rx,
         }
     }
 
     async fn init(&mut self) {
+        self.check_for_update().await;
         self.chains.on_init().await;
         self.validators.on_init();
         self.collators.on_init();
@@ -116,6 +120,11 @@ impl App {
 
     fn is_masked(&self) -> bool {
         self.masked
+    }
+
+    pub async fn check_for_update(&mut self) {
+        let new_version = suno_update::check_for_update().await.ok();
+        self.new_version = new_version;
     }
 
     pub async fn run(&mut self) -> AppResult<()> {

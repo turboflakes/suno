@@ -1,6 +1,6 @@
 use std::result::Result;
 use suno_config::{Subcommand, CONFIG};
-use suno_error::{Error, ResultExt};
+use suno_error::Error;
 use tokio::sync::mpsc;
 
 #[tokio::main]
@@ -12,7 +12,7 @@ async fn main() -> Result<(), Error> {
     match config.subcommand() {
         Some(Subcommand::Update { version }) => {
             suno_tracing::init_cli()?;
-            suno_config::run_update(version.as_deref()).await.boxed()?;
+            suno_update::run(version.as_deref()).await?;
         }
         _ => {
             let (tx, rx) = mpsc::unbounded_channel();

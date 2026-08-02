@@ -49,8 +49,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Logger error: {0}")]
     Tracing(#[from] suno_tracing::Error),
-    #[error("Logger error: {0}")]
-    TuiLogger(#[from] tui_logger::TuiLoggerError),
+    #[error("Update error: {0}")]
+    Update(#[from] suno_update::Error),
     #[error("Other error: {0}")]
     Other(String),
 }

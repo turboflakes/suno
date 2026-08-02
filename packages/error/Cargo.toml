@@ -15,6 +15,6 @@ suno-config = { path = "../config" }
 suno-primitives = { path = "../primitives" }
 suno-signer = { path = "../signer" }
 suno-tracing = { path = "../tracing" }
+suno-update = { path = "../update" }
 thiserror = { workspace = true }
-tui-logger = { workspace = true }
 tokio = { workspace = true }

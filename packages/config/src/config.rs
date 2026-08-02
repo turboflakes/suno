@@ -507,11 +507,7 @@ fn get_config() -> Result<Config, Error> {
                 .map(|s| validate_semver(s).map(|v| v.to_string()))
                 .transpose()?;
 
-            if version.is_none() {
-                Some(Subcommand::Update { version })
-            } else {
-                Some(Subcommand::Update { version: None })
-            }
+            Some(Subcommand::Update { version })
         }
         _ => None,
     };

@@ -3,13 +3,14 @@ members = [
     "packages/actions",
     "packages/config",
     "packages/error",
-    "packages/qrcode",
     "packages/primitives",
+    "packages/qrcode",
     "packages/signer",
     "packages/suno",
     "packages/theme",
-    "packages/tui",
     "packages/tracing",
+    "packages/tui",
+    "packages/update",
     "packages/chains/asset-hub-paseo",
     "packages/chains/asset-hub-polkadot",
     "packages/chains/asset-hub-kusama",
@@ -80,7 +81,6 @@ tokio = { version = "1.43.0", features = ["full"] }
 toml = "1.0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.23", features = ["fmt","env-filter"] }
-tui-logger = "0.18.3"
 unicode-width = "0.2.0"
 zeroize = { version = "1.7", features = ["derive"] }
 
