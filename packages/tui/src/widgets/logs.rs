@@ -26,7 +26,7 @@ impl LogsState {
     }
 
     pub fn entries(&self) -> &VecDeque<LogEntry> {
-        &self.logs.entries()
+        self.logs.entries()
     }
 
     pub fn update(&mut self) {

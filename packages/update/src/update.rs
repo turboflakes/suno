@@ -6,10 +6,10 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use tracing::{debug, info};
 
-const GITHUB_API: &'static str = "https://api.github.com";
-const REPO_OWNER: &'static str = "turboflakes";
-const REPO_NAME: &'static str = "suno";
-const BIN_NAME: &'static str = "suno";
+const GITHUB_API: &str = "https://api.github.com";
+const REPO_OWNER: &str = "turboflakes";
+const REPO_NAME: &str = "suno";
+const BIN_NAME: &str = "suno";
 
 pub type Checksum = String;
 pub type AssetName = String;
@@ -55,7 +55,7 @@ pub async fn check_for_update() -> Result<String, Error> {
 /// Starts the update process for the given version.
 pub async fn start(client: &Client, version: Option<&str>) -> Result<Release, Error> {
     // Fetch release metadata
-    let release = fetch_release(&client, version).await?;
+    let release = fetch_release(client, version).await?;
     info!("✔︎ Found release {}", release.tag_name);
 
     // Check if already up to date
@@ -131,7 +131,7 @@ pub fn validate(bytes: &Bytes, expected_hash: &str) -> Result<(), Error> {
 /// Extracts the binary from the downloaded bytes and replaces the existing binary.
 pub fn extract_and_replace(bytes: &Bytes, asset_name: &str) -> Result<(), Error> {
     // Extract binary to temp location
-    let (_tmp_dir, bin_path) = extract_binary(&bytes, &asset_name)?;
+    let (_tmp_dir, bin_path) = extract_binary(bytes, asset_name)?;
     debug!("Binary extracted to {}", bin_path.display());
 
     // Atomically replace current binary
@@ -157,10 +157,10 @@ pub async fn run_update(version: Option<&str>) -> Result<(), Error> {
     let (bytes, expected_hash) = download(&client, &release, &asset_name).await?;
 
     // Validate SHA256
-    let _ = validate(&bytes, &expected_hash)?;
+    validate(&bytes, &expected_hash)?;
 
     // Extract binary to temp location and replace current binary
-    let _ = extract_and_replace(&bytes, &asset_name)?;
+    extract_and_replace(&bytes, &asset_name)?;
 
     info!("✔︎ Updated to {}", release.tag_name);
     Ok(())

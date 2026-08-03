@@ -809,7 +809,6 @@ impl App {
                         Err(e) => {
                             error!("{}", e);
                             let _ = tx.send(Action::Update(UpdateAction::Error));
-                            return;
                         }
                     }
                 });
@@ -855,13 +854,12 @@ impl App {
                         Err(e) => {
                             error!("{}", e);
                             let _ = tx.send(Action::Update(UpdateAction::Error));
-                            return;
                         }
                     }
                 });
             }
             UpdateAction::Validate(asset_name, bytes, expected_hash) => {
-                self.popup.change_update_status(&format!("validating"));
+                self.popup.change_update_status("validating");
 
                 if let Err(e) = update::validate(&bytes, &expected_hash) {
                     error!("{}", e);
@@ -879,7 +877,7 @@ impl App {
             }
             UpdateAction::Complete => {
                 self.popup
-                    .show_upgrade_complete(&format!("upgrade complete, restart to apply"));
+                    .show_upgrade_complete("upgrade complete, restart to apply");
             }
             UpdateAction::Error => {
                 self.popup.show_upgrade_error();

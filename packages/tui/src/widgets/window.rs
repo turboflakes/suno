@@ -208,9 +208,8 @@ impl Window {
 
 impl Widget for &Window {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        match self {
-            Window::Help => self.render_help(area, buf),
-            _ => {}
+        if self == &Window::Help {
+            self.render_help(area, buf)
         }
     }
 }
