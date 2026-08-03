@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
 use suno_theme::Theme;
@@ -100,6 +101,24 @@ pub struct ChainConfig {
 }
 
 impl ChainConfig {
+    pub fn new() -> Self {
+        Self {
+            rpc_url: String::new(),
+            signer: None,
+            validators: Vec::new(),
+            collators: Vec::new(),
+        }
+    }
+
+    pub fn with_validators(validators: Vec<NodeConfig>) -> Self {
+        Self {
+            rpc_url: String::new(),
+            signer: None,
+            validators,
+            collators: Vec::new(),
+        }
+    }
+
     pub fn signer_path(&self) -> Option<String> {
         self.signer
             .as_ref()
@@ -196,6 +215,16 @@ pub enum NodeConfig {
         #[serde(default)]
         commands: Option<Vec<CustomCommand>>,
     },
+}
+
+impl FromStr for NodeConfig {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<AccountId32>()
+            .map(NodeConfig::Address)
+            .map_err(|e| Error::InvalidAddress(e.to_string()))
+    }
 }
 
 fn default_enable() -> bool {
@@ -453,6 +482,22 @@ fn build_cli() -> clap::Command {
                         .help("If given a version argument then `update` command updates the specified version, otherwise installs latest."),
                 ),
         )
+        .subcommand(network_subcommand(
+            "polkadot",
+            "Launch SUNO in light client mode on Polkadot",
+        ))
+        .subcommand(network_subcommand(
+            "kusama",
+            "Launch SUNO in light client mode on Kusama",
+        ))
+        .subcommand(network_subcommand(
+            "paseo",
+            "Launch SUNO in light client mode on Paseo",
+        ))
+        .subcommand(network_subcommand(
+            "westend",
+            "Launch SUNO in light client mode on Westend",
+        ))
         .arg(
             clap::Arg::new("config-path")
                 .short('c')
@@ -462,19 +507,42 @@ fn build_cli() -> clap::Command {
                 .help("Sets a custom config file path."),
         )
         .arg(
-            clap::Arg::new("proxy-path")
+            clap::Arg::new("proxy-account")
                 .short('p')
+                .long("proxy-account")
+                .value_name("ADDRESS")
+                .help("Sets a global proxy account used by Polkadot Vault."),
+        )
+        .arg(
+            clap::Arg::new("proxy-path")
                 .long("proxy-path")
                 .value_name("FILE")
                 .default_value(default_proxy_path)
                 .help("Sets a global proxy account file path."),
         )
+}
+
+/// Returns a subcommand for a specific network (e.g. `polkadot`, `kusama`).
+fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command {
+    clap::Command::new(name)
+        .about(about)
+        .arg(
+            clap::Arg::new("validators")
+                .long("validators")
+                .short('v')
+                .value_delimiter(',')
+                .num_args(1..)
+                .help(
+                    "Validator stash addresses for which `suno` will be applied. \
+                     Specify one or multiple addresses (e.g. stash_1,stash_2,stash_3).",
+                ),
+        )
         .arg(
             clap::Arg::new("proxy-account")
-                .short('a')
                 .long("proxy-account")
-                .value_name("ADDRESS")
-                .help("Sets a global proxy account used by Polkadot Vault."),
+                .short('p')
+                .value_name("PROXY ADDRESS")
+                .help("Proxy account used by Polkadot Vault."),
         )
 }
 
@@ -499,22 +567,6 @@ fn get_config() -> Result<Config, Error> {
     // Read and parse the config file
     let mut config = Config::from_file(config_path)?;
 
-    // Process the subcommand
-    let subcommand = match matches.subcommand() {
-        Some(("update", sub)) => {
-            let version = sub
-                .get_one::<String>("version")
-                .map(|s| validate_semver(s).map(|v| v.to_string()))
-                .transpose()?;
-
-            Some(Subcommand::Update { version })
-        }
-        _ => None,
-    };
-
-    // Add the subcommand to the config
-    config.subcommand = subcommand;
-
     // If not specified in the config file, load the signer proxy path
     // from the CLI, otherwise try to load the default
     if config.signer.is_none() {
@@ -526,6 +578,50 @@ fn get_config() -> Result<Config, Error> {
             config.set_signer_account(account.as_str());
         }
     }
+
+    // Process the subcommand
+    let subcommand = match matches.subcommand() {
+        Some(("update", sub)) => {
+            let version = sub
+                .get_one::<String>("version")
+                .map(|s| validate_semver(s).map(|v| v.to_string()))
+                .transpose()?;
+
+            Some(Subcommand::Update { version })
+        }
+        Some((relay_chain, sub)) => {
+            let runtime = SupportedRuntime::from_str(relay_chain)?;
+
+            let validators = sub
+                .get_many::<String>("validators")
+                .unwrap_or_default()
+                .map(|s| s.parse::<NodeConfig>())
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let rc_config = ChainConfig::with_validators(validators);
+
+            let mut chains = vec![HashMap::from([(runtime, rc_config)])];
+            for system_chain in runtime.default_system_chains() {
+                chains.push(HashMap::from([(system_chain, ChainConfig::new())]));
+            }
+
+            // Replace the chains in the config with the new chains
+            config.chains = chains;
+
+            let signer = sub
+                .get_one::<String>("proxy-account")
+                .map(|s| Signer::from_address(s))
+                .transpose()?;
+
+            // Replace the signer in the config with the new signer
+            config.signer = signer;
+            None
+        }
+        _ => None,
+    };
+
+    // Add the subcommand to the config
+    config.subcommand = subcommand;
 
     // Validate the theme and set the default if necessary
     if config.themes.active.is_empty() {

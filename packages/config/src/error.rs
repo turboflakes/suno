@@ -11,6 +11,8 @@ pub enum Error {
     Yaml(#[from] serde_yaml::Error),
     #[error("At least one chain has to be configured [Polkadot, Kusama, Paseo, Westend]")]
     ChainNotAvailable,
+    #[error("Unsupported chain: {0}")]
+    UnsupportedChain(String),
     #[error("Theme parsing error: {0}")]
     Theme(#[from] suno_theme::Error),
     #[error("Invalid theme: {0}")]

@@ -109,6 +109,16 @@ impl SupportedRuntime {
         }
     }
 
+    pub fn default_system_chains(&self) -> Vec<Self> {
+        match &self {
+            Self::Polkadot => vec![Self::AssetHubPolkadot, Self::PeoplePolkadot],
+            Self::Kusama => vec![Self::AssetHubKusama, Self::PeopleKusama],
+            Self::Paseo => vec![Self::AssetHubPaseo, Self::PeoplePaseo],
+            Self::Westend => vec![Self::AssetHubWestend, Self::PeopleWestend],
+            _ => panic!("Unsupported relay-chain"),
+        }
+    }
+
     pub fn chain_specs(&self) -> &str {
         match &self {
             Self::Polkadot => POLKADOT_SPEC,
@@ -397,6 +407,32 @@ impl SupportedRuntime {
 impl std::fmt::Display for SupportedRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for SupportedRuntime {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "polkadot" => Ok(SupportedRuntime::Polkadot),
+            "kusama" => Ok(SupportedRuntime::Kusama),
+            "paseo" => Ok(SupportedRuntime::Paseo),
+            "westend" => Ok(SupportedRuntime::Westend),
+            "asset_hub_polkadot" => Ok(SupportedRuntime::AssetHubPolkadot),
+            "bridge_hub_polkadot" => Ok(SupportedRuntime::BridgeHubPolkadot),
+            "people_polkadot" => Ok(SupportedRuntime::PeoplePolkadot),
+            "asset_hub_kusama" => Ok(SupportedRuntime::AssetHubKusama),
+            "bridge_hub_kusama" => Ok(SupportedRuntime::BridgeHubKusama),
+            "people_kusama" => Ok(SupportedRuntime::PeopleKusama),
+            "asset_hub_paseo" => Ok(SupportedRuntime::AssetHubPaseo),
+            "bridge_hub_paseo" => Ok(SupportedRuntime::BridgeHubPaseo),
+            "people_paseo" => Ok(SupportedRuntime::PeoplePaseo),
+            "asset_hub_westend" => Ok(SupportedRuntime::AssetHubWestend),
+            "bridge_hub_westend" => Ok(SupportedRuntime::BridgeHubWestend),
+            "people_westend" => Ok(SupportedRuntime::PeopleWestend),
+            _ => Err(Error::UnsupportedChain(s.to_string())),
+        }
     }
 }
 
