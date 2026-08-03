@@ -12,7 +12,7 @@ async fn main() -> Result<(), Error> {
     match config.subcommand() {
         Some(Subcommand::Update { version }) => {
             suno_tracing::init_cli()?;
-            suno_update::run(version.as_deref()).await?;
+            suno_update::run_update(version.as_deref()).await?;
         }
         _ => {
             let (tx, rx) = mpsc::unbounded_channel();

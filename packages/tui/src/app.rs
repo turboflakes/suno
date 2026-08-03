@@ -19,7 +19,7 @@ use std::{io, thread, time::Duration};
 use suno_actions::network::ConnectionState;
 use suno_actions::{
     Action, ChainAction, ConfirmationContext, InputAction, NavigationAction, PopupAction,
-    ScannerAction, SystemAction, ThreadAction, TxAction, ValidatorAction,
+    ScannerAction, SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
@@ -27,6 +27,7 @@ use suno_primitives::entry::ToMethod;
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
 use suno_tracing::LogEntry;
+use suno_update::update;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 use zeroize::Zeroizing;
@@ -180,6 +181,7 @@ impl App {
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
+                Action::Update(act) => self.handle_update_actions(act),
             }
         }
     }
@@ -187,7 +189,9 @@ impl App {
     fn handle_system_actions(&mut self, action: SystemAction) {
         match action {
             SystemAction::Quit => self.quit(),
-            SystemAction::Update => self.run_update(),
+            SystemAction::Update => {
+                let _ = self.tx.send(Action::Update(UpdateAction::Start));
+            }
             SystemAction::Tick => self.tick(),
             SystemAction::Noop => self.noop(),
             SystemAction::Error(err) => error!("{err}"),
@@ -775,6 +779,114 @@ impl App {
         }
     }
 
+    fn handle_update_actions(&mut self, action: UpdateAction) {
+        match action {
+            UpdateAction::Start => {
+                self.popup.show_update_status();
+                // Switch app focus to main while rendering transaction status
+                self.focus = Focus::Main;
+
+                let tx = self.tx.clone();
+
+                tokio::spawn(async move {
+                    let res = reqwest::Client::builder()
+                        .user_agent(format!("suno/{}", env!("CARGO_PKG_VERSION")))
+                        .build();
+                    let client = match res {
+                        Ok(client) => client,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::start(&client, None).await;
+                    match res {
+                        Ok(release) => {
+                            let _ = tx.send(Action::Update(UpdateAction::Download(release)));
+                        }
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    }
+                });
+            }
+            UpdateAction::Download(release) => {
+                self.popup
+                    .change_update_status(&format!("downloading {}", release.tag_name()));
+
+                let tx = self.tx.clone();
+
+                tokio::spawn(async move {
+                    let res = reqwest::Client::builder()
+                        .user_agent(format!("suno/{}", env!("CARGO_PKG_VERSION")))
+                        .build();
+                    let client = match res {
+                        Ok(client) => client,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::asset_name_for_platform();
+                    let asset_name = match res {
+                        Ok(asset_name) => asset_name,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::download(&client, &release, &asset_name).await;
+                    match res {
+                        Ok((bytes, expected_hash)) => {
+                            let _ = tx.send(Action::Update(UpdateAction::Validate(
+                                asset_name,
+                                bytes,
+                                expected_hash,
+                            )));
+                        }
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    }
+                });
+            }
+            UpdateAction::Validate(asset_name, bytes, expected_hash) => {
+                self.popup.change_update_status(&format!("validating"));
+
+                if let Err(e) = update::validate(&bytes, &expected_hash) {
+                    error!("{}", e);
+                    let _ = self.tx.send(Action::Update(UpdateAction::Error));
+                    return;
+                }
+
+                if let Err(e) = update::extract_and_replace(&bytes, &asset_name) {
+                    error!("{}", e);
+                    let _ = self.tx.send(Action::Update(UpdateAction::Error));
+                    return;
+                }
+
+                let _ = self.tx.send(Action::Update(UpdateAction::Complete));
+            }
+            UpdateAction::Complete => {
+                self.popup
+                    .show_upgrade_complete(&format!("upgrade complete, restart to apply"));
+            }
+            UpdateAction::Error => {
+                self.popup.show_upgrade_error();
+            }
+        }
+    }
+
     /// Handles the noop event of the terminal.
     pub fn noop(&self) {}
 
@@ -784,17 +896,6 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
-    }
-
-    /// Updates the application to the latest version.
-    pub fn run_update(&self) {
-        tokio::spawn(async move {
-            let res = suno_update::run(None).await;
-            match res {
-                Ok(_) => warn!("✔︎ Update completed. Restart to initialize the latest version."),
-                Err(e) => error!("Update failed: {e}"),
-            }
-        });
     }
 
     /// Moves row selection up.

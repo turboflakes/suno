@@ -1,4 +1,5 @@
 use crate::error::Error;
+use bytes::Bytes;
 use reqwest::Client;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -10,21 +11,30 @@ const REPO_OWNER: &'static str = "turboflakes";
 const REPO_NAME: &'static str = "suno";
 const BIN_NAME: &'static str = "suno";
 
-#[derive(Debug, Deserialize)]
-struct Release {
+pub type Checksum = String;
+pub type AssetName = String;
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct Release {
     tag_name: String,
     assets: Vec<Asset>,
+}
+
+impl Release {
+    pub fn tag_name(&self) -> &str {
+        &self.tag_name
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+struct Asset {
+    name: String,
+    browser_download_url: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct ErrorResponse {
     message: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Asset {
-    name: String,
-    browser_download_url: String,
 }
 
 /// Checks if a new version is available for download.
@@ -42,27 +52,26 @@ pub async fn check_for_update() -> Result<String, Error> {
     Err(Error::NewVersionNotFound)
 }
 
-/// Runs the update process for the given version.
-pub async fn run(version: Option<&str>) -> Result<(), Error> {
-    let client = Client::builder()
-        .user_agent(format!("{}/{}", BIN_NAME, env!("CARGO_PKG_VERSION")))
-        .build()?;
-
+/// Starts the update process for the given version.
+pub async fn start(client: &Client, version: Option<&str>) -> Result<Release, Error> {
     // Fetch release metadata
     let release = fetch_release(&client, version).await?;
-    info!("✔︎ Found release: {}", release.tag_name);
+    info!("✔︎ Found release {}", release.tag_name);
 
     // Check if already up to date
     let current = env!("CARGO_PKG_VERSION");
     if version.is_none() && release.tag_name.trim_start_matches('v') == current {
-        info!("— Already up to date (v{})", current);
-        return Ok(());
+        return Err(Error::AlreadyUpToDate);
     }
 
-    // Resolve platform-specific asset name
-    let asset_name = asset_name_for_platform()?;
-    let checksum_name = format!("{}.sha256", asset_name);
+    Ok(release)
+}
 
+pub async fn download(
+    client: &Client,
+    release: &Release,
+    asset_name: &str,
+) -> Result<(Bytes, Checksum), Error> {
     // Locate assets in release
     let asset = release
         .assets
@@ -70,6 +79,8 @@ pub async fn run(version: Option<&str>) -> Result<(), Error> {
         .find(|a| a.name == asset_name)
         .ok_or_else(|| Error::AssetNotFound(asset_name.to_string()))?;
 
+    // Download checksum
+    let checksum_name = format!("{}.sha256", asset_name);
     let checksum_asset = release
         .assets
         .iter()
@@ -101,22 +112,57 @@ pub async fn run(version: Option<&str>) -> Result<(), Error> {
         .bytes()
         .await?;
 
-    // Validate SHA256
-    let actual_hash = hex::encode(Sha256::digest(&bytes));
+    info!("✔︎ Assets downloaded");
+
+    Ok((bytes, expected_hash))
+}
+
+/// Validates the checksum of the downloaded bytes against the expected hash.
+pub fn validate(bytes: &Bytes, expected_hash: &str) -> Result<(), Error> {
+    let actual_hash = hex::encode(Sha256::digest(bytes));
     if actual_hash != expected_hash {
         return Err(Error::InvalidChecksum);
     }
-    info!("✔︎ Checksum verified");
 
+    info!("✔︎ Checksum verified");
+    Ok(())
+}
+
+/// Extracts the binary from the downloaded bytes and replaces the existing binary.
+pub fn extract_and_replace(bytes: &Bytes, asset_name: &str) -> Result<(), Error> {
     // Extract binary to temp location
     let (_tmp_dir, bin_path) = extract_binary(&bytes, &asset_name)?;
-
-    debug!("Extracted binary to {}", bin_path.display());
+    debug!("Binary extracted to {}", bin_path.display());
 
     // Atomically replace current binary
     self_replace::self_replace(&bin_path)?;
-    info!("✔︎ Updated to {}", release.tag_name);
 
+    info!("✔︎ Binary replaced");
+    Ok(())
+}
+
+/// Runs the update process for the given version.
+pub async fn run_update(version: Option<&str>) -> Result<(), Error> {
+    let client = Client::builder()
+        .user_agent(format!("{}/{}", BIN_NAME, env!("CARGO_PKG_VERSION")))
+        .build()?;
+
+    // Start update process
+    let release = start(&client, version).await?;
+
+    // Resolve platform-specific asset name
+    let asset_name = asset_name_for_platform()?;
+
+    // Download binary archive
+    let (bytes, expected_hash) = download(&client, &release, &asset_name).await?;
+
+    // Validate SHA256
+    let _ = validate(&bytes, &expected_hash)?;
+
+    // Extract binary to temp location and replace current binary
+    let _ = extract_and_replace(&bytes, &asset_name)?;
+
+    info!("✔︎ Updated to {}", release.tag_name);
     Ok(())
 }
 
@@ -149,7 +195,7 @@ async fn fetch_release(client: &Client, version: Option<&str>) -> Result<Release
 }
 
 /// Returns the asset name for the current platform.
-fn asset_name_for_platform() -> Result<String, Error> {
+pub fn asset_name_for_platform() -> Result<String, Error> {
     let arch = match std::env::consts::ARCH {
         "x86_64" => "x86_64",
         "aarch64" => "aarch64",

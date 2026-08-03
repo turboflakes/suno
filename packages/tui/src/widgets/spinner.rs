@@ -7,10 +7,18 @@ use std::time::Instant;
 use suno_config::CONFIG;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum Status {
+    Running,
+    Completed,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spinner {
     frames: Vec<&'static str>,
     start_time: Instant,
     counter: usize,
+    status: Status,
 }
 
 impl Default for Spinner {
@@ -19,6 +27,7 @@ impl Default for Spinner {
             frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
             start_time: Instant::now(),
             counter: 0,
+            status: Status::Running,
         }
     }
 }
@@ -34,20 +43,40 @@ impl Spinner {
         self.frames[frame_index]
     }
 
-    pub fn progress(&self) -> String {
-        let full = "⣿".repeat(self.counter);
-        format!("{}{}", full, self.frame())
+    fn progress(&self) -> String {
+        let mut result = "⣿".repeat(self.counter);
+        result.push_str(self.frame());
+        result
     }
 
     pub fn increment(&mut self) {
+        self.status = Status::Running;
         self.counter += 1;
+    }
+
+    pub fn complete(&mut self) {
+        self.status = Status::Completed;
+        self.counter = 0;
+    }
+
+    pub fn error(&mut self) {
+        self.status = Status::Error;
+        self.counter = 0;
+    }
+
+    pub fn status(&self) -> String {
+        match self.status {
+            Status::Running => self.progress(),
+            Status::Error => "✘".to_string(),
+            Status::Completed => "✔︎".to_string(),
+        }
     }
 }
 
 impl Widget for &Spinner {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let theme = CONFIG.theme();
-        let spinner = self.progress();
+        let spinner = self.status();
         let block = Block::new()
             .style(theme.input.base)
             .padding(Padding::new(0, 2, 1, 1));

@@ -1,6 +1,7 @@
 pub mod network;
 
 use crate::network::ConnectionState;
+use bytes::Bytes;
 use image::DynamicImage;
 use sp_arithmetic::Permill;
 use subxt::utils::H256;
@@ -16,6 +17,7 @@ use suno_primitives::{
     validator::ValidatorStatus,
     AccountKey,
 };
+use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
@@ -47,6 +49,8 @@ pub enum Action {
     Scanner(ScannerAction),
     /// System actions
     System(SystemAction),
+    /// Update related actions
+    Update(UpdateAction),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,4 +175,13 @@ pub enum ScannerAction {
 /// eg. stopping a scanner thread.
 pub enum ThreadAction {
     Stop,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateAction {
+    Start,
+    Download(Release),
+    Validate(AssetName, Bytes, Checksum),
+    Complete,
+    Error,
 }

@@ -1,5 +1,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("Already up to date")]
+    AlreadyUpToDate,
     #[error("Request error: {0}")]
     RequestError(#[from] reqwest::Error),
     #[error("IO error: {0}")]

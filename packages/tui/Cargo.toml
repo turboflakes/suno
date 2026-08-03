@@ -19,6 +19,7 @@ indoc = { workspace = true }
 lazy_static = { workspace = true }
 ratatui = { workspace = true }
 ratatui-image = { workspace = true }
+reqwest = { workspace = true }
 rxing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

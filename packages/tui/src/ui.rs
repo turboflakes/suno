@@ -1,5 +1,4 @@
 use crate::app::App;
-use crate::section::Section;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
@@ -90,15 +89,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Display commands legend in footer, aligned right.
     render_legend_widget(app, frame, footer[1]);
 
-    // Render the frame.
-    if app.popup.is_visible() && app.section == Section::Validators {
-        render_validators_popup(app, frame, container[0]);
+    // Render popup if it is visible.
+    if app.popup.is_visible() {
+        render_popup(app, frame, container[0]);
     }
 }
 
-fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
+fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     let area = match &app.popup.get_mode() {
-        PopupMode::Transaction => flex_area(
+        PopupMode::Transaction | PopupMode::Update => flex_area(
             area,
             Constraint::Percentage(100),
             Constraint::Length(3),
@@ -263,7 +262,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.push(Span::styled("ctrl+u".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled(
-            format!("update ({} available)", v),
+            format!("update to {}", v),
             theme.paragraph.header,
         ));
     }

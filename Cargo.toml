@@ -39,6 +39,7 @@ edition = "2021"
 arboard = "3.6.1"
 async-recursion = "1.0"
 async-trait = "0.1.89"
+bytes = "1.12.1"
 clap = "4.6.0"
 codec = { package = "parity-scale-codec", version = "3.7.5" }
 color-eyre = "0.6.3"
