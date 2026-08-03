@@ -74,7 +74,8 @@ chains:
   #     #   - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
 
 features:
-  enable_validators: true
+  enable_validators: true # default true
+  enable_check_update: true # default true
   show_nominators_counter: true # default true
   show_nominators_stake: true # default true
   show_own_stake: true # default true
