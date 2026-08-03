@@ -1,9 +1,9 @@
 use crate::error::Error;
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use suno_theme::{Palette, Theme, SUNO_DARK_PALETTE, SUNO_LIGHT_PALETTE};
+use tracing::{info, warn};
 
 type Name = String;
 type ThemesMap = HashMap<Name, Theme>;

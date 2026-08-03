@@ -1,7 +1,6 @@
 use crate::bridge::subscribe::{subscribe_best_block, subscribe_finalized_block};
 use crate::utils::create_rpc_client_from_config;
 use crate::widgets::scrollbar::render_scrollbar;
-use log::debug;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
@@ -22,6 +21,7 @@ use suno_primitives::{
     Epoch, Era,
 };
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::debug;
 
 type BlockNumber = u64;
 type BlockHash = H256;

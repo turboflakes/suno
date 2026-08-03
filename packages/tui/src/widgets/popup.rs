@@ -3,7 +3,6 @@ use crate::widgets::{
     spinner::Spinner,
 };
 use image::DynamicImage;
-use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
@@ -27,6 +26,7 @@ use suno_primitives::{
 };
 use suno_qrcode::{QrCodeWidget, QrScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::warn;
 
 use unicode_width::UnicodeWidthStr;
 
@@ -53,6 +53,7 @@ enum Context {
     Menu(Box<MenuContext>),
     Confirmation(Box<ConfirmationContext>),
     Transaction,
+    Update,
 }
 
 impl Context {
@@ -61,6 +62,7 @@ impl Context {
             Context::Menu(_) => Mode::Menu,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Transaction => Mode::Transaction,
+            Context::Update => Mode::Update,
         }
     }
 }
@@ -73,6 +75,7 @@ pub enum Mode {
     Menu,
     Confirmation,
     Transaction,
+    Update,
 }
 
 #[derive(Clone, Default)]
@@ -206,6 +209,7 @@ impl PopupWidget {
             Context::Menu(ctx) => self.init_menu(&mut state, ctx),
             Context::Confirmation(ctx) => self.init_confirmation(&mut state, ctx),
             Context::Transaction => self.init_transaction(&mut state),
+            Context::Update => self.init_update(&mut state),
         }
 
         state.mode = context.mode();
@@ -424,6 +428,13 @@ impl PopupWidget {
         )));
     }
 
+    fn init_update(&self, state: &mut PopupState) {
+        state.spinner.increment();
+        state
+            .options
+            .push(Entry::new(Command::Text("starting update".to_string())));
+    }
+
     pub fn show_commands(&self, active_era: ActiveEra, validator: &Validator) {
         let menu = MenuContext {
             era: active_era,
@@ -440,6 +451,10 @@ impl PopupWidget {
 
     pub fn show_transaction_status(&self) {
         self.on_init(Context::Transaction);
+    }
+
+    pub fn show_update_status(&self) {
+        self.on_init(Context::Update);
     }
 
     pub fn is_hidden(&self) -> bool {
@@ -561,6 +576,33 @@ impl PopupWidget {
             .push(Entry::new(Command::Text(message.to_string())));
     }
 
+    pub fn change_update_status(&self, message: &str) {
+        let mut state = self.state.write().unwrap();
+        state.spinner.increment();
+        state.options.clear();
+        state
+            .options
+            .push(Entry::new(Command::Text(message.to_string())));
+    }
+
+    pub fn show_upgrade_complete(&self, message: &str) {
+        let mut state = self.state.write().unwrap();
+        state.spinner.complete();
+        state.options.clear();
+        state
+            .options
+            .push(Entry::new(Command::Text(message.to_string())));
+    }
+
+    pub fn show_upgrade_error(&self) {
+        let mut state = self.state.write().unwrap();
+        state.spinner.error();
+        state.options.clear();
+        state.options.push(Entry::new(Command::Text(
+            "upgrade failed, check the logs".to_string(),
+        )));
+    }
+
     pub fn update_scanner_frame(&self, frame: DynamicImage) {
         let mut state = self.state.write().unwrap();
         if let Some(scanner) = &mut state.scanner {
@@ -660,8 +702,8 @@ impl Widget for &PopupWidget {
         match state.mode {
             Mode::Menu => render_menu(area, buf, &mut state),
             Mode::Confirmation => render_confirm_and_sign(area, buf, &mut state),
-            Mode::Transaction => render_transaction(area, buf, &mut state),
-            _ => {}
+            Mode::Transaction | Mode::Update => render_message(area, buf, &mut state),
+            Mode::Hidden => {}
         }
     }
 }
@@ -895,7 +937,7 @@ fn render_password_sign(details: Paragraph, area: Rect, buf: &mut Buffer, state:
     state.input.as_password().render(sign_area, buf);
 }
 
-fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+fn render_message(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let theme = CONFIG.theme();
     let horizontal = Layout::horizontal([Constraint::Max(56)]);
     let [area] = horizontal.areas(area);
@@ -906,11 +948,11 @@ fn render_transaction(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
         .style(theme.block.main)
         .padding(Padding::proportional(1));
 
-    let spinner_progress = state.spinner.frame();
+    let spinner_progress = state.spinner.status();
 
     let rows = state.options.iter().map(|f| {
         let command = f.get_command();
-        to_row(command, state.mode.clone(), Some(spinner_progress))
+        to_row(command, state.mode.clone(), Some(&spinner_progress))
     });
     let widths = [Constraint::Fill(1), Constraint::Length(7)];
     let table = Table::new(rows, widths)
@@ -937,7 +979,7 @@ pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> 
             Row::new(cols)
         }
         Command::Text(t) => match mode {
-            Mode::Transaction => {
+            Mode::Transaction | Mode::Update => {
                 let cols = vec![
                     Cell::from(Line::from(t.to_string())),
                     Cell::from(

@@ -2,7 +2,6 @@ use crate::bridge::{
     dispatch::dispatch_response_action, RuntimeCaller, RuntimeFetcher, RuntimeProcessor,
 };
 use futures::{stream, stream::StreamExt, Future};
-use log::error;
 use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,
@@ -17,6 +16,7 @@ use suno_config::{CustomConfig, SupportedRuntime};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::error;
 
 /// Default spawner for making asynchronous fetch requests.
 struct DefaultSpawner {

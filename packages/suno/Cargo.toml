@@ -9,7 +9,12 @@ edition.workspace = true
 
 
 [dependencies]
-suno-tui = { path = "../tui" }
-
 color-eyre = { workspace = true }
+suno-config = { path = "../config" }
+suno-error = { path = "../error" }
+suno-tracing = { path = "../tracing" }
+suno-tui = { path = "../tui" }
+suno-update = { path = "../update" }
 tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

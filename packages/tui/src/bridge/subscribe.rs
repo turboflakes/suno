@@ -1,8 +1,8 @@
 use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_events};
 use crate::widgets::chains::Chain;
-use log::{error, info};
 use suno_actions::{network::ConnectionState, Action, ChainAction};
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::{error, info};
 
 /// Background task that subscribes head block and sends response over channel.
 pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {

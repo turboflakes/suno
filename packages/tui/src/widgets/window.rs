@@ -3,11 +3,10 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Clear, Padding, Paragraph, Widget, Wrap},
+    widgets::{Block, Padding, Paragraph, Widget, Wrap},
 };
 use strum::{Display, EnumIter, FromRepr};
 use suno_config::CONFIG;
-use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
 
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
 pub enum Window {
@@ -34,28 +33,6 @@ impl Window {
         }
         let prev_index = current_index.saturating_sub(1);
         Self::from_repr(prev_index).unwrap_or(self)
-    }
-
-    fn render_logs(&self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
-        let block = Block::default()
-            .style(theme.block.main)
-            .padding(Padding::proportional(1));
-
-        Clear.render(area, buf);
-
-        let inner_area = block.inner(area);
-        block.render(area, buf);
-
-        let logger = TuiLoggerWidget::default()
-            .output_separator('|')
-            .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
-            .output_level(Some(TuiLoggerLevelOutput::Long))
-            .output_target(false)
-            .output_file(false)
-            .output_line(false)
-            .style(theme.block.main);
-        logger.render(inner_area, buf);
     }
 
     fn render_help(&self, area: Rect, buf: &mut Buffer) {
@@ -231,10 +208,8 @@ impl Window {
 
 impl Widget for &Window {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        match self {
-            Window::Logs => self.render_logs(area, buf),
-            Window::Help => self.render_help(area, buf),
-            _ => {}
+        if self == &Window::Help {
+            self.render_help(area, buf)
         }
     }
 }

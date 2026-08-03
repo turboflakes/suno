@@ -1,8 +1,8 @@
 use crate::app::AppResult;
-use crate::error::TuiError;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use std::time::Duration;
+use suno_error::Error;
 use tokio::sync::mpsc;
 
 /// Terminal events.
@@ -98,6 +98,6 @@ impl EventHandler {
         self.receiver
             .recv()
             .await
-            .ok_or(TuiError::Other("Event handler error".to_string()))
+            .ok_or(Error::Other("Event handler error".to_string()))
     }
 }

@@ -1,9 +1,9 @@
 use crate::bridge::{custom, sync, RuntimeCaller};
-use crate::error::TuiError;
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsListWidget,
     collators::CollatorsListWidget,
+    logs::LogsState,
     popup::{Mode as PopupMode, PopupWidget},
     validators::ValidatorsListWidget,
     window::Window,
@@ -14,23 +14,26 @@ use crate::{
     tui::Tui,
 };
 use arboard::Clipboard;
-use log::{error, info, warn};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
 use suno_actions::network::ConnectionState;
 use suno_actions::{
     Action, ChainAction, ConfirmationContext, InputAction, NavigationAction, PopupAction,
-    ScannerAction, SystemAction, ThreadAction, TxAction, ValidatorAction,
+    ScannerAction, SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
 use suno_primitives::entry::ToMethod;
 use suno_primitives::{call::Call, display::to_compact_string, Validator};
 use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
+use suno_tracing::LogEntry;
+use suno_update::update;
 use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 use zeroize::Zeroizing;
+
 /// Application result type.
-pub type AppResult<T> = std::result::Result<T, TuiError>;
+pub type AppResult<T> = std::result::Result<T, Error>;
 
 // Constants
 const TICK_RATE: u64 = 250;
@@ -68,23 +71,21 @@ pub struct App {
     pub collators: CollatorsListWidget,
     /// The popup widget.
     pub popup: PopupWidget,
+    /// Logs state.
+    pub logs: LogsState,
     /// Is any sensitive data masked?
     pub masked: bool,
+    /// New version available
+    pub new_version: Option<String>,
     /// The sender to send actions to update the state to the app.
     pub tx: mpsc::UnboundedSender<Action>,
     /// The receiver to handle actions sent from tx.
     pub rx: mpsc::UnboundedReceiver<Action>,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new() -> Self {
+    pub fn new(rx_logs: mpsc::UnboundedReceiver<LogEntry>) -> Self {
         // Define the channel to send actions to update the app state.
         let (tx, rx) = mpsc::unbounded_channel::<Action>();
 
@@ -97,13 +98,16 @@ impl App {
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: PopupWidget::default(),
+            logs: LogsState::new(rx_logs),
             masked: true,
+            new_version: None,
             tx,
             rx,
         }
     }
 
     async fn init(&mut self) {
+        self.check_for_update().await;
         self.chains.on_init().await;
         self.validators.on_init();
         self.collators.on_init();
@@ -119,6 +123,11 @@ impl App {
         self.masked
     }
 
+    pub async fn check_for_update(&mut self) {
+        let new_version = suno_update::check_for_update().await.ok();
+        self.new_version = new_version;
+    }
+
     pub async fn run(&mut self) -> AppResult<()> {
         // Initialize async widgets
         self.init().await;
@@ -131,6 +140,8 @@ impl App {
 
         // Start the main loop.
         while self.running {
+            // Drain tracing events
+            self.logs.update();
             // Render the user interface.
             tui.draw(self)?;
             // Handle events.
@@ -170,6 +181,7 @@ impl App {
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
+                Action::Update(act) => self.handle_update_actions(act),
             }
         }
     }
@@ -177,6 +189,9 @@ impl App {
     fn handle_system_actions(&mut self, action: SystemAction) {
         match action {
             SystemAction::Quit => self.quit(),
+            SystemAction::Update => {
+                let _ = self.tx.send(Action::Update(UpdateAction::Start));
+            }
             SystemAction::Tick => self.tick(),
             SystemAction::Noop => self.noop(),
             SystemAction::Error(err) => error!("{err}"),
@@ -764,9 +779,110 @@ impl App {
         }
     }
 
-    /// Handles application errors.
-    pub fn error(&self, err: Error) {
-        error!("{}", err);
+    fn handle_update_actions(&mut self, action: UpdateAction) {
+        match action {
+            UpdateAction::Start => {
+                self.popup.show_update_status();
+                // Switch app focus to main while rendering transaction status
+                self.focus = Focus::Main;
+
+                let tx = self.tx.clone();
+
+                tokio::spawn(async move {
+                    let res = reqwest::Client::builder()
+                        .user_agent(format!("suno/{}", env!("CARGO_PKG_VERSION")))
+                        .build();
+                    let client = match res {
+                        Ok(client) => client,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::start(&client, None).await;
+                    match res {
+                        Ok(release) => {
+                            let _ = tx.send(Action::Update(UpdateAction::Download(release)));
+                        }
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                        }
+                    }
+                });
+            }
+            UpdateAction::Download(release) => {
+                self.popup
+                    .change_update_status(&format!("downloading {}", release.tag_name()));
+
+                let tx = self.tx.clone();
+
+                tokio::spawn(async move {
+                    let res = reqwest::Client::builder()
+                        .user_agent(format!("suno/{}", env!("CARGO_PKG_VERSION")))
+                        .build();
+                    let client = match res {
+                        Ok(client) => client,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::asset_name_for_platform();
+                    let asset_name = match res {
+                        Ok(asset_name) => asset_name,
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                            return;
+                        }
+                    };
+
+                    let res = update::download(&client, &release, &asset_name).await;
+                    match res {
+                        Ok((bytes, expected_hash)) => {
+                            let _ = tx.send(Action::Update(UpdateAction::Validate(
+                                asset_name,
+                                bytes,
+                                expected_hash,
+                            )));
+                        }
+                        Err(e) => {
+                            error!("{}", e);
+                            let _ = tx.send(Action::Update(UpdateAction::Error));
+                        }
+                    }
+                });
+            }
+            UpdateAction::Validate(asset_name, bytes, expected_hash) => {
+                self.popup.change_update_status("validating");
+
+                if let Err(e) = update::validate(&bytes, &expected_hash) {
+                    error!("{}", e);
+                    let _ = self.tx.send(Action::Update(UpdateAction::Error));
+                    return;
+                }
+
+                if let Err(e) = update::extract_and_replace(&bytes, &asset_name) {
+                    error!("{}", e);
+                    let _ = self.tx.send(Action::Update(UpdateAction::Error));
+                    return;
+                }
+
+                let _ = self.tx.send(Action::Update(UpdateAction::Complete));
+            }
+            UpdateAction::Complete => {
+                self.popup
+                    .show_upgrade_complete("upgrade complete, restart to apply");
+            }
+            UpdateAction::Error => {
+                self.popup.show_upgrade_error();
+            }
+        }
     }
 
     /// Handles the noop event of the terminal.
@@ -964,7 +1080,7 @@ impl App {
         let proxy_account_id = match runtime.signer_account_id().boxed() {
             Ok(address) => address,
             Err(e) => {
-                self.error(e.into());
+                error!("{}", e);
                 return;
             }
         };
@@ -1077,7 +1193,7 @@ impl App {
                     let proxy_account_id = match runtime.signer_account_id().boxed() {
                         Ok(address) => address,
                         Err(e) => {
-                            self.error(e.into());
+                            error!("{}", e);
                             return;
                         }
                     };
@@ -1283,7 +1399,7 @@ impl App {
 
         let result = self
             .popup
-            .execute_with_password(|password| -> Result<(), TuiError> {
+            .execute_with_password(|password| -> AppResult<()> {
                 let password = Zeroizing::new(password.to_string());
 
                 tokio::spawn(async move {
@@ -1379,13 +1495,13 @@ impl App {
             let mut clipboard = match Clipboard::new() {
                 Ok(cb) => cb,
                 Err(e) => {
-                    self.error(e.into());
+                    error!("{}", e);
                     return;
                 }
             };
 
             if let Err(e) = clipboard.set_text(hex_bytes) {
-                self.error(e.into());
+                error!("{}", e);
             }
         }
     }

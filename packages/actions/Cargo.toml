@@ -9,8 +9,10 @@ edition.workspace = true
 
 
 [dependencies]
+bytes = { workspace = true }
 image = { workspace = true }
 sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
 suno-primitives = { path = "../primitives" }
+suno-update = { path = "../update" }

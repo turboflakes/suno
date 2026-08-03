@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::section::Section;
+use crate::widgets::logs::LogsWidget;
 use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -72,7 +72,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Switch between main body window.
     match app.window {
         Window::Main => render_body_widget(app, frame, outer_layout[1]),
-        Window::Logs | Window::Help => {
+        Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
+        Window::Help => {
             frame.render_widget(&app.window, outer_layout[1]);
         }
     }
@@ -88,15 +89,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Display commands legend in footer, aligned right.
     render_legend_widget(app, frame, footer[1]);
 
-    // Render the frame.
-    if app.popup.is_visible() && app.section == Section::Validators {
-        render_validators_popup(app, frame, container[0]);
+    // Render popup if it is visible.
+    if app.popup.is_visible() {
+        render_popup(app, frame, container[0]);
     }
 }
 
-fn render_validators_popup(app: &mut App, frame: &mut Frame, area: Rect) {
+fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
     let area = match &app.popup.get_mode() {
-        PopupMode::Transaction => flex_area(
+        PopupMode::Transaction | PopupMode::Update => flex_area(
             area,
             Constraint::Percentage(100),
             Constraint::Length(3),
@@ -158,6 +159,15 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block_area = block.inner(area);
     frame.render_widget(block, area);
     frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
+}
+
+fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = CONFIG.theme();
+    let block = Block::default()
+        .style(theme.block.main)
+        .padding(Padding::proportional(1));
+    let logs = LogsWidget::new().block(block);
+    frame.render_stateful_widget(logs, area, &mut app.logs);
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -246,6 +256,16 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     legend.push(Span::styled("ctrl+c".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));
     legend.push(Span::styled("quit".to_string(), theme.paragraph.label));
+
+    if let Some(v) = app.new_version.as_deref() {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+u".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled(
+            format!("update to {}", v),
+            theme.paragraph.header,
+        ));
+    }
 
     let footer = Paragraph::new(Line::from(legend))
         .block(block)

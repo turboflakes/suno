@@ -1,11 +1,7 @@
-use log::LevelFilter;
-use tui_logger::{init_logger, set_default_level};
-
 use crate::app::{App, AppResult};
 
 pub mod app;
 mod bridge;
-mod error;
 mod event;
 mod handler;
 mod section;
@@ -14,13 +10,12 @@ mod ui;
 mod utils;
 mod widgets;
 
-pub async fn start() -> AppResult<()> {
-    // Initialize logs
-    init_logger(LevelFilter::Info)?;
-    set_default_level(LevelFilter::Info);
+use suno_tracing::LogEntry;
+use tokio::sync::mpsc;
 
+pub async fn init(rx: mpsc::UnboundedReceiver<LogEntry>) -> AppResult<()> {
     // Create an application.
-    let mut app = App::new();
+    let mut app = App::new(rx);
 
     // Run the application.
     app.run().await?;

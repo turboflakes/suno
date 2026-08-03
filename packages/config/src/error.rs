@@ -25,6 +25,8 @@ pub enum Error {
     SignerNotDefined,
     #[error("Remote execution error: {0}")]
     RemoteExecution(String),
+    #[error("Invalid version: {0}")]
+    InvalidVersion(semver::Error),
     #[error("Other error: {0}")]
     Other(String),
 }

@@ -1,11 +1,11 @@
 use crate::error::Error;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use subxt::utils::AccountId32;
+use tracing::warn;
 
 /// Provides default value for the proxy account file path
 pub fn default_proxy_path() -> &'static str {

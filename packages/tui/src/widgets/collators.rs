@@ -1,5 +1,4 @@
 use crate::widgets::scrollbar::render_scrollbar;
-use log::warn;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
@@ -9,6 +8,7 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use suno_config::{NodeConfig, CONFIG};
 use suno_primitives::Collator;
+use tracing::warn;
 
 #[derive(Debug, Clone, Default)]
 pub struct CollatorsListWidget {
