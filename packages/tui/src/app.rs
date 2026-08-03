@@ -136,7 +136,7 @@ impl App {
                 Ok(version) => {
                     let _ = tx.send(Action::Update(UpdateAction::NewVersionAvailable(version)));
                 }
-                Err(suno_update::Error::AlreadyUpToDate) => return,
+                Err(suno_update::Error::AlreadyUpToDate) => (),
                 Err(e) => error!("{:?}", e),
             }
         });

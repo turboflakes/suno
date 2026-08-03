@@ -45,7 +45,7 @@ pub async fn check_for_update() -> Result<String, Error> {
 
     let release = start(&client, None).await?;
 
-    return Ok(release.tag_name);
+    Ok(release.tag_name)
 }
 
 /// Starts the update process for the given version.
