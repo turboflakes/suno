@@ -220,7 +220,7 @@ impl SupportedRuntime {
             Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => 0,
             Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => 2,
             Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => 42,
-            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 0,
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 42,
             _ => panic!("Unsupported chain"),
         }
     }
