@@ -26,6 +26,7 @@ type BlockHash = H256;
 type Amount = u128;
 type Points = u32;
 type Counter = u32;
+type Version = String;
 
 /// Application actions.
 #[derive(Debug, Clone, PartialEq)]
@@ -179,6 +180,7 @@ pub enum ThreadAction {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UpdateAction {
+    NewVersionAvailable(Version),
     Start,
     Download(Release),
     Validate(AssetName, Bytes, Checksum),

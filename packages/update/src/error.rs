@@ -22,8 +22,6 @@ pub enum Error {
     BinaryNotFound,
     #[error("Unknown format: {0}")]
     UnknownFormat(String),
-    #[error("New version not found")]
-    NewVersionNotFound,
     #[error("Other error: {0}")]
     Other(String),
 }
