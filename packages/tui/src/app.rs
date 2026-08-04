@@ -107,8 +107,7 @@ impl App {
     }
 
     async fn init(&mut self) {
-        self.validators.on_init();
-        self.validators.on_init_from_source().await;
+        self.validators.on_init().await;
         self.chains.on_init().await;
         self.check_for_update();
     }

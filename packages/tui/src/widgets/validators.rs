@@ -402,11 +402,22 @@ impl ValidatorsListWidget {
         }
     }
 
-    pub fn on_init(&self) {
+    pub async fn on_init(&self) {
         let chains = CONFIG.chains();
         for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
+                // Process validators from the chain config.
                 self.process_validators(chain_name, &chain_config.validators);
+                // Fetch validators from the external source, if defined.
+                if let Some(source) = &chain_config.validators_source {
+                    let res = fetch_validators_from_source(source).await;
+                    match res {
+                        Ok(validators) => {
+                            self.process_validators(chain_name, &validators);
+                        }
+                        Err(e) => error!("{:?}", e),
+                    }
+                }
             }
         }
         self.init_table();
@@ -433,23 +444,6 @@ impl ValidatorsListWidget {
                         validator.commands = cmds.clone();
                     }
                     self.add_validator(&validator);
-                }
-            }
-        }
-    }
-
-    pub async fn on_init_from_source(&self) {
-        let chains = CONFIG.chains();
-        for chain in chains.iter() {
-            for (chain_name, chain_config) in chain {
-                if let Some(source) = &chain_config.validators_source {
-                    let res = fetch_validators_from_source(source).await;
-                    match res {
-                        Ok(validators) => {
-                            self.process_validators(chain_name, &validators);
-                        }
-                        Err(e) => error!("{:?}", e),
-                    }
                 }
             }
         }
