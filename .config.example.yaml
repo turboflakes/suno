@@ -26,6 +26,9 @@ chains:
             - name: "Upgrade node binary"
               cmd: /upgrade {version}
               run: "~/update_stable_node.sh {version}"
+      validators_source:
+        url: "https://raw.githubusercontent.com/turboflakes/suno/main/remote_stashes.example"
+        pat: "github_pat_11ABC.."
 
   - asset_hub_polkadot:
       signer:
