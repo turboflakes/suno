@@ -98,23 +98,6 @@ impl Default for Config {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Provider {
-    Github,
-}
-
-impl FromStr for Provider {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "github" => Ok(Provider::Github),
-            _ => Err(Error::UnsupportedProvider(s.to_string())),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct Source {
     /// URL to fetch data from.
     #[serde(default)]
@@ -122,9 +105,6 @@ pub struct Source {
     /// Personal Access Token for the URL.
     #[serde(default)]
     pat: Option<Pat>,
-    /// Personal Access Token provider for the URL.
-    #[serde(default)]
-    pat_provider: Option<Provider>,
 }
 
 impl Source {
@@ -132,16 +112,11 @@ impl Source {
         Self {
             url: String::new(),
             pat: None,
-            pat_provider: None,
         }
     }
 
-    pub fn with(url: String, pat: Option<Pat>, pat_provider: Option<Provider>) -> Self {
-        Self {
-            url,
-            pat,
-            pat_provider,
-        }
+    pub fn with(url: String, pat: Option<Pat>) -> Self {
+        Self { url, pat }
     }
 
     pub fn url(&self) -> &str {
@@ -149,9 +124,6 @@ impl Source {
     }
     pub fn pat(&self) -> &Option<Pat> {
         &self.pat
-    }
-    pub fn pat_provider(&self) -> &Option<Provider> {
-        &self.pat_provider
     }
 }
 
@@ -633,8 +605,8 @@ fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command 
                 ),
         )
         .arg(
-            clap::Arg::new("validators-source-url")
-                .long("validators-source-url")
+            clap::Arg::new("validators-url")
+                .long("validators-url")
                 .short('u')
                 .value_name("URL")
                 .help("Validator source URL for stash addresses."),
@@ -644,14 +616,6 @@ fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command 
                 .long("pat")
                 .value_name("PAT")
                 .help("Personal Access Token for the validators source URL."),
-        )
-        .arg(
-            clap::Arg::new("pat-provider")
-                .long("pat-provider")
-                .value_parser(["github"])
-                .default_value("github")
-                .value_name("PAT SOURCE")
-                .help("Personal Access Token provider for the validators source URL."),
         )
         .arg(
             clap::Arg::new("proxy-account")
@@ -715,21 +679,16 @@ fn get_config() -> Result<Config, Error> {
                 .collect::<Result<Vec<_>, _>>()?;
 
             let url = sub
-                .get_one::<String>("validators-source-url")
+                .get_one::<String>("validators-url")
                 .cloned()
                 .unwrap_or_default();
 
             let pat = sub.get_one::<String>("pat").cloned();
 
-            let pat_provider = sub
-                .get_one::<String>("pat-provider")
-                .map(|s| s.parse::<Provider>())
-                .transpose()?;
-
             let validators_source = if url.is_empty() {
                 None
             } else {
-                Some(Source::with(url, pat, pat_provider))
+                Some(Source::with(url, pat))
             };
 
             let rc_config = ChainConfig::with_validators(validators, validators_source);

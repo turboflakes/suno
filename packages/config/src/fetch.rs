@@ -1,4 +1,4 @@
-use crate::config::{NodeConfig, Provider, Source};
+use crate::config::{NodeConfig, Source};
 use crate::error::Error;
 use reqwest::Client;
 use tracing::info;
@@ -14,10 +14,8 @@ pub async fn fetch_validators_from_source(source: &Source) -> Result<Vec<NodeCon
 
     let mut request = client.get(source.url());
 
-    if let (Some(pat), Some(Provider::Github)) = (source.pat(), source.pat_provider()) {
-        request = request
-            .header("Authorization", format!("token {}", pat))
-            .header("Accept", "application/vnd.github.raw");
+    if let Some(pat) = source.pat() {
+        request = request.header("Authorization", format!("Bearer {}", pat))
     }
 
     let response = request.send().await?.error_for_status()?.text().await?;
