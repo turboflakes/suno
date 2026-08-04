@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
 use suno_theme::Theme;
@@ -28,7 +29,9 @@ lazy_static! {
     };
 }
 
+type Chains = Vec<HashMap<SupportedRuntime, ChainConfig>>;
 type Stash = AccountId32;
+type Pat = String;
 
 /// Provides default value for Themes struct
 fn default_themes() -> Themes {
@@ -57,18 +60,25 @@ pub enum Subcommand {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// CLI subcommand to execute.
     #[serde(default)]
     pub subcommand: Option<Subcommand>,
+    /// Chain configurations.
     #[serde(default)]
-    pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
+    pub chains: Chains,
+    /// Features to enable or disable.
     #[serde(default = "default_features")]
     pub features: Features,
+    /// Signer configuration.
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// Explorer configuration.
     #[serde(default = "default_explorer")]
     pub explorer: Explorer,
+    /// Themes configuration.
     #[serde(default = "default_themes")]
-    themes: Themes,
+    pub themes: Themes,
+    /// Logs configuration.
     #[serde(default = "default_logs")]
     pub logs: Logs,
 }
@@ -88,18 +98,82 @@ impl Default for Config {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Source {
+    /// URL to fetch data from.
+    #[serde(default)]
+    url: String,
+    /// Personal Access Token for the URL.
+    #[serde(default)]
+    pat: Option<Pat>,
+}
+
+impl Source {
+    pub fn new() -> Self {
+        Self {
+            url: String::new(),
+            pat: None,
+        }
+    }
+
+    pub fn with(url: String, pat: Option<Pat>) -> Self {
+        Self { url, pat }
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    pub fn pat(&self) -> &Option<Pat> {
+        &self.pat
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
+    /// RPC URL for the chain.
     #[serde(default)]
     pub rpc_url: String,
+    /// Signer configuration for the chain.
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// Validators stashes for the chain.
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
+    /// Validators stashes source for the chain.
+    #[serde(default)]
+    pub validators_source: Option<Source>,
+    /// Collators for the system chains.
+    /// TODO: To be supported in the future.
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
 }
 
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChainConfig {
+    pub fn new() -> Self {
+        Self {
+            rpc_url: String::new(),
+            signer: None,
+            validators: Vec::new(),
+            validators_source: None,
+            collators: Vec::new(),
+        }
+    }
+
+    pub fn with_validators(validators: Vec<NodeConfig>, validators_source: Option<Source>) -> Self {
+        Self {
+            rpc_url: String::new(),
+            signer: None,
+            validators,
+            validators_source,
+            collators: Vec::new(),
+        }
+    }
+
     pub fn signer_path(&self) -> Option<String> {
         self.signer
             .as_ref()
@@ -196,6 +270,16 @@ pub enum NodeConfig {
         #[serde(default)]
         commands: Option<Vec<CustomCommand>>,
     },
+}
+
+impl FromStr for NodeConfig {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<AccountId32>()
+            .map(NodeConfig::Address)
+            .map_err(|e| Error::InvalidAddress(e.to_string()))
+    }
 }
 
 fn default_enable() -> bool {
@@ -423,6 +507,10 @@ impl Config {
         self.themes.theme()
     }
 
+    pub fn chains(&self) -> &Chains {
+        &self.chains
+    }
+
     pub fn features(&self) -> &Features {
         &self.features
     }
@@ -460,6 +548,22 @@ fn build_cli() -> clap::Command {
                         .help("If given a version argument then `update` command updates the specified version, otherwise installs latest."),
                 ),
         )
+        .subcommand(network_subcommand(
+            "polkadot",
+            "Launch SUNO in light client mode on Polkadot",
+        ))
+        .subcommand(network_subcommand(
+            "kusama",
+            "Launch SUNO in light client mode on Kusama",
+        ))
+        .subcommand(network_subcommand(
+            "paseo",
+            "Launch SUNO in light client mode on Paseo",
+        ))
+        .subcommand(network_subcommand(
+            "westend",
+            "Launch SUNO in light client mode on Westend",
+        ))
         .arg(
             clap::Arg::new("config-path")
                 .short('c')
@@ -469,19 +573,56 @@ fn build_cli() -> clap::Command {
                 .help("Sets a custom config file path."),
         )
         .arg(
-            clap::Arg::new("proxy-path")
+            clap::Arg::new("proxy-account")
                 .short('p')
+                .long("proxy-account")
+                .value_name("PROXY ADDRESS")
+                .help("Sets a global proxy account used by Polkadot Vault."),
+        )
+        .arg(
+            clap::Arg::new("proxy-path")
                 .long("proxy-path")
                 .value_name("FILE")
                 .default_value(default_proxy_path)
                 .help("Sets a global proxy account file path."),
         )
+}
+
+/// Returns a subcommand for a specific network (e.g. `polkadot`, `kusama`).
+fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command {
+    clap::Command::new(name)
+        .about(about)
+        .arg(
+            clap::Arg::new("validators")
+                .long("validators")
+                .short('v')
+                .value_delimiter(',')
+                .num_args(1..)
+                .value_name("STASH ADDRESS")
+                .help(
+                    "Validator stash addresses. \
+                     Specify one or multiple addresses (e.g. stash_1,stash_2,stash_3).",
+                ),
+        )
+        .arg(
+            clap::Arg::new("validators-url")
+                .long("validators-url")
+                .short('u')
+                .value_name("URL")
+                .help("Validator source URL for stash addresses."),
+        )
+        .arg(
+            clap::Arg::new("pat")
+                .long("pat")
+                .value_name("PAT")
+                .help("Personal Access Token for the validators source URL."),
+        )
         .arg(
             clap::Arg::new("proxy-account")
-                .short('a')
                 .long("proxy-account")
-                .value_name("ADDRESS")
-                .help("Sets a global proxy account used by Polkadot Vault."),
+                .short('p')
+                .value_name("PROXY ADDRESS")
+                .help("Proxy account used by Polkadot Vault."),
         )
 }
 
@@ -506,22 +647,6 @@ fn get_config() -> Result<Config, Error> {
     // Read and parse the config file
     let mut config = Config::from_file(config_path)?;
 
-    // Process the subcommand
-    let subcommand = match matches.subcommand() {
-        Some(("update", sub)) => {
-            let version = sub
-                .get_one::<String>("version")
-                .map(|s| validate_semver(s).map(|v| v.to_string()))
-                .transpose()?;
-
-            Some(Subcommand::Update { version })
-        }
-        _ => None,
-    };
-
-    // Add the subcommand to the config
-    config.subcommand = subcommand;
-
     // If not specified in the config file, load the signer proxy path
     // from the CLI, otherwise try to load the default
     if config.signer.is_none() {
@@ -533,6 +658,63 @@ fn get_config() -> Result<Config, Error> {
             config.set_signer_account(account.as_str());
         }
     }
+
+    // Process the subcommand
+    let subcommand = match matches.subcommand() {
+        Some(("update", sub)) => {
+            let version = sub
+                .get_one::<String>("version")
+                .map(|s| validate_semver(s).map(|v| v.to_string()))
+                .transpose()?;
+
+            Some(Subcommand::Update { version })
+        }
+        Some((relay_chain, sub)) => {
+            let runtime = SupportedRuntime::from_str(relay_chain)?;
+
+            let validators = sub
+                .get_many::<String>("validators")
+                .unwrap_or_default()
+                .map(|s| s.parse::<NodeConfig>())
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let url = sub
+                .get_one::<String>("validators-url")
+                .cloned()
+                .unwrap_or_default();
+
+            let pat = sub.get_one::<String>("pat").cloned();
+
+            let validators_source = if url.is_empty() {
+                None
+            } else {
+                Some(Source::with(url, pat))
+            };
+
+            let rc_config = ChainConfig::with_validators(validators, validators_source);
+
+            let mut chains = vec![HashMap::from([(runtime, rc_config)])];
+            for system_chain in runtime.default_system_chains() {
+                chains.push(HashMap::from([(system_chain, ChainConfig::new())]));
+            }
+
+            // Replace the chains in the config with the new chains
+            config.chains = chains;
+
+            let signer = sub
+                .get_one::<String>("proxy-account")
+                .map(|s| Signer::from_address(s))
+                .transpose()?;
+
+            // Replace the signer in the config with the new signer
+            config.signer = signer;
+            None
+        }
+        _ => None,
+    };
+
+    // Add the subcommand to the config
+    config.subcommand = subcommand;
 
     // Validate the theme and set the default if necessary
     if config.themes.active.is_empty() {

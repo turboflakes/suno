@@ -11,6 +11,10 @@ pub enum Error {
     Yaml(#[from] serde_yaml::Error),
     #[error("At least one chain has to be configured [Polkadot, Kusama, Paseo, Westend]")]
     ChainNotAvailable,
+    #[error("Unsupported chain: {0}")]
+    UnsupportedChain(String),
+    #[error("Unsupported provider: {0}")]
+    UnsupportedProvider(String),
     #[error("Theme parsing error: {0}")]
     Theme(#[from] suno_theme::Error),
     #[error("Invalid theme: {0}")]
@@ -27,6 +31,8 @@ pub enum Error {
     RemoteExecution(String),
     #[error("Invalid version: {0}")]
     InvalidVersion(semver::Error),
+    #[error("Reqwest error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
     #[error("Other error: {0}")]
     Other(String),
 }
