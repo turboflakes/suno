@@ -240,6 +240,8 @@ pub struct Features {
     #[serde(default)]
     enable_rpcs: bool,
     #[serde(default = "default_enable")]
+    enable_check_update: bool,
+    #[serde(default = "default_enable")]
     show_nominators_counter: bool,
     #[serde(default = "default_enable")]
     show_nominators_stake: bool,
@@ -259,6 +261,7 @@ impl Default for Features {
             enable_validators: true,
             enable_collators: false,
             enable_rpcs: false,
+            enable_check_update: true,
             show_nominators_counter: true,
             show_nominators_stake: true,
             show_own_stake: true,
@@ -284,6 +287,10 @@ impl Features {
 
     pub fn rpcs_enabled(&self) -> bool {
         self.enable_rpcs
+    }
+
+    pub fn check_update_enabled(&self) -> bool {
+        self.enable_check_update
     }
 
     pub fn nominators_counter_visible(&self) -> bool {

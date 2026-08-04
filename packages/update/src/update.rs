@@ -42,21 +42,16 @@ pub async fn check_for_update() -> Result<String, Error> {
     let client = Client::builder()
         .user_agent(format!("{}/{}", BIN_NAME, env!("CARGO_PKG_VERSION")))
         .build()?;
-    let release = fetch_release(&client, None).await?;
 
-    let current = env!("CARGO_PKG_VERSION");
-    if release.tag_name.trim_start_matches('v') != current {
-        return Ok(release.tag_name);
-    }
+    let release = start(&client, None).await?;
 
-    Err(Error::NewVersionNotFound)
+    Ok(release.tag_name)
 }
 
 /// Starts the update process for the given version.
 pub async fn start(client: &Client, version: Option<&str>) -> Result<Release, Error> {
     // Fetch release metadata
     let release = fetch_release(client, version).await?;
-    info!("✔︎ Found release {}", release.tag_name);
 
     // Check if already up to date
     let current = env!("CARGO_PKG_VERSION");
@@ -64,6 +59,7 @@ pub async fn start(client: &Client, version: Option<&str>) -> Result<Release, Er
         return Err(Error::AlreadyUpToDate);
     }
 
+    info!("✔︎ Available release {}", release.tag_name);
     Ok(release)
 }
 

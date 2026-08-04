@@ -107,7 +107,7 @@ impl App {
     }
 
     async fn init(&mut self) {
-        self.check_for_update().await;
+        self.check_for_update();
         self.chains.on_init().await;
         self.validators.on_init();
         self.collators.on_init();
@@ -123,9 +123,23 @@ impl App {
         self.masked
     }
 
-    pub async fn check_for_update(&mut self) {
-        let new_version = suno_update::check_for_update().await.ok();
-        self.new_version = new_version;
+    pub fn check_for_update(&mut self) {
+        let features = CONFIG.features();
+        if !features.check_update_enabled() {
+            return;
+        }
+
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let res = suno_update::check_for_update().await;
+            match res {
+                Ok(version) => {
+                    let _ = tx.send(Action::Update(UpdateAction::NewVersionAvailable(version)));
+                }
+                Err(suno_update::Error::AlreadyUpToDate) => (),
+                Err(e) => error!("{:?}", e),
+            }
+        });
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
@@ -781,6 +795,9 @@ impl App {
 
     fn handle_update_actions(&mut self, action: UpdateAction) {
         match action {
+            UpdateAction::NewVersionAvailable(version) => {
+                self.new_version = Some(version);
+            }
             UpdateAction::Start => {
                 self.popup.show_update_status();
                 // Switch app focus to main while rendering transaction status
