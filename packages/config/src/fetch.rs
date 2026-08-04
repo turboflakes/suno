@@ -1,23 +1,22 @@
-use crate::config::NodeConfig;
+use crate::config::{NodeConfig, Provider, Source};
 use crate::error::Error;
 use reqwest::Client;
 use tracing::info;
 
+const BIN_NAME: &str = "suno";
+
 /// Fetches validator stashes from a remote URL,
 /// optionally using a GitHub PAT for private repositories.
-pub async fn fetch_validators_from_url(
-    url: &str,
-    github_pat: Option<&str>,
-) -> Result<Vec<NodeConfig>, Error> {
+pub async fn fetch_validators_from_source(source: &Source) -> Result<Vec<NodeConfig>, Error> {
     let client = Client::builder()
-        .user_agent(format!("suno/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("{}/{}", BIN_NAME, env!("CARGO_PKG_VERSION")))
         .build()?;
 
-    let mut request = client.get(url);
+    let mut request = client.get(source.url());
 
-    if let Some(pat) = github_pat {
+    if let (Some(pat), Some(Provider::Github)) = (source.pat(), source.pat_provider()) {
         request = request
-            .header("Authorization", format!("Bearer {}", pat))
+            .header("Authorization", format!("token {}", pat))
             .header("Accept", "application/vnd.github.raw");
     }
 
@@ -29,6 +28,6 @@ pub async fn fetch_validators_from_url(
         .map(|s| s.parse::<NodeConfig>())
         .collect::<Result<Vec<_>, _>>()?;
 
-    info!("{} stashes loaded from {}", v.len(), url);
+    info!("{} stashes loaded from {}", v.len(), source.url());
     Ok(v)
 }

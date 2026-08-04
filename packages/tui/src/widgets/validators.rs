@@ -8,7 +8,7 @@ use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_config::{fetch_validators_from_source, NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
@@ -18,6 +18,7 @@ use suno_primitives::{
     validator::{Validator, ValidatorStatus},
     AccountKey,
 };
+use tracing::error;
 
 type Points = u32;
 type Amount = u128;
@@ -402,35 +403,56 @@ impl ValidatorsListWidget {
     }
 
     pub fn on_init(&self) {
-        let config = CONFIG.clone();
-        for chain in config.chains.iter() {
+        let chains = CONFIG.chains();
+        for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
-                for validator in &chain_config.validators {
-                    match validator {
-                        NodeConfig::Address(stash) => {
-                            let validator = Validator::new(*chain_name, *stash);
-                            self.add_validator(&validator);
+                self.process_validators(chain_name, &chain_config.validators);
+            }
+        }
+        self.init_table();
+    }
+
+    fn process_validators(&self, chain_name: &SupportedRuntime, validators: &[NodeConfig]) {
+        for validator in validators {
+            match validator {
+                NodeConfig::Address(stash) => {
+                    let validator = Validator::new(*chain_name, *stash);
+                    self.add_validator(&validator);
+                }
+                NodeConfig::Detailed {
+                    stash,
+                    host_rpc,
+                    ssh,
+                    commands,
+                    ..
+                } => {
+                    let mut validator = Validator::new(*chain_name, *stash);
+                    validator.host_rpc = host_rpc.clone();
+                    validator.ssh = ssh.clone();
+                    if let Some(cmds) = commands {
+                        validator.commands = cmds.clone();
+                    }
+                    self.add_validator(&validator);
+                }
+            }
+        }
+    }
+
+    pub async fn on_init_from_source(&self) {
+        let chains = CONFIG.chains();
+        for chain in chains.iter() {
+            for (chain_name, chain_config) in chain {
+                if let Some(source) = &chain_config.validators_source {
+                    let res = fetch_validators_from_source(source).await;
+                    match res {
+                        Ok(validators) => {
+                            self.process_validators(chain_name, &validators);
                         }
-                        NodeConfig::Detailed {
-                            stash,
-                            host_rpc,
-                            ssh,
-                            commands,
-                            ..
-                        } => {
-                            let mut validator = Validator::new(*chain_name, *stash);
-                            validator.host_rpc = host_rpc.clone();
-                            validator.ssh = ssh.clone();
-                            if let Some(cmds) = commands {
-                                validator.commands = cmds.clone();
-                            }
-                            self.add_validator(&validator);
-                        }
+                        Err(e) => error!("{:?}", e),
                     }
                 }
             }
         }
-        self.init_table();
     }
 
     fn add_validator(&self, validator: &Validator) {

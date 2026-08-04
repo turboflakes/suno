@@ -13,6 +13,8 @@ pub enum Error {
     ChainNotAvailable,
     #[error("Unsupported chain: {0}")]
     UnsupportedChain(String),
+    #[error("Unsupported provider: {0}")]
+    UnsupportedProvider(String),
     #[error("Theme parsing error: {0}")]
     Theme(#[from] suno_theme::Error),
     #[error("Invalid theme: {0}")]

@@ -29,7 +29,9 @@ lazy_static! {
     };
 }
 
+type Chains = Vec<HashMap<SupportedRuntime, ChainConfig>>;
 type Stash = AccountId32;
+type Pat = String;
 
 /// Provides default value for Themes struct
 fn default_themes() -> Themes {
@@ -58,18 +60,25 @@ pub enum Subcommand {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// CLI subcommand to execute.
     #[serde(default)]
     pub subcommand: Option<Subcommand>,
+    /// Chain configurations.
     #[serde(default)]
-    pub chains: Vec<HashMap<SupportedRuntime, ChainConfig>>,
+    pub chains: Chains,
+    /// Features to enable or disable.
     #[serde(default = "default_features")]
     pub features: Features,
+    /// Signer configuration.
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// Explorer configuration.
     #[serde(default = "default_explorer")]
     pub explorer: Explorer,
+    /// Themes configuration.
     #[serde(default = "default_themes")]
-    themes: Themes,
+    pub themes: Themes,
+    /// Logs configuration.
     #[serde(default = "default_logs")]
     pub logs: Logs,
 }
@@ -89,15 +98,87 @@ impl Default for Config {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Provider {
+    Github,
+}
+
+impl FromStr for Provider {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "github" => Ok(Provider::Github),
+            _ => Err(Error::UnsupportedProvider(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Source {
+    /// URL to fetch data from.
+    #[serde(default)]
+    url: String,
+    /// Personal Access Token for the URL.
+    #[serde(default)]
+    pat: Option<Pat>,
+    /// Personal Access Token provider for the URL.
+    #[serde(default)]
+    pat_provider: Option<Provider>,
+}
+
+impl Source {
+    pub fn new() -> Self {
+        Self {
+            url: String::new(),
+            pat: None,
+            pat_provider: None,
+        }
+    }
+
+    pub fn with(url: String, pat: Option<Pat>, pat_provider: Option<Provider>) -> Self {
+        Self {
+            url,
+            pat,
+            pat_provider,
+        }
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    pub fn pat(&self) -> &Option<Pat> {
+        &self.pat
+    }
+    pub fn pat_provider(&self) -> &Option<Provider> {
+        &self.pat_provider
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
+    /// RPC URL for the chain.
     #[serde(default)]
     pub rpc_url: String,
+    /// Signer configuration for the chain.
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// Validators stashes for the chain.
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
+    /// Validators stashes source for the chain.
+    #[serde(default)]
+    pub validators_source: Option<Source>,
+    /// Collators for the system chains.
+    /// TODO: To be supported in the future.
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
+}
+
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChainConfig {
@@ -106,15 +187,17 @@ impl ChainConfig {
             rpc_url: String::new(),
             signer: None,
             validators: Vec::new(),
+            validators_source: None,
             collators: Vec::new(),
         }
     }
 
-    pub fn with_validators(validators: Vec<NodeConfig>) -> Self {
+    pub fn with_validators(validators: Vec<NodeConfig>, validators_source: Option<Source>) -> Self {
         Self {
             rpc_url: String::new(),
             signer: None,
             validators,
+            validators_source,
             collators: Vec::new(),
         }
     }
@@ -452,6 +535,10 @@ impl Config {
         self.themes.theme()
     }
 
+    pub fn chains(&self) -> &Chains {
+        &self.chains
+    }
+
     pub fn features(&self) -> &Features {
         &self.features
     }
@@ -517,7 +604,7 @@ fn build_cli() -> clap::Command {
             clap::Arg::new("proxy-account")
                 .short('p')
                 .long("proxy-account")
-                .value_name("ADDRESS")
+                .value_name("PROXY ADDRESS")
                 .help("Sets a global proxy account used by Polkadot Vault."),
         )
         .arg(
@@ -539,10 +626,32 @@ fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command 
                 .short('v')
                 .value_delimiter(',')
                 .num_args(1..)
+                .value_name("STASH ADDRESS")
                 .help(
-                    "Validator stash addresses for which `suno` will be applied. \
+                    "Validator stash addresses. \
                      Specify one or multiple addresses (e.g. stash_1,stash_2,stash_3).",
                 ),
+        )
+        .arg(
+            clap::Arg::new("validators-source-url")
+                .long("validators-source-url")
+                .short('u')
+                .value_name("URL")
+                .help("Validator source URL for stash addresses."),
+        )
+        .arg(
+            clap::Arg::new("pat")
+                .long("pat")
+                .value_name("PAT")
+                .help("Personal Access Token for the validators source URL."),
+        )
+        .arg(
+            clap::Arg::new("pat-provider")
+                .long("pat-provider")
+                .value_parser(["github"])
+                .default_value("github")
+                .value_name("PAT SOURCE")
+                .help("Personal Access Token provider for the validators source URL."),
         )
         .arg(
             clap::Arg::new("proxy-account")
@@ -605,7 +714,25 @@ fn get_config() -> Result<Config, Error> {
                 .map(|s| s.parse::<NodeConfig>())
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let rc_config = ChainConfig::with_validators(validators);
+            let url = sub
+                .get_one::<String>("validators-source-url")
+                .cloned()
+                .unwrap_or_default();
+
+            let pat = sub.get_one::<String>("pat").cloned();
+
+            let pat_provider = sub
+                .get_one::<String>("pat-provider")
+                .map(|s| s.parse::<Provider>())
+                .transpose()?;
+
+            let validators_source = if url.is_empty() {
+                None
+            } else {
+                Some(Source::with(url, pat, pat_provider))
+            };
+
+            let rc_config = ChainConfig::with_validators(validators, validators_source);
 
             let mut chains = vec![HashMap::from([(runtime, rc_config)])];
             for system_chain in runtime.default_system_chains() {

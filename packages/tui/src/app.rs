@@ -107,23 +107,17 @@ impl App {
     }
 
     async fn init(&mut self) {
-        self.check_for_update();
-        self.chains.on_init().await;
         self.validators.on_init();
-        self.collators.on_init();
-        // if let Some(chain) = self.chains.get_selected() {
-        //     let tx = self.tx.clone();
-        //     self.validators.on_chain_selected(chain.clone(), tx);
-        //     let tx = self.tx.clone();
-        //     self.collators.on_chain_selected(chain.clone(), tx);
-        // }
+        self.validators.on_init_from_source().await;
+        self.chains.on_init().await;
+        self.check_for_update();
     }
 
     fn is_masked(&self) -> bool {
         self.masked
     }
 
-    pub fn check_for_update(&mut self) {
+    fn check_for_update(&mut self) {
         let features = CONFIG.features();
         if !features.check_update_enabled() {
             return;
