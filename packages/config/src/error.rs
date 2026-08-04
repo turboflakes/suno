@@ -29,6 +29,8 @@ pub enum Error {
     RemoteExecution(String),
     #[error("Invalid version: {0}")]
     InvalidVersion(semver::Error),
+    #[error("Reqwest error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
     #[error("Other error: {0}")]
     Other(String),
 }

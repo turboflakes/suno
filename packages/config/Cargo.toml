@@ -13,6 +13,7 @@ clap = { workspace = true }
 codec = { workspace = true }
 lazy_static = { workspace = true }
 openssh = { workspace = true }
+reqwest = { workspace = true }
 scale-info = { workspace = true }
 self-replace = { workspace = true }
 serde = { workspace = true }

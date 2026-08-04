@@ -7039,6 +7039,7 @@ dependencies = [
  "lazy_static",
  "openssh",
  "parity-scale-codec",
+ "reqwest",
  "scale-info",
  "self-replace",
  "semver",

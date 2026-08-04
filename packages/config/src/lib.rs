@@ -2,6 +2,7 @@ mod access;
 mod config;
 mod custom;
 mod error;
+mod fetch;
 mod runtime;
 mod signer;
 mod substrate;
