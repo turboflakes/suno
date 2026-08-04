@@ -1,10 +1,12 @@
 pub mod babe;
 pub mod balance;
 pub mod call;
+pub mod chain;
 pub mod display;
 pub mod entry;
 pub mod identity;
 pub mod key;
+pub mod network;
 pub mod node_account;
 pub mod proxy;
 pub mod session;
@@ -12,7 +14,9 @@ pub mod staking;
 pub mod storage;
 pub mod tx;
 pub mod validator;
+
 pub use babe::Epoch;
+pub use chain::{BlockHash, BlockNumber, Chain};
 pub use key::AccountKey;
 pub use node_account::{AccountDisplay, Collator, NodeAccount};
 pub use staking::Era;

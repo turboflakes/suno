@@ -22,7 +22,7 @@ use suno_primitives::{
     entry::{Command, Entry, ToDescription},
     session::{Keys, Proof},
     staking::Payee,
-    Validator,
+    Chain, Validator,
 };
 use suno_qrcode::{QrCodeWidget, QrScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
@@ -35,17 +35,6 @@ struct MenuContext {
     era: ActiveEra,
     validator: Option<Validator>,
 }
-
-// #[derive(Clone, PartialEq, Eq)]
-// pub struct ConfirmationContext {
-//     runtime: SupportedRuntime,
-//     spec_version: u32,
-//     proxy_identity: String,
-//     stash_identity: String,
-//     call: Call,
-//     bytes: Vec<u8>,
-//     qr_bytes: Vec<u8>,
-// }
 
 /// Context holds the initialization data for a popup. Carries the heavy, mode-specific
 /// payload only while building the popup; it is not stored in state.
@@ -435,13 +424,17 @@ impl PopupWidget {
             .push(Entry::new(Command::Text("starting update".to_string())));
     }
 
-    pub fn show_commands(&self, active_era: ActiveEra, validator: &Validator) {
+    pub fn show_validator_commands(&self, validator: &Validator, active_era: ActiveEra) {
         let menu = MenuContext {
             era: active_era,
             validator: Some(validator.clone()),
         };
         let ctx = Context::Menu(Box::new(menu));
         self.on_init(ctx);
+    }
+
+    pub fn show_chain_commands(&self, chain: &Chain) {
+        // TODO:
     }
 
     pub fn show_confirm_and_sign(&self, ctx: &ConfirmationContext) {

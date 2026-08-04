@@ -13,167 +13,15 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{lightclient::LightClient, utils::H256, OnlineClient};
-use suno_actions::{network::ConnectionState, Action, SystemAction};
+use suno_actions::{Action, SystemAction};
 use suno_config::{CustomConfig, SupportedRuntime, CONFIG};
-use suno_error::Error;
 use suno_primitives::{
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
-    Epoch, Era,
+    network::ConnectionState,
+    BlockHash, BlockNumber, Chain, Epoch, Era,
 };
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::debug;
-
-type BlockNumber = u64;
-type BlockHash = H256;
-
-#[derive(Debug, Clone)]
-pub struct Chain {
-    // Chain runtime details
-    runtime: SupportedRuntime,
-    // Api client details
-    client: OnlineClient<CustomConfig>,
-    // Best block number
-    best_block: BlockNumber,
-    // Finalized block number
-    finalized_block: BlockNumber,
-    // Finalized block timestamp
-    finalized_block_hash: Option<BlockHash>,
-    // Finalized block timestamp in milliseconds
-    finalized_block_ts: u128,
-    // Era details
-    era: Option<Era>,
-    // Epoch details
-    epoch: Option<Epoch>,
-    // Active validators
-    active_vals: u32,
-    // Total validators
-    total_vals: u32,
-    // Active nominators
-    active_noms: u32,
-    // Total nominators
-    total_noms: u32,
-    // Total staked rate
-    total_staked_pm: Permill,
-    // RPC Connection status
-    state: ConnectionState,
-}
-
-impl Chain {
-    pub fn new(runtime: SupportedRuntime, client: OnlineClient<CustomConfig>) -> Self {
-        Self {
-            runtime,
-            client,
-            best_block: 0,
-            finalized_block: 0,
-            finalized_block_hash: None,
-            finalized_block_ts: 0,
-            era: None,
-            epoch: None,
-            active_vals: 0,
-            total_vals: 0,
-            active_noms: 0,
-            total_noms: 0,
-            total_staked_pm: Permill::zero(),
-            state: ConnectionState::default(),
-        }
-    }
-
-    pub fn key(&self) -> SupportedRuntime {
-        self.runtime
-    }
-
-    pub fn name(&self) -> &str {
-        self.runtime.as_str()
-    }
-
-    pub fn runtime(&self) -> SupportedRuntime {
-        self.runtime
-    }
-
-    pub fn client(&self) -> &OnlineClient<CustomConfig> {
-        &self.client
-    }
-
-    pub fn state(&self) -> &ConnectionState {
-        &self.state
-    }
-
-    pub fn finalized_block(&self) -> u64 {
-        self.finalized_block
-    }
-
-    pub fn era(&self) -> &Option<Era> {
-        &self.era
-    }
-
-    pub fn epoch(&self) -> &Option<Epoch> {
-        &self.epoch
-    }
-
-    pub fn active_validators_count(&self) -> u32 {
-        self.active_vals
-    }
-
-    pub fn total_validators_count(&self) -> u32 {
-        self.total_vals
-    }
-
-    pub fn waiting_validators_count(&self) -> u32 {
-        self.total_vals.saturating_sub(self.active_vals)
-    }
-
-    pub fn active_nominators_count(&self) -> u32 {
-        self.active_noms
-    }
-
-    pub fn total_nominators_count(&self) -> u32 {
-        self.total_noms
-    }
-
-    pub fn waiting_nominators_count(&self) -> u32 {
-        self.total_noms.saturating_sub(self.active_noms)
-    }
-
-    pub fn total_staked_percentage(&self) -> String {
-        let percentage = self.total_staked_pm.deconstruct() as f64 / 10_000.0;
-        format!("{:.1}%", percentage)
-    }
-
-    pub fn block_hash(&self) -> Option<BlockHash> {
-        self.finalized_block_hash
-    }
-
-    pub fn validate_genesis(&mut self) -> Result<(), Error> {
-        if self.client().genesis_hash() != self.runtime.chain_genesis_hash() {
-            let err = Error::Genesis;
-            self.set_state(ConnectionState::Error(err.to_string()));
-            return Err(err);
-        }
-
-        self.set_state(ConnectionState::Validated);
-
-        Ok(())
-    }
-
-    pub fn is_validated(&self) -> bool {
-        matches!(self.state, ConnectionState::Validated)
-    }
-
-    pub fn is_connected(&self) -> bool {
-        matches!(self.state, ConnectionState::Connected)
-    }
-
-    pub fn is_offline(&self) -> bool {
-        matches!(
-            self.state,
-            ConnectionState::Idle | ConnectionState::Reconnecting | ConnectionState::Error(_)
-        )
-    }
-
-    pub fn set_state(&mut self, state: ConnectionState) {
-        self.state = state;
-    }
-}
 
 type ChainKey = SupportedRuntime;
 
@@ -196,8 +44,8 @@ impl ChainsListState {
 
     pub fn set_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            if chain.best_block != block_number {
-                chain.best_block = block_number;
+            if chain.best_block() != block_number {
+                chain.set_best_block(block_number);
                 return true;
             }
         }
@@ -211,13 +59,15 @@ impl ChainsListState {
         block_hash: BlockHash,
     ) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            if chain.finalized_block != block_number {
-                chain.finalized_block = block_number;
-                chain.finalized_block_hash = Some(block_hash);
-                chain.finalized_block_ts = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis();
+            if chain.finalized_block() != block_number {
+                chain.set_finalized_block(block_number);
+                chain.set_finalized_block_hash(Some(block_hash));
+                chain.set_finalized_block_ts(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis(),
+                );
                 return true;
             }
         }
@@ -226,8 +76,8 @@ impl ChainsListState {
 
     pub fn set_connection_state(&mut self, chain_key: &ChainKey, state: ConnectionState) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            if chain.state != state {
-                chain.state = state;
+            if chain.state() != &state {
+                chain.set_state(state);
                 return true;
             }
         }
@@ -236,7 +86,7 @@ impl ChainsListState {
 
     pub fn set_era(&mut self, chain_key: &ChainKey, data: Era) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.era = Some(data);
+            chain.set_era(Some(data));
             return true;
         }
         false
@@ -244,7 +94,7 @@ impl ChainsListState {
 
     pub fn set_epoch(&mut self, chain_key: &ChainKey, data: Epoch) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.epoch = Some(data);
+            chain.set_epoch(Some(data));
             return true;
         }
         false
@@ -252,7 +102,7 @@ impl ChainsListState {
 
     pub fn set_active_vals(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.active_vals = counter;
+            chain.set_active_vals(counter);
             return true;
         }
         false
@@ -260,7 +110,7 @@ impl ChainsListState {
 
     pub fn set_total_vals(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.total_vals = counter;
+            chain.set_total_vals(counter);
             return true;
         }
         false
@@ -268,7 +118,7 @@ impl ChainsListState {
 
     pub fn set_active_noms(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.active_noms = counter;
+            chain.set_active_noms(counter);
             return true;
         }
         false
@@ -276,7 +126,7 @@ impl ChainsListState {
 
     pub fn set_total_noms(&mut self, chain_key: &ChainKey, counter: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.total_noms = counter;
+            chain.set_total_noms(counter);
             return true;
         }
         false
@@ -284,7 +134,7 @@ impl ChainsListState {
 
     pub fn set_total_staked(&mut self, chain_key: &ChainKey, value: Permill) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.total_staked_pm = value;
+            chain.set_total_staked_pm(value);
             return true;
         }
         false
@@ -555,7 +405,21 @@ impl Widget for &ChainsListWidget {
             .set_style(theme.block.pane_header(state.is_active))
             .padding(Padding::symmetric(0, 1));
 
-        let rows = state.chains_iter();
+        let rows = state.chains_iter().map(|chain| {
+            let elapsed = get_elapsed_millis(chain.finalized_block_ts());
+            let progress = create_progress_bar_by_millis(elapsed, 6);
+
+            Row::new(vec![
+                Text::from(""),
+                Text::from(format!("{}{}", chain.state(), chain.runtime())),
+                Text::from(format!("#{}", chain.best_block())).alignment(Alignment::Right),
+                Text::from(format!("#{}", chain.finalized_block())).alignment(Alignment::Right),
+                Text::from(progress.to_string()).alignment(Alignment::Right),
+                Text::from(format_millis(elapsed)).alignment(Alignment::Right),
+                Text::from(""),
+            ])
+        });
+
         let widths = [
             Constraint::Length(1),
             Constraint::Fill(1),
@@ -597,22 +461,5 @@ impl Widget for &ChainsListWidget {
                 render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
             }
         }
-    }
-}
-
-impl From<&Chain> for Row<'_> {
-    fn from(chain: &Chain) -> Self {
-        let elapsed = get_elapsed_millis(chain.finalized_block_ts);
-        let progress = create_progress_bar_by_millis(elapsed, 6);
-
-        Row::new(vec![
-            Text::from(""),
-            Text::from(format!("{}{}", chain.state, chain.runtime)),
-            Text::from(format!("#{}", chain.best_block)).alignment(Alignment::Right),
-            Text::from(format!("#{}", chain.finalized_block)).alignment(Alignment::Right),
-            Text::from(progress.to_string()).alignment(Alignment::Right),
-            Text::from(format_millis(elapsed)).alignment(Alignment::Right),
-            Text::from(""),
-        ])
     }
 }

@@ -1,6 +1,3 @@
-pub mod network;
-
-use crate::network::ConnectionState;
 use bytes::Bytes;
 use image::DynamicImage;
 use sp_arithmetic::Permill;
@@ -11,6 +8,7 @@ use suno_primitives::{
     balance::Balance,
     call::Call,
     identity::Identity,
+    network::ConnectionState,
     proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},

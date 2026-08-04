@@ -16,15 +16,15 @@ use crate::{
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
-use suno_actions::network::ConnectionState;
 use suno_actions::{
     Action, ChainAction, ConfirmationContext, InputAction, NavigationAction, PopupAction,
     ScannerAction, SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
-use suno_primitives::entry::ToMethod;
-use suno_primitives::{call::Call, display::to_compact_string, Validator};
+use suno_primitives::{
+    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, Validator,
+};
 use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
 use suno_tracing::LogEntry;
 use suno_update::update;
@@ -899,7 +899,15 @@ impl App {
     pub fn noop(&self) {}
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
+    pub fn tick(&self) {
+        if self.popup.is_visible() {
+            return;
+        }
+
+        if self.section == Section::Chains {
+            info!("__tick_");
+        }
+    }
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
@@ -1011,7 +1019,20 @@ impl App {
                 return;
             };
 
-            self.popup.show_commands(active_era.index(), &validator);
+            self.popup
+                .show_validator_commands(&validator, active_era.index());
+
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        };
+
+        if self.section == Section::Chains {
+            let Some(chain) = self.chains.get_selected() else {
+                return;
+            };
+
+            self.popup.show_chain_commands(&chain);
+
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         };
