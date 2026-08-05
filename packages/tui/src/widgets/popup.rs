@@ -15,8 +15,8 @@ use ratatui::{
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
-use suno_actions::{ConfirmationContext, ThreadAction};
-use suno_config::CONFIG;
+use suno_actions::{ChainSpecsContext, ConfirmationContext, ThreadAction};
+use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::Call,
     entry::{Command, Entry, ToDescription},
@@ -27,31 +27,39 @@ use suno_primitives::{
 use suno_qrcode::{QrCodeWidget, QrScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
-
 use unicode_width::UnicodeWidthStr;
 
-#[derive(Clone, Default, PartialEq, Eq)]
-struct MenuContext {
+#[derive(Clone, PartialEq, Eq)]
+struct ValidatorContext {
     era: ActiveEra,
-    validator: Option<Validator>,
+    validator: Validator,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct ChainContext {
+    runtime: SupportedRuntime,
 }
 
 /// Context holds the initialization data for a popup. Carries the heavy, mode-specific
 /// payload only while building the popup; it is not stored in state.
 enum Context {
-    Menu(Box<MenuContext>),
+    ValidatorMenu(Box<ValidatorContext>),
+    ChainMenu(Box<ChainContext>),
     Confirmation(Box<ConfirmationContext>),
     Transaction,
     Update,
+    ChainSpecs(Box<ChainSpecsContext>),
 }
 
 impl Context {
     fn mode(&self) -> Mode {
         match self {
-            Context::Menu(_) => Mode::Menu,
+            Context::ValidatorMenu(_) => Mode::Menu,
+            Context::ChainMenu(_) => Mode::Menu,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Transaction => Mode::Transaction,
             Context::Update => Mode::Update,
+            Context::ChainSpecs(_) => Mode::ChainSpecs,
         }
     }
 }
@@ -65,6 +73,7 @@ pub enum Mode {
     Confirmation,
     Transaction,
     Update,
+    ChainSpecs,
 }
 
 #[derive(Clone, Default)]
@@ -195,10 +204,12 @@ impl PopupWidget {
         state.options.clear();
 
         match &context {
-            Context::Menu(ctx) => self.init_menu(&mut state, ctx),
+            Context::ValidatorMenu(ctx) => self.init_validator_menu(&mut state, ctx),
+            Context::ChainMenu(ctx) => self.init_chain_menu(&mut state, ctx),
             Context::Confirmation(ctx) => self.init_confirmation(&mut state, ctx),
             Context::Transaction => self.init_transaction(&mut state),
             Context::Update => self.init_update(&mut state),
+            Context::ChainSpecs(ctx) => self.init_chain_specs_qrcode(&mut state, ctx),
         }
 
         state.mode = context.mode();
@@ -209,38 +220,33 @@ impl PopupWidget {
         // TODO: Set chain state to error
     }
 
-    fn init_menu(&self, state: &mut PopupState, context: &MenuContext) {
-        let active_era = context.era;
-
-        let Some(validator) = &context.validator else {
-            return;
-        };
-
-        if !validator.is_proxy_valid() && !validator.is_commands_available() {
+    fn init_validator_menu(&self, state: &mut PopupState, ctx: &ValidatorContext) {
+        // If the validator is not a proxy or has no commands, do not show the menu.
+        if !ctx.validator.is_proxy_valid() && !ctx.validator.is_commands_available() {
             return;
         }
 
         // Set pop-up title as the validator selected
-        state.title = Some(validator.display_identity());
+        state.title = Some(ctx.validator.display_identity());
 
-        let runtime = validator.runtime().asset_hub_runtime();
+        let runtime = ctx.validator.runtime().asset_hub_runtime();
 
         // Reset the input field to command mode and set metadata.
         let unit = runtime.token_symbol();
         let decimals = runtime.token_decimals();
         let metadata = InputFieldMetadata::new(unit, decimals)
-            .with_custom_commands(validator.commands.clone());
+            .with_custom_commands(ctx.validator.commands.clone());
         state.input.reset_as_command(Some(metadata));
 
         // For each supported proxy, push the respective calls depending on the validator's status.
-        validator.proxies.iter().for_each(|p| {
+        ctx.validator.proxies.iter().for_each(|p| {
             // NOTE: Bonding calls are only available if validator status is unknown.
             let bond = Call::Bond {
                 amount: 0,
                 payee: Payee::default(),
-                max: Some(validator.free_balance_extended(4)),
+                max: Some(ctx.validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond) && validator.is_unknown() {
+            if p.proxy().can_call(&bond) && ctx.validator.is_unknown() {
                 state.options.push(Entry::new(Command::Instruction {
                     call: bond,
                     bytes: None,
@@ -249,11 +255,11 @@ impl PopupWidget {
 
             let bond_extra = Call::BondExtra {
                 amount: 0,
-                max: Some(validator.free_balance_extended(4)),
+                max: Some(ctx.validator.free_balance_extended(4)),
             };
             if p.proxy().can_call(&bond_extra)
-                && validator.is_active_or_waiting()
-                && validator.free_balance() > 0
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.free_balance() > 0
             {
                 state.options.push(Entry::new(Command::Instruction {
                     call: bond_extra,
@@ -263,11 +269,11 @@ impl PopupWidget {
 
             let unbond = Call::Unbond {
                 amount: 0,
-                max: Some(validator.bounded_extended(4)),
+                max: Some(ctx.validator.bounded_extended(4)),
             };
             if p.proxy().can_call(&unbond)
-                && validator.is_active_or_waiting()
-                && validator.bounded() > 0
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.bounded() > 0
             {
                 state.options.push(Entry::new(Command::Instruction {
                     call: unbond,
@@ -277,11 +283,11 @@ impl PopupWidget {
 
             let rebond = Call::Rebond {
                 amount: 0,
-                max: Some(validator.unlocking_extended(active_era, 4)),
+                max: Some(ctx.validator.unlocking_extended(ctx.era, 4)),
             };
             if p.proxy().can_call(&rebond)
-                && validator.is_active_or_waiting()
-                && validator.unlocking(active_era) > 0
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.unlocking(ctx.era) > 0
             {
                 state.options.push(Entry::new(Command::Instruction {
                     call: rebond,
@@ -290,11 +296,11 @@ impl PopupWidget {
             }
 
             let withdraw = Call::WithdrawUnbonded {
-                max: Some(validator.unlocked_extended(active_era, 4)),
+                max: Some(ctx.validator.unlocked_extended(ctx.era, 4)),
             };
             if p.proxy().can_call(&withdraw)
-                && validator.is_active_or_waiting()
-                && validator.unlocked(active_era) > 0
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.unlocked(ctx.era) > 0
             {
                 state.options.push(Entry::new(Command::Instruction {
                     call: withdraw,
@@ -305,7 +311,7 @@ impl PopupWidget {
             let set_payee = Call::SetPayee {
                 payee: Payee::default(),
             };
-            if p.proxy().can_call(&set_payee) && validator.is_active_or_waiting() {
+            if p.proxy().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
                 state.options.push(Entry::new(Command::Instruction {
                     call: set_payee,
                     bytes: None,
@@ -325,7 +331,7 @@ impl PopupWidget {
             }
 
             let chill = Call::Chill;
-            if p.proxy().can_call(&chill) && validator.is_active_or_waiting() {
+            if p.proxy().can_call(&chill) && ctx.validator.is_active_or_waiting() {
                 state.options.push(Entry::new(Command::Instruction {
                     call: chill,
                     bytes: None,
@@ -336,7 +342,7 @@ impl PopupWidget {
                 keys: Keys::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_keys) && validator.is_active_or_waiting() {
+            if p.proxy().can_call(&set_keys) && ctx.validator.is_active_or_waiting() {
                 state.options.push(Entry::new(Command::Instruction {
                     call: set_keys,
                     bytes: None,
@@ -345,8 +351,8 @@ impl PopupWidget {
 
             let purge_keys = Call::PurgeKeys;
             if p.proxy().can_call(&purge_keys)
-                && validator.is_active_or_waiting()
-                && validator.has_keys()
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.has_keys()
             {
                 state.options.push(Entry::new(Command::Instruction {
                     call: purge_keys,
@@ -356,12 +362,12 @@ impl PopupWidget {
         });
 
         // Set pop-up label as configured host, if custom commands are defined
-        if !validator.commands.is_empty() {
-            state.label = Some(validator.host(state.is_masked()));
+        if !ctx.validator.commands.is_empty() {
+            state.label = Some(ctx.validator.host(state.is_masked()));
         }
 
         // For each custom commands, push the respective calls depending on the validator's status.
-        validator.commands.iter().for_each(|c| {
+        ctx.validator.commands.iter().for_each(|c| {
             state.options.push(Entry::new(Command::Instruction {
                 call: Call::Custom(c.clone()),
                 bytes: None,
@@ -374,24 +380,51 @@ impl PopupWidget {
         }
     }
 
-    fn init_confirmation(&self, state: &mut PopupState, context: &ConfirmationContext) {
+    fn init_chain_menu(&self, state: &mut PopupState, ctx: &ChainContext) {
+        // Set pop-up title as the chain selected
+        state.title = Some(format!(
+            "{} NETWORK",
+            ctx.runtime.to_string().to_uppercase()
+        ));
+
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::ChainSpecs {
+                chain_name: ctx.runtime.to_string(),
+            },
+            bytes: None,
+        }));
+
+        state.options.push(Entry::new(Command::Instruction {
+            call: Call::Metadata {
+                chain_name: ctx.runtime.to_string(),
+            },
+            bytes: None,
+        }));
+
+        // Select the first option.
+        if !state.options.is_empty() {
+            state.table_state.select(Some(0));
+        }
+    }
+
+    fn init_confirmation(&self, state: &mut PopupState, ctx: &ConfirmationContext) {
         state.options.push(Entry::new(Command::Text(
-            context.runtime.as_str_long().to_string(),
+            ctx.runtime.as_str_long().to_string(),
         )));
         state
             .options
-            .push(Entry::new(Command::Text(context.spec_version.to_string())));
+            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
         state
             .options
-            .push(Entry::new(Command::Text(context.proxy_identity.clone())));
+            .push(Entry::new(Command::Text(ctx.proxy_identity.clone())));
         state
             .options
-            .push(Entry::new(Command::Text(context.stash_identity.clone())));
+            .push(Entry::new(Command::Text(ctx.stash_identity.clone())));
 
         // Instruction with the previously selected call and respective call_data_bytes
         state.options.push(Entry::new(Command::Instruction {
-            call: context.call.clone(),
-            bytes: Some(context.call_data_bytes.clone()),
+            call: ctx.call.clone(),
+            bytes: Some(ctx.call_data_bytes.clone()),
         }));
 
         // NOTE: Rather than having a specific field to hold the call data bytes,
@@ -400,10 +433,10 @@ impl PopupWidget {
         state.table_state.select(Some(4));
 
         // NOTE: Make QR Data available only if qrcode signing is enabled
-        if context.runtime.is_qrcode_enabled() {
+        if ctx.runtime.is_qrcode_enabled() {
             state
                 .options
-                .push(Entry::new(Command::Data(context.qr_bytes.clone())));
+                .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
         }
 
         // Reset the input field as a password field
@@ -424,21 +457,57 @@ impl PopupWidget {
             .push(Entry::new(Command::Text("starting update".to_string())));
     }
 
+    fn init_chain_specs_qrcode(&self, state: &mut PopupState, ctx: &ChainSpecsContext) {
+        // Chain name
+        state.options.push(Entry::new(Command::Text(
+            ctx.runtime.as_str_long().to_string(),
+        )));
+        // Chain spec version
+        state
+            .options
+            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
+        // Genesis hash
+        state.options.push(Entry::new(Command::Data(
+            ctx.runtime.chain_genesis_hash().0.into(),
+        )));
+        // Address prefix
+        state.options.push(Entry::new(Command::Text(
+            ctx.runtime.account_format().to_string(),
+        )));
+        // Unit
+        state.options.push(Entry::new(Command::Text(
+            ctx.runtime.token_symbol().to_string(),
+        )));
+        // QR Data
+        state
+            .options
+            .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
+    }
+
     pub fn show_validator_commands(&self, validator: &Validator, active_era: ActiveEra) {
-        let menu = MenuContext {
+        let ctx = ValidatorContext {
             era: active_era,
-            validator: Some(validator.clone()),
+            validator: validator.clone(),
         };
-        let ctx = Context::Menu(Box::new(menu));
+        let ctx = Context::ValidatorMenu(Box::new(ctx));
         self.on_init(ctx);
     }
 
     pub fn show_chain_commands(&self, chain: &Chain) {
-        // TODO:
+        let ctx = ChainContext {
+            runtime: chain.runtime().clone(),
+        };
+        let ctx = Context::ChainMenu(Box::new(ctx));
+        self.on_init(ctx);
     }
 
     pub fn show_confirm_and_sign(&self, ctx: &ConfirmationContext) {
         let ctx = Context::Confirmation(Box::new(ctx.clone()));
+        self.on_init(ctx);
+    }
+
+    pub fn show_chain_specs_qrcode(&self, ctx: &ChainSpecsContext) {
+        let ctx = Context::ChainSpecs(Box::new(ctx.clone()));
         self.on_init(ctx);
     }
 
@@ -696,6 +765,7 @@ impl Widget for &PopupWidget {
             Mode::Menu => render_menu(area, buf, &mut state),
             Mode::Confirmation => render_confirm_and_sign(area, buf, &mut state),
             Mode::Transaction | Mode::Update => render_message(area, buf, &mut state),
+            Mode::ChainSpecs => render_chain_specs_qrcode(area, buf, &mut state),
             Mode::Hidden => {}
         }
     }
@@ -858,12 +928,12 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     // Note: The QR code entry is only available if QR code signing is enabled
     // If it's not available, we default to the standard sign mode
     match state.options.get(5) {
-        Some(qr) => render_qr_sign(qr.as_bytes(), details, area, buf, state),
-        None => render_password_sign(details, area, buf, state),
+        Some(qr) => render_transaction_qrcode(qr.as_bytes(), details, area, buf, state),
+        None => render_password_input(details, area, buf, state),
     }
 }
 
-fn render_qr_sign(
+fn render_transaction_qrcode(
     qr_bytes: Vec<u8>,
     details: Paragraph,
     area: Rect,
@@ -873,14 +943,14 @@ fn render_qr_sign(
     let theme = CONFIG.theme();
 
     // Render qrcode
-    let qr_code = QrCodeWidget::new(&qr_bytes);
+    let qrcode = QrCodeWidget::new(&qr_bytes);
 
     // Split the area into header to show transaction details and sign area (password / QR code)
     let [details_area, sign_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Max(7), // Details
-            Constraint::Length(qr_code.height()),
+            Constraint::Length(qrcode.height()),
         ])
         .flex(Flex::End)
         .areas(area);
@@ -898,7 +968,7 @@ fn render_qr_sign(
 
     let block = Block::default().style(theme.qrcode.base);
 
-    qr_code
+    qrcode
         .block(block)
         .set_style(theme.qrcode.base)
         .render(qrcode_area, buf);
@@ -915,7 +985,7 @@ fn render_qr_sign(
     }
 }
 
-fn render_password_sign(details: Paragraph, area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+fn render_password_input(details: Paragraph, area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let [details_area, sign_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -954,6 +1024,93 @@ fn render_message(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     // .row_highlight_style(THEME.table.row_highlight(state.is_visible));
 
     StatefulWidget::render(table, area, buf, &mut state.table_state);
+}
+
+fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let theme = CONFIG.theme();
+
+    let Some(network_entry) = state.options.first() else {
+        return;
+    };
+
+    let Some(spec_version_entry) = state.options.get(1) else {
+        return;
+    };
+
+    let Some(genesis_hash_entry) = state.options.get(2) else {
+        return;
+    };
+
+    let Some(account_format_entry) = state.options.get(3) else {
+        return;
+    };
+
+    let Some(unit_entry) = state.options.get(4) else {
+        return;
+    };
+
+    let Some(qrcode_entry) = state.options.get(5) else {
+        return;
+    };
+
+    let network = Line::from(vec![Span::styled(
+        format!(
+            "{} ({})",
+            network_entry.command(),
+            spec_version_entry.command()
+        ),
+        theme.paragraph.header(true),
+    )])
+    .alignment(Alignment::Right);
+
+    let genesis_hash = Line::from(vec![
+        Span::styled("genesis hash ", theme.paragraph.label_inverse),
+        Span::raw(genesis_hash_entry.to_hex_truncated(16)),
+    ]);
+
+    let account_format = Line::from(vec![
+        Span::styled("address prefix ", theme.paragraph.label_inverse),
+        Span::raw(account_format_entry.command()),
+    ]);
+
+    let unit = Line::from(vec![
+        Span::styled("unit ", theme.paragraph.label_inverse),
+        Span::raw(unit_entry.command()),
+    ]);
+
+    let block = Block::new()
+        .style(theme.block.pane_body)
+        .padding(Padding::proportional(1));
+
+    let details = Paragraph::new(vec![network, genesis_hash, account_format, unit])
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    // Render qrcode
+    let qr_bytes = qrcode_entry.as_bytes();
+    let qrcode = QrCodeWidget::new(&qr_bytes);
+
+    // Split the area into header to chain details QR code
+    let [details_area, qrcode_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(7), // Details
+            Constraint::Length(qrcode.height()),
+        ])
+        .flex(Flex::End)
+        .areas(area);
+
+    Clear.render(details_area, buf);
+    Clear.render(qrcode_area, buf);
+
+    details.render(details_area, buf);
+
+    let block = Block::default().style(theme.qrcode.base);
+
+    qrcode
+        .block(block)
+        .set_style(theme.qrcode.base)
+        .render(qrcode_area, buf);
 }
 
 pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> {

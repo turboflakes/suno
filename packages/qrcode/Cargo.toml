@@ -9,6 +9,7 @@ edition.workspace = true
 
 
 [dependencies]
+codec = { workspace = true }
 hex = { workspace = true }
 image = { workspace = true }
 nokhwa = { workspace = true }

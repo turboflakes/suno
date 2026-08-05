@@ -48,6 +48,14 @@ pub enum Call {
     },
     PurgeKeys,
     Custom(CustomCommand),
+    // Specific chain commands
+    // TODO: These should live in their own enum
+    ChainSpecs {
+        chain_name: String,
+    },
+    Metadata {
+        chain_name: String,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -92,6 +100,12 @@ impl Call {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
+                "chain_specs" => Ok(Self::ChainSpecs {
+                    chain_name: "".to_string(),
+                }),
+                "metadata" => Ok(Self::Metadata {
+                    chain_name: "".to_string(),
+                }),
                 _ => {
                     // Match against custom commands by cmd designation or name
                     custom_commands
@@ -228,6 +242,8 @@ impl std::fmt::Display for Call {
             Self::SetKeys { .. } => write!(f, "set_keys"),
             Self::PurgeKeys => write!(f, "purge_keys"),
             Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
+            Self::ChainSpecs { .. } => write!(f, "chain_specs"),
+            Self::Metadata { .. } => write!(f, "metadata"),
         }
     }
 }
@@ -279,6 +295,12 @@ impl ToDescription for Call {
             }
             Self::PurgeKeys => "Remove all session keys".to_string(),
             Self::Custom(custom) => custom.to_string(),
+            Self::ChainSpecs { chain_name } => {
+                format!("Show chain-specs QR code for the {} network", chain_name)
+            }
+            Self::Metadata { chain_name } => {
+                format!("Show metadata QR code for the {} network", chain_name)
+            }
         }
     }
 }
@@ -302,6 +324,8 @@ impl ToPlaceholder for Call {
             Self::SetKeys { .. } => "set_keys <hex-session-keys> <hex-proof>".to_string(),
             Self::PurgeKeys => "purge_keys".to_string(),
             Self::Custom(custom) => custom.placeholder(),
+            Self::ChainSpecs { .. } => "chain_specs".to_string(),
+            Self::Metadata { .. } => "metadata".to_string(),
         }
     }
 }
@@ -328,6 +352,8 @@ impl ToMethod for Call {
             }
             Self::PurgeKeys => "staking_rc_client.purge_keys".to_string(),
             Self::Custom(custom) => format!("custom.{}", custom.cmd()),
+            Self::ChainSpecs { .. } => "chain_specs".to_string(),
+            Self::Metadata { .. } => "metadata".to_string(),
         }
     }
 }

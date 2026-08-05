@@ -1,8 +1,8 @@
+pub mod build;
 pub mod error;
 pub mod layout;
-pub mod metadata;
 pub mod scanner;
-pub mod tx;
 pub mod widgets;
 
+pub type QrBytes = Vec<u8>;
 pub use widgets::{QrCodeWidget, QrScannerWidget};

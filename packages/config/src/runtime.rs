@@ -360,7 +360,7 @@ impl SupportedRuntime {
         }
     }
 
-    fn chain_name(&self) -> String {
+    pub fn chain_name(&self) -> String {
         self.as_str_long().to_lowercase().replace(' ', "-")
     }
 

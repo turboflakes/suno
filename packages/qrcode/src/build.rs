@@ -2,16 +2,74 @@ use crate::error::{Error, ResultExt};
 use subxt::client::{ClientAtBlock, OnlineClientAtBlockImpl};
 use subxt::ext::codec::{Compact, Encode};
 use subxt::utils::AccountId32;
-use suno_config::CustomConfig;
+use suno_config::{CustomConfig, SupportedRuntime};
+
+#[derive(Encode)]
+#[repr(u8)]
+pub enum Encryption {
+    Ed25519 = 0,
+    Sr25519 = 1,
+    Ecdsa = 2,
+}
+
+/// The UOS spec for `0xc1` (add specs) expects the payload to be
+/// a SCALE-encoded `NetworkSpecsToSend` struct
+#[derive(Encode)]
+struct NetworkSpecsToSend {
+    base58prefix: u16, // e.g. 0
+    color: String,
+    decimals: u8,           // e.g. 10
+    encryption: Encryption, // e.g. Sr25519
+    genesis_hash: [u8; 32],
+    logo: String,
+    name: String,    // e.g. "Polkadot"
+    path_id: String, // e.g. "//polkadot"
+    secondary_color: String,
+    title: String,
+    unit: String, // tokenSymbol = "DOT"
+}
+
+impl NetworkSpecsToSend {
+    fn from_runtime(runtime: SupportedRuntime) -> Self {
+        Self {
+            base58prefix: runtime.account_format(),
+            color: "".to_string(),
+            decimals: runtime.token_decimals() as u8,
+            encryption: Encryption::Sr25519,
+            genesis_hash: runtime.chain_genesis_hash().0,
+            logo: "".to_string(),
+            name: runtime.as_str_long().to_string(), // e.g. "Polkadot"
+            path_id: format!("//{}", runtime.chain_name()), // e.g. "//polkadot"
+            secondary_color: "".to_string(),
+            title: "".to_string(),
+            unit: runtime.token_symbol().to_string(),
+        }
+    }
+}
+
+/// Build a chain-specs QR code according to the UOS spec:
+/// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
+pub fn build_chain_specs_qrcode(runtime: SupportedRuntime) -> Vec<u8> {
+    let chain_specs = NetworkSpecsToSend::from_runtime(runtime);
+    let bytes_encoded = chain_specs.encode();
+
+    let mut content = Vec::new();
+    // 3-byte prelude: Substrate + unsigned + add specs update
+    content.extend_from_slice(&[0x53, 0xff, 0xc1]); // prelude
+    content.extend_from_slice(&bytes_encoded); // SCALE-encoded metadata
+
+    // wrap in single-frame legacy multiframe envelope
+    wrap_single_frame(&content)
+}
 
 /// Build a transaction QR code according to the UOS spec:
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
-pub async fn build_qrcode(
+pub async fn build_transaction_qrcode(
     api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
-    signer: &AccountId32, // signer's account ID
-    bytes: &[u8],         // raw call data bytes
+    signer: &AccountId32,   // signer's account ID
+    call_data_bytes: &[u8], // raw call data bytes
 ) -> Result<Vec<u8>, Error> {
-    let bytes_encoded = bytes.encode();
+    let bytes_encoded = call_data_bytes.encode();
     let genesis_hash = api.genesis_hash().ok_or(Error::GenesisHashNotAvailable)?;
     let extensions = encode_extensions(api, signer, &genesis_hash.0).await?;
     let data = transaction(&signer.0, &bytes_encoded, &extensions, &genesis_hash.0);
