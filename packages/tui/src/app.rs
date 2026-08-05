@@ -28,8 +28,12 @@ use suno_primitives::{
     Validator,
 };
 use suno_qrcode::{
-    build::{build_chain_specs_qrcode, build_transaction_qrcode},
+    build::{
+        build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned,
+        build_transaction_qrcode,
+    },
     scanner::Scanner,
+    NetworkSpecsToSend,
 };
 use suno_tracing::LogEntry;
 use suno_update::update;
@@ -272,8 +276,7 @@ impl App {
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::Error(msg) => {
-                if (self.popup.is_menu_or_confirmation_mode()) && self.popup.invalidate_input(&msg)
-                {
+                if (self.popup.can_close()) && self.popup.invalidate_input(&msg) {
                     self.focus = Focus::Input;
                 }
             }
@@ -1083,9 +1086,13 @@ impl App {
 
     /// Build chain-specs QR code popup
     pub fn build_chain_specs_qrcode_popup(&mut self, chain: &Chain) {
+        let config = CONFIG.clone();
         if !self.popup.is_visible() {
             return;
         }
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
 
         let api = chain.client().clone();
         let runtime = chain.runtime();
@@ -1103,7 +1110,30 @@ impl App {
                 }
             };
 
-            let qr_bytes = build_chain_specs_qrcode(runtime);
+            // Build the QR code payload based on the vault configuration, if available.
+            let qr_bytes = if let Some(vault) = config.vault.as_ref() {
+                let chain_specs = NetworkSpecsToSend::from(runtime);
+                let payload = chain_specs.payload();
+                match vault.sign(&payload) {
+                    Ok((public_key, signature)) => build_chain_specs_qrcode_signed(
+                        &payload,
+                        public_key.as_ref(),
+                        signature.as_ref(),
+                    ),
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to sign chain specs: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                }
+            } else {
+                let chain_specs = NetworkSpecsToSend::from(runtime);
+                let payload = chain_specs.payload();
+                build_chain_specs_qrcode_unsigned(&payload)
+            };
+
             let spec_version = at_block.spec_version();
             let ctx = Box::new(ChainSpecsContext {
                 runtime,
@@ -1150,11 +1180,8 @@ impl App {
                 return;
             };
 
-            match self.popup.get_mode() {
-                PopupMode::Menu => {
-                    self.on_chain_menu_enter(&chain);
-                }
-                _ => {}
+            if self.popup.get_mode() == PopupMode::Menu {
+                self.on_chain_menu_enter(&chain);
             }
         }
     }
@@ -1168,7 +1195,7 @@ impl App {
 
         match call {
             Call::ChainSpecs { .. } => {
-                self.build_chain_specs_qrcode_popup(&chain);
+                self.build_chain_specs_qrcode_popup(chain);
             }
             Call::Metadata { .. } => {
                 // TODO:
@@ -1595,7 +1622,7 @@ impl App {
             return;
         }
 
-        if self.popup.is_menu_or_confirmation_mode() {
+        if self.popup.can_close() {
             self.close_popup();
         }
     }

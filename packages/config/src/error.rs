@@ -9,6 +9,12 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("YAML parsing error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+    #[error("No secret key available")]
+    NoKey,
+    #[error("SecretError error: {0}")]
+    SecretError(#[from] subxt_signer::SecretUriError),
+    #[error("Keypair error: {0}")]
+    KeypairError(#[from] subxt_signer::sr25519::Error),
     #[error("At least one chain has to be configured [Polkadot, Kusama, Paseo, Westend]")]
     ChainNotAvailable,
     #[error("Unsupported chain: {0}")]

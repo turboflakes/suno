@@ -5,4 +5,5 @@ pub mod scanner;
 pub mod widgets;
 
 pub type QrBytes = Vec<u8>;
+pub use build::NetworkSpecsToSend;
 pub use widgets::{QrCodeWidget, QrScannerWidget};

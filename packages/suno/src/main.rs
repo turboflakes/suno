@@ -16,7 +16,7 @@ async fn main() -> Result<(), Error> {
         }
         _ => {
             let (tx, rx) = mpsc::unbounded_channel();
-            suno_tracing::init_tui(tx)?;
+            let _log_guard = suno_tracing::init_tui(tx)?;
             suno_tui::init(rx).await?;
         }
     }

@@ -15,7 +15,7 @@ pub enum Encryption {
 /// The UOS spec for `0xc1` (add specs) expects the payload to be
 /// a SCALE-encoded `NetworkSpecsToSend` struct
 #[derive(Encode)]
-struct NetworkSpecsToSend {
+pub struct NetworkSpecsToSend {
     base58prefix: u16, // e.g. 0
     color: String,
     decimals: u8,           // e.g. 10
@@ -30,16 +30,23 @@ struct NetworkSpecsToSend {
 }
 
 impl NetworkSpecsToSend {
-    fn from_runtime(runtime: SupportedRuntime) -> Self {
+    /// Returns the SCALE-encoded payload for this network specs update.
+    pub fn payload(&self) -> Vec<u8> {
+        self.encode()
+    }
+}
+
+impl From<SupportedRuntime> for NetworkSpecsToSend {
+    fn from(runtime: SupportedRuntime) -> Self {
         Self {
             base58prefix: runtime.account_format(),
             color: "".to_string(),
             decimals: runtime.token_decimals() as u8,
             encryption: Encryption::Sr25519,
-            genesis_hash: runtime.chain_genesis_hash().0,
+            genesis_hash: runtime.chain_genesis_hash().into(),
             logo: "".to_string(),
-            name: runtime.as_str_long().to_string(), // e.g. "Polkadot"
-            path_id: format!("//{}", runtime.chain_name()), // e.g. "//polkadot"
+            name: runtime.as_str_long().to_string(),
+            path_id: format!("//{}", runtime.chain_name()),
             secondary_color: "".to_string(),
             title: "".to_string(),
             unit: runtime.token_symbol().to_string(),
@@ -47,19 +54,28 @@ impl NetworkSpecsToSend {
     }
 }
 
-/// Build a chain-specs QR code according to the UOS spec:
+/// Build a chain-specs signed QR code according to the UOS spec:
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
-pub fn build_chain_specs_qrcode(runtime: SupportedRuntime) -> Vec<u8> {
-    let chain_specs = NetworkSpecsToSend::from_runtime(runtime);
-    let bytes_encoded = chain_specs.encode();
+pub fn build_chain_specs_qrcode_signed(
+    payload: &[u8],
+    public_key: &[u8],
+    signature: &[u8],
+) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&[0x53, 0x01, 0xc1]); // 3-byte prelude: Substrate + Sr25519 + add specs update
+    data.extend_from_slice(public_key); // 32 bytes
+    data.extend_from_slice(&payload.encode()); // SCALE-encoded data
+    data.extend_from_slice(signature); // 64 bytes
+    data
+}
 
-    let mut content = Vec::new();
-    // 3-byte prelude: Substrate + unsigned + add specs update
-    content.extend_from_slice(&[0x53, 0xff, 0xc1]); // prelude
-    content.extend_from_slice(&bytes_encoded); // SCALE-encoded metadata
-
-    // wrap in single-frame legacy multiframe envelope
-    wrap_single_frame(&content)
+/// Build a chain-specs unsigned QR code according to the UOS spec:
+/// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
+pub fn build_chain_specs_qrcode_unsigned(payload: &[u8]) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&[0x53, 0xff, 0xc1]); // 3-byte prelude: Substrate + unsigned + add specs update
+    data.extend_from_slice(&payload.encode()); // SCALE-encoded data
+    data
 }
 
 /// Build a transaction QR code according to the UOS spec:

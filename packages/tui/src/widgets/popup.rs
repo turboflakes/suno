@@ -234,7 +234,9 @@ impl PopupWidget {
         // Reset the input field to command mode and set metadata.
         let unit = runtime.token_symbol();
         let decimals = runtime.token_decimals();
-        let metadata = InputFieldMetadata::new(unit, decimals)
+        let metadata = InputFieldMetadata::new()
+            .with_unit(unit)
+            .with_decimals(decimals)
             .with_custom_commands(ctx.validator.commands.clone());
         state.input.reset_as_command(Some(metadata));
 
@@ -381,6 +383,9 @@ impl PopupWidget {
     }
 
     fn init_chain_menu(&self, state: &mut PopupState, ctx: &ChainContext) {
+        // Reset the input field to command mode. and set metadata.
+        state.input.reset_as_command(None);
+
         // Set pop-up title as the chain selected
         state.title = Some(format!(
             "{} NETWORK",
@@ -571,6 +576,7 @@ impl PopupWidget {
         let mut state = self.state.write().unwrap();
         state.mode = Mode::Hidden;
         state.scanner = None;
+        state.input.clear_focus();
     }
 
     pub fn start_scanner(&self, ctrl: UnboundedSender<ThreadAction>) {
@@ -614,9 +620,12 @@ impl PopupWidget {
         matches!(state.mode, Mode::Menu)
     }
 
-    pub fn is_menu_or_confirmation_mode(&self) -> bool {
+    pub fn can_close(&self) -> bool {
         let state = self.state.read().unwrap();
-        matches!(state.mode, Mode::Menu | Mode::Confirmation)
+        matches!(
+            state.mode,
+            Mode::Menu | Mode::ChainSpecs | Mode::Confirmation
+        )
     }
 
     pub fn is_masked(&self) -> bool {
@@ -1053,19 +1062,24 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
         return;
     };
 
-    let network = Line::from(vec![Span::styled(
-        format!(
-            "{} ({})",
-            network_entry.command(),
-            spec_version_entry.command()
-        ),
+    let title = Line::from(vec![Span::styled(
+        "QR CODE (CHAIN SPECS)",
         theme.paragraph.header(true),
     )])
     .alignment(Alignment::Right);
 
+    let network = Line::from(vec![
+        Span::styled("network ", theme.paragraph.label_inverse),
+        Span::raw(format!(
+            "{}/{}",
+            network_entry.command(),
+            spec_version_entry.command()
+        )),
+    ]);
+
     let genesis_hash = Line::from(vec![
         Span::styled("genesis hash ", theme.paragraph.label_inverse),
-        Span::raw(genesis_hash_entry.to_hex_truncated(16)),
+        Span::raw(genesis_hash_entry.to_hex()),
     ]);
 
     let account_format = Line::from(vec![
@@ -1079,10 +1093,10 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
     ]);
 
     let block = Block::new()
-        .style(theme.block.pane_body)
+        .style(theme.block.pane_header(true))
         .padding(Padding::proportional(1));
 
-    let details = Paragraph::new(vec![network, genesis_hash, account_format, unit])
+    let details = Paragraph::new(vec![title, network, genesis_hash, account_format, unit])
         .block(block)
         .wrap(Wrap { trim: false });
 
