@@ -1,6 +1,7 @@
 use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
+use crate::logs::Logs;
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
@@ -97,7 +98,7 @@ impl Default for Config {
             vault: None,
             explorer: default_explorer(),
             themes: default_themes(),
-            logs: Logs::default(),
+            logs: default_logs(),
         }
     }
 }
@@ -383,30 +384,6 @@ pub struct Explorer {
     url: Option<String>,
 }
 
-fn default_max_entries() -> usize {
-    2000
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Logs {
-    #[serde(default = "default_max_entries")]
-    max_entries: usize,
-}
-
-impl Default for Logs {
-    fn default() -> Self {
-        Self {
-            max_entries: default_max_entries(),
-        }
-    }
-}
-
-impl Logs {
-    pub fn max_entries(&self) -> usize {
-        self.max_entries
-    }
-}
-
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref();
@@ -530,7 +507,11 @@ impl Config {
     }
 
     pub fn logs_max_entries(&self) -> usize {
-        self.logs.max_entries
+        self.logs.max_entries()
+    }
+
+    pub fn logs_file_path(&self) -> Option<&str> {
+        self.logs.file_path()
     }
 }
 

@@ -3,6 +3,7 @@ mod config;
 mod custom;
 mod error;
 mod fetch;
+mod logs;
 mod runtime;
 mod signer;
 mod substrate;

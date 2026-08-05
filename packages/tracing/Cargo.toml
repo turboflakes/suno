@@ -9,7 +9,6 @@ edition.workspace = true
 
 
 [dependencies]
-suno-config = { path = "../config" }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
