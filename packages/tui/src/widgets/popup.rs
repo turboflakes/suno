@@ -500,7 +500,7 @@ impl PopupWidget {
 
     pub fn show_chain_commands(&self, chain: &Chain) {
         let ctx = ChainContext {
-            runtime: chain.runtime().clone(),
+            runtime: chain.runtime(),
         };
         let ctx = Context::ChainMenu(Box::new(ctx));
         self.on_init(ctx);
