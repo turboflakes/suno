@@ -78,6 +78,32 @@ pub fn build_chain_specs_qrcode_unsigned(payload: &[u8]) -> Vec<u8> {
     data
 }
 
+/// Build a metadata signed QR code according to the UOS spec:
+/// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
+pub fn build_metadata_qrcode_signed(
+    payload: &[u8],
+    public_key: &[u8],
+    signature: &[u8],
+) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&[0x53, 0x01, 0x80]); // 3-byte prelude: Substrate + Sr25519 + load metadata update
+    data.extend_from_slice(public_key); // 32 bytes
+    data.extend_from_slice(&payload); // SCALE-encoded data
+    data.extend_from_slice(signature); // 64 bytes
+    data
+}
+
+/// Build a metadata unsigned QR code according to the UOS spec:
+/// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
+pub fn build_metadata_qrcode_unsigned(payload: &[u8], genesis_hash: &[u8; 32]) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&[0x53, 0xff, 0x80]); // 3-byte prelude: Substrate + unsigned + load metadata update
+    data.extend_from_slice(&payload); // SCALE-encoded data
+    data.extend_from_slice(genesis_hash);
+
+    data
+}
+
 /// Build a transaction QR code according to the UOS spec:
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
 pub async fn build_transaction_qrcode(

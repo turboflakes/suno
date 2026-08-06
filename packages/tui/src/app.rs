@@ -1,4 +1,4 @@
-use crate::bridge::{custom, sync, RuntimeCaller};
+use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsListWidget,
@@ -17,9 +17,9 @@ use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
 use suno_actions::{
-    Action, ChainAction, ChainSpecsContext, ConfirmationContext, InputAction, NavigationAction,
-    PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction, UpdateAction,
-    ValidatorAction,
+    Action, ChainAction, ChainSpecsContext, ConfirmationContext, InputAction, MetadataContext,
+    NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction,
+    UpdateAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
@@ -30,7 +30,7 @@ use suno_primitives::{
 use suno_qrcode::{
     build::{
         build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned,
-        build_transaction_qrcode,
+        build_metadata_qrcode_signed, build_metadata_qrcode_unsigned, build_transaction_qrcode,
     },
     scanner::Scanner,
     NetworkSpecsToSend,
@@ -45,7 +45,7 @@ use zeroize::Zeroizing;
 pub type AppResult<T> = std::result::Result<T, Error>;
 
 // Constants
-const TICK_RATE: u64 = 250;
+const TICK_RATE: u64 = 100;
 
 /// Application active focus.
 #[derive(Debug, Clone, Default)]
@@ -237,7 +237,9 @@ impl App {
             PopupAction::ShowChainSpecsQrcode(ctx) => {
                 self.popup.show_chain_specs_qrcode(&ctx);
             }
-
+            PopupAction::ShowMetadataQrcode(ctx) => {
+                self.popup.show_metadata_qrcode(&ctx);
+            }
             PopupAction::Close => self.close_popup(),
             PopupAction::Cancel => self.cancel(),
         }
@@ -912,12 +914,10 @@ impl App {
 
     /// Handles the tick event of the terminal.
     pub fn tick(&self) {
-        if self.popup.is_visible() {
-            return;
-        }
-
         if self.section == Section::Chains {
-            // TODO:
+            if self.popup.get_mode() == PopupMode::Metadata {
+                self.popup.advance_metadata_frame();
+            }
         }
     }
 
@@ -1075,15 +1075,6 @@ impl App {
         }
     }
 
-    /// Open chain-specs QR code popup
-    pub fn open_chain_specs_qrcode_popup(&mut self, ctx: &ChainSpecsContext) {
-        if !self.popup.is_visible() {
-            return;
-        }
-
-        self.popup.show_chain_specs_qrcode(ctx);
-    }
-
     /// Build chain-specs QR code popup
     pub fn build_chain_specs_qrcode_popup(&mut self, chain: &Chain) {
         let config = CONFIG.clone();
@@ -1144,6 +1135,76 @@ impl App {
         });
     }
 
+    /// Build metatada QR code popup
+    pub fn build_metadata_qrcode_popup(&mut self, chain: &Chain) {
+        let config = CONFIG.clone();
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+        let api = chain.client().clone();
+        let runtime = chain.runtime();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            let at_block = match api.at_current_block().await.boxed() {
+                Ok(client) => client,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_current_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let metadata_bytes = match runtime.fetch_metadata(&at_block).await {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to fetch metadata: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let genesis_hash = runtime.chain_genesis_hash();
+
+            // Build the QR code payload based on the vault configuration, if available.
+            let qr_bytes = if let Some(vault) = config.vault.as_ref() {
+                let payload = [metadata_bytes.as_slice(), genesis_hash.as_bytes()].concat();
+                match vault.sign(&payload) {
+                    Ok((public_key, signature)) => build_metadata_qrcode_signed(
+                        &payload,
+                        public_key.as_ref(),
+                        signature.as_ref(),
+                    ),
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to sign chain specs: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                }
+            } else {
+                build_metadata_qrcode_unsigned(&metadata_bytes, &genesis_hash.into())
+            };
+
+            let spec_version = at_block.spec_version();
+            let ctx = Box::new(MetadataContext {
+                runtime,
+                spec_version,
+                qr_bytes,
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowMetadataQrcode(ctx)));
+        });
+    }
+
     /// Close menu popup
     pub fn close_popup(&mut self) {
         if !self.popup.is_visible() {
@@ -1198,7 +1259,7 @@ impl App {
                 self.build_chain_specs_qrcode_popup(chain);
             }
             Call::Metadata { .. } => {
-                // TODO:
+                self.build_metadata_qrcode_popup(chain);
             }
             _ => {}
         }

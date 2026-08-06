@@ -227,7 +227,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
             }
-            PopupMode::ChainSpecs => {
+            PopupMode::ChainSpecs | PopupMode::Metadata => {
                 legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("go back".to_string(), theme.paragraph.label));

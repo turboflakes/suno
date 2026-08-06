@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use subxt::{
+    client::{ClientAtBlock, OnlineClientAtBlockImpl},
     utils::{AccountId32, H256},
     OnlineClient,
 };
@@ -148,6 +149,11 @@ pub trait RuntimeFetcher {
         block_hash: H256,
         stash: &AccountId32,
     ) -> Result<Response, Error>;
+
+    async fn fetch_metadata(
+        &self,
+        api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
+    ) -> Result<Vec<u8>, Error>;
 }
 
 #[async_trait]
@@ -648,6 +654,27 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_balance(api, block_hash, stash).await
             }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_metadata(
+        &self,
+        api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
+    ) -> Result<Vec<u8>, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_metadata(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_metadata(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_metadata(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_metadata(api).await,
+            Runtime::Polkadot => suno_polkadot::fetch_metadata(api).await,
+            Runtime::Kusama => suno_kusama::fetch_metadata(api).await,
+            Runtime::Paseo => suno_paseo::fetch_metadata(api).await,
+            Runtime::Westend => suno_westend::fetch_metadata(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_metadata(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_metadata(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_metadata(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_metadata(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

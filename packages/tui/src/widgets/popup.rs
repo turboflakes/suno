@@ -15,7 +15,7 @@ use ratatui::{
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use std::sync::{Arc, RwLock};
-use suno_actions::{ChainSpecsContext, ConfirmationContext, ThreadAction};
+use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::Call,
@@ -24,7 +24,7 @@ use suno_primitives::{
     staking::Payee,
     Chain, Validator,
 };
-use suno_qrcode::{QrCodeWidget, QrScannerWidget};
+use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, QrScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 use unicode_width::UnicodeWidthStr;
@@ -49,6 +49,7 @@ enum Context {
     Transaction,
     Update,
     ChainSpecs(Box<ChainSpecsContext>),
+    Metadata(Box<MetadataContext>),
 }
 
 impl Context {
@@ -60,6 +61,7 @@ impl Context {
             Context::Transaction => Mode::Transaction,
             Context::Update => Mode::Update,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
+            Context::Metadata(_) => Mode::Metadata,
         }
     }
 }
@@ -74,6 +76,7 @@ pub enum Mode {
     Transaction,
     Update,
     ChainSpecs,
+    Metadata,
 }
 
 #[derive(Clone, Default)]
@@ -114,6 +117,7 @@ pub struct PopupState {
     label: Option<String>,
     scanner: Option<ScannerSession>,
     masked: bool,
+    metadata: Option<MetadataState>,
 }
 
 impl Default for PopupState {
@@ -128,6 +132,7 @@ impl Default for PopupState {
             label: None,
             scanner: None,
             masked: true,
+            metadata: None,
         }
     }
 }
@@ -210,6 +215,7 @@ impl PopupWidget {
             Context::Transaction => self.init_transaction(&mut state),
             Context::Update => self.init_update(&mut state),
             Context::ChainSpecs(ctx) => self.init_chain_specs_qrcode(&mut state, ctx),
+            Context::Metadata(ctx) => self.init_metadata_qrcode(&mut state, ctx),
         }
 
         state.mode = context.mode();
@@ -489,6 +495,24 @@ impl PopupWidget {
             .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
     }
 
+    fn init_metadata_qrcode(&self, state: &mut PopupState, ctx: &MetadataContext) {
+        // Chain name
+        state.options.push(Entry::new(Command::Text(
+            ctx.runtime.as_str_long().to_string(),
+        )));
+        // Chain spec version
+        state
+            .options
+            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
+        // Genesis hash
+        state.options.push(Entry::new(Command::Data(
+            ctx.runtime.chain_genesis_hash().0.into(),
+        )));
+
+        // Set Current Metadata QR Data
+        state.metadata = Some(MetadataState::new(&ctx.qr_bytes));
+    }
+
     pub fn show_validator_commands(&self, validator: &Validator, active_era: ActiveEra) {
         let ctx = ValidatorContext {
             era: active_era,
@@ -516,12 +540,22 @@ impl PopupWidget {
         self.on_init(ctx);
     }
 
+    pub fn show_metadata_qrcode(&self, ctx: &MetadataContext) {
+        let ctx = Context::Metadata(Box::new(ctx.clone()));
+        self.on_init(ctx);
+    }
+
     pub fn show_transaction_status(&self) {
         self.on_init(Context::Transaction);
     }
 
     pub fn show_update_status(&self) {
         self.on_init(Context::Update);
+    }
+
+    pub fn advance_metadata_frame(&self) {
+        let mut state = self.state.write().unwrap();
+        state.metadata.as_mut().map(|m| m.advance_frame());
     }
 
     pub fn is_hidden(&self) -> bool {
@@ -624,7 +658,7 @@ impl PopupWidget {
         let state = self.state.read().unwrap();
         matches!(
             state.mode,
-            Mode::Menu | Mode::ChainSpecs | Mode::Confirmation
+            Mode::Menu | Mode::ChainSpecs | Mode::Metadata | Mode::Confirmation
         )
     }
 
@@ -775,6 +809,7 @@ impl Widget for &PopupWidget {
             Mode::Confirmation => render_confirm_and_sign(area, buf, &mut state),
             Mode::Transaction | Mode::Update => render_message(area, buf, &mut state),
             Mode::ChainSpecs => render_chain_specs_qrcode(area, buf, &mut state),
+            Mode::Metadata => render_metadata_qrcode(area, buf, &mut state),
             Mode::Hidden => {}
         }
     }
@@ -979,7 +1014,7 @@ fn render_transaction_qrcode(
 
     qrcode
         .block(block)
-        .set_style(theme.qrcode.base)
+        .style(theme.qrcode.base)
         .render(qrcode_area, buf);
 
     // Render qrscanner (camera)
@@ -1123,7 +1158,83 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
 
     qrcode
         .block(block)
-        .set_style(theme.qrcode.base)
+        .style(theme.qrcode.base)
+        .render(qrcode_area, buf);
+}
+
+fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
+    let theme = CONFIG.theme();
+
+    let Some(network_entry) = state.options.first() else {
+        return;
+    };
+
+    let Some(spec_version_entry) = state.options.get(1) else {
+        return;
+    };
+
+    let Some(chain_specs_entry) = state.options.get(2) else {
+        return;
+    };
+
+    let Some(metadata_state) = state.metadata.as_ref() else {
+        return;
+    };
+
+    let Some(qrcode) = metadata_state.frame() else {
+        return;
+    };
+
+    let title = Line::from(vec![Span::styled(
+        "QR CODE (METADATA)",
+        theme.paragraph.header(true),
+    )])
+    .alignment(Alignment::Right);
+
+    let network = Line::from(vec![
+        Span::styled("network ", theme.paragraph.label_inverse),
+        Span::raw(format!(
+            "{}/{}",
+            network_entry.command(),
+            spec_version_entry.command()
+        )),
+    ]);
+
+    let genesis_hash = Line::from(vec![
+        Span::styled("genesis_hash ", theme.paragraph.label_inverse),
+        Span::raw(chain_specs_entry.command()),
+    ]);
+
+    let block = Block::new()
+        .style(theme.block.pane_header(true))
+        .padding(Padding::proportional(1));
+
+    let details = Paragraph::new(vec![title, network, genesis_hash])
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    let qrcode = MetadataWidget::new(&qrcode);
+
+    // Split the area into header to chain details QR code
+    let [details_area, qrcode_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Max(7), // Details
+            Constraint::Length(qrcode.height()),
+        ])
+        .flex(Flex::End)
+        .areas(area);
+
+    Clear.render(details_area, buf);
+    Clear.render(qrcode_area, buf);
+
+    details.render(details_area, buf);
+
+    let block = Block::default().style(theme.qrcode.base);
+
+    qrcode
+        .block(block)
+        .style(theme.qrcode.base)
         .render(qrcode_area, buf);
 }
 

@@ -31,7 +31,7 @@ impl<'a> QrCodeWidget<'a> {
         self
     }
 
-    pub fn set_style(mut self, style: Style) -> Self {
+    pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }

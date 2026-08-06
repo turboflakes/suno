@@ -91,10 +91,18 @@ pub struct ChainSpecsContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataContext {
+    pub runtime: SupportedRuntime,
+    pub spec_version: SpecVersion,
+    pub qr_bytes: QrBytes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
     Open,
     ShowConfirmAndSign(Box<ConfirmationContext>),
     ShowChainSpecsQrcode(Box<ChainSpecsContext>),
+    ShowMetadataQrcode(Box<MetadataContext>),
     Close,
     Cancel,
 }

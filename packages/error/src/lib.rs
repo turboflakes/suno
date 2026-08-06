@@ -25,6 +25,10 @@ pub enum Error {
     StorageValue(#[from] Box<subxt::error::StorageValueError>),
     #[error("Constant error: {0}")]
     Constant(#[from] Box<subxt::error::ConstantError>),
+    #[error("RuntimeApi error: {0}")]
+    RuntimeApi(#[from] Box<subxt::error::RuntimeApiError>),
+    #[error("Metadata V14 not available")]
+    MetadataV14,
     #[error("Send error: {0}")]
     Send(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
     #[error("Signer error: {0}")]

@@ -7109,6 +7109,7 @@ dependencies = [
  "suno-error",
  "suno-primitives",
  "suno-signer",
+ "tracing",
 ]
 
 [[package]]
