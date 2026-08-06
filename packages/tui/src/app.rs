@@ -914,10 +914,8 @@ impl App {
 
     /// Handles the tick event of the terminal.
     pub fn tick(&self) {
-        if self.section == Section::Chains {
-            if self.popup.get_mode() == PopupMode::Metadata {
-                self.popup.advance_metadata_frame();
-            }
+        if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
+            self.popup.advance_metadata_frame();
         }
     }
 

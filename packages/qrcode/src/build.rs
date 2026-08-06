@@ -88,7 +88,7 @@ pub fn build_metadata_qrcode_signed(
     let mut data = Vec::new();
     data.extend_from_slice(&[0x53, 0x01, 0x80]); // 3-byte prelude: Substrate + Sr25519 + load metadata update
     data.extend_from_slice(public_key); // 32 bytes
-    data.extend_from_slice(&payload); // SCALE-encoded data
+    data.extend_from_slice(payload); // SCALE-encoded data
     data.extend_from_slice(signature); // 64 bytes
     data
 }
@@ -98,7 +98,7 @@ pub fn build_metadata_qrcode_signed(
 pub fn build_metadata_qrcode_unsigned(payload: &[u8], genesis_hash: &[u8; 32]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&[0x53, 0xff, 0x80]); // 3-byte prelude: Substrate + unsigned + load metadata update
-    data.extend_from_slice(&payload); // SCALE-encoded data
+    data.extend_from_slice(payload); // SCALE-encoded data
     data.extend_from_slice(genesis_hash);
 
     data

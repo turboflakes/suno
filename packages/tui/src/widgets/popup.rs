@@ -555,7 +555,9 @@ impl PopupWidget {
 
     pub fn advance_metadata_frame(&self) {
         let mut state = self.state.write().unwrap();
-        state.metadata.as_mut().map(|m| m.advance_frame());
+        if let Some(m) = state.metadata.as_mut() {
+            m.advance_frame()
+        }
     }
 
     pub fn is_hidden(&self) -> bool {
@@ -1213,7 +1215,7 @@ fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) 
         .block(block)
         .wrap(Wrap { trim: false });
 
-    let qrcode = MetadataWidget::new(&qrcode);
+    let qrcode = MetadataWidget::new(qrcode);
 
     // Split the area into header to chain details QR code
     let [details_area, qrcode_area] = Layout::default()

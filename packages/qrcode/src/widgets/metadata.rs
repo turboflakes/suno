@@ -21,7 +21,7 @@ impl MetadataState {
     pub fn new(payload: &[u8]) -> Self {
         // Build fountain-code packets
         let config = ObjectTransmissionInformation::with_defaults(payload.len() as u64, CHUNK_SIZE);
-        let encoder = Encoder::new(&payload, config);
+        let encoder = Encoder::new(payload, config);
 
         let size = payload.len();
 
