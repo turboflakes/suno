@@ -9,17 +9,15 @@ async fn main() -> Result<(), Error> {
     let config = CONFIG.clone();
     let file_path = config.logs_file_path();
 
-    eprintln!("__{file_path:?}", file_path = file_path);
-
     // Run subcommands or start TUI
     match config.subcommand() {
         Some(Subcommand::Update { version }) => {
-            let _ = suno_tracing::init_cli(file_path)?;
+            let _guard = suno_tracing::init_cli(file_path)?;
             suno_update::run_update(version.as_deref()).await?;
         }
         _ => {
             let (tx, rx) = mpsc::unbounded_channel();
-            let _ = suno_tracing::init_tui(tx, file_path)?;
+            let _guard = suno_tracing::init_tui(tx, file_path)?;
             suno_tui::init(rx).await?;
         }
     }
