@@ -45,8 +45,8 @@ impl From<SupportedRuntime> for NetworkSpecsToSend {
             encryption: Encryption::Sr25519,
             genesis_hash: runtime.chain_genesis_hash().into(),
             logo: "".to_string(),
-            name: runtime.as_str_long().to_string(),
-            path_id: format!("//{}", runtime.chain_name()),
+            name: runtime.legacy_name(),
+            path_id: format!("//{}", runtime.legacy_name()),
             secondary_color: "".to_string(),
             title: "".to_string(),
             unit: runtime.token_symbol().to_string(),
@@ -81,26 +81,38 @@ pub fn build_chain_specs_qrcode_unsigned(payload: &[u8]) -> Vec<u8> {
 /// Build a metadata signed QR code according to the UOS spec:
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
 pub fn build_metadata_qrcode_signed(
-    payload: &[u8],
+    metadata_bytes: &[u8],
+    genesis_hash: &[u8; 32],
     public_key: &[u8],
     signature: &[u8],
 ) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&[0x53, 0x01, 0x80]); // 3-byte prelude: Substrate + Sr25519 + load metadata update
     data.extend_from_slice(public_key); // 32 bytes
-    data.extend_from_slice(payload); // SCALE-encoded data
+    data.extend_from_slice(&metadata_bytes.encode());
+    data.extend_from_slice(genesis_hash);
     data.extend_from_slice(signature); // 64 bytes
     data
 }
 
 /// Build a metadata unsigned QR code according to the UOS spec:
+///
+/// payload is the raw `meta`-prefixed blob returned by `Metadata_metadata_at_version`;
 /// https://github.com/novasamatech/parity-signer/blob/master/docs/src/development/UOS.md
-pub fn build_metadata_qrcode_unsigned(payload: &[u8], genesis_hash: &[u8; 32]) -> Vec<u8> {
+pub fn build_metadata_qrcode_unsigned(metadata_bytes: &[u8], genesis_hash: &[u8; 32]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&[0x53, 0xff, 0x80]); // 3-byte prelude: Substrate + unsigned + load metadata update
-    data.extend_from_slice(payload); // SCALE-encoded data
+    data.extend_from_slice(&metadata_bytes.encode());
     data.extend_from_slice(genesis_hash);
+    data
+}
 
+/// Build the `load_metadata` update content that must be signed and transferred.
+/// The metadata itself is the raw `meta`-prefixed blob returned by
+/// `Metadata_metadata_at_version`; UOS wraps it as a SCALE `Vec<u8>`.
+pub fn build_metadata_payload(metadata_bytes: &[u8], genesis_hash: &[u8; 32]) -> Vec<u8> {
+    let mut data = metadata_bytes.encode();
+    data.extend_from_slice(genesis_hash);
     data
 }
 

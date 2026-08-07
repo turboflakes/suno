@@ -53,7 +53,7 @@ lazy_static = "1.5"
 nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
 qrcodegen = "1.8"
-raptorq = "2.0.1"
+raptorq = "1.8.1"
 ratatui = "0.30.2"
 ratatui-image  = { version = "11.0.6", default-features = false, features = ["image-defaults", "crossterm"] }
 regex = "1.11"

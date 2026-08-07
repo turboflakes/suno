@@ -7,7 +7,6 @@ use ratatui::{
     style::Style,
     widgets::{Block, Widget},
 };
-
 const CHUNK_SIZE: u16 = 768; // bytes per QR frame
 const QUIET: i32 = 4;
 
@@ -25,8 +24,12 @@ impl MetadataState {
 
         let size = payload.len();
 
-        // Calculate the number of repair packets needed based on the payload size
-        let repair_packets = (size / CHUNK_SIZE as usize / 5).max(10) as u32;
+        // Match Polkadot Vault's encoder: one recovery packet per source packet.
+        let repair_packets = if size <= CHUNK_SIZE as usize {
+            0
+        } else {
+            (size / CHUNK_SIZE as usize) as u32
+        };
 
         // Generate QR codes from the packets
         let frames: Vec<QrCode> = encoder
