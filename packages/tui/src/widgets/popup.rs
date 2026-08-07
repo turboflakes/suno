@@ -469,10 +469,13 @@ impl PopupWidget {
     }
 
     fn init_chain_specs_qrcode(&self, state: &mut PopupState, ctx: &ChainSpecsContext) {
-        // Chain name
-        state.options.push(Entry::new(Command::Text(
-            ctx.runtime.as_str_long().to_string(),
-        )));
+        state.title = Some(ctx.runtime.as_str_long().to_string());
+        state.label = Some("chain-specs".to_string());
+
+        // Legacy name
+        state
+            .options
+            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
         // Chain spec version
         state
             .options
@@ -496,10 +499,13 @@ impl PopupWidget {
     }
 
     fn init_metadata_qrcode(&self, state: &mut PopupState, ctx: &MetadataContext) {
-        // Chain name
-        state.options.push(Entry::new(Command::Text(
-            ctx.runtime.as_str_long().to_string(),
-        )));
+        state.title = Some(ctx.runtime.as_str_long().to_string());
+        state.label = Some("metadata".to_string());
+
+        // Legacy name
+        state
+            .options
+            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
         // Chain spec version
         state
             .options
@@ -612,6 +618,9 @@ impl PopupWidget {
         let mut state = self.state.write().unwrap();
         state.mode = Mode::Hidden;
         state.scanner = None;
+        state.title = None;
+        state.label = None;
+        state.metadata = None;
         state.input.clear_focus();
     }
 
@@ -821,9 +830,10 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let theme = CONFIG.theme();
     let options = state.get_options_filtered();
 
+    let mode = state.mode.clone();
     let rows = options.iter().map(|f| {
         let command = f.get_command();
-        to_row(command, state.mode.clone(), None)
+        to_row(command, mode.clone(), None)
     });
 
     // Split the area into top header to show all options, a small central box to show the input field
@@ -1075,7 +1085,7 @@ fn render_message(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let theme = CONFIG.theme();
 
-    let Some(network_entry) = state.options.first() else {
+    let Some(legacy_name_entry) = state.options.first() else {
         return;
     };
 
@@ -1099,17 +1109,21 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
         return;
     };
 
-    let title = Line::from(vec![Span::styled(
-        "QR CODE (CHAIN SPECS)",
-        theme.paragraph.header(true),
-    )])
-    .alignment(Alignment::Right);
+    let mut header_content = vec![];
+    if state.title.is_some() {
+        let title = Span::styled(
+            state.title.as_deref().unwrap_or_default(),
+            theme.paragraph.header(true),
+        );
+        header_content.push(title);
+    }
+    let header = Line::from(header_content).alignment(Alignment::Right);
 
-    let network = Line::from(vec![
-        Span::styled("network ", theme.paragraph.label_inverse),
+    let runtime_version = Line::from(vec![
+        Span::styled("runtime version ", theme.paragraph.label_inverse),
         Span::raw(format!(
             "{}/{}",
-            network_entry.command(),
+            legacy_name_entry.command(),
             spec_version_entry.command()
         )),
     ]);
@@ -1133,9 +1147,15 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
         .style(theme.block.pane_header(true))
         .padding(Padding::proportional(1));
 
-    let details = Paragraph::new(vec![title, network, genesis_hash, account_format, unit])
-        .block(block)
-        .wrap(Wrap { trim: false });
+    let details = Paragraph::new(vec![
+        header,
+        runtime_version,
+        genesis_hash,
+        account_format,
+        unit,
+    ])
+    .block(block)
+    .wrap(Wrap { trim: false });
 
     // Render qrcode
     let qr_bytes = qrcode_entry.as_bytes();
@@ -1166,8 +1186,7 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
 
 fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let theme = CONFIG.theme();
-
-    let Some(network_entry) = state.options.first() else {
+    let Some(legacy_name_entry) = state.options.first() else {
         return;
     };
 
@@ -1175,7 +1194,7 @@ fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) 
         return;
     };
 
-    let Some(chain_specs_entry) = state.options.get(2) else {
+    let Some(genesis_hash_entry) = state.options.get(2) else {
         return;
     };
 
@@ -1187,31 +1206,35 @@ fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) 
         return;
     };
 
-    let title = Line::from(vec![Span::styled(
-        "QR CODE (METADATA)",
-        theme.paragraph.header(true),
-    )])
-    .alignment(Alignment::Right);
+    let mut header_content = vec![];
+    if state.title.is_some() {
+        let title = Span::styled(
+            state.title.as_deref().unwrap_or_default(),
+            theme.paragraph.header(true),
+        );
+        header_content.push(title);
+    }
+    let header = Line::from(header_content).alignment(Alignment::Right);
 
-    let network = Line::from(vec![
-        Span::styled("network ", theme.paragraph.label_inverse),
+    let runtime_version = Line::from(vec![
+        Span::styled("runtime version ", theme.paragraph.label_inverse),
         Span::raw(format!(
             "{}/{}",
-            network_entry.command(),
+            legacy_name_entry.command(),
             spec_version_entry.command()
         )),
     ]);
 
     let genesis_hash = Line::from(vec![
         Span::styled("genesis_hash ", theme.paragraph.label_inverse),
-        Span::raw(chain_specs_entry.command()),
+        Span::raw(genesis_hash_entry.command()),
     ]);
 
     let block = Block::new()
         .style(theme.block.pane_header(true))
         .padding(Padding::proportional(1));
 
-    let details = Paragraph::new(vec![title, network, genesis_hash])
+    let details = Paragraph::new(vec![header, runtime_version, genesis_hash])
         .block(block)
         .wrap(Wrap { trim: false });
 

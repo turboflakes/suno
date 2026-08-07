@@ -29,7 +29,7 @@ use suno_primitives::{
 };
 use suno_qrcode::{
     build::{
-        build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned,
+        build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned, build_metadata_payload,
         build_metadata_qrcode_signed, build_metadata_qrcode_unsigned, build_transaction_qrcode,
     },
     scanner::Scanner,
@@ -1099,7 +1099,7 @@ impl App {
                 }
             };
 
-            // Build the QR code payload based on the vault configuration, if available.
+            // Sign the QR code payload based on the vault configuration, if available.
             let qr_bytes = if let Some(vault) = config.vault.as_ref() {
                 let chain_specs = NetworkSpecsToSend::from(runtime);
                 let payload = chain_specs.payload();
@@ -1172,12 +1172,13 @@ impl App {
 
             let genesis_hash = runtime.chain_genesis_hash();
 
-            // Build the QR code payload based on the vault configuration, if available.
+            // Sign the QR code payload based on the vault configuration, if available.
             let qr_bytes = if let Some(vault) = config.vault.as_ref() {
-                let payload = [metadata_bytes.as_slice(), genesis_hash.as_bytes()].concat();
+                let payload = build_metadata_payload(&metadata_bytes, &genesis_hash.into());
                 match vault.sign(&payload) {
                     Ok((public_key, signature)) => build_metadata_qrcode_signed(
-                        &payload,
+                        &metadata_bytes,
+                        &genesis_hash.into(),
                         public_key.as_ref(),
                         signature.as_ref(),
                     ),

@@ -364,6 +364,15 @@ impl SupportedRuntime {
         self.as_str_long().to_lowercase().replace(' ', "-")
     }
 
+    pub fn legacy_name(&self) -> String {
+        match self {
+            Self::AssetHubPolkadot => "statemint".to_string(),
+            Self::AssetHubKusama => "statemine".to_string(),
+            Self::AssetHubWestend => "westmint".to_string(),
+            _ => self.chain_name(),
+        }
+    }
+
     pub fn log_block_hash_explorer(&self, block_hash: H256) {
         let config = CONFIG.clone();
         let hash = format!("{:#x}", block_hash);
