@@ -9,5 +9,5 @@ pub use build::NetworkSpecsToSend;
 pub use widgets::{
     metadata::{MetadataState, MetadataWidget},
     qrcode::QrCodeWidget,
-    qrscanner::QrScannerWidget,
+    scanner::ScannerWidget,
 };

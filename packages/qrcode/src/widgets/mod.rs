@@ -1,3 +1,3 @@
 pub mod metadata;
 pub mod qrcode;
-pub mod qrscanner;
+pub mod scanner;

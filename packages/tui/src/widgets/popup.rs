@@ -24,7 +24,7 @@ use suno_primitives::{
     staking::Payee,
     Chain, Validator,
 };
-use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, QrScannerWidget};
+use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 use unicode_width::UnicodeWidthStr;
@@ -79,9 +79,20 @@ pub enum Mode {
     Metadata,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct PopupWidget {
     pub state: Arc<RwLock<PopupState>>,
+    picker: Arc<Picker>,
+}
+
+impl Default for PopupWidget {
+    fn default() -> Self {
+        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+        Self {
+            state: Arc::default(),
+            picker: Arc::new(picker),
+        }
+    }
 }
 
 /// Per-session scanner state. Exists only while the popup is showing the scanner.
@@ -89,12 +100,12 @@ pub struct PopupWidget {
 /// thread's receiver and stops it.
 pub struct ScannerSession {
     _ctrl: UnboundedSender<ThreadAction>,
-    _picker: Picker,
+    _picker: Arc<Picker>,
     frame_protocol: Option<StatefulProtocol>,
 }
 
 impl ScannerSession {
-    pub fn new(ctrl: UnboundedSender<ThreadAction>, picker: Picker) -> Self {
+    pub fn new(ctrl: UnboundedSender<ThreadAction>, picker: Arc<Picker>) -> Self {
         Self {
             _ctrl: ctrl,
             _picker: picker,
@@ -626,8 +637,7 @@ impl PopupWidget {
 
     pub fn start_scanner(&self, ctrl: UnboundedSender<ThreadAction>) {
         let mut state = self.state.write().unwrap();
-        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
-        state.scanner = Some(ScannerSession::new(ctrl, picker));
+        state.scanner = Some(ScannerSession::new(ctrl, Arc::clone(&self.picker)));
     }
 
     pub fn get_selected(&self) -> Option<Entry<Call>> {
@@ -1029,11 +1039,11 @@ fn render_transaction_qrcode(
         .style(theme.qrcode.base)
         .render(qrcode_area, buf);
 
-    // Render qrscanner (camera)
+    // Render qrcode scanner (camera)
     if let Some(ref mut scanner) = state.scanner {
         if let Some(ref mut frame) = scanner.frame_protocol {
-            QrScannerWidget::new(frame)
-                .set_title("QR Reader")
+            ScannerWidget::new(frame)
+                .set_title("Scan QR code")
                 .set_title_style(theme.qrcode.title)
                 .set_style(theme.qrcode.scanner)
                 .render(scanner_area, buf);

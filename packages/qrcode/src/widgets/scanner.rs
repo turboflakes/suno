@@ -10,7 +10,7 @@ use ratatui_image::{protocol::StatefulProtocol, FilterType, Resize, StatefulImag
 /// Renders a captured camera frame (a ratatui-image `StatefulProtocol`) fitted
 /// and centered within the render area, over a solid background so the
 /// letterbox margins aren't the terminal's default background.
-pub struct QrScannerWidget<'a> {
+pub struct ScannerWidget<'a> {
     protocol: &'a mut StatefulProtocol,
     block: Option<Block<'a>>,
     title: &'a str,
@@ -19,7 +19,7 @@ pub struct QrScannerWidget<'a> {
     filter: FilterType,
 }
 
-impl<'a> QrScannerWidget<'a> {
+impl<'a> ScannerWidget<'a> {
     pub fn new(protocol: &'a mut StatefulProtocol) -> Self {
         Self {
             protocol,
@@ -62,7 +62,7 @@ impl<'a> QrScannerWidget<'a> {
     }
 }
 
-impl Widget for QrScannerWidget<'_> {
+impl Widget for ScannerWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let inner = match self.block {
             Some(b) => {

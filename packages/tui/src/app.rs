@@ -1297,6 +1297,9 @@ impl App {
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
 
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
         tokio::spawn(async move {
             let at_block = match api.at_current_block().await.boxed() {
                 Ok(client) => client,
