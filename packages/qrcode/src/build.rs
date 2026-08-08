@@ -211,6 +211,24 @@ async fn encode_extensions(
             "CheckGenesis" => {
                 additional_part.extend_from_slice(genesis_hash_bytes);
             }
+            "AuthorizeValueTransfer" => {
+                data.push(0x00); // Option<[u8; 64]>::None
+            }
+            "AsPgas" => {
+                data.push(0x00); // Option<AsPgasInfo>::None
+            }
+            "AsRingAlias" => {
+                data.push(0x00); // Option<AsRingAliasInfo>::None
+            }
+            "AsDotnsGateway" => {
+                data.push(0x00); // Option<AsDotnsGatewayInfo>::None
+            }
+            "AuthorizeCall" => {
+                // no value encoded
+            }
+            "RestrictOrigins" => {
+                data.push(0x01); // bool = true (restricted)
+            }
             _ => {} // CheckNonZeroSender and others have empty ty + additional_signed
         }
     }
