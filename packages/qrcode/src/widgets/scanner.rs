@@ -1,7 +1,7 @@
 use crate::layout::centered_area;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::Style,
     widgets::{Block, Clear, Paragraph, StatefulWidget, Widget},
 };
@@ -79,18 +79,23 @@ impl Widget for ScannerWidget<'_> {
             .size_for(Resize::Fit(Some(self.filter)), inner.as_size());
         let centered = centered_area(inner, fitted.width, fitted.height);
 
-        let [title_area, scanner_area] = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Fill(1)])
-            .areas(centered);
+        // Set the title if it's not empty. Just above the centered image.
+        if !self.title.is_empty() {
+            let title_area = Rect {
+                x: centered.x,
+                y: centered.y.saturating_sub(1),
+                width: centered.width,
+                height: 1,
+            };
 
-        Clear.render(scanner_area, buf);
-        Paragraph::new(self.title)
-            .style(self.title_style)
-            .render(title_area, buf);
+            Paragraph::new(self.title)
+                .style(self.title_style)
+                .render(title_area, buf);
+        }
 
+        Clear.render(centered, buf);
         StatefulImage::new()
             .resize(Resize::Fit(Some(self.filter)))
-            .render(scanner_area, buf, self.protocol);
+            .render(centered, buf, self.protocol);
     }
 }

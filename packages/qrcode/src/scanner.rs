@@ -62,6 +62,7 @@ impl Scanner {
     pub fn scan_frame(&mut self) -> Result<(Option<Vec<u8>>, DynamicImage), Error> {
         let qr = self.capture_square()?;
         let display = qr.thumbnail(DISPLAY_W, DISPLAY_H);
+        let display = display.fliph();
         let data = self.decode(qr);
 
         Ok((data, display))
