@@ -20,7 +20,7 @@ impl std::fmt::Display for ConnectionState {
         match self {
             Self::Idle => write!(f, "◯ "),
             // Self::Connected => write!(f, "●"),
-            Self::Validated => write!(f, "✓ "),
+            Self::Validated => write!(f, "✔︎ "),
             Self::Connected => write!(f, ""),
             Self::Reconnecting => write!(f, "↺ "),
             Self::BestBlockSubcriptionDropped(_) => write!(f, "❗ "),

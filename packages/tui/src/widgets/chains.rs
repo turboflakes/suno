@@ -415,7 +415,7 @@ impl Widget for &ChainsListWidget {
                 Text::from(format!("#{}", chain.best_block())).alignment(Alignment::Right),
                 Text::from(format!("#{}", chain.finalized_block())).alignment(Alignment::Right),
                 Text::from(progress.to_string()).alignment(Alignment::Right),
-                Text::from(format_millis(elapsed)).alignment(Alignment::Right),
+                Text::from(format_millis(elapsed, false)).alignment(Alignment::Right),
                 Text::from(""),
             ])
         });
