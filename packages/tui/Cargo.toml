@@ -7,6 +7,40 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 
+[features]
+default = ["polkadot", "kusama", "paseo", "westend"]
+
+polkadot = [
+    "dep:suno-polkadot",
+    "dep:suno-asset-hub-polkadot",
+    "dep:suno-people-polkadot",
+    "suno-config/polkadot",
+    "suno-primitives/polkadot",
+]
+
+kusama = [
+    "dep:suno-kusama",
+    "dep:suno-asset-hub-kusama",
+    "dep:suno-people-kusama",
+    "suno-config/kusama",
+    "suno-primitives/kusama",
+]
+
+paseo = [
+    "dep:suno-paseo",
+    "dep:suno-asset-hub-paseo",
+    "dep:suno-people-paseo",
+    "suno-config/paseo",
+    "suno-primitives/paseo",
+]
+
+westend = [
+    "dep:suno-westend",
+    "dep:suno-asset-hub-westend",
+    "dep:suno-people-westend",
+    "suno-config/westend",
+    "suno-primitives/westend",
+]
 
 [dependencies]
 arboard = { workspace = true }
@@ -30,26 +64,26 @@ subxt = { workspace = true }
 subxt-rpcs = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../actions" }
-suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
-suno-asset-hub-polkadot = { path = "../chains/asset-hub-polkadot" }
-suno-asset-hub-kusama = { path = "../chains/asset-hub-kusama" }
-suno-asset-hub-westend = { path = "../chains/asset-hub-westend" }
-suno-config = { path = "../config" }
+suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo", optional = true  }
+suno-asset-hub-polkadot = { path = "../chains/asset-hub-polkadot", optional = true  }
+suno-asset-hub-kusama = { path = "../chains/asset-hub-kusama", optional = true  }
+suno-asset-hub-westend = { path = "../chains/asset-hub-westend", optional = true  }
+suno-config = { path = "../config", default-features = false }
 suno-error = { path = "../error" }
 suno-qrcode = { path = "../qrcode" }
-suno-paseo = { path = "../chains/paseo" }
-suno-people-paseo = { path = "../chains/people-paseo" }
-suno-people-polkadot = { path = "../chains/people-polkadot" }
-suno-people-kusama = { path = "../chains/people-kusama" }
-suno-people-westend = { path = "../chains/people-westend" }
-suno-polkadot = { path = "../chains/polkadot" }
+suno-paseo = { path = "../chains/paseo", optional = true  }
+suno-people-paseo = { path = "../chains/people-paseo", optional = true  }
+suno-people-polkadot = { path = "../chains/people-polkadot", optional = true  }
+suno-people-kusama = { path = "../chains/people-kusama", optional = true  }
+suno-people-westend = { path = "../chains/people-westend", optional = true  }
+suno-polkadot = { path = "../chains/polkadot", optional = true  }
 suno-primitives = { path = "../primitives" }
-suno-kusama = { path = "../chains/kusama" }
+suno-kusama = { path = "../chains/kusama", optional = true  }
 suno-signer = { path = "../signer" }
 suno-theme = { path = "../theme" }
 suno-tracing = { path = "../tracing" }
 suno-update = { path = "../update" }
-suno-westend = { path = "../chains/westend" }
+suno-westend = { path = "../chains/westend", optional = true  }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

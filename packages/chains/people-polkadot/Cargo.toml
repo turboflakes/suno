@@ -10,7 +10,7 @@ edition.workspace = true
 [dependencies]
 async-recursion = { workspace = true }
 subxt = { workspace = true }
-suno-config = { path = "../../config" }
+suno-config = { path = "../../config", default-features = false, features = ["polkadot"] }
 suno-error = { path = "../../error" }
 suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }

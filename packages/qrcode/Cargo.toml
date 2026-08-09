@@ -19,5 +19,5 @@ ratatui = { workspace = true }
 ratatui-image = { workspace = true }
 rxing = { workspace = true }
 subxt = { workspace = true }
-suno-config = { path = "../config" }
+suno-config = { path = "../config", default-features = false }
 thiserror = { workspace = true }

@@ -39,15 +39,23 @@ impl RuntimeProcessor for Runtime {
         events: ExtrinsicEvents<CustomConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => suno_polkadot::process_transaction_events(events),
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::process_transaction_events(events),
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::process_transaction_events(events),
+            #[cfg(feature = "westend")]
             Runtime::Westend => suno_westend::process_transaction_events(events),
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::process_transaction_events(events)
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => suno_asset_hub_kusama::process_transaction_events(events),
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::process_transaction_events(events),
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => suno_asset_hub_westend::process_transaction_events(events),
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -60,21 +68,29 @@ impl RuntimeProcessor for Runtime {
         events: Events<CustomConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::process_runtime_events(api, block_hash, events).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::process_runtime_events(api, block_hash, events).await,
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::process_runtime_events(api, block_hash, events).await,
+            #[cfg(feature = "westend")]
             Runtime::Westend => suno_westend::process_runtime_events(api, block_hash, events).await,
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::process_runtime_events(api, block_hash, events).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::process_runtime_events(api, block_hash, events).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::process_runtime_events(api, block_hash, events).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_runtime_events(api, block_hash, events).await
             }
@@ -89,27 +105,35 @@ impl RuntimeProcessor for Runtime {
         extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => {
                 suno_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => {
                 suno_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "westend")]
             Runtime::Westend => {
                 suno_westend::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_block_extrinsics(api, block_hash, extrinsics).await
             }

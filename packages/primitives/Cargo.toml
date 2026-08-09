@@ -7,6 +7,13 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+polkadot = ["suno-config/polkadot"]
+kusama = ["suno-config/kusama"]
+paseo = ["suno-config/paseo"]
+westend = ["suno-config/westend"]
+
 [dependencies]
 hex = { workspace = true }
 ratatui = { workspace = true }
@@ -17,7 +24,7 @@ scale-info = { workspace = true }
 sp-arithmetic = { workspace = true }
 sp-core = { workspace = true }
 subxt = { workspace = true }
-suno-config = { path = "../config" }
+suno-config = { path = "../config", default-features = false }
 time = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

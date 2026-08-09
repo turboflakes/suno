@@ -164,11 +164,15 @@ impl RuntimeFetcher for Runtime {
         block_hash: H256,
     ) -> Result<Response, Error> {
         match &self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_era_data(api, block_hash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_era_data(api, block_hash).await,
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_era_data(api, block_hash).await,
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_era_data(api, block_hash).await
             }
@@ -182,9 +186,13 @@ impl RuntimeFetcher for Runtime {
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => suno_polkadot::fetch_epoch_data(api, block_hash).await,
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::fetch_epoch_data(api, block_hash).await,
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::fetch_epoch_data(api, block_hash).await,
+            #[cfg(feature = "westend")]
             Runtime::Westend => suno_westend::fetch_epoch_data(api, block_hash).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -197,15 +205,19 @@ impl RuntimeFetcher for Runtime {
         era_index: u32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_total_staked(api, block_hash, era_index).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_total_staked(api, block_hash, era_index).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_total_staked(api, block_hash, era_index).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_staked(api, block_hash, era_index).await
             }
@@ -220,18 +232,22 @@ impl RuntimeFetcher for Runtime {
         era_index: u32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_active_validators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_active_validators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_active_validators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_active_validators_count(api, block_hash, era_index)
                     .await
@@ -247,18 +263,22 @@ impl RuntimeFetcher for Runtime {
         era_index: u32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_active_nominators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_active_nominators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_active_nominators_count(api, block_hash, era_index)
                     .await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_active_nominators_count(api, block_hash, era_index)
                     .await
@@ -273,15 +293,19 @@ impl RuntimeFetcher for Runtime {
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_total_validators_count(api, block_hash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_total_validators_count(api, block_hash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_total_validators_count(api, block_hash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_validators_count(api, block_hash).await
             }
@@ -295,15 +319,19 @@ impl RuntimeFetcher for Runtime {
         block_hash: H256,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_total_nominators_count(api, block_hash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_total_nominators_count(api, block_hash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_total_nominators_count(api, block_hash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_total_nominators_count(api, block_hash).await
             }
@@ -319,6 +347,7 @@ impl RuntimeFetcher for Runtime {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validators_era_points(
                     api,
@@ -328,6 +357,7 @@ impl RuntimeFetcher for Runtime {
                 )
                 .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validators_era_points(
                     api,
@@ -337,6 +367,7 @@ impl RuntimeFetcher for Runtime {
                 )
                 .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validators_era_points(
                     api,
@@ -346,6 +377,7 @@ impl RuntimeFetcher for Runtime {
                 )
                 .await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validators_era_points(
                     api,
@@ -366,11 +398,15 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::fetch_validator_points(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::fetch_validator_points(api, block_hash, stash).await,
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::fetch_validator_points(api, block_hash, stash).await,
+            #[cfg(feature = "westend")]
             Runtime::Westend => suno_westend::fetch_validator_points(api, block_hash, stash).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -383,17 +419,21 @@ impl RuntimeFetcher for Runtime {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::fetch_validators_authority_status(api, block_hash, validator_keys)
                     .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => {
                 suno_kusama::fetch_validators_authority_status(api, block_hash, validator_keys)
                     .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => {
                 suno_paseo::fetch_validators_authority_status(api, block_hash, validator_keys).await
             }
+            #[cfg(feature = "westend")]
             Runtime::Westend => {
                 suno_westend::fetch_validators_authority_status(api, block_hash, validator_keys)
                     .await
@@ -409,15 +449,19 @@ impl RuntimeFetcher for Runtime {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::fetch_validators_queued_keys(api, block_hash, validator_keys).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => {
                 suno_kusama::fetch_validators_queued_keys(api, block_hash, validator_keys).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => {
                 suno_paseo::fetch_validators_queued_keys(api, block_hash, validator_keys).await
             }
+            #[cfg(feature = "westend")]
             Runtime::Westend => {
                 suno_westend::fetch_validators_queued_keys(api, block_hash, validator_keys).await
             }
@@ -432,11 +476,15 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => {
                 suno_polkadot::fetch_validator_next_keys(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::fetch_validator_next_keys(api, block_hash, stash).await,
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::fetch_validator_next_keys(api, block_hash, stash).await,
+            #[cfg(feature = "westend")]
             Runtime::Westend => {
                 suno_westend::fetch_validator_next_keys(api, block_hash, stash).await
             }
@@ -452,24 +500,28 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validator_stake_overview(
                     api, block_hash, era_index, stash,
                 )
                 .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validator_stake_overview(
                     api, block_hash, era_index, stash,
                 )
                 .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validator_stake_overview(
                     api, block_hash, era_index, stash,
                 )
                 .await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_stake_overview(
                     api, block_hash, era_index, stash,
@@ -487,16 +539,20 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validator_staking_ledger(api, block_hash, stash)
                     .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_staking_ledger(api, block_hash, stash).await
             }
@@ -512,17 +568,21 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validator_prefs(api, block_hash, era_index, stash)
                     .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validator_prefs(api, block_hash, era_index, stash)
                     .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validator_prefs(api, block_hash, era_index, stash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_prefs(api, block_hash, era_index, stash)
                     .await
@@ -538,15 +598,19 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validator_prefs_next(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validator_prefs_next(api, block_hash, stash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validator_prefs_next(api, block_hash, stash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_prefs_next(api, block_hash, stash).await
             }
@@ -561,15 +625,19 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_validator_payee(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_validator_payee(api, block_hash, stash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_validator_payee(api, block_hash, stash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_validator_payee(api, block_hash, stash).await
             }
@@ -584,13 +652,17 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::PeoplePolkadot => {
                 suno_people_polkadot::fetch_identity(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::PeopleKusama => {
                 suno_people_kusama::fetch_identity(api, block_hash, stash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, block_hash, stash).await,
+            #[cfg(feature = "westend")]
             Runtime::PeopleWestend => {
                 suno_people_westend::fetch_identity(api, block_hash, stash).await
             }
@@ -606,24 +678,28 @@ impl RuntimeFetcher for Runtime {
         proxy: &AccountId32,
     ) -> Result<Vec<Response>, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_and_validate_proxy_account(
                     api, block_hash, stash, proxy,
                 )
                 .await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_and_validate_proxy_account(
                     api, block_hash, stash, proxy,
                 )
                 .await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_and_validate_proxy_account(
                     api, block_hash, stash, proxy,
                 )
                 .await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_and_validate_proxy_account(
                     api, block_hash, stash, proxy,
@@ -642,15 +718,19 @@ impl RuntimeFetcher for Runtime {
         stash: &AccountId32,
     ) -> Result<Response, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_balance(api, block_hash, stash).await
             }
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => {
                 suno_asset_hub_kusama::fetch_balance(api, block_hash, stash).await
             }
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => {
                 suno_asset_hub_paseo::fetch_balance(api, block_hash, stash).await
             }
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_balance(api, block_hash, stash).await
             }
@@ -663,17 +743,29 @@ impl RuntimeFetcher for Runtime {
         api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<u8>, Error> {
         match self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_metadata(api).await,
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_metadata(api).await,
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_metadata(api).await,
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_metadata(api).await,
+            #[cfg(feature = "polkadot")]
             Runtime::Polkadot => suno_polkadot::fetch_metadata(api).await,
+            #[cfg(feature = "kusama")]
             Runtime::Kusama => suno_kusama::fetch_metadata(api).await,
+            #[cfg(feature = "paseo")]
             Runtime::Paseo => suno_paseo::fetch_metadata(api).await,
+            #[cfg(feature = "westend")]
             Runtime::Westend => suno_westend::fetch_metadata(api).await,
+            #[cfg(feature = "polkadot")]
             Runtime::PeoplePolkadot => suno_people_polkadot::fetch_metadata(api).await,
+            #[cfg(feature = "kusama")]
             Runtime::PeopleKusama => suno_people_kusama::fetch_metadata(api).await,
+            #[cfg(feature = "paseo")]
             Runtime::PeoplePaseo => suno_people_paseo::fetch_metadata(api).await,
+            #[cfg(feature = "westend")]
             Runtime::PeopleWestend => suno_people_westend::fetch_metadata(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }

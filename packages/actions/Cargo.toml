@@ -13,6 +13,6 @@ bytes = { workspace = true }
 image = { workspace = true }
 sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
-suno-config = { path = "../config" }
+suno-config = { path = "../config", default-features = false }
 suno-primitives = { path = "../primitives" }
 suno-update = { path = "../update" }

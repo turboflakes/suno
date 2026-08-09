@@ -12,7 +12,7 @@ sp-arithmetic = { workspace = true }
 subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-actions = { path = "../../actions" }
-suno-config = { path = "../../config" }
+suno-config = { path = "../../config", default-features = false, features = ["westend"] }
 suno-error = { path = "../../error" }
 suno-primitives = { path = "../../primitives" }
 thiserror = { workspace = true }

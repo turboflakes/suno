@@ -11,7 +11,7 @@ edition.workspace = true
 arboard = { workspace = true }
 subxt = { workspace = true }
 suno-actions = { path = "../actions" }
-suno-config = { path = "../config" }
+suno-config = { path = "../config", default-features = false }
 suno-primitives = { path = "../primitives" }
 suno-signer = { path = "../signer" }
 suno-tracing = { path = "../tracing" }

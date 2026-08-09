@@ -7,13 +7,19 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 
+[features]
+default = ["polkadot", "kusama", "paseo", "westend"]
+polkadot = ["suno-config/polkadot", "suno-tui/polkadot"]
+kusama = ["suno-config/kusama", "suno-tui/kusama"]
+paseo = ["suno-config/paseo", "suno-tui/paseo"]
+westend = ["suno-config/westend", "suno-tui/westend"]
 
 [dependencies]
 color-eyre = { workspace = true }
-suno-config = { path = "../config" }
+suno-config = { path = "../config", default-features = false }
 suno-error = { path = "../error" }
 suno-tracing = { path = "../tracing" }
-suno-tui = { path = "../tui" }
+suno-tui = { path = "../tui", default-features = false }
 suno-update = { path = "../update" }
 tokio = { workspace = true }
 tracing = { workspace = true }

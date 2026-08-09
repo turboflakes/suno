@@ -51,6 +51,7 @@ impl RuntimeCaller for Runtime {
         supported_proxy: SupportedProxy,
     ) -> Result<Bytes, Error> {
         match &self {
+            #[cfg(feature = "polkadot")]
             Runtime::AssetHubPolkadot => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_bond(amount, payee);
@@ -102,6 +103,7 @@ impl RuntimeCaller for Runtime {
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
+            #[cfg(feature = "kusama")]
             Runtime::AssetHubKusama => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_bond(amount, payee);
@@ -152,6 +154,7 @@ impl RuntimeCaller for Runtime {
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
+            #[cfg(feature = "paseo")]
             Runtime::AssetHubPaseo => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_bond(amount, payee);
@@ -202,6 +205,7 @@ impl RuntimeCaller for Runtime {
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
+            #[cfg(feature = "westend")]
             Runtime::AssetHubWestend => match call {
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_bond(amount, payee);

@@ -89,27 +89,45 @@ impl ProxyKey {
     }
 
     pub fn is_staking_valid(&self) -> bool {
-        (self.runtime == SupportedRuntime::AssetHubPolkadot
-            || self.runtime == SupportedRuntime::AssetHubKusama
-            || self.runtime == SupportedRuntime::AssetHubPaseo
-            || self.runtime == SupportedRuntime::AssetHubWestend)
-            && self.proxy == SupportedProxy::Staking
+        match self.runtime {
+            #[cfg(feature = "polkadot")]
+            SupportedRuntime::AssetHubPolkadot => self.proxy == SupportedProxy::Staking,
+            #[cfg(feature = "kusama")]
+            SupportedRuntime::AssetHubKusama => self.proxy == SupportedProxy::Staking,
+            #[cfg(feature = "paseo")]
+            SupportedRuntime::AssetHubPaseo => self.proxy == SupportedProxy::Staking,
+            #[cfg(feature = "westend")]
+            SupportedRuntime::AssetHubWestend => self.proxy == SupportedProxy::Staking,
+            _ => false,
+        }
     }
 
     pub fn is_staking_operator_valid(&self) -> bool {
-        (self.runtime == SupportedRuntime::AssetHubPolkadot
-            || self.runtime == SupportedRuntime::AssetHubKusama
-            || self.runtime == SupportedRuntime::AssetHubPaseo
-            || self.runtime == SupportedRuntime::AssetHubWestend)
-            && self.proxy == SupportedProxy::StakingOperator
+        match self.runtime {
+            #[cfg(feature = "polkadot")]
+            SupportedRuntime::AssetHubPolkadot => self.proxy == SupportedProxy::StakingOperator,
+            #[cfg(feature = "kusama")]
+            SupportedRuntime::AssetHubKusama => self.proxy == SupportedProxy::StakingOperator,
+            #[cfg(feature = "paseo")]
+            SupportedRuntime::AssetHubPaseo => self.proxy == SupportedProxy::StakingOperator,
+            #[cfg(feature = "westend")]
+            SupportedRuntime::AssetHubWestend => self.proxy == SupportedProxy::StakingOperator,
+            _ => false,
+        }
     }
 
     pub fn is_non_transfer_valid(&self) -> bool {
-        (self.runtime == SupportedRuntime::Polkadot
-            || self.runtime == SupportedRuntime::Kusama
-            || self.runtime == SupportedRuntime::Paseo
-            || self.runtime == SupportedRuntime::Westend)
-            && self.proxy == SupportedProxy::NonTransfer
+        match self.runtime {
+            #[cfg(feature = "polkadot")]
+            SupportedRuntime::Polkadot => self.proxy == SupportedProxy::NonTransfer,
+            #[cfg(feature = "kusama")]
+            SupportedRuntime::Kusama => self.proxy == SupportedProxy::NonTransfer,
+            #[cfg(feature = "paseo")]
+            SupportedRuntime::Paseo => self.proxy == SupportedProxy::NonTransfer,
+            #[cfg(feature = "westend")]
+            SupportedRuntime::Westend => self.proxy == SupportedProxy::NonTransfer,
+            _ => false,
+        }
     }
 }
 
