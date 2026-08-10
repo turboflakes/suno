@@ -245,6 +245,7 @@ impl PopupWidget {
 
         // Set pop-up title as the validator selected
         state.title = Some(ctx.validator.display_identity());
+        state.label = Some("Commands".to_string());
 
         let runtime = ctx.validator.runtime().asset_hub_runtime();
 
@@ -404,10 +405,8 @@ impl PopupWidget {
         state.input.reset_as_command(None);
 
         // Set pop-up title as the chain selected
-        state.title = Some(format!(
-            "{} NETWORK",
-            ctx.runtime.to_string().to_uppercase()
-        ));
+        state.title = Some(ctx.runtime.as_str_long().to_uppercase());
+        state.label = Some("Commands".to_string());
 
         state.options.push(Entry::new(Command::Instruction {
             call: Call::ChainSpecs {
@@ -430,9 +429,9 @@ impl PopupWidget {
     }
 
     fn init_confirmation(&self, state: &mut PopupState, ctx: &ConfirmationContext) {
-        state.options.push(Entry::new(Command::Text(
-            ctx.runtime.as_str_long().to_string(),
-        )));
+        state
+            .options
+            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
         state
             .options
             .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
@@ -459,10 +458,13 @@ impl PopupWidget {
             state
                 .options
                 .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
-        }
 
-        // Reset the input field as a password field
-        state.input.reset_as_password();
+            state.title = Some("SCAN TO AUTHORIZE TRANSACTION".to_string());
+        } else {
+            state.title = Some("AUTHORIZE TRANSACTION".to_string());
+            // Reset the input field as a password field
+            state.input.reset_as_password();
+        }
     }
 
     fn init_transaction(&self, state: &mut PopupState) {
@@ -480,9 +482,7 @@ impl PopupWidget {
     }
 
     fn init_chain_specs_qrcode(&self, state: &mut PopupState, ctx: &ChainSpecsContext) {
-        state.title = Some(ctx.runtime.as_str_long().to_string());
-        state.label = Some("chain-specs".to_string());
-
+        state.title = Some("SCAN TO ADD CHAIN SPECS".to_string());
         // Legacy name
         state
             .options
@@ -510,8 +510,7 @@ impl PopupWidget {
     }
 
     fn init_metadata_qrcode(&self, state: &mut PopupState, ctx: &MetadataContext) {
-        state.title = Some(ctx.runtime.as_str_long().to_string());
-        state.label = Some("metadata".to_string());
+        state.title = Some("SCAN TO UPDATE METADATA".to_string());
 
         // Legacy name
         state
@@ -865,20 +864,20 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
 
     let mut header_line = vec![];
 
+    if state.label.is_some() {
+        let label = Span::styled(
+            format!("{} ", state.label.as_deref().unwrap_or_default()),
+            theme.paragraph.label(true),
+        );
+        header_line.push(label);
+    }
+
     if state.title.is_some() {
         let title = Span::styled(
             state.title.as_deref().unwrap_or_default(),
             theme.paragraph.header(true),
         );
         header_line.push(title);
-    }
-
-    if state.label.is_some() {
-        let label = Span::styled(
-            format!(" ({})", state.label.as_deref().unwrap_or_default()),
-            theme.paragraph.label(true),
-        );
-        header_line.push(label);
     }
 
     let header = Line::from(header_line).alignment(Alignment::Right);
@@ -924,10 +923,9 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
 
     // Get all required data from 'state.options' based on the indices established
     // in `init_menu`.
-    let Some(network_entry) = state.options.first() else {
+    let Some(legacy_entry) = state.options.first() else {
         return;
     };
-
     let Some(spec_version_entry) = state.options.get(1) else {
         return;
     };
@@ -941,15 +939,25 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         return;
     };
 
-    let network = Line::from(vec![Span::styled(
-        format!(
-            "{} ({})",
-            network_entry.command(),
+    let mut header_content = vec![];
+    let title = state.title.clone();
+    if state.title.is_some() {
+        let title = Span::styled(
+            title.as_deref().unwrap_or_default(),
+            theme.paragraph.header(true),
+        );
+        header_content.push(title);
+    };
+    let header = Line::from(header_content).alignment(Alignment::Right);
+
+    let runtime_version = Line::from(vec![
+        Span::styled("runtime version ", theme.paragraph.label_inverse),
+        Span::raw(format!(
+            "{}/{}",
+            legacy_entry.command(),
             spec_version_entry.command()
-        ),
-        theme.paragraph.header(true),
-    )])
-    .alignment(Alignment::Right);
+        )),
+    ]);
 
     let stash = Line::from(vec![
         Span::styled("stash ", theme.paragraph.label_inverse),
@@ -987,9 +995,16 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
         .style(theme.block.pane_body)
         .padding(Padding::proportional(1));
 
-    let details = Paragraph::new(vec![network, stash, method, proxy, call_data])
-        .block(block)
-        .wrap(Wrap { trim: false });
+    let details = Paragraph::new(vec![
+        header,
+        runtime_version,
+        stash,
+        method,
+        proxy,
+        call_data,
+    ])
+    .block(block)
+    .wrap(Wrap { trim: false });
 
     // Note: The QR code entry is only available if QR code signing is enabled
     // If it's not available, we default to the standard sign mode
