@@ -1,4 +1,4 @@
-use crate::widgets::chains::ChainsListWidget;
+use crate::widgets::chains::ChainsList;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsListState;
 use ratatui::{
@@ -22,7 +22,7 @@ pub const PADDING: u16 = 4;
 #[derive(Debug, Clone)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
     pub state: Arc<RwLock<ValidatorsListState>>,
-    pub chains: &'a ChainsListWidget,
+    pub chains: &'a ChainsList,
 }
 
 /// Validators grouped view widget implementation, mostly to be used under the validators main tab view

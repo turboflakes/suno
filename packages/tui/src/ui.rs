@@ -124,7 +124,7 @@ fn flex_area(area: Rect, horizontal: Constraint, vertical: Constraint, flex: Fle
 }
 
 fn render_chains_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.chains, area);
+    frame.render_widget(&mut app.chains, area);
 }
 
 fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {

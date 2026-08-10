@@ -10,7 +10,6 @@ use ratatui::{
 };
 use sp_arithmetic::Permill;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::{lightclient::LightClient, utils::H256, OnlineClient};
 use suno_actions::{Action, SystemAction};
@@ -26,14 +25,14 @@ use tracing::debug;
 type ChainKey = SupportedRuntime;
 
 #[derive(Debug, Default)]
-pub struct ChainsListState {
+pub struct ChainsList {
     chains: HashMap<ChainKey, Chain>,
     chains_order: Vec<ChainKey>,
     table_state: TableState,
     is_active: bool,
 }
 
-impl ChainsListState {
+impl ChainsList {
     pub fn add_chain(&mut self, chain: Chain) {
         let key = chain.key();
         if !self.chains.contains_key(&key) {
@@ -175,25 +174,9 @@ impl ChainsListState {
             .selected()
             .and_then(|i| self.get_chain_by_index(i))
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct ChainsListWidget {
-    /// The state is wrapped in an `Arc<RwLock<>>` to allow for shared ownership between the widget and other threads.
-    state: Arc<RwLock<ChainsListState>>,
-    /// The sender to send actions to update the state to the app.
-    tx: UnboundedSender<Action>,
-}
-
-impl ChainsListWidget {
-    pub fn new(tx: UnboundedSender<Action>) -> Self {
-        Self {
-            state: Arc::new(RwLock::new(ChainsListState::default())),
-            tx,
-        }
-    }
     /// Initialize OnlineClients for each configured chain.
-    pub async fn on_init(&self) {
+    pub async fn on_init(&mut self, tx: UnboundedSender<Action>) {
         let config = CONFIG.clone();
         let mut relay_lc: Option<(SupportedRuntime, LightClient)> = None;
         for chain in config.chains.iter() {
@@ -204,7 +187,7 @@ impl ChainsListWidget {
                     {
                         Ok(result) => result,
                         Err(err) => {
-                            self.error(err);
+                            Self::error(&tx, err);
                             continue;
                         }
                     };
@@ -214,111 +197,87 @@ impl ChainsListWidget {
                 let client = match OnlineClient::<CustomConfig>::from_rpc_client(rpc_client).await {
                     Ok(client) => client,
                     Err(err) => {
-                        self.error(err.into());
+                        Self::error(&tx, err.into());
                         continue;
                     }
                 };
 
                 let mut chain = Chain::new(*runtime, client);
                 if let Err(err) = chain.validate_genesis() {
-                    self.error(err.into());
+                    Self::error(&tx, err.into());
                 }
-                self.add_chain(&chain);
-                self.subscribe(&chain);
+                self.add_chain(chain.clone());
+                if chain.is_validated() {
+                    subscribe_best_block(&chain, tx.clone());
+                    subscribe_finalized_block(&chain, tx.clone());
+                }
             }
         }
         self.init_table();
     }
 
-    fn error(&self, err: Box<dyn std::error::Error>) {
-        self.tx
-            .send(Action::System(SystemAction::Error(err.to_string())))
+    fn error(tx: &UnboundedSender<Action>, err: Box<dyn std::error::Error>) {
+        tx.send(Action::System(SystemAction::Error(err.to_string())))
             .expect("Failed to send error message");
     }
 
-    fn add_chain(&self, chain: &Chain) {
-        let mut state = self.state.write().unwrap();
-        state.add_chain(chain.clone());
+    pub fn subscribe_best_block(&self, chain: &Chain, tx: UnboundedSender<Action>) {
+        subscribe_best_block(chain, tx);
     }
 
-    fn subscribe(&self, chain: &Chain) {
-        if chain.is_validated() {
-            subscribe_best_block(chain, self.tx.clone());
-            subscribe_finalized_block(chain, self.tx.clone());
-        }
+    pub fn subscribe_finalized_block(&self, chain: &Chain, tx: UnboundedSender<Action>) {
+        subscribe_finalized_block(chain, tx);
     }
 
-    pub fn subscribe_best_block(&self, chain: &Chain) {
-        subscribe_best_block(chain, self.tx.clone());
-    }
-
-    pub fn subscribe_finalized_block(&self, chain: &Chain) {
-        subscribe_finalized_block(chain, self.tx.clone());
-    }
-
-    pub fn move_down(&self) -> Option<Chain> {
-        let mut state = self.state.write().unwrap();
-        if let Some(selected) = state.table_state.selected() {
-            if selected == state.chains.len() - 1 {
-                state.table_state.select_first();
+    pub fn move_down(&mut self) -> Option<Chain> {
+        if let Some(selected) = self.table_state.selected() {
+            if selected == self.chains.len() - 1 {
+                self.table_state.select_first();
             } else {
-                state.table_state.scroll_down_by(1);
+                self.table_state.scroll_down_by(1);
             }
-            state
-                .table_state
+            self.table_state
                 .selected()
-                .and_then(|i| state.get_chain_by_index_cloned(i))
+                .and_then(|i| self.get_chain_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn move_up(&self) -> Option<Chain> {
-        let mut state = self.state.write().unwrap();
-        if let Some(selected) = state.table_state.selected() {
+    pub fn move_up(&mut self) -> Option<Chain> {
+        if let Some(selected) = self.table_state.selected() {
             if selected == 0 {
-                let i = state.chains.len() - 1;
-                state.table_state.select(Some(i));
+                let i = self.chains.len() - 1;
+                self.table_state.select(Some(i));
             } else {
-                state.table_state.scroll_up_by(1);
+                self.table_state.scroll_up_by(1);
             }
-            state
-                .table_state
+            self.table_state
                 .selected()
-                .and_then(|i| state.get_chain_by_index_cloned(i))
+                .and_then(|i| self.get_chain_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn init_table(&self) {
-        let mut state = self.state.write().unwrap();
-        if !state.chains.is_empty() {
-            state.table_state.select(Some(0));
+    pub fn init_table(&mut self) {
+        if !self.chains.is_empty() {
+            self.table_state.select(Some(0));
         }
     }
 
-    pub fn is_active(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_active()
-    }
-
-    pub fn set_active(&self, active: bool) {
-        let mut state = self.state.write().unwrap();
-        state.is_active = active;
+    pub fn set_active(&mut self, active: bool) {
+        self.is_active = active;
     }
 
     pub fn get_selected(&self) -> Option<Chain> {
-        let state = self.state.read().unwrap();
-        state
-            .table_state
+        self.table_state
             .selected()
-            .and_then(|i| state.get_chain_by_index_cloned(i))
+            .and_then(|i| self.get_chain_by_index_cloned(i))
     }
 
     pub fn get_chain_by_runtime(&self, runtime: SupportedRuntime) -> Option<Chain> {
-        let state = self.state.read().unwrap();
-        state.get_chain_by_key_cloned(runtime)
+        self.get_chain_by_key_cloned(runtime)
     }
 
     pub fn get_api_and_block_hash(
@@ -337,75 +296,64 @@ impl ChainsListWidget {
     }
 
     pub fn update_connection_state(
-        &self,
+        &mut self,
         chain_key: &ChainKey,
         connection_state: ConnectionState,
     ) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_connection_state(chain_key, connection_state)
+        self.set_connection_state(chain_key, connection_state)
     }
 
-    pub fn update_best_block(&self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_best_block(chain_key, block_number)
+    pub fn update_best_block(&mut self, chain_key: &ChainKey, block_number: BlockNumber) -> bool {
+        self.set_best_block(chain_key, block_number)
     }
 
     pub fn update_finalized_block(
-        &self,
+        &mut self,
         chain_key: &ChainKey,
         block_number: BlockNumber,
         block_hash: BlockHash,
     ) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_finalized_block(chain_key, block_number, block_hash)
+        self.set_finalized_block(chain_key, block_number, block_hash)
     }
 
-    pub fn update_era(&self, chain_key: &ChainKey, era: Era) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_era(chain_key, era)
+    pub fn update_era(&mut self, chain_key: &ChainKey, era: Era) -> bool {
+        self.set_era(chain_key, era)
     }
 
-    pub fn update_epoch(&self, chain_key: &ChainKey, epoch: Epoch) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_epoch(chain_key, epoch)
+    pub fn update_epoch(&mut self, chain_key: &ChainKey, epoch: Epoch) -> bool {
+        self.set_epoch(chain_key, epoch)
     }
 
-    pub fn update_active_validators(&self, chain_key: &ChainKey, count: u32) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_active_vals(chain_key, count)
+    pub fn update_active_validators(&mut self, chain_key: &ChainKey, count: u32) -> bool {
+        self.set_active_vals(chain_key, count)
     }
 
-    pub fn update_total_validators(&self, chain_key: &ChainKey, count: u32) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_total_vals(chain_key, count)
+    pub fn update_total_validators(&mut self, chain_key: &ChainKey, count: u32) -> bool {
+        self.set_total_vals(chain_key, count)
     }
 
-    pub fn update_active_nominators(&self, chain_key: &ChainKey, count: u32) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_active_noms(chain_key, count)
+    pub fn update_active_nominators(&mut self, chain_key: &ChainKey, count: u32) -> bool {
+        self.set_active_noms(chain_key, count)
     }
 
-    pub fn update_total_nominators(&self, chain_key: &ChainKey, count: u32) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_total_noms(chain_key, count)
+    pub fn update_total_nominators(&mut self, chain_key: &ChainKey, count: u32) -> bool {
+        self.set_total_noms(chain_key, count)
     }
 
-    pub fn update_total_staked(&self, chain_key: &ChainKey, value: Permill) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_total_staked(chain_key, value)
+    pub fn update_total_staked(&mut self, chain_key: &ChainKey, value: Permill) -> bool {
+        self.set_total_staked(chain_key, value)
     }
 }
 
-impl Widget for &ChainsListWidget {
+impl Widget for &mut ChainsList {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let theme = CONFIG.theme();
-        let mut state = self.state.write().unwrap();
 
         let block = Block::new()
-            .set_style(theme.block.pane_header(state.is_active))
+            .set_style(theme.block.pane_header(self.is_active))
             .padding(Padding::symmetric(0, 1));
 
-        let rows = state.chains_iter().map(|chain| {
+        let rows = self.chains_iter().map(|chain| {
             let elapsed = get_elapsed_millis(chain.finalized_block_ts());
             let progress = create_progress_bar_by_millis(elapsed, 6);
 
@@ -442,23 +390,23 @@ impl Widget for &ChainsListWidget {
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active)))
+            .header(Row::new(header_cells).set_style(theme.table.header(self.is_active)))
             .style(theme.table.base)
-            .row_highlight_style(theme.table.row_highlight(state.is_active))
-            .highlight_symbol(theme.table.highlight_symbol(state.is_active));
+            .row_highlight_style(theme.table.row_highlight(self.is_active))
+            .highlight_symbol(theme.table.highlight_symbol(self.is_active));
 
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
+        StatefulWidget::render(table, area, buf, &mut self.table_state);
 
         // Render scrollbar when active
-        if state.is_active && state.chains.len() >= area.height.saturating_sub(2) as usize {
+        if self.is_active && self.chains.len() >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
             };
-            if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(row_index, state.chains.len(), scrollbar_area, buf);
+            if let Some(row_index) = self.table_state.selected() {
+                render_scrollbar(row_index, self.chains.len(), scrollbar_area, buf);
             }
         }
     }

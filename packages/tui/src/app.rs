@@ -1,7 +1,7 @@
 use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
-    chains::ChainsListWidget,
+    chains::ChainsList,
     collators::CollatorsListWidget,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
@@ -73,7 +73,7 @@ pub struct App {
     /// The current selected section.
     pub section: Section,
     /// Holds the API clients for each supported runtime.
-    pub chains: ChainsListWidget,
+    pub chains: ChainsList,
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsListWidget,
     /// Holds the collators list for the selected relay-chain.
@@ -103,7 +103,7 @@ impl App {
             focus: Focus::default(),
             window: Window::default(),
             section: Section::default(),
-            chains: ChainsListWidget::new(tx.clone()),
+            chains: ChainsList::default(),
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
             popup: Popup::default(),
@@ -117,7 +117,7 @@ impl App {
 
     async fn init(&mut self) {
         self.validators.on_init().await;
-        self.chains.on_init().await;
+        self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
     }
 
@@ -415,13 +415,14 @@ impl App {
                     (true, ConnectionState::BestBlockSubcriptionDropped(e)) => {
                         warn!("{}", e);
                         if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
-                            self.chains.subscribe_best_block(&chain);
+                            self.chains.subscribe_best_block(&chain, self.tx.clone());
                         }
                     }
                     (true, ConnectionState::FinalizedSubscriptionDropped(e)) => {
                         warn!("{}", e);
                         if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
-                            self.chains.subscribe_finalized_block(&chain);
+                            self.chains
+                                .subscribe_finalized_block(&chain, self.tx.clone());
                         }
                     }
                     (_, ConnectionState::Error(e)) => {

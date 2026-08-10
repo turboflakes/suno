@@ -1,4 +1,4 @@
-use crate::widgets::chains::ChainsListWidget;
+use crate::widgets::chains::ChainsList;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::{
     ValidatorsDetailedGroupWidget, GROUP_HEADER_HEIGHT, PADDING,
@@ -373,7 +373,7 @@ impl<'a> ValidatorsListWidget {
 
     pub fn as_detailed_group(
         &self,
-        chains: &'a ChainsListWidget,
+        chains: &'a ChainsList,
     ) -> ValidatorsDetailedGroupWidget<'a> {
         ValidatorsDetailedGroupWidget {
             state: self.state.clone(),
