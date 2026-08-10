@@ -859,7 +859,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
         .areas(area);
 
     let block = Block::new()
-        .style(theme.block.pane_body)
+        .style(theme.block.popup_header)
         .padding(Padding::new(1, 1, 1, 0));
 
     let mut header_line = vec![];
@@ -900,7 +900,7 @@ fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
     let table_labels = vec!["", "command", "description", ""];
 
     let block = Block::new()
-        .style(theme.block.pane_body)
+        .style(theme.block.popup_header)
         .padding(Padding::bottom(1));
 
     let table = Table::new(rows, widths)
@@ -992,7 +992,7 @@ fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState)
     ]);
 
     let block = Block::new()
-        .style(theme.block.pane_body)
+        .style(theme.block.popup_header)
         .padding(Padding::proportional(1));
 
     let details = Paragraph::new(vec![
@@ -1169,7 +1169,7 @@ fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupStat
     ]);
 
     let block = Block::new()
-        .style(theme.block.pane_header(true))
+        .style(theme.block.popup_header)
         .padding(Padding::proportional(1));
 
     let details = Paragraph::new(vec![
@@ -1256,7 +1256,7 @@ fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) 
     ]);
 
     let block = Block::new()
-        .style(theme.block.pane_header(true))
+        .style(theme.block.popup_header)
         .padding(Padding::proportional(1));
 
     let details = Paragraph::new(vec![header, runtime_version, genesis_hash])
