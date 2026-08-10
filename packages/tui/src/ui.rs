@@ -96,8 +96,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
-    let area = match &app.popup.get_mode() {
-        PopupMode::Transaction | PopupMode::Update => flex_area(
+    let area = match app.popup.get_mode() {
+        PopupMode::Message => flex_area(
             area,
             Constraint::Percentage(100),
             Constraint::Length(3),
@@ -110,10 +110,9 @@ fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
             Flex::Center,
         ),
     };
-    frame.render_widget(&app.popup, area);
+    frame.render_widget(&mut app.popup, area);
     // Apply the cursor if it was set during render
-    let state = app.popup.state.read().unwrap();
-    if let Some(pos) = state.get_input_cursor_position() {
+    if let Some(pos) = app.popup.get_input_cursor_position() {
         frame.set_cursor_position(pos);
     }
 }

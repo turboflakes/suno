@@ -4,7 +4,7 @@ use crate::widgets::{
     chains::ChainsListWidget,
     collators::CollatorsListWidget,
     logs::LogsState,
-    popup::{Mode as PopupMode, PopupWidget},
+    popup::{Mode as PopupMode, Popup},
     validators::ValidatorsListWidget,
     window::Window,
 };
@@ -78,8 +78,8 @@ pub struct App {
     pub validators: ValidatorsListWidget,
     /// Holds the collators list for the selected relay-chain.
     pub collators: CollatorsListWidget,
-    /// The popup widget.
-    pub popup: PopupWidget,
+    /// Manages popup state and rendering.
+    pub popup: Popup,
     /// Logs state.
     pub logs: LogsState,
     /// Is any sensitive data masked?
@@ -106,7 +106,7 @@ impl App {
             chains: ChainsListWidget::new(tx.clone()),
             validators: ValidatorsListWidget::new(),
             collators: CollatorsListWidget::default(),
-            popup: PopupWidget::default(),
+            popup: Popup::default(),
             logs: LogsState::new(rx_logs),
             masked: true,
             new_version: None,
@@ -717,18 +717,17 @@ impl App {
     fn handle_transaction_actions(&mut self, action: TxAction) {
         match action {
             TxAction::Processing => {
-                self.popup.show_transaction_status();
+                self.popup.show_message("processing transaction");
                 // Switch app focus to main while rendering transaction status
                 self.focus = Focus::Main;
             }
             TxAction::Message(message) => {
-                self.popup.update_transaction_status(message);
+                self.popup.update_message(message);
             }
             TxAction::InBestBlock(block_hash) => {
                 let message = format!("transaction in block {block_hash}");
                 info!("{message}");
-                self.popup.update_transaction_status(&message);
-                self.close_popup();
+                self.popup.update_message(message);
             }
             // NOTE: The following actions can just be logged.
             TxAction::InFinalizedBlock(block_hash) => {
@@ -736,6 +735,7 @@ impl App {
             }
             TxAction::Success => {
                 info!("Transaction succeeded");
+                self.close_popup();
             }
             TxAction::Error(err) => {
                 error!("Transaction error: {}", err);
@@ -806,7 +806,7 @@ impl App {
                 self.new_version = Some(version);
             }
             UpdateAction::Start => {
-                self.popup.show_update_status();
+                self.popup.show_message("starting update");
                 // Switch app focus to main while rendering transaction status
                 self.focus = Focus::Main;
 
@@ -839,7 +839,7 @@ impl App {
             }
             UpdateAction::Download(release) => {
                 self.popup
-                    .change_update_status(&format!("downloading {}", release.tag_name()));
+                    .update_message(format!("downloading {}", release.tag_name()));
 
                 let tx = self.tx.clone();
 
@@ -883,7 +883,7 @@ impl App {
                 });
             }
             UpdateAction::Validate(asset_name, bytes, expected_hash) => {
-                self.popup.change_update_status("validating");
+                self.popup.update_message("validating");
 
                 if let Err(e) = update::validate(&bytes, &expected_hash) {
                     error!("{}", e);
@@ -913,7 +913,7 @@ impl App {
     pub fn noop(&self) {}
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {
+    pub fn tick(&mut self) {
         if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
             self.popup.advance_metadata_frame();
         }
@@ -1575,11 +1575,9 @@ impl App {
                 let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                     return;
                 };
-                let Some(entry) = self.popup.get_selected() else {
+                let Some(bytes) = self.popup.get_call_data_bytes() else {
                     return;
                 };
-
-                let bytes = entry.as_bytes();
                 let api = chain.client().clone();
                 let tx = self.tx.clone();
 
@@ -1606,11 +1604,9 @@ impl App {
             return;
         };
 
-        let Some(entry) = self.popup.get_selected() else {
+        let Some(bytes) = self.popup.get_call_data_bytes() else {
             return;
         };
-
-        let bytes = entry.as_bytes();
         let api = chain.client().clone();
         let tx = self.tx.clone();
 
@@ -1704,10 +1700,10 @@ impl App {
         }
 
         if self.popup.is_confirmation_mode() {
-            let Some(bytes_entry) = self.popup.get_selected() else {
+            let Some(bytes) = self.popup.get_call_data_bytes() else {
                 return;
             };
-            let hex_bytes = bytes_entry.to_hex();
+            let hex_bytes = hex::encode(&bytes);
 
             let mut clipboard = match Clipboard::new() {
                 Ok(cb) => cb,
