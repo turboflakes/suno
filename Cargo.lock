@@ -487,9 +487,9 @@ dependencies = [
 
 [[package]]
 name = "ark-vrf"
-version = "0.1.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d63e9780640021b74d02b32895d8cec1b4abe8e5547b560a6bda6b14b78c6da"
+checksum = "9b9bd02dbd2f282fe742d51f681adb2745a79dc8a025bc8d16cac9b255d55bf7"
 dependencies = [
  "ark-bls12-381 0.5.0",
  "ark-ec 0.5.0",
@@ -498,7 +498,7 @@ dependencies = [
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "digest 0.10.7",
- "rand_chacha 0.3.1",
+ "generic-array",
  "sha2 0.10.9",
  "w3f-ring-proof",
  "zeroize",
@@ -4990,6 +4990,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-warning"
+version = "1.84.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75eea531cfcd120e0851a3f8aed42c4841f78c889eefafd96339c72677ae42c3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6539,9 +6550,9 @@ dependencies = [
 
 [[package]]
 name = "sp-core"
-version = "39.0.0"
+version = "43.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0f32d2a9af72fe90bec51076d0e109ef3c25aa1d2a1eef15cf3588acd4a23da"
+checksum = "41314ae10e80f9f0c5f68bb23f26f2d21f105bb6d867810b719c29c684aa0458"
 dependencies = [
  "ark-vrf",
  "array-bytes",
@@ -6601,10 +6612,11 @@ dependencies = [
 
 [[package]]
 name = "sp-debug-derive"
-version = "14.0.0"
+version = "15.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48d09fa0a5f7299fb81ee25ae3853d26200f7a348148aed6de76be905c007dbe"
+checksum = "d61809bf52be994e4d0a0485bb18a78509ed185e1418736c1ff9011bd1528999"
 dependencies = [
+ "proc-macro-warning",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -6612,9 +6624,9 @@ dependencies = [
 
 [[package]]
 name = "sp-externalities"
-version = "0.31.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b67582d8eb400e730d4abaa9f8841898fa36782a2c6b7f61676e5dd6f8166c"
+checksum = "aa3b0eef9f045e705a34987920f538b0730f7e1a11798e3b32642ccf3dafb979"
 dependencies = [
  "environmental",
  "parity-scale-codec",
@@ -6629,9 +6641,9 @@ checksum = "12f8ee986414b0a9ad741776762f4083cd3a5128449b982a3919c4df36874834"
 
 [[package]]
 name = "sp-storage"
-version = "22.0.0"
+version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee3b70ca340e41cde9d2e069d354508a6e37a6573d66f7cc38f11549002f64ec"
+checksum = "10a6b7ba48e82f36b2c4b037059866c858f3f3bfe79bfa71345fee61bd45d69b"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -8235,9 +8247,9 @@ dependencies = [
 
 [[package]]
 name = "w3f-pcs"
-version = "0.0.2"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe7a8d5c914b69392ab3b267f679a2e546fe29afaddce47981772ac71bd02e1"
+checksum = "3ea1046a1deb6d26c34ba2d1f1bab4222d695d126502ee765f80b021753cb674"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -8249,9 +8261,9 @@ dependencies = [
 
 [[package]]
 name = "w3f-plonk-common"
-version = "0.0.2"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aca389e494fe08c5c108b512e2328309036ee1c0bc7bdfdb743fef54d448c8c"
+checksum = "30408cda37b81bd7257319942584c794c5784d00d749757bc664656749a1472a"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -8265,9 +8277,9 @@ dependencies = [
 
 [[package]]
 name = "w3f-ring-proof"
-version = "0.0.2"
+version = "0.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a639379402ad51504575dbd258740383291ac8147d3b15859bdf1ea48c677de"
+checksum = "0cbfc4cb881a934e6f33c25927bf955d0cb18e52b94528bbc5fa28dddedb4cd1"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",

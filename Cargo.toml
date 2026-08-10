@@ -70,7 +70,7 @@ serde_yaml = "0.9"
 sha2 = "0.11.0"
 shellexpand = "3.1.2"
 sp-arithmetic = "28.0.1"
-sp-core = "39.0.0"
+sp-core = "43.0.0"
 strum = { version = "0.26.3", features = ["derive"] }
 subxt = { git = "https://github.com/paritytech/subxt", rev="6f86195dbc80693d52f1f8f9aa6b5acdc73b4a34", features = ["reconnecting-rpc-client", "light-client", "jsonrpsee"] }
 subxt-signer = { git = "https://github.com/paritytech/subxt", rev="6f86195dbc80693d52f1f8f9aa6b5acdc73b4a34", features = ["polkadot-js-compat"] }
