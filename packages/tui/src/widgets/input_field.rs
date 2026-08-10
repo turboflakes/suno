@@ -89,12 +89,18 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(unit: &'static str, decimals: u32) -> Self {
-        Self {
-            unit,
-            decimals,
-            custom_commands: vec![],
-        }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_unit(mut self, unit: &'static str) -> Self {
+        self.unit = unit;
+        self
+    }
+
+    pub fn with_decimals(mut self, decimals: u32) -> Self {
+        self.decimals = decimals;
+        self
     }
 
     pub fn with_custom_commands(mut self, commands: Vec<CustomCommand>) -> Self {

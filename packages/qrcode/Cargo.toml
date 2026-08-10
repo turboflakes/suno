@@ -9,10 +9,12 @@ edition.workspace = true
 
 
 [dependencies]
+codec = { workspace = true }
 hex = { workspace = true }
 image = { workspace = true }
 nokhwa = { workspace = true }
 qrcodegen = { workspace = true }
+raptorq = { workspace = true }
 ratatui = { workspace = true }
 ratatui-image = { workspace = true }
 rxing = { workspace = true }

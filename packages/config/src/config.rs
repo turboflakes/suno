@@ -1,9 +1,11 @@
 use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
+use crate::logs::Logs;
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
+use crate::vault::Vault;
 use lazy_static::lazy_static;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -72,6 +74,9 @@ pub struct Config {
     /// Signer configuration.
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// Vault configuration.
+    #[serde(default)]
+    pub vault: Option<Vault>,
     /// Explorer configuration.
     #[serde(default = "default_explorer")]
     pub explorer: Explorer,
@@ -90,9 +95,10 @@ impl Default for Config {
             chains: Vec::new(),
             features: default_features(),
             signer: None,
+            vault: None,
             explorer: default_explorer(),
             themes: default_themes(),
-            logs: Logs::default(),
+            logs: default_logs(),
         }
     }
 }
@@ -378,30 +384,6 @@ pub struct Explorer {
     url: Option<String>,
 }
 
-fn default_max_entries() -> usize {
-    2000
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Logs {
-    #[serde(default = "default_max_entries")]
-    max_entries: usize,
-}
-
-impl Default for Logs {
-    fn default() -> Self {
-        Self {
-            max_entries: default_max_entries(),
-        }
-    }
-}
-
-impl Logs {
-    pub fn max_entries(&self) -> usize {
-        self.max_entries
-    }
-}
-
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref();
@@ -492,6 +474,11 @@ impl Config {
         self.signer = signer;
     }
 
+    pub fn set_vault_path(&mut self, path: &str) {
+        let vault = Vault::from_file(path).ok();
+        self.vault = vault;
+    }
+
     pub fn explorer_url(&self, chain: &str, block_hash: &str) -> Option<String> {
         self.explorer.url.as_ref().map(|url| {
             url.replace("{chain}", chain)
@@ -520,7 +507,11 @@ impl Config {
     }
 
     pub fn logs_max_entries(&self) -> usize {
-        self.logs.max_entries
+        self.logs.max_entries()
+    }
+
+    pub fn logs_file_path(&self) -> Option<&str> {
+        self.logs.file_path()
     }
 }
 
@@ -576,7 +567,7 @@ fn build_cli() -> clap::Command {
             clap::Arg::new("proxy-account")
                 .short('p')
                 .long("proxy-account")
-                .value_name("PROXY ADDRESS")
+                .value_name("PROXY_ADDRESS")
                 .help("Sets a global proxy account used by Polkadot Vault."),
         )
         .arg(
@@ -585,6 +576,12 @@ fn build_cli() -> clap::Command {
                 .value_name("FILE")
                 .default_value(default_proxy_path)
                 .help("Sets a global proxy account file path."),
+        )
+        .arg(
+            clap::Arg::new("vault-secret-path")
+                .long("vault-secret-path")
+                .value_name("FILE")
+                .help("Sets a global vault secret file path."),
         )
 }
 
@@ -598,7 +595,7 @@ fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command 
                 .short('v')
                 .value_delimiter(',')
                 .num_args(1..)
-                .value_name("STASH ADDRESS")
+                .value_name("STASH_ADDRESS")
                 .help(
                     "Validator stash addresses. \
                      Specify one or multiple addresses (e.g. stash_1,stash_2,stash_3).",
@@ -621,7 +618,7 @@ fn network_subcommand(name: &'static str, about: &'static str) -> clap::Command 
             clap::Arg::new("proxy-account")
                 .long("proxy-account")
                 .short('p')
-                .value_name("PROXY ADDRESS")
+                .value_name("PROXY_ADDRESS")
                 .help("Proxy account used by Polkadot Vault."),
         )
 }
@@ -656,6 +653,14 @@ fn get_config() -> Result<Config, Error> {
 
         if let Some(account) = matches.get_one::<String>("proxy-account") {
             config.set_signer_account(account.as_str());
+        }
+    }
+
+    // If not specified in the config file, load the vault private key path
+    // from the CLI.
+    if config.vault.is_none() {
+        if let Some(path) = matches.get_one::<String>("vault-secret-path") {
+            config.set_vault_path(path.as_str());
         }
     }
 
@@ -844,6 +849,7 @@ mod tests {
             chains: vec![],
             features: Features::default(),
             signer: None,
+            vault: None,
             explorer: Explorer::default(),
             themes: Themes::default(),
             logs: Logs::default(),

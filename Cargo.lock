@@ -1549,6 +1549,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d85363c37faeca707aef026efa9f3b34d077bce547e48f770770625c6013679e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5184,6 +5193,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "raptorq"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cc8cd0bcb2d520fff368264b5a6295e064c60955349517d09b14473afae4856"
+
+[[package]]
 name = "ratatui"
 version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7039,6 +7054,7 @@ dependencies = [
  "lazy_static",
  "openssh",
  "parity-scale-codec",
+ "regex",
  "reqwest",
  "scale-info",
  "self-replace",
@@ -7048,6 +7064,7 @@ dependencies = [
  "serde_yaml",
  "shellexpand",
  "subxt",
+ "subxt-signer",
  "suno-theme",
  "tempfile",
  "thiserror 2.0.19",
@@ -7092,6 +7109,7 @@ dependencies = [
  "suno-error",
  "suno-primitives",
  "suno-signer",
+ "tracing",
 ]
 
 [[package]]
@@ -7183,7 +7201,9 @@ dependencies = [
  "hex",
  "image",
  "nokhwa",
+ "parity-scale-codec",
  "qrcodegen",
+ "raptorq",
  "ratatui",
  "ratatui-image",
  "rxing",
@@ -7218,10 +7238,10 @@ dependencies = [
 name = "suno-tracing"
 version = "0.5.0"
 dependencies = [
- "suno-config",
  "thiserror 2.0.19",
  "tokio",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
 ]
 
@@ -7306,6 +7326,12 @@ dependencies = [
  "suno-primitives",
  "suno-signer",
 ]
+
+[[package]]
+name = "symlink"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7973cce6668464ea31f176d85b13c7ab3bba2cb3b77a2ed26abd7801688010a"
 
 [[package]]
 name = "syn"
@@ -7854,6 +7880,19 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-appender"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "050686193eb999b4bb3bc2acfa891a13da00f79734704c4b8b4ef1a10b368a3c"
+dependencies = [
+ "crossbeam-channel",
+ "symlink",
+ "thiserror 2.0.19",
+ "time",
+ "tracing-subscriber",
 ]
 
 [[package]]

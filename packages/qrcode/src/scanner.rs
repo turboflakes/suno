@@ -11,8 +11,8 @@ use rxing::{
 };
 
 /// Max display size sent to the UI thread — keep small for fast encoding.
-const DISPLAY_W: u32 = 480;
-const DISPLAY_H: u32 = 360;
+const DISPLAY_W: u32 = 640;
+const DISPLAY_H: u32 = 640;
 
 pub struct Scanner {
     camera: Camera,
@@ -24,7 +24,7 @@ impl Scanner {
     pub fn new() -> Result<Self, Error> {
         let index = CameraIndex::Index(0);
         let requested =
-            RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestFrameRate);
+            RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestResolution);
         let camera = Camera::new(index, requested)?;
         Ok(Self {
             camera,
@@ -62,6 +62,7 @@ impl Scanner {
     pub fn scan_frame(&mut self) -> Result<(Option<Vec<u8>>, DynamicImage), Error> {
         let qr = self.capture_square()?;
         let display = qr.thumbnail(DISPLAY_W, DISPLAY_H);
+        let display = display.fliph();
         let data = self.decode(qr);
 
         Ok((data, display))

@@ -178,9 +178,10 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let mut legend = vec![];
 
-    // show how to open popup with extrinsics/commands
-    if app.validators.is_active()
-        && (app.validators.is_proxy_valid() || app.validators.is_commands_available())
+    // show how to open popup with available commands depending on the active section
+    if ((app.validators.is_active()
+        && (app.validators.is_proxy_valid() || app.validators.is_commands_available()))
+        || app.chains.is_active())
         && !app.popup.is_visible()
     {
         legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
@@ -212,7 +213,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw("   "));
                 legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("close".to_string(), theme.paragraph.label));
+                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
             }
             PopupMode::Confirmation => {
                 legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
@@ -224,7 +225,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw("   "));
                 legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
-                legend.push(Span::styled("close".to_string(), theme.paragraph.label));
+                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
+            }
+            PopupMode::ChainSpecs | PopupMode::Metadata => {
+                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
             }
             _ => {}
         }

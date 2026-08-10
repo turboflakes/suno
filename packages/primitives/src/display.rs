@@ -5,7 +5,7 @@ use subxt::utils::AccountId32;
 use time::{macros::format_description, OffsetDateTime};
 
 /// Format milliseconds to human-readable string (e.g., "6.5s")
-pub fn format_millis(millis: u64) -> String {
+pub fn format_millis(millis: u64, long: bool) -> String {
     let seconds = millis / 1000;
 
     match seconds {
@@ -18,14 +18,24 @@ pub fn format_millis(millis: u64) -> String {
         //     format!("{:.1}s", seconds_f)
         // }
         s if s < 60 => format!("{}s", s),
-        s if s < 3600 => format!("{} mins", s / 60),
-        s => {
-            let hrs = s / 3600;
-            let mins = (s % 3600) / 60;
-            if mins > 0 {
-                format!("{} hrs {} mins", hrs, mins)
+        s if s < 3600 => {
+            if long {
+                format!("{} mins", s / 60)
             } else {
-                format!("{} hrs", hrs)
+                format!("{}m", s / 60)
+            }
+        }
+        s => {
+            if long {
+                let hrs = s / 3600;
+                let mins = (s % 3600) / 60;
+                if mins > 0 {
+                    format!("{} hrs {} mins", hrs, mins)
+                } else {
+                    format!("{} hrs", hrs)
+                }
+            } else {
+                format!("{}h", s / 3600)
             }
         }
     }
@@ -71,6 +81,9 @@ pub fn format_planks(planks: u128, decimals: u32, display_decimals: usize) -> St
 
 /// Get elapsed time in milliseconds since the given timestamp
 pub fn get_elapsed_millis(last_updated: u128) -> u64 {
+    if last_updated == 0 {
+        return 0;
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

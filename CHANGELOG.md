@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace log for tracing see PR [#28](https://github.com/turboflakes/suno/pull/28)
 - Add `enable_check_update` feature see PR [#30](https://github.com/turboflakes/suno/pull/30)
 - Add CLI subcommands to ease initialization without the need for static config files see PR [#31](https://github.com/turboflakes/suno/pull/31)
+- Add Chain-specs and Metadata QR codes to update Polkadot Vault see PR [#32](https://github.com/turboflakes/suno/pull/32)
 
 ## [0.5.0] - 2026-07-17
 - Add support for Polkadot-Vault see PR [#20](https://github.com/turboflakes/suno/pull/20)

@@ -1,4 +1,7 @@
+pub mod runtime_apis;
 pub mod storage;
+
+pub use runtime_apis::fetch_metadata;
 pub use storage::fetch_identity;
 
 #[subxt::subxt(

@@ -24,14 +24,20 @@ target/
 # Config files
 .config.yaml
 
-# Seed files
-.proxy*
-.proxy_private.seed
+# Contain local seed files
+*.seed
 .proxy_private.json
+keys/
+
+# Tape files
+tapes/
+
+# Contain log files
+*.log
+logs/
 
 # Scripts
 bump-version.sh
-*.tape
 
 # Other
 .DS_Store

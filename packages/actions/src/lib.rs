@@ -1,6 +1,3 @@
-pub mod network;
-
-use crate::network::ConnectionState;
 use bytes::Bytes;
 use image::DynamicImage;
 use sp_arithmetic::Permill;
@@ -11,6 +8,7 @@ use suno_primitives::{
     balance::Balance,
     call::Call,
     identity::Identity,
+    network::ConnectionState,
     proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -86,9 +84,25 @@ pub struct ConfirmationContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChainSpecsContext {
+    pub runtime: SupportedRuntime,
+    pub spec_version: SpecVersion,
+    pub qr_bytes: QrBytes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataContext {
+    pub runtime: SupportedRuntime,
+    pub spec_version: SpecVersion,
+    pub qr_bytes: QrBytes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
     Open,
-    ConfirmAndSign(Box<ConfirmationContext>),
+    ShowConfirmAndSign(Box<ConfirmationContext>),
+    ShowChainSpecsQrcode(Box<ChainSpecsContext>),
+    ShowMetadataQrcode(Box<MetadataContext>),
     Close,
     Cancel,
 }

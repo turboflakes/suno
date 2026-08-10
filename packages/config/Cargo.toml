@@ -13,6 +13,7 @@ clap = { workspace = true }
 codec = { workspace = true }
 lazy_static = { workspace = true }
 openssh = { workspace = true }
+regex = { workspace = true }
 reqwest = { workspace = true }
 scale-info = { workspace = true }
 self-replace = { workspace = true }
@@ -22,6 +23,7 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 shellexpand = { workspace = true }
 subxt = { workspace = true }
+subxt-signer = { workspace = true }
 suno-theme = { path = "../theme" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

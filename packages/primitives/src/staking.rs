@@ -60,12 +60,12 @@ impl Era {
         let duration = self.duration_ms(blocks_per_session, block_time_ms);
 
         if duration < (now - self.start_ts as u128) as u64 {
-            return format_millis(0);
+            return format_millis(0, true);
         }
 
         let diff = duration - (now - self.start_ts as u128) as u64;
 
-        format_millis(diff)
+        format_millis(diff, true)
     }
 }
 

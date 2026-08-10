@@ -1,6 +1,6 @@
 use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_events};
-use crate::widgets::chains::Chain;
-use suno_actions::{network::ConnectionState, Action, ChainAction};
+use suno_actions::{Action, ChainAction};
+use suno_primitives::{chain::Chain, network::ConnectionState};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info};
 

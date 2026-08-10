@@ -50,9 +50,9 @@ impl Epoch {
         if current_block_number < self.start()
             || current_block_number >= self.start() + self.duration()
         {
-            return format_millis(0);
+            return format_millis(0, true);
         }
         let diff = self.duration() - (current_block_number - self.start());
-        format_millis(diff * self.block_time_ms)
+        format_millis(diff * self.block_time_ms, true)
     }
 }

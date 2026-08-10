@@ -1,4 +1,4 @@
-use crate::bridge::{custom, sync, RuntimeCaller};
+use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsListWidget,
@@ -16,16 +16,25 @@ use crate::{
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
-use suno_actions::network::ConnectionState;
 use suno_actions::{
-    Action, ChainAction, ConfirmationContext, InputAction, NavigationAction, PopupAction,
-    ScannerAction, SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
+    Action, ChainAction, ChainSpecsContext, ConfirmationContext, InputAction, MetadataContext,
+    NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction,
+    UpdateAction, ValidatorAction,
 };
 use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
 use suno_error::{Error, ResultExt};
-use suno_primitives::entry::ToMethod;
-use suno_primitives::{call::Call, display::to_compact_string, Validator};
-use suno_qrcode::{scanner::Scanner, tx::build_qrcode};
+use suno_primitives::{
+    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, Chain,
+    Validator,
+};
+use suno_qrcode::{
+    build::{
+        build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned, build_metadata_payload,
+        build_metadata_qrcode_signed, build_metadata_qrcode_unsigned, build_transaction_qrcode,
+    },
+    scanner::Scanner,
+    NetworkSpecsToSend,
+};
 use suno_tracing::LogEntry;
 use suno_update::update;
 use tokio::sync::mpsc;
@@ -36,7 +45,7 @@ use zeroize::Zeroizing;
 pub type AppResult<T> = std::result::Result<T, Error>;
 
 // Constants
-const TICK_RATE: u64 = 250;
+const TICK_RATE: u64 = 100;
 
 /// Application active focus.
 #[derive(Debug, Clone, Default)]
@@ -222,8 +231,14 @@ impl App {
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
-            PopupAction::ConfirmAndSign(ctx) => {
-                self.confirm_and_sign_popup(&ctx);
+            PopupAction::ShowConfirmAndSign(ctx) => {
+                self.open_confirm_and_sign_popup(&ctx);
+            }
+            PopupAction::ShowChainSpecsQrcode(ctx) => {
+                self.popup.show_chain_specs_qrcode(&ctx);
+            }
+            PopupAction::ShowMetadataQrcode(ctx) => {
+                self.popup.show_metadata_qrcode(&ctx);
             }
             PopupAction::Close => self.close_popup(),
             PopupAction::Cancel => self.cancel(),
@@ -263,8 +278,7 @@ impl App {
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::Error(msg) => {
-                if (self.popup.is_menu_or_confirmation_mode()) && self.popup.invalidate_input(&msg)
-                {
+                if (self.popup.can_close()) && self.popup.invalidate_input(&msg) {
                     self.focus = Focus::Input;
                 }
             }
@@ -899,7 +913,11 @@ impl App {
     pub fn noop(&self) {}
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
+    pub fn tick(&self) {
+        if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
+            self.popup.advance_metadata_frame();
+        }
+    }
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
@@ -910,7 +928,11 @@ impl App {
     pub fn move_up(&mut self) {
         match self.section {
             Section::Chains => {
-                self.chains.move_up();
+                if self.popup.is_visible() {
+                    self.popup.move_up();
+                } else {
+                    self.chains.move_up();
+                }
             }
             Section::Validators => {
                 if self.popup.is_visible() {
@@ -930,7 +952,11 @@ impl App {
     pub fn move_down(&mut self) {
         match self.section {
             Section::Chains => {
-                self.chains.move_down();
+                if self.popup.is_visible() {
+                    self.popup.move_down();
+                } else {
+                    self.chains.move_down();
+                }
             }
             Section::Validators => {
                 if self.popup.is_visible() {
@@ -991,7 +1017,7 @@ impl App {
             return;
         }
 
-        if self.section == Section::Validators {
+        if self.section == Section::Validators && self.validators.is_active() {
             if !self.validators.is_proxy_valid() && !self.validators.is_commands_available() {
                 return;
             }
@@ -1011,14 +1037,27 @@ impl App {
                 return;
             };
 
-            self.popup.show_commands(active_era.index(), &validator);
+            self.popup
+                .show_validator_commands(&validator, active_era.index());
+
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        };
+
+        if self.section == Section::Chains && self.chains.is_active() {
+            let Some(chain) = self.chains.get_selected() else {
+                return;
+            };
+
+            self.popup.show_chain_commands(&chain);
+
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         };
     }
 
     /// Open confirm and sign popup
-    pub fn confirm_and_sign_popup(&mut self, ctx: &ConfirmationContext) {
+    pub fn open_confirm_and_sign_popup(&mut self, ctx: &ConfirmationContext) {
         if !self.popup.is_visible() {
             return;
         }
@@ -1032,6 +1071,137 @@ impl App {
         } else {
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         }
+    }
+
+    /// Build chain-specs QR code popup
+    pub fn build_chain_specs_qrcode_popup(&mut self, chain: &Chain) {
+        let config = CONFIG.clone();
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+        let api = chain.client().clone();
+        let runtime = chain.runtime();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            let at_block = match api.at_current_block().await.boxed() {
+                Ok(client) => client,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_current_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            // Sign the QR code payload based on the vault configuration, if available.
+            let qr_bytes = if let Some(vault) = config.vault.as_ref() {
+                let chain_specs = NetworkSpecsToSend::from(runtime);
+                let payload = chain_specs.payload();
+                match vault.sign(&payload) {
+                    Ok((public_key, signature)) => build_chain_specs_qrcode_signed(
+                        &payload,
+                        public_key.as_ref(),
+                        signature.as_ref(),
+                    ),
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to sign chain specs: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                }
+            } else {
+                let chain_specs = NetworkSpecsToSend::from(runtime);
+                let payload = chain_specs.payload();
+                build_chain_specs_qrcode_unsigned(&payload)
+            };
+
+            let spec_version = at_block.spec_version();
+            let ctx = Box::new(ChainSpecsContext {
+                runtime,
+                spec_version,
+                qr_bytes,
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowChainSpecsQrcode(ctx)));
+        });
+    }
+
+    /// Build metatada QR code popup
+    pub fn build_metadata_qrcode_popup(&mut self, chain: &Chain) {
+        let config = CONFIG.clone();
+        if !self.popup.is_visible() {
+            return;
+        }
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+        let api = chain.client().clone();
+        let runtime = chain.runtime();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            let at_block = match api.at_current_block().await.boxed() {
+                Ok(client) => client,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_current_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let metadata_bytes = match runtime.fetch_metadata(&at_block).await {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to fetch metadata: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let genesis_hash = runtime.chain_genesis_hash();
+
+            // Sign the QR code payload based on the vault configuration, if available.
+            let qr_bytes = if let Some(vault) = config.vault.as_ref() {
+                let payload = build_metadata_payload(&metadata_bytes, &genesis_hash.into());
+                match vault.sign(&payload) {
+                    Ok((public_key, signature)) => build_metadata_qrcode_signed(
+                        &metadata_bytes,
+                        &genesis_hash.into(),
+                        public_key.as_ref(),
+                        signature.as_ref(),
+                    ),
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to sign chain specs: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                }
+            } else {
+                build_metadata_qrcode_unsigned(&metadata_bytes, &genesis_hash.into())
+            };
+
+            let spec_version = at_block.spec_version();
+            let ctx = Box::new(MetadataContext {
+                runtime,
+                spec_version,
+                qr_bytes,
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowMetadataQrcode(ctx)));
+        });
     }
 
     /// Close menu popup
@@ -1056,18 +1226,47 @@ impl App {
 
             match self.popup.get_mode() {
                 PopupMode::Menu => {
-                    self.on_menu_enter(validator);
+                    self.on_validator_menu_enter(validator);
                 }
                 PopupMode::Confirmation => {
-                    self.on_confirm_enter(validator);
+                    self.on_validator_confirm_enter(validator);
                 }
                 _ => {}
             }
         };
+
+        if self.section == Section::Chains {
+            let Some(chain) = self.chains.get_selected() else {
+                return;
+            };
+
+            if self.popup.get_mode() == PopupMode::Menu {
+                self.on_chain_menu_enter(&chain);
+            }
+        }
     }
 
-    /// Handle enter when popup is in menu mode, showing available extrinsics/commands
-    pub fn on_menu_enter(&mut self, validator: Validator) {
+    /// Handle enter when a chain is selected and popup is in menu mode
+    /// showing available options
+    pub fn on_chain_menu_enter(&mut self, chain: &Chain) {
+        let Some(call) = self.popup.get_input_parsed_call() else {
+            return;
+        };
+
+        match call {
+            Call::ChainSpecs { .. } => {
+                self.build_chain_specs_qrcode_popup(chain);
+            }
+            Call::Metadata { .. } => {
+                self.build_metadata_qrcode_popup(chain);
+            }
+            _ => {}
+        }
+    }
+
+    /// Handle enter when a validator is selected and popup is in menu mode
+    /// showing available extrinsics/commands
+    pub fn on_validator_menu_enter(&mut self, validator: Validator) {
         let Some(call) = self.popup.get_input_parsed_call() else {
             return;
         };
@@ -1098,6 +1297,9 @@ impl App {
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
 
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
         tokio::spawn(async move {
             let at_block = match api.at_current_block().await.boxed() {
                 Ok(client) => client,
@@ -1125,7 +1327,12 @@ impl App {
             info!("method: {}", call.to_method());
             info!("call_data: 0x{}", hex::encode(&call_data_bytes));
 
-            let qr_bytes = match build_qrcode(&at_block, &proxy_account_id, &call_data_bytes).await
+            let qr_bytes = match build_transaction_qrcode(
+                &at_block,
+                &proxy_account_id,
+                &call_data_bytes,
+            )
+            .await
             {
                 Ok(qr_bytes) => qr_bytes,
                 Err(e) => {
@@ -1138,7 +1345,7 @@ impl App {
             };
 
             let spec_version = at_block.spec_version();
-            let ctx = ConfirmationContext {
+            let ctx = Box::new(ConfirmationContext {
                 runtime,
                 spec_version,
                 proxy_identity,
@@ -1146,8 +1353,8 @@ impl App {
                 call,
                 call_data_bytes,
                 qr_bytes,
-            };
-            let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(Box::new(ctx))));
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowConfirmAndSign(ctx)));
         });
     }
 
@@ -1243,7 +1450,7 @@ impl App {
                                     }
                                 };
 
-                                let qr_bytes = match build_qrcode(
+                                let qr_bytes = match build_transaction_qrcode(
                                     &at_block,
                                     &proxy_account_id,
                                     &call_data_bytes,
@@ -1260,7 +1467,7 @@ impl App {
                                 };
 
                                 let spec_version = at_block.spec_version();
-                                let ctx = ConfirmationContext {
+                                let ctx = Box::new(ConfirmationContext {
                                     runtime,
                                     spec_version,
                                     proxy_identity,
@@ -1268,10 +1475,9 @@ impl App {
                                     call,
                                     call_data_bytes,
                                     qr_bytes,
-                                };
-                                let _ = tx.send(Action::Popup(PopupAction::ConfirmAndSign(
-                                    Box::new(ctx),
-                                )));
+                                });
+                                let _ =
+                                    tx.send(Action::Popup(PopupAction::ShowConfirmAndSign(ctx)));
                             }
                             Err(e) => {
                                 let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
@@ -1391,8 +1597,9 @@ impl App {
         };
     }
 
-    /// Handle enter when popup is in confirmation mode, showing call details and input field as password
-    pub fn on_confirm_enter(&mut self, validator: Validator) {
+    /// Handle enter when a validator is selected and popup is in confirmation mode
+    /// showing the call details and input field as password
+    pub fn on_validator_confirm_enter(&mut self, validator: Validator) {
         let runtime = validator.runtime().asset_hub_runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
@@ -1478,7 +1685,7 @@ impl App {
             return;
         }
 
-        if self.popup.is_menu_or_confirmation_mode() {
+        if self.popup.can_close() {
             self.close_popup();
         }
     }

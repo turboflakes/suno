@@ -1,9 +1,12 @@
 pub mod blocks;
 pub mod constants;
 pub mod extrinsics;
+pub mod runtime_apis;
 pub mod storage;
+
 pub use blocks::{process_block_extrinsics, process_runtime_events, process_transaction_events};
 pub use extrinsics::wrap_call_into_proxy;
+pub use runtime_apis::fetch_metadata;
 pub use storage::{
     fetch_active_nominators_count, fetch_active_validators_count, fetch_and_validate_proxy_account,
     fetch_balance, fetch_era_data, fetch_total_nominators_count, fetch_total_staked,

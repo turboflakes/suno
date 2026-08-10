@@ -3,10 +3,12 @@ mod config;
 mod custom;
 mod error;
 mod fetch;
+mod logs;
 mod runtime;
 mod signer;
 mod substrate;
 mod themes;
+mod vault;
 
 pub use crate::access::{NodeAccess, SshConfig};
 pub use crate::config::{ChainConfig, Config, Features, Host, NodeConfig, Subcommand, CONFIG};
