@@ -1,5 +1,7 @@
 use crate::app::App;
 use crate::widgets::logs::LogsWidget;
+use crate::widgets::validators_compact::ValidatorsCompactWidget;
+use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -61,9 +63,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_validators_widget(app, frame, left_layout[1]);
     }
 
-    if config.features.collators_enabled() {
-        render_collators_widget(app, frame, left_layout[2]);
-    }
+    // TODO: Collators
+    // if config.features.collators_enabled() {
+    //     render_collators_widget(app, frame, left_layout[2]);
+    // }
 
     if config.features.rpcs_enabled() {
         render_rpcs_widget(app, frame, left_layout[3]);
@@ -96,8 +99,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
-    let area = match &app.popup.get_mode() {
-        PopupMode::Transaction | PopupMode::Update => flex_area(
+    let area = match app.popup.get_mode() {
+        PopupMode::Message => flex_area(
             area,
             Constraint::Percentage(100),
             Constraint::Length(3),
@@ -110,10 +113,9 @@ fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
             Flex::Center,
         ),
     };
-    frame.render_widget(&app.popup, area);
+    frame.render_widget(&mut app.popup, area);
     // Apply the cursor if it was set during render
-    let state = app.popup.state.read().unwrap();
-    if let Some(pos) = state.get_input_cursor_position() {
+    if let Some(pos) = app.popup.get_input_cursor_position() {
         frame.set_cursor_position(pos);
     }
 }
@@ -125,16 +127,16 @@ fn flex_area(area: Rect, horizontal: Constraint, vertical: Constraint, flex: Fle
 }
 
 fn render_chains_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.chains, area);
+    frame.render_widget(&mut app.chains, area);
 }
 
 fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.validators.as_compact(), area);
+    frame.render_stateful_widget(ValidatorsCompactWidget::new(), area, &mut app.validators);
 }
 
-fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.collators, area);
-}
+// fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+//     frame.render_widget(&app.collators, area);
+// }
 
 fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_widget(
@@ -158,7 +160,8 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
+    let widget = ValidatorsDetailedGroupWidget::new(&app.chains);
+    frame.render_stateful_widget(widget, block_area, &mut app.validators);
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {

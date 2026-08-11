@@ -1,12 +1,6 @@
-use crate::widgets::chains::ChainsListWidget;
-use crate::widgets::validators_compact::ValidatorsCompactWidget;
-use crate::widgets::validators_detailed_group::{
-    ValidatorsDetailedGroupWidget, GROUP_HEADER_HEIGHT, PADDING,
-};
-use crate::widgets::validators_detailed_list::ValidatorsDetailedListWidget;
+use crate::widgets::validators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{fetch_validators_from_source, NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
@@ -25,7 +19,7 @@ type Amount = u128;
 type ValidatorKey = AccountKey;
 
 #[derive(Debug)]
-pub struct ValidatorsListState {
+pub struct ValidatorsList {
     pub validators: HashMap<ValidatorKey, Validator>,
     pub validators_order: Vec<ValidatorKey>,
     pub table_state: TableState,
@@ -35,7 +29,7 @@ pub struct ValidatorsListState {
     masked: bool,
 }
 
-impl Default for ValidatorsListState {
+impl Default for ValidatorsList {
     fn default() -> Self {
         Self {
             validators: HashMap::new(),
@@ -49,7 +43,7 @@ impl Default for ValidatorsListState {
     }
 }
 
-impl ValidatorsListState {
+impl ValidatorsList {
     pub fn add_validator(&mut self, validator: Validator) {
         let key = validator.key();
         if !self.validators.contains_key(key) {
@@ -354,55 +348,8 @@ impl ValidatorsListState {
     pub fn scroll_up(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_sub(1);
     }
-}
 
-#[derive(Debug)]
-pub struct ValidatorsListWidget {
-    state: Arc<RwLock<ValidatorsListState>>,
-    // The sender to send actions to update the state to the app.
-    // tx: UnboundedSender<Action>,
-}
-
-impl<'a> ValidatorsListWidget {
-    // Add methods to create the alternative widgets
-    pub fn as_compact(&self) -> ValidatorsCompactWidget {
-        ValidatorsCompactWidget {
-            state: self.state.clone(),
-        }
-    }
-
-    pub fn as_detailed_group(
-        &self,
-        chains: &'a ChainsListWidget,
-    ) -> ValidatorsDetailedGroupWidget<'a> {
-        ValidatorsDetailedGroupWidget {
-            state: self.state.clone(),
-            chains,
-        }
-    }
-
-    pub fn as_detailed_list(&self) -> ValidatorsDetailedListWidget {
-        ValidatorsDetailedListWidget {
-            state: self.state.clone(),
-        }
-    }
-}
-
-impl Default for ValidatorsListWidget {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ValidatorsListWidget {
-    pub fn new() -> Self {
-        Self {
-            state: Arc::new(RwLock::new(ValidatorsListState::default())),
-            // tx,
-        }
-    }
-
-    pub async fn on_init(&self) {
+    pub async fn on_init(&mut self) {
         let chains = CONFIG.chains();
         for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
@@ -423,12 +370,12 @@ impl ValidatorsListWidget {
         self.init_table();
     }
 
-    fn process_validators(&self, chain_name: &SupportedRuntime, validators: &[NodeConfig]) {
+    fn process_validators(&mut self, chain_name: &SupportedRuntime, validators: &[NodeConfig]) {
         for validator in validators {
             match validator {
                 NodeConfig::Address(stash) => {
                     let validator = Validator::new(*chain_name, *stash);
-                    self.add_validator(&validator);
+                    self.add_validator(validator);
                 }
                 NodeConfig::Detailed {
                     stash,
@@ -443,186 +390,124 @@ impl ValidatorsListWidget {
                     if let Some(cmds) = commands {
                         validator.commands = cmds.clone();
                     }
-                    self.add_validator(&validator);
+                    self.add_validator(validator);
                 }
             }
         }
     }
 
-    fn add_validator(&self, validator: &Validator) {
-        let mut state = self.state.write().unwrap();
-        state.add_validator(validator.clone());
-    }
-
-    pub fn move_down(&self) -> Option<Validator> {
-        let mut state = self.state.write().unwrap();
-        if let Some(selected) = state.table_state.selected() {
-            if selected == state.validators_order.len() - 1 {
-                state.table_state.select_first();
-                state.scroll_offset = 0;
+    pub fn move_down(&mut self) -> Option<Validator> {
+        if let Some(selected) = self.table_state.selected() {
+            if selected == self.validators_order.len() - 1 {
+                self.table_state.select_first();
+                self.scroll_offset = 0;
             } else {
-                state.table_state.scroll_down_by(1);
+                self.table_state.scroll_down_by(1);
             }
-            state.ensure_selection_in_view();
-            state
-                .table_state
+            self.ensure_selection_in_view();
+            self.table_state
                 .selected()
-                .and_then(|i| state.get_validator_by_index_cloned(i))
+                .and_then(|i| self.get_validator_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn move_up(&self) -> Option<Validator> {
-        let mut state = self.state.write().unwrap();
-        if let Some(selected) = state.table_state.selected() {
+    pub fn move_up(&mut self) -> Option<Validator> {
+        if let Some(selected) = self.table_state.selected() {
             if selected == 0 {
-                let i = state.validators_order.len() - 1;
-                state.table_state.select(Some(i));
+                let i = self.validators_order.len() - 1;
+                self.table_state.select(Some(i));
             } else {
-                state.table_state.scroll_up_by(1);
-                state.scroll_offset = state.scroll_offset.saturating_sub(1);
+                self.table_state.scroll_up_by(1);
+                self.scroll_offset = self.scroll_offset.saturating_sub(1);
             }
-            state.ensure_selection_in_view();
-            state
-                .table_state
+            self.ensure_selection_in_view();
+            self.table_state
                 .selected()
-                .and_then(|i| state.get_validator_by_index_cloned(i))
+                .and_then(|i| self.get_validator_by_index_cloned(i))
         } else {
             None
         }
     }
 
-    pub fn init_table(&self) {
-        let mut state = self.state.write().unwrap();
-        if !state.validators.is_empty() {
-            state.table_state.select(Some(0));
+    pub fn init_table(&mut self) {
+        if !self.validators.is_empty() {
+            self.table_state.select(Some(0));
         }
     }
 
-    pub fn is_active(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_active()
+    pub fn set_active(&mut self, active: bool) {
+        self.active = active;
     }
 
-    pub fn set_active(&self, active: bool) {
-        let mut state = self.state.write().unwrap();
-        state.active = active;
-    }
-
-    pub fn is_masked(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_masked()
-    }
-
-    pub fn toggle_mask(&self) {
-        let mut state = self.state.write().unwrap();
-        state.masked = !state.is_masked();
-    }
-
-    pub fn get_selected(&self) -> Option<Validator> {
-        let state = self.state.read().unwrap();
-        state.get_selected()
+    pub fn toggle_mask(&mut self) {
+        self.masked = !self.is_masked();
     }
 
     pub fn is_proxy_valid(&self) -> bool {
-        let state = self.state.read().unwrap();
-        if let Some(v) = state.get_selected() {
+        if let Some(v) = self.get_selected() {
             return v.is_proxy_valid();
         }
         false
     }
 
     pub fn is_commands_available(&self) -> bool {
-        let state = self.state.read().unwrap();
-        if let Some(v) = state.get_selected() {
+        if let Some(v) = self.get_selected() {
             return v.is_commands_available();
         }
         false
     }
 
     pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
-        let state = self.state.read().unwrap();
-        state.get_keys_by_runtime(runtime.relay_chain())
+        self.get_keys_by_runtime(runtime.relay_chain())
     }
 
-    pub fn update_prefs(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_prefs(validator_key, prefs)
+    pub fn update_prefs(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
+        self.set_prefs(validator_key, prefs)
     }
 
-    pub fn update_prefs_next(&self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_prefs_next(validator_key, prefs)
+    pub fn update_prefs_next(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
+        self.set_prefs_next(validator_key, prefs)
     }
 
-    pub fn update_points(&self, validator_key: &AccountKey, points: Points) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_points(validator_key, points)
+    pub fn update_points(&mut self, validator_key: &AccountKey, points: Points) -> bool {
+        self.set_points(validator_key, points)
     }
 
-    pub fn update_era_points(&self, validator_key: &AccountKey, points: Points) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_era_points(validator_key, points)
+    pub fn update_era_points(&mut self, validator_key: &AccountKey, points: Points) -> bool {
+        self.set_era_points(validator_key, points)
     }
 
-    pub fn update_identity(&self, validator_key: &AccountKey, identity: Identity) {
-        let mut state = self.state.write().unwrap();
-        state.set_identity(validator_key, identity);
+    pub fn update_identity(&mut self, validator_key: &AccountKey, identity: Identity) {
+        self.set_identity(validator_key, identity);
     }
 
-    pub fn update_stake_overview(&self, validator_key: &AccountKey, data: StakeOverview) {
-        let mut state = self.state.write().unwrap();
-        state.set_stake_overview(validator_key, data);
+    pub fn update_stake_overview(&mut self, validator_key: &AccountKey, data: StakeOverview) {
+        self.set_stake_overview(validator_key, data);
     }
 
-    pub fn update_stake_ledger(&self, validator_key: &AccountKey, data: StakeLedger) {
-        let mut state = self.state.write().unwrap();
-        state.set_stake_ledger(validator_key, data);
+    pub fn update_stake_ledger(&mut self, validator_key: &AccountKey, data: StakeLedger) {
+        self.set_stake_ledger(validator_key, data);
     }
 
-    pub fn update_payee(&self, validator_key: &AccountKey, data: Payee) {
-        let mut state = self.state.write().unwrap();
-        state.set_payee(validator_key, data);
+    pub fn update_payee(&mut self, validator_key: &AccountKey, data: Payee) {
+        self.set_payee(validator_key, data);
     }
 
-    pub fn update_next_keys(&self, validator_key: &AccountKey, data: Option<Keys>) {
-        let mut state = self.state.write().unwrap();
-        state.set_next_keys(validator_key, data);
+    pub fn update_next_keys(&mut self, validator_key: &AccountKey, data: Option<Keys>) {
+        self.set_next_keys(validator_key, data);
     }
 
-    pub fn update_queued_keys(&self, validator_key: &AccountKey, data: Option<Keys>) {
-        let mut state = self.state.write().unwrap();
-        state.set_queued_keys(validator_key, data);
+    pub fn update_queued_keys(&mut self, validator_key: &AccountKey, data: Option<Keys>) {
+        self.set_queued_keys(validator_key, data);
     }
 
-    pub fn update_status(&self, validator_key: &AccountKey, status: ValidatorStatus) {
-        let mut state = self.state.write().unwrap();
-        state.set_status(validator_key, status);
+    pub fn update_status(&mut self, validator_key: &AccountKey, status: ValidatorStatus) {
+        self.set_status(validator_key, status);
     }
 
-    pub fn add_amount_to_stake_ledger(&self, validator_key: &AccountKey, amount: Amount) {
-        let mut state = self.state.write().unwrap();
-        state.add_amount_to_stake_ledger(validator_key, amount);
-    }
-
-    pub fn sub_chunk_from_stake_ledger(&self, validator_key: &AccountKey, chunk: Chunk) {
-        let mut state = self.state.write().unwrap();
-        state.sub_chunk_from_stake_ledger(validator_key, chunk);
-    }
-
-    pub fn add_proxy(&self, validator_key: &AccountKey, proxy: ProxyKey) {
-        let mut state = self.state.write().unwrap();
-        state.add_proxy(validator_key, proxy);
-    }
-
-    pub fn update_balance(&self, validator_key: &AccountKey, balance: Balance) {
-        let mut state = self.state.write().unwrap();
-        state.set_balance(validator_key, balance);
-    }
-
-    pub fn add_amount_to_balance(&self, validator_key: &AccountKey, amount: Amount) {
-        let mut state = self.state.write().unwrap();
-        state.add_amount_to_balance(validator_key, amount);
+    pub fn update_balance(&mut self, validator_key: &AccountKey, balance: Balance) {
+        self.set_balance(validator_key, balance);
     }
 }

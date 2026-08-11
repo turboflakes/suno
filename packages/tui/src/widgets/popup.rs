@@ -14,20 +14,20 @@ use ratatui::{
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
-use std::sync::{Arc, RwLock};
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
 use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::Call,
-    entry::{Command, Entry, ToDescription},
+    entry::{Command, Entry, ToDescription, ToMethod},
     session::{Keys, Proof},
     staking::Payee,
     Chain, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
 use unicode_width::UnicodeWidthStr;
+
+type ActiveEra = u32;
 
 #[derive(Clone, PartialEq, Eq)]
 struct ValidatorContext {
@@ -35,19 +35,29 @@ struct ValidatorContext {
     validator: Validator,
 }
 
-#[derive(Clone, PartialEq, Eq)]
 struct ChainContext {
     runtime: SupportedRuntime,
 }
 
-/// Context holds the initialization data for a popup. Carries the heavy, mode-specific
-/// payload only while building the popup; it is not stored in state.
+#[derive(Clone, PartialEq, Eq)]
+struct MessageContext {
+    msg: String,
+}
+
+impl MessageContext {
+    fn new(msg: impl Into<String>) -> Self {
+        Self { msg: msg.into() }
+    }
+}
+
+#[derive(Default)]
 enum Context {
+    #[default]
+    None,
     ValidatorMenu(Box<ValidatorContext>),
     ChainMenu(Box<ChainContext>),
     Confirmation(Box<ConfirmationContext>),
-    Transaction,
-    Update,
+    Message(MessageContext),
     ChainSpecs(Box<ChainSpecsContext>),
     Metadata(Box<MetadataContext>),
 }
@@ -55,118 +65,376 @@ enum Context {
 impl Context {
     fn mode(&self) -> Mode {
         match self {
+            Context::None => Mode::Hidden,
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
             Context::Confirmation(_) => Mode::Confirmation,
-            Context::Transaction => Mode::Transaction,
-            Context::Update => Mode::Update,
+            Context::Message(_) => Mode::Message,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
             Context::Metadata(_) => Mode::Metadata,
         }
     }
 }
 
-/// Popup status_modes.
-#[derive(Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum Mode {
     #[default]
     Hidden,
     Menu,
     Confirmation,
-    Transaction,
-    Update,
+    Message,
     ChainSpecs,
     Metadata,
 }
 
-#[derive(Clone)]
-pub struct PopupWidget {
-    pub state: Arc<RwLock<PopupState>>,
-    picker: Arc<Picker>,
-}
-
-impl Default for PopupWidget {
-    fn default() -> Self {
-        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
-        Self {
-            state: Arc::default(),
-            picker: Arc::new(picker),
-        }
-    }
-}
-
-/// Per-session scanner state. Exists only while the popup is showing the scanner.
-/// Dropping this (e.g. on `close`) drops `_ctrl`, which disconnects the scanner
-/// thread's receiver and stops it.
 pub struct ScannerSession {
     _ctrl: UnboundedSender<ThreadAction>,
-    _picker: Arc<Picker>,
     frame_protocol: Option<StatefulProtocol>,
 }
 
 impl ScannerSession {
-    pub fn new(ctrl: UnboundedSender<ThreadAction>, picker: Arc<Picker>) -> Self {
+    pub fn new(ctrl: UnboundedSender<ThreadAction>) -> Self {
         Self {
             _ctrl: ctrl,
-            _picker: picker,
             frame_protocol: None,
         }
     }
-
-    pub fn set_frame(&mut self, frame: DynamicImage) {
-        self.frame_protocol = Some(self._picker.new_resize_protocol(frame));
-    }
 }
 
-pub struct PopupState {
+pub struct Popup {
+    context: Context,
     options: Vec<Entry<Call>>,
     table_state: TableState,
-    mode: Mode,
     input: InputFieldWidget,
     spinner: Spinner,
-    title: Option<String>,
-    label: Option<String>,
     scanner: Option<ScannerSession>,
+    picker: Picker,
     masked: bool,
     metadata: Option<MetadataState>,
 }
 
-impl Default for PopupState {
+impl Default for Popup {
     fn default() -> Self {
+        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
         Self {
+            context: Context::default(),
             options: Vec::new(),
             table_state: TableState::default(),
-            mode: Mode::default(),
             input: InputFieldWidget::new(),
             spinner: Spinner::default(),
-            title: None,
-            label: None,
             scanner: None,
+            picker,
             masked: true,
             metadata: None,
         }
     }
 }
 
-impl PopupState {
-    fn is_hidden(&self) -> bool {
-        matches!(self.mode, Mode::Hidden)
+impl Popup {
+    fn on_init(&mut self, context: Context) {
+        self.options.clear();
+        self.metadata = None;
+        self.scanner = None;
+        self.table_state.select(None);
+
+        match &context {
+            Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
+            Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::Confirmation(ctx) => {
+                if !ctx.runtime.is_qrcode_enabled() {
+                    self.input.reset_as_password();
+                }
+            }
+            Context::Message(_) => {
+                self.spinner.increment();
+            }
+            Context::ChainSpecs(_) => {}
+            Context::Metadata(ctx) => {
+                self.metadata = Some(MetadataState::new(&ctx.qr_bytes));
+            }
+            Context::None => {}
+        }
+
+        self.context = context;
     }
 
-    fn is_visible(&self) -> bool {
+    fn init_validator_menu(&mut self, ctx: &ValidatorContext) {
+        if !ctx.validator.is_proxy_valid() && !ctx.validator.is_commands_available() {
+            return;
+        }
+
+        let runtime = ctx.validator.runtime().asset_hub_runtime();
+        let unit = runtime.token_symbol();
+        let decimals = runtime.token_decimals();
+        let metadata = InputFieldMetadata::new()
+            .with_unit(unit)
+            .with_decimals(decimals)
+            .with_custom_commands(ctx.validator.commands.clone());
+        self.input.reset_as_command(Some(metadata));
+
+        ctx.validator.proxies.iter().for_each(|p| {
+            let bond = Call::Bond {
+                amount: 0,
+                payee: Payee::default(),
+                max: Some(ctx.validator.free_balance_extended(4)),
+            };
+            if p.proxy().can_call(&bond) && ctx.validator.is_unknown() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: bond,
+                    bytes: None,
+                }));
+            }
+
+            let bond_extra = Call::BondExtra {
+                amount: 0,
+                max: Some(ctx.validator.free_balance_extended(4)),
+            };
+            if p.proxy().can_call(&bond_extra)
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.free_balance() > 0
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: bond_extra,
+                    bytes: None,
+                }));
+            }
+
+            let unbond = Call::Unbond {
+                amount: 0,
+                max: Some(ctx.validator.bounded_extended(4)),
+            };
+            if p.proxy().can_call(&unbond)
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.bounded() > 0
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: unbond,
+                    bytes: None,
+                }));
+            }
+
+            let rebond = Call::Rebond {
+                amount: 0,
+                max: Some(ctx.validator.unlocking_extended(ctx.era, 4)),
+            };
+            if p.proxy().can_call(&rebond)
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.unlocking(ctx.era) > 0
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: rebond,
+                    bytes: None,
+                }));
+            }
+
+            let withdraw = Call::WithdrawUnbonded {
+                max: Some(ctx.validator.unlocked_extended(ctx.era, 4)),
+            };
+            if p.proxy().can_call(&withdraw)
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.unlocked(ctx.era) > 0
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: withdraw,
+                    bytes: None,
+                }));
+            }
+
+            let set_payee = Call::SetPayee {
+                payee: Payee::default(),
+            };
+            if p.proxy().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: set_payee,
+                    bytes: None,
+                }));
+            }
+
+            let validate = Call::Validate {
+                commission: Perbill::from_percent(0),
+                blocked: false,
+            };
+            if p.proxy().can_call(&validate) {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: validate,
+                    bytes: None,
+                }));
+            }
+
+            let chill = Call::Chill;
+            if p.proxy().can_call(&chill) && ctx.validator.is_active_or_waiting() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: chill,
+                    bytes: None,
+                }));
+            }
+
+            let set_keys = Call::SetKeys {
+                keys: Keys::default(),
+                proof: Proof::default(),
+            };
+            if p.proxy().can_call(&set_keys) && ctx.validator.is_active_or_waiting() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: set_keys,
+                    bytes: None,
+                }));
+            }
+
+            let purge_keys = Call::PurgeKeys;
+            if p.proxy().can_call(&purge_keys)
+                && ctx.validator.is_active_or_waiting()
+                && ctx.validator.has_keys()
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: purge_keys,
+                    bytes: None,
+                }));
+            }
+        });
+
+        ctx.validator.commands.iter().for_each(|c| {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::Custom(c.clone()),
+                bytes: None,
+            }));
+        });
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn init_chain_menu(&mut self, ctx: &ChainContext) {
+        self.input.reset_as_command(None);
+
+        self.options.push(Entry::new(Command::Instruction {
+            call: Call::ChainSpecs {
+                chain_name: ctx.runtime.to_string(),
+            },
+            bytes: None,
+        }));
+
+        self.options.push(Entry::new(Command::Instruction {
+            call: Call::Metadata {
+                chain_name: ctx.runtime.to_string(),
+            },
+            bytes: None,
+        }));
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    pub fn show_validator_commands(&mut self, validator: &Validator, active_era: ActiveEra) {
+        let ctx = ValidatorContext {
+            era: active_era,
+            validator: validator.clone(),
+        };
+        self.on_init(Context::ValidatorMenu(Box::new(ctx)));
+    }
+
+    pub fn show_chain_commands(&mut self, chain: &Chain) {
+        let ctx = ChainContext {
+            runtime: chain.runtime(),
+        };
+        self.on_init(Context::ChainMenu(Box::new(ctx)));
+    }
+
+    pub fn show_confirm_and_sign(&mut self, ctx: &ConfirmationContext) {
+        self.on_init(Context::Confirmation(Box::new(ctx.clone())));
+    }
+
+    pub fn show_chain_specs_qrcode(&mut self, ctx: &ChainSpecsContext) {
+        self.on_init(Context::ChainSpecs(Box::new(ctx.clone())));
+    }
+
+    pub fn show_metadata_qrcode(&mut self, ctx: &MetadataContext) {
+        self.on_init(Context::Metadata(Box::new(ctx.clone())));
+    }
+
+    pub fn show_message(&mut self, msg: impl Into<String>) {
+        self.on_init(Context::Message(MessageContext::new(msg)));
+    }
+
+    pub fn advance_metadata_frame(&mut self) {
+        if let Some(metadata) = self.metadata.as_mut() {
+            metadata.advance_frame();
+        }
+    }
+
+    pub fn is_hidden(&self) -> bool {
+        matches!(self.context, Context::None)
+    }
+
+    pub fn is_visible(&self) -> bool {
         !self.is_hidden()
     }
 
-    fn is_masked(&self) -> bool {
-        self.masked
+    pub fn move_down(&mut self) -> Option<Entry<Call>> {
+        let options = self.get_options_filtered();
+        if options.is_empty() {
+            self.table_state.select(None);
+            return None;
+        }
+
+        let selected = self
+            .table_state
+            .selected()
+            .unwrap_or(0)
+            .min(options.len() - 1);
+        let next = if selected == options.len() - 1 {
+            0
+        } else {
+            selected + 1
+        };
+        self.table_state.select(Some(next));
+        options.get(next).cloned()
     }
 
-    pub fn get_input_cursor_position(&self) -> Option<Position> {
-        self.input.get_cursor_position()
+    pub fn move_up(&mut self) -> Option<Entry<Call>> {
+        let options = self.get_options_filtered();
+        if options.is_empty() {
+            self.table_state.select(None);
+            return None;
+        }
+
+        let selected = self
+            .table_state
+            .selected()
+            .unwrap_or(0)
+            .min(options.len() - 1);
+        let next = if selected == 0 {
+            options.len() - 1
+        } else {
+            selected - 1
+        };
+        self.table_state.select(Some(next));
+        options.get(next).cloned()
     }
 
-    pub fn get_input_parsed_call(&self) -> Option<Call> {
-        self.input.get_parsed_call()
+    pub fn close(&mut self) {
+        self.context = Context::None;
+        self.options.clear();
+        self.scanner = None;
+        self.metadata = None;
+        self.table_state.select(None);
+        self.input.clear_focus();
+    }
+
+    pub fn start_scanner(&mut self, ctrl: UnboundedSender<ThreadAction>) {
+        self.scanner = Some(ScannerSession::new(ctrl));
+    }
+
+    pub fn get_selected(&self) -> Option<Entry<Call>> {
+        let options = self.get_options_filtered();
+        if options.is_empty() {
+            return None;
+        }
+        self.table_state.selected().and_then(|i| {
+            let i = i.min(options.len() - 1);
+            options.get(i).cloned()
+        })
     }
 
     pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
@@ -183,627 +451,138 @@ impl PopupState {
             .collect()
     }
 
-    pub fn get_selected(&self) -> Option<Entry<Call>> {
-        match self.mode {
-            Mode::Menu => {
-                let options = self.get_options_filtered();
-                if options.is_empty() {
-                    return None;
-                }
-                self.table_state.selected().and_then(|i| {
-                    // clamp: if the filter shrank the list, use the last item
-                    let i = i.min(options.len() - 1);
-                    options.get(i).cloned()
-                })
-            }
-            _ => self.table_state.selected().map(|i| self.options[i].clone()),
-        }
-    }
-
     pub fn get_selected_call(&self) -> Option<Call> {
-        if let Some(selected) = self.get_selected() {
-            match selected.get_command() {
+        self.get_selected()
+            .and_then(|selected| match selected.get_command() {
                 Command::Instruction { call, .. } => Some(call),
                 _ => None,
-            }
+            })
+    }
+
+    pub fn get_call_data_bytes(&self) -> Option<Vec<u8>> {
+        if let Context::Confirmation(ctx) = &self.context {
+            Some(ctx.call_data_bytes.clone())
         } else {
             None
         }
-    }
-}
-
-type ActiveEra = u32;
-
-impl PopupWidget {
-    fn on_init(&self, context: Context) {
-        let mut state = self.state.write().unwrap();
-        state.options.clear();
-
-        match &context {
-            Context::ValidatorMenu(ctx) => self.init_validator_menu(&mut state, ctx),
-            Context::ChainMenu(ctx) => self.init_chain_menu(&mut state, ctx),
-            Context::Confirmation(ctx) => self.init_confirmation(&mut state, ctx),
-            Context::Transaction => self.init_transaction(&mut state),
-            Context::Update => self.init_update(&mut state),
-            Context::ChainSpecs(ctx) => self.init_chain_specs_qrcode(&mut state, ctx),
-            Context::Metadata(ctx) => self.init_metadata_qrcode(&mut state, ctx),
-        }
-
-        state.mode = context.mode();
-    }
-
-    fn _on_err(&self, err: Box<dyn std::error::Error>) {
-        warn!("Failed with error: {}", err);
-        // TODO: Set chain state to error
-    }
-
-    fn init_validator_menu(&self, state: &mut PopupState, ctx: &ValidatorContext) {
-        // If the validator is not a proxy or has no commands, do not show the menu.
-        if !ctx.validator.is_proxy_valid() && !ctx.validator.is_commands_available() {
-            return;
-        }
-
-        // Set pop-up title as the validator selected
-        state.title = Some(ctx.validator.display_identity());
-        state.label = Some("Commands".to_string());
-
-        let runtime = ctx.validator.runtime().asset_hub_runtime();
-
-        // Reset the input field to command mode and set metadata.
-        let unit = runtime.token_symbol();
-        let decimals = runtime.token_decimals();
-        let metadata = InputFieldMetadata::new()
-            .with_unit(unit)
-            .with_decimals(decimals)
-            .with_custom_commands(ctx.validator.commands.clone());
-        state.input.reset_as_command(Some(metadata));
-
-        // For each supported proxy, push the respective calls depending on the validator's status.
-        ctx.validator.proxies.iter().for_each(|p| {
-            // NOTE: Bonding calls are only available if validator status is unknown.
-            let bond = Call::Bond {
-                amount: 0,
-                payee: Payee::default(),
-                max: Some(ctx.validator.free_balance_extended(4)),
-            };
-            if p.proxy().can_call(&bond) && ctx.validator.is_unknown() {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: bond,
-                    bytes: None,
-                }));
-            }
-
-            let bond_extra = Call::BondExtra {
-                amount: 0,
-                max: Some(ctx.validator.free_balance_extended(4)),
-            };
-            if p.proxy().can_call(&bond_extra)
-                && ctx.validator.is_active_or_waiting()
-                && ctx.validator.free_balance() > 0
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: bond_extra,
-                    bytes: None,
-                }));
-            }
-
-            let unbond = Call::Unbond {
-                amount: 0,
-                max: Some(ctx.validator.bounded_extended(4)),
-            };
-            if p.proxy().can_call(&unbond)
-                && ctx.validator.is_active_or_waiting()
-                && ctx.validator.bounded() > 0
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: unbond,
-                    bytes: None,
-                }));
-            }
-
-            let rebond = Call::Rebond {
-                amount: 0,
-                max: Some(ctx.validator.unlocking_extended(ctx.era, 4)),
-            };
-            if p.proxy().can_call(&rebond)
-                && ctx.validator.is_active_or_waiting()
-                && ctx.validator.unlocking(ctx.era) > 0
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: rebond,
-                    bytes: None,
-                }));
-            }
-
-            let withdraw = Call::WithdrawUnbonded {
-                max: Some(ctx.validator.unlocked_extended(ctx.era, 4)),
-            };
-            if p.proxy().can_call(&withdraw)
-                && ctx.validator.is_active_or_waiting()
-                && ctx.validator.unlocked(ctx.era) > 0
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: withdraw,
-                    bytes: None,
-                }));
-            }
-
-            let set_payee = Call::SetPayee {
-                payee: Payee::default(),
-            };
-            if p.proxy().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: set_payee,
-                    bytes: None,
-                }));
-            }
-
-            // NOTE: Validate calls are always available.
-            let validate = Call::Validate {
-                commission: Perbill::from_percent(0),
-                blocked: false,
-            };
-            if p.proxy().can_call(&validate) {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: validate,
-                    bytes: None,
-                }));
-            }
-
-            let chill = Call::Chill;
-            if p.proxy().can_call(&chill) && ctx.validator.is_active_or_waiting() {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: chill,
-                    bytes: None,
-                }));
-            }
-
-            let set_keys = Call::SetKeys {
-                keys: Keys::default(),
-                proof: Proof::default(),
-            };
-            if p.proxy().can_call(&set_keys) && ctx.validator.is_active_or_waiting() {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: set_keys,
-                    bytes: None,
-                }));
-            }
-
-            let purge_keys = Call::PurgeKeys;
-            if p.proxy().can_call(&purge_keys)
-                && ctx.validator.is_active_or_waiting()
-                && ctx.validator.has_keys()
-            {
-                state.options.push(Entry::new(Command::Instruction {
-                    call: purge_keys,
-                    bytes: None,
-                }));
-            }
-        });
-
-        // Set pop-up label as configured host, if custom commands are defined
-        if !ctx.validator.commands.is_empty() {
-            state.label = Some(ctx.validator.host(state.is_masked()));
-        }
-
-        // For each custom commands, push the respective calls depending on the validator's status.
-        ctx.validator.commands.iter().for_each(|c| {
-            state.options.push(Entry::new(Command::Instruction {
-                call: Call::Custom(c.clone()),
-                bytes: None,
-            }));
-        });
-
-        // Select the first option.
-        if !state.options.is_empty() {
-            state.table_state.select(Some(0));
-        }
-    }
-
-    fn init_chain_menu(&self, state: &mut PopupState, ctx: &ChainContext) {
-        // Reset the input field to command mode. and set metadata.
-        state.input.reset_as_command(None);
-
-        // Set pop-up title as the chain selected
-        state.title = Some(ctx.runtime.as_str_long().to_uppercase());
-        state.label = Some("Commands".to_string());
-
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::ChainSpecs {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
-
-        state.options.push(Entry::new(Command::Instruction {
-            call: Call::Metadata {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
-
-        // Select the first option.
-        if !state.options.is_empty() {
-            state.table_state.select(Some(0));
-        }
-    }
-
-    fn init_confirmation(&self, state: &mut PopupState, ctx: &ConfirmationContext) {
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.proxy_identity.clone())));
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.stash_identity.clone())));
-
-        // Instruction with the previously selected call and respective call_data_bytes
-        state.options.push(Entry::new(Command::Instruction {
-            call: ctx.call.clone(),
-            bytes: Some(ctx.call_data_bytes.clone()),
-        }));
-
-        // NOTE: Rather than having a specific field to hold the call data bytes,
-        // we just select the option in position 4th which is where it is being added.
-        // Makes it easier to retrieve the selected option later to copy it to the clipboard;
-        state.table_state.select(Some(4));
-
-        // NOTE: Make QR Data available only if qrcode signing is enabled
-        if ctx.runtime.is_qrcode_enabled() {
-            state
-                .options
-                .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
-
-            state.title = Some("SCAN TO AUTHORIZE TRANSACTION".to_string());
-        } else {
-            state.title = Some("AUTHORIZE TRANSACTION".to_string());
-            // Reset the input field as a password field
-            state.input.reset_as_password();
-        }
-    }
-
-    fn init_transaction(&self, state: &mut PopupState) {
-        state.spinner.increment();
-        state.options.push(Entry::new(Command::Text(
-            "processing transaction".to_string(),
-        )));
-    }
-
-    fn init_update(&self, state: &mut PopupState) {
-        state.spinner.increment();
-        state
-            .options
-            .push(Entry::new(Command::Text("starting update".to_string())));
-    }
-
-    fn init_chain_specs_qrcode(&self, state: &mut PopupState, ctx: &ChainSpecsContext) {
-        state.title = Some("SCAN TO ADD CHAIN SPECS".to_string());
-        // Legacy name
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
-        // Chain spec version
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
-        // Genesis hash
-        state.options.push(Entry::new(Command::Data(
-            ctx.runtime.chain_genesis_hash().0.into(),
-        )));
-        // Address prefix
-        state.options.push(Entry::new(Command::Text(
-            ctx.runtime.account_format().to_string(),
-        )));
-        // Unit
-        state.options.push(Entry::new(Command::Text(
-            ctx.runtime.token_symbol().to_string(),
-        )));
-        // QR Data
-        state
-            .options
-            .push(Entry::new(Command::Data(ctx.qr_bytes.clone())));
-    }
-
-    fn init_metadata_qrcode(&self, state: &mut PopupState, ctx: &MetadataContext) {
-        state.title = Some("SCAN TO UPDATE METADATA".to_string());
-
-        // Legacy name
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.runtime.legacy_name())));
-        // Chain spec version
-        state
-            .options
-            .push(Entry::new(Command::Text(ctx.spec_version.to_string())));
-        // Genesis hash
-        state.options.push(Entry::new(Command::Data(
-            ctx.runtime.chain_genesis_hash().0.into(),
-        )));
-
-        // Set Current Metadata QR Data
-        state.metadata = Some(MetadataState::new(&ctx.qr_bytes));
-    }
-
-    pub fn show_validator_commands(&self, validator: &Validator, active_era: ActiveEra) {
-        let ctx = ValidatorContext {
-            era: active_era,
-            validator: validator.clone(),
-        };
-        let ctx = Context::ValidatorMenu(Box::new(ctx));
-        self.on_init(ctx);
-    }
-
-    pub fn show_chain_commands(&self, chain: &Chain) {
-        let ctx = ChainContext {
-            runtime: chain.runtime(),
-        };
-        let ctx = Context::ChainMenu(Box::new(ctx));
-        self.on_init(ctx);
-    }
-
-    pub fn show_confirm_and_sign(&self, ctx: &ConfirmationContext) {
-        let ctx = Context::Confirmation(Box::new(ctx.clone()));
-        self.on_init(ctx);
-    }
-
-    pub fn show_chain_specs_qrcode(&self, ctx: &ChainSpecsContext) {
-        let ctx = Context::ChainSpecs(Box::new(ctx.clone()));
-        self.on_init(ctx);
-    }
-
-    pub fn show_metadata_qrcode(&self, ctx: &MetadataContext) {
-        let ctx = Context::Metadata(Box::new(ctx.clone()));
-        self.on_init(ctx);
-    }
-
-    pub fn show_transaction_status(&self) {
-        self.on_init(Context::Transaction);
-    }
-
-    pub fn show_update_status(&self) {
-        self.on_init(Context::Update);
-    }
-
-    pub fn advance_metadata_frame(&self) {
-        let mut state = self.state.write().unwrap();
-        if let Some(m) = state.metadata.as_mut() {
-            m.advance_frame()
-        }
-    }
-
-    pub fn is_hidden(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_hidden()
-    }
-
-    pub fn is_visible(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_visible()
-    }
-
-    pub fn move_down(&self) -> Option<Entry<Call>> {
-        let mut state = self.state.write().unwrap();
-        let options = state.get_options_filtered();
-        if options.is_empty() {
-            return None;
-        }
-        if let Some(selected) = state.table_state.selected() {
-            if selected == options.len() - 1 {
-                state.table_state.select_first();
-            } else {
-                state.table_state.select(Some(selected + 1));
-            }
-            state.table_state.selected().map(|i| options[i].clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn move_up(&self) -> Option<Entry<Call>> {
-        let mut state = self.state.write().unwrap();
-        let options = state.get_options_filtered();
-        if options.is_empty() {
-            return None;
-        }
-        if let Some(selected) = state.table_state.selected() {
-            if selected == 0 {
-                let i = options.len() - 1;
-                state.table_state.select(Some(i));
-            } else {
-                state.table_state.select(Some(selected - 1));
-            }
-
-            state.table_state.selected().map(|i| options[i].clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn close(&self) {
-        let mut state = self.state.write().unwrap();
-        state.mode = Mode::Hidden;
-        state.scanner = None;
-        state.title = None;
-        state.label = None;
-        state.metadata = None;
-        state.input.clear_focus();
-    }
-
-    pub fn start_scanner(&self, ctrl: UnboundedSender<ThreadAction>) {
-        let mut state = self.state.write().unwrap();
-        state.scanner = Some(ScannerSession::new(ctrl, Arc::clone(&self.picker)));
-    }
-
-    pub fn get_selected(&self) -> Option<Entry<Call>> {
-        let state = self.state.read().unwrap();
-        state.get_selected()
-    }
-
-    pub fn get_options_filtered(&self) -> Vec<Entry<Call>> {
-        let state = self.state.read().unwrap();
-        state.get_options_filtered()
-    }
-
-    pub fn get_selected_call(&self) -> Option<Call> {
-        let state = self.state.read().unwrap();
-        state.get_selected_call()
     }
 
     pub fn get_input_parsed_call(&self) -> Option<Call> {
-        let state = self.state.read().unwrap();
-        state.get_input_parsed_call()
+        self.input.get_parsed_call()
     }
 
     pub fn get_mode(&self) -> Mode {
-        let state = self.state.read().unwrap();
-        state.mode.clone()
+        self.context.mode()
     }
 
     pub fn is_confirmation_mode(&self) -> bool {
-        let state = self.state.read().unwrap();
-        matches!(state.mode, Mode::Confirmation)
+        matches!(self.context, Context::Confirmation(_))
     }
 
     pub fn is_menu_mode(&self) -> bool {
-        let state = self.state.read().unwrap();
-        matches!(state.mode, Mode::Menu)
+        matches!(
+            self.context,
+            Context::ValidatorMenu(_) | Context::ChainMenu(_)
+        )
     }
 
     pub fn can_close(&self) -> bool {
-        let state = self.state.read().unwrap();
         matches!(
-            state.mode,
-            Mode::Menu | Mode::ChainSpecs | Mode::Metadata | Mode::Confirmation
+            self.context,
+            Context::ValidatorMenu(_)
+                | Context::ChainMenu(_)
+                | Context::ChainSpecs(_)
+                | Context::Metadata(_)
+                | Context::Confirmation(_)
         )
     }
 
     pub fn is_masked(&self) -> bool {
-        let state = self.state.read().unwrap();
-        state.is_masked()
+        self.masked
     }
 
-    pub fn toggle_mask(&self) {
-        let mut state = self.state.write().unwrap();
-        state.masked = !state.is_masked();
+    pub fn toggle_mask(&mut self) {
+        self.masked = !self.is_masked();
     }
 
-    pub fn update_transaction_status(&self, message: &str) {
-        let mut state = self.state.write().unwrap();
-        state.spinner.increment();
-        state.options.clear();
-        state
-            .options
-            .push(Entry::new(Command::Text(message.to_string())));
+    pub fn update_message(&mut self, msg: impl Into<String>) {
+        self.spinner.increment();
+        self.context = Context::Message(MessageContext::new(msg));
     }
 
-    pub fn change_update_status(&self, message: &str) {
-        let mut state = self.state.write().unwrap();
-        state.spinner.increment();
-        state.options.clear();
-        state
-            .options
-            .push(Entry::new(Command::Text(message.to_string())));
+    pub fn show_upgrade_complete(&mut self, msg: impl Into<String>) {
+        self.spinner.complete();
+        self.context = Context::Message(MessageContext::new(msg));
     }
 
-    pub fn show_upgrade_complete(&self, message: &str) {
-        let mut state = self.state.write().unwrap();
-        state.spinner.complete();
-        state.options.clear();
-        state
-            .options
-            .push(Entry::new(Command::Text(message.to_string())));
+    pub fn show_upgrade_error(&mut self) {
+        self.spinner.error();
+        self.context = Context::Message(MessageContext::new("upgrade failed, check the logs"));
     }
 
-    pub fn show_upgrade_error(&self) {
-        let mut state = self.state.write().unwrap();
-        state.spinner.error();
-        state.options.clear();
-        state.options.push(Entry::new(Command::Text(
-            "upgrade failed, check the logs".to_string(),
-        )));
-    }
-
-    pub fn update_scanner_frame(&self, frame: DynamicImage) {
-        let mut state = self.state.write().unwrap();
-        if let Some(scanner) = &mut state.scanner {
-            scanner.set_frame(frame);
+    pub fn update_scanner_frame(&mut self, frame: DynamicImage) {
+        let frame_protocol = self.picker.new_resize_protocol(frame);
+        if let Some(scanner) = self.scanner.as_mut() {
+            scanner.frame_protocol = Some(frame_protocol);
         }
     }
 
-    // Input actions
-    pub fn set_input_focus(&self) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.input.set_focus()
+    pub fn set_input_focus(&mut self) -> bool {
+        self.input.set_focus()
     }
 
-    pub fn clear_input_focus(&self) {
-        let mut state = self.state.write().unwrap();
-        state.input.clear_focus();
+    pub fn clear_input_focus(&mut self) {
+        self.input.clear_focus();
     }
 
-    pub fn lock_input(&self) {
-        let mut state = self.state.write().unwrap();
-        state.input.lock_input();
+    pub fn lock_input(&mut self) {
+        self.input.lock_input();
     }
 
-    pub fn set_input_success(&self, msg: &str) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.input.set_success(msg)
+    pub fn set_input_success(&mut self, msg: &str) -> bool {
+        self.input.set_success(msg)
     }
 
-    pub fn set_input_error(&self, msg: &str) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.input.set_error(msg)
+    pub fn set_input_error(&mut self, msg: &str) -> bool {
+        self.input.set_error(msg)
     }
 
-    pub fn invalidate_input(&self, msg: &str) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.input.invalidate(msg)
+    pub fn invalidate_input(&mut self, msg: &str) -> bool {
+        self.input.invalidate(msg)
     }
 
-    pub fn insert_input_char(&self, new_char: char) {
-        let mut state = self.state.write().unwrap();
-        state.input.insert_char(new_char);
+    pub fn insert_input_char(&mut self, new_char: char) {
+        self.input.insert_char(new_char);
     }
 
-    pub fn delete_input_char(&self) {
-        let mut state = self.state.write().unwrap();
-        state.input.delete_char();
+    pub fn delete_input_char(&mut self) {
+        self.input.delete_char();
 
-        if state.mode == Mode::Menu {
-            let options = state.get_options_filtered();
+        if self.is_menu_mode() {
+            let options = self.get_options_filtered();
             if options.is_empty() {
+                self.table_state.select(None);
                 return;
             }
-            // NOTE: ensure to select the first entry as soon as options are not filtered out
-            state.table_state.select(Some(0));
+            self.table_state.select(Some(0));
         }
     }
 
-    pub fn insert_input_paste_data(&self, data: String) {
-        let mut state = self.state.write().unwrap();
-        state.input.paste_data(data);
+    pub fn insert_input_paste_data(&mut self, data: String) {
+        self.input.paste_data(data);
     }
 
-    pub fn move_cursor_left(&self) {
-        let mut state = self.state.write().unwrap();
-        state.input.move_cursor_left();
+    pub fn move_cursor_left(&mut self) {
+        self.input.move_cursor_left();
     }
 
-    pub fn move_cursor_right(&self) {
-        let mut state = self.state.write().unwrap();
-        state.input.move_cursor_right();
+    pub fn move_cursor_right(&mut self) {
+        self.input.move_cursor_right();
     }
 
-    pub fn set_input_autocomplete(&self) {
-        let mut state = self.state.write().unwrap();
-        if let Some(call) = state.get_selected_call() {
-            state.input.set_value(call.to_string());
+    pub fn set_input_autocomplete(&mut self) {
+        if let Some(call) = self.get_selected_call() {
+            self.input.set_value(call.to_string());
         }
     }
 
@@ -811,530 +590,429 @@ impl PopupWidget {
     where
         F: FnOnce(&str) -> Result<R, E>,
     {
-        let state = self.state.read().unwrap();
-        state.input.execute_with_password(f)
+        self.input.execute_with_password(f)
+    }
+
+    pub fn get_input_cursor_position(&self) -> Option<Position> {
+        self.input.get_cursor_position()
     }
 }
 
-impl Widget for &PopupWidget {
+impl Widget for &mut Popup {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if !self.is_visible() {
-            return; // Do not render if popup is not active.
-        }
-
-        let mut state = self.state.write().unwrap();
-
-        match state.mode {
-            Mode::Menu => render_menu(area, buf, &mut state),
-            Mode::Confirmation => render_confirm_and_sign(area, buf, &mut state),
-            Mode::Transaction | Mode::Update => render_message(area, buf, &mut state),
-            Mode::ChainSpecs => render_chain_specs_qrcode(area, buf, &mut state),
-            Mode::Metadata => render_metadata_qrcode(area, buf, &mut state),
+        match self.get_mode() {
+            Mode::Menu => self.render_menu(area, buf),
+            Mode::Confirmation => self.render_confirm_and_sign(area, buf),
+            Mode::Message => self.render_message(area, buf),
+            Mode::ChainSpecs => self.render_chain_specs_qrcode(area, buf),
+            Mode::Metadata => self.render_metadata_qrcode(area, buf),
             Mode::Hidden => {}
         }
     }
 }
 
-fn render_menu(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
-    let options = state.get_options_filtered();
+impl Popup {
+    fn render_menu(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
+        let options = self.get_options_filtered();
+        let rows = options
+            .iter()
+            .map(|entry| to_row(entry.get_command(), self.get_mode()));
 
-    let mode = state.mode.clone();
-    let rows = options.iter().map(|f| {
-        let command = f.get_command();
-        to_row(command, mode.clone(), None)
-    });
+        let (title, label) = match &self.context {
+            Context::ValidatorMenu(ctx) => {
+                let label = if !ctx.validator.commands.is_empty() {
+                    format!("Commands ({})", ctx.validator.host(self.masked))
+                } else {
+                    "Commands".to_string()
+                };
+                (Some(ctx.validator.display_identity()), Some(label))
+            }
+            Context::ChainMenu(ctx) => (
+                Some(ctx.runtime.as_str_long().to_uppercase()),
+                Some("Commands".to_string()),
+            ),
+            _ => (None, None),
+        };
 
-    // Split the area into top header to show all options, a small central box to show the input field
-    // and a bottom footer to show the error message
-    let details_len = (options.len() as u16 + 5).clamp(4, 10);
-    let [top_area, details_area, input_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
+        let details_len = (options.len() as u16 + 5).clamp(4, 10);
+        let [top_area, details_area, input_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Max(details_len),
+                Constraint::Length(5),
+            ])
+            .flex(Flex::End)
+            .areas(area);
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::new(1, 1, 1, 0));
+
+        let mut header_line = vec![];
+
+        if let Some(label) = label {
+            header_line.push(Span::styled(
+                format!("{} ", label),
+                theme.paragraph.label(true),
+            ));
+        }
+
+        if let Some(title) = title {
+            header_line.push(Span::styled(title, theme.paragraph.header(true)));
+        }
+
+        let header = Line::from(header_line).alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        let widths = [
             Constraint::Length(2),
-            Constraint::Max(details_len), // Top header
-            Constraint::Length(5), // InputField as command mode (input (3) + invalid msg (2))
+            Constraint::Length(22),
+            Constraint::Fill(2),
+            Constraint::Length(2),
+        ];
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::bottom(1));
+
+        let table = Table::new(rows, widths)
+            .block(block)
+            .header(Row::new(["", "command", "description", ""]).style(theme.table.header))
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(true));
+
+        Clear.render(details_area, buf);
+        StatefulWidget::render(table, details_area, buf, &mut self.table_state);
+
+        let call = self.get_selected_call();
+        self.input.as_command(call).render(input_area, buf);
+    }
+
+    fn render_confirm_and_sign(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
+
+        let Context::Confirmation(ctx) = &self.context else {
+            return;
+        };
+
+        let title = if ctx.runtime.is_qrcode_enabled() {
+            "SCAN TO AUTHORIZE TRANSACTION"
+        } else {
+            "AUTHORIZE TRANSACTION"
+        };
+        let runtime_version_value = format!("{}/{}", ctx.runtime.legacy_name(), ctx.spec_version);
+        let stash = ctx.stash_identity.clone();
+        let proxy = ctx.proxy_identity.clone();
+        let method = truncate_method(&ctx.call, 32);
+        let call_data = truncate_hex(&ctx.call_data_bytes, 24);
+        let qr_bytes = if ctx.runtime.is_qrcode_enabled() {
+            Some(ctx.qr_bytes.clone())
+        } else {
+            None
+        };
+
+        let header = Line::from(vec![Span::styled(title, theme.paragraph.header(true))])
+            .alignment(Alignment::Right);
+        let runtime_version = Line::from(vec![
+            Span::styled("runtime version ", theme.paragraph.label_inverse),
+            Span::raw(runtime_version_value),
+        ]);
+        let stash = Line::from(vec![
+            Span::styled("stash ", theme.paragraph.label_inverse),
+            Span::raw(stash),
+        ]);
+        let method = Line::from(vec![
+            Span::styled("method ", theme.paragraph.label_inverse),
+            Span::raw(method),
+        ]);
+        let proxy = Line::from(vec![
+            Span::styled("proxy account ", theme.paragraph.label_inverse),
+            Span::raw(proxy),
+        ]);
+
+        let available_width = usize::from(area.width.saturating_sub(4));
+        let left_text = format!("call data {call_data}");
+        let right_text = "ctrl+shift+c copy";
+        let spaces = available_width
+            .saturating_sub(left_text.width())
+            .saturating_sub(right_text.width());
+
+        let call_data = Line::from(vec![
+            Span::styled("call data ", theme.paragraph.label_inverse),
+            Span::raw(call_data),
+            Span::raw(" ".repeat(spaces)),
+            Span::styled("ctrl+shift+c", theme.paragraph.base),
+            Span::raw(" "),
+            Span::styled("copy", theme.paragraph.label_inverse),
+        ]);
+
+        let details = Paragraph::new(vec![
+            header,
+            runtime_version,
+            stash,
+            method,
+            proxy,
+            call_data,
         ])
-        .flex(Flex::End)
-        .areas(area);
-
-    let block = Block::new()
-        .style(theme.block.popup_header)
-        .padding(Padding::new(1, 1, 1, 0));
-
-    let mut header_line = vec![];
-
-    if state.label.is_some() {
-        let label = Span::styled(
-            format!("{} ", state.label.as_deref().unwrap_or_default()),
-            theme.paragraph.label(true),
-        );
-        header_line.push(label);
-    }
-
-    if state.title.is_some() {
-        let title = Span::styled(
-            state.title.as_deref().unwrap_or_default(),
-            theme.paragraph.header(true),
-        );
-        header_line.push(title);
-    }
-
-    let header = Line::from(header_line).alignment(Alignment::Right);
-
-    let top = Paragraph::new(header)
-        .block(block)
+        .block(
+            Block::new()
+                .style(theme.block.popup_header)
+                .padding(Padding::proportional(1)),
+        )
         .wrap(Wrap { trim: false });
 
-    Clear.render(top_area, buf);
-
-    top.render(top_area, buf);
-
-    let widths = [
-        Constraint::Length(2),
-        Constraint::Length(22),
-        Constraint::Fill(2),
-        Constraint::Length(2),
-    ];
-
-    let table_labels = vec!["", "command", "description", ""];
-
-    let block = Block::new()
-        .style(theme.block.popup_header)
-        .padding(Padding::bottom(1));
-
-    let table = Table::new(rows, widths)
-        .block(block)
-        .header(Row::new(table_labels).style(theme.table.header))
-        .style(theme.table.base)
-        .row_highlight_style(theme.table.row_highlight(true));
-
-    Clear.render(details_area, buf);
-
-    StatefulWidget::render(table, details_area, buf, &mut state.table_state);
-
-    // Render input area
-    let call = state.get_selected_call();
-    state.input.as_command(call).render(input_area, buf);
-}
-
-fn render_confirm_and_sign(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
-
-    // Get all required data from 'state.options' based on the indices established
-    // in `init_menu`.
-    let Some(legacy_entry) = state.options.first() else {
-        return;
-    };
-    let Some(spec_version_entry) = state.options.get(1) else {
-        return;
-    };
-    let Some(proxy_identity_entry) = state.options.get(2) else {
-        return;
-    };
-    let Some(stash_identity_entry) = state.options.get(3) else {
-        return;
-    };
-    let Some(call_entry) = state.options.get(4) else {
-        return;
-    };
-
-    let mut header_content = vec![];
-    let title = state.title.clone();
-    if state.title.is_some() {
-        let title = Span::styled(
-            title.as_deref().unwrap_or_default(),
-            theme.paragraph.header(true),
-        );
-        header_content.push(title);
-    };
-    let header = Line::from(header_content).alignment(Alignment::Right);
-
-    let runtime_version = Line::from(vec![
-        Span::styled("runtime version ", theme.paragraph.label_inverse),
-        Span::raw(format!(
-            "{}/{}",
-            legacy_entry.command(),
-            spec_version_entry.command()
-        )),
-    ]);
-
-    let stash = Line::from(vec![
-        Span::styled("stash ", theme.paragraph.label_inverse),
-        Span::raw(stash_identity_entry.command()),
-    ]);
-
-    let method = Line::from(vec![
-        Span::styled("method ", theme.paragraph.label_inverse),
-        Span::raw(call_entry.to_method_truncated(32)),
-    ]);
-
-    let proxy = Line::from(vec![
-        Span::styled("proxy account ", theme.paragraph.label_inverse),
-        Span::raw(proxy_identity_entry.command()),
-    ]);
-
-    // Calculate spaces needed to show the `ctrl+shift+c copy on the right`
-    let available_width = area.width.saturating_sub(4);
-    let left_text = format!("call data {}", call_entry.to_hex_truncated(24));
-    let right_len = "ctrl+shift+c copy".len() as u16; // 17
-    let spaces = available_width
-        .saturating_sub(left_text.len() as u16)
-        .saturating_sub(right_len);
-
-    let call_data = Line::from(vec![
-        Span::styled("call data ", theme.paragraph.label_inverse),
-        Span::raw(call_entry.to_hex_truncated(24)),
-        Span::raw(" ".repeat(spaces as usize)),
-        Span::styled("ctrl+shift+c", theme.paragraph.base),
-        Span::raw(" "),
-        Span::styled("copy", theme.paragraph.label_inverse),
-    ]);
-
-    let block = Block::new()
-        .style(theme.block.popup_header)
-        .padding(Padding::proportional(1));
-
-    let details = Paragraph::new(vec![
-        header,
-        runtime_version,
-        stash,
-        method,
-        proxy,
-        call_data,
-    ])
-    .block(block)
-    .wrap(Wrap { trim: false });
-
-    // Note: The QR code entry is only available if QR code signing is enabled
-    // If it's not available, we default to the standard sign mode
-    match state.options.get(5) {
-        Some(qr) => render_transaction_qrcode(qr.as_bytes(), details, area, buf, state),
-        None => render_password_input(details, area, buf, state),
-    }
-}
-
-fn render_transaction_qrcode(
-    qr_bytes: Vec<u8>,
-    details: Paragraph,
-    area: Rect,
-    buf: &mut Buffer,
-    state: &mut PopupState,
-) {
-    let theme = CONFIG.theme();
-
-    // Render qrcode
-    let qrcode = QrCodeWidget::new(&qr_bytes);
-
-    // Split the area into header to show transaction details and sign area (password / QR code)
-    let [details_area, sign_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Max(7), // Details
-            Constraint::Length(qrcode.height()),
-        ])
-        .flex(Flex::End)
-        .areas(area);
-
-    Clear.render(details_area, buf);
-    Clear.render(sign_area, buf);
-
-    details.render(details_area, buf);
-
-    // Split the sign area into QR code and scanner camera area
-    let [qrcode_area, scanner_area] = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Fill(1)])
-        .areas(sign_area);
-
-    let block = Block::default().style(theme.qrcode.base);
-
-    qrcode
-        .block(block)
-        .style(theme.qrcode.base)
-        .render(qrcode_area, buf);
-
-    // Render qrcode scanner (camera)
-    if let Some(ref mut scanner) = state.scanner {
-        if let Some(ref mut frame) = scanner.frame_protocol {
-            ScannerWidget::new(frame)
-                .set_title("Scan QR code")
-                .set_title_style(theme.qrcode.title)
-                .set_style(theme.qrcode.scanner)
-                .render(scanner_area, buf);
+        match qr_bytes {
+            Some(qr_bytes) => self.render_transaction_qrcode(&qr_bytes, details, area, buf),
+            None => self.render_password_input(details, area, buf),
         }
     }
-}
 
-fn render_password_input(details: Paragraph, area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let [details_area, sign_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Max(7), // Details
-            Constraint::Length(5),
-        ])
-        .flex(Flex::End)
-        .areas(area);
+    fn render_transaction_qrcode(
+        &mut self,
+        qr_bytes: &[u8],
+        details: Paragraph<'_>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        let theme = CONFIG.theme();
 
-    details.render(details_area, buf);
+        let qrcode = QrCodeWidget::new(qr_bytes);
 
-    state.input.as_password().render(sign_area, buf);
-}
+        let [details_area, sign_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Max(7), Constraint::Length(qrcode.height())])
+            .flex(Flex::End)
+            .areas(area);
 
-fn render_message(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
-    let horizontal = Layout::horizontal([Constraint::Max(56)]);
-    let [area] = horizontal.areas(area);
+        Clear.render(details_area, buf);
+        Clear.render(sign_area, buf);
+        details.render(details_area, buf);
 
-    Clear.render(area, buf);
+        let [qrcode_area, scanner_area] = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(70), Constraint::Fill(1)])
+            .areas(sign_area);
 
-    let block = Block::new()
-        .style(theme.block.main)
-        .padding(Padding::proportional(1));
+        qrcode
+            .block(Block::default().style(theme.qrcode.base))
+            .style(theme.qrcode.base)
+            .render(qrcode_area, buf);
 
-    let spinner_progress = state.spinner.status();
-
-    let rows = state.options.iter().map(|f| {
-        let command = f.get_command();
-        to_row(command, state.mode.clone(), Some(&spinner_progress))
-    });
-    let widths = [Constraint::Fill(1), Constraint::Length(7)];
-    let table = Table::new(rows, widths)
-        .style(theme.table.base)
-        .block(block);
-    // .row_highlight_style(THEME.table.row_highlight(state.is_visible));
-
-    StatefulWidget::render(table, area, buf, &mut state.table_state);
-}
-
-fn render_chain_specs_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
-
-    let Some(legacy_name_entry) = state.options.first() else {
-        return;
-    };
-
-    let Some(spec_version_entry) = state.options.get(1) else {
-        return;
-    };
-
-    let Some(genesis_hash_entry) = state.options.get(2) else {
-        return;
-    };
-
-    let Some(account_format_entry) = state.options.get(3) else {
-        return;
-    };
-
-    let Some(unit_entry) = state.options.get(4) else {
-        return;
-    };
-
-    let Some(qrcode_entry) = state.options.get(5) else {
-        return;
-    };
-
-    let mut header_content = vec![];
-    if state.title.is_some() {
-        let title = Span::styled(
-            state.title.as_deref().unwrap_or_default(),
-            theme.paragraph.header(true),
-        );
-        header_content.push(title);
+        if let Some(scanner) = self.scanner.as_mut() {
+            if let Some(frame) = scanner.frame_protocol.as_mut() {
+                ScannerWidget::new(frame)
+                    .set_title("Scan QR code")
+                    .set_title_style(theme.qrcode.title)
+                    .set_style(theme.qrcode.scanner)
+                    .render(scanner_area, buf);
+            }
+        }
     }
-    let header = Line::from(header_content).alignment(Alignment::Right);
 
-    let runtime_version = Line::from(vec![
-        Span::styled("runtime version ", theme.paragraph.label_inverse),
-        Span::raw(format!(
-            "{}/{}",
-            legacy_name_entry.command(),
-            spec_version_entry.command()
-        )),
-    ]);
+    fn render_password_input(&self, details: Paragraph<'_>, area: Rect, buf: &mut Buffer) {
+        let [details_area, sign_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Max(7), Constraint::Length(5)])
+            .flex(Flex::End)
+            .areas(area);
 
-    let genesis_hash = Line::from(vec![
-        Span::styled("genesis hash ", theme.paragraph.label_inverse),
-        Span::raw(genesis_hash_entry.to_hex()),
-    ]);
-
-    let account_format = Line::from(vec![
-        Span::styled("address prefix ", theme.paragraph.label_inverse),
-        Span::raw(account_format_entry.command()),
-    ]);
-
-    let unit = Line::from(vec![
-        Span::styled("unit ", theme.paragraph.label_inverse),
-        Span::raw(unit_entry.command()),
-    ]);
-
-    let block = Block::new()
-        .style(theme.block.popup_header)
-        .padding(Padding::proportional(1));
-
-    let details = Paragraph::new(vec![
-        header,
-        runtime_version,
-        genesis_hash,
-        account_format,
-        unit,
-    ])
-    .block(block)
-    .wrap(Wrap { trim: false });
-
-    // Render qrcode
-    let qr_bytes = qrcode_entry.as_bytes();
-    let qrcode = QrCodeWidget::new(&qr_bytes);
-
-    // Split the area into header to chain details QR code
-    let [details_area, qrcode_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Max(7), // Details
-            Constraint::Length(qrcode.height()),
-        ])
-        .flex(Flex::End)
-        .areas(area);
-
-    Clear.render(details_area, buf);
-    Clear.render(qrcode_area, buf);
-
-    details.render(details_area, buf);
-
-    let block = Block::default().style(theme.qrcode.base);
-
-    qrcode
-        .block(block)
-        .style(theme.qrcode.base)
-        .render(qrcode_area, buf);
-}
-
-fn render_metadata_qrcode(area: Rect, buf: &mut Buffer, state: &mut PopupState) {
-    let theme = CONFIG.theme();
-    let Some(legacy_name_entry) = state.options.first() else {
-        return;
-    };
-
-    let Some(spec_version_entry) = state.options.get(1) else {
-        return;
-    };
-
-    let Some(genesis_hash_entry) = state.options.get(2) else {
-        return;
-    };
-
-    let Some(metadata_state) = state.metadata.as_ref() else {
-        return;
-    };
-
-    let Some(qrcode) = metadata_state.frame() else {
-        return;
-    };
-
-    let mut header_content = vec![];
-    if state.title.is_some() {
-        let title = Span::styled(
-            state.title.as_deref().unwrap_or_default(),
-            theme.paragraph.header(true),
-        );
-        header_content.push(title);
+        details.render(details_area, buf);
+        self.input.as_password().render(sign_area, buf);
     }
-    let header = Line::from(header_content).alignment(Alignment::Right);
 
-    let runtime_version = Line::from(vec![
-        Span::styled("runtime version ", theme.paragraph.label_inverse),
-        Span::raw(format!(
-            "{}/{}",
-            legacy_name_entry.command(),
-            spec_version_entry.command()
-        )),
-    ]);
+    fn render_message(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
 
-    let genesis_hash = Line::from(vec![
-        Span::styled("genesis_hash ", theme.paragraph.label_inverse),
-        Span::raw(genesis_hash_entry.command()),
-    ]);
+        let Context::Message(ctx) = &self.context else {
+            return;
+        };
 
-    let block = Block::new()
-        .style(theme.block.popup_header)
-        .padding(Padding::proportional(1));
+        let [area] = Layout::horizontal([Constraint::Max(56)]).areas(area);
 
-    let details = Paragraph::new(vec![header, runtime_version, genesis_hash])
-        .block(block)
+        Clear.render(area, buf);
+
+        let row = Row::new([
+            Cell::from(Line::from(ctx.msg.clone())),
+            Cell::from(Line::from(self.spinner.status()).alignment(Alignment::Right)),
+        ]);
+
+        let table = Table::new([row], [Constraint::Fill(1), Constraint::Length(7)])
+            .style(theme.table.base)
+            .block(
+                Block::new()
+                    .style(theme.block.main)
+                    .padding(Padding::proportional(1)),
+            );
+
+        StatefulWidget::render(table, area, buf, &mut self.table_state);
+    }
+
+    fn render_chain_specs_qrcode(&self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
+
+        let Context::ChainSpecs(ctx) = &self.context else {
+            return;
+        };
+
+        let runtime_version_value = format!("{}/{}", ctx.runtime.legacy_name(), ctx.spec_version);
+        let genesis_hash_value = format!("0x{}", hex::encode(ctx.runtime.chain_genesis_hash().0));
+        let account_format_value = ctx.runtime.account_format().to_string();
+        let unit_value = ctx.runtime.token_symbol().to_string();
+        let qr_bytes = ctx.qr_bytes.clone();
+
+        let header = Line::from(vec![Span::styled(
+            "SCAN TO ADD CHAIN SPECS",
+            theme.paragraph.header(true),
+        )])
+        .alignment(Alignment::Right);
+        let runtime_version = Line::from(vec![
+            Span::styled("runtime version ", theme.paragraph.label_inverse),
+            Span::raw(runtime_version_value),
+        ]);
+        let genesis_hash = Line::from(vec![
+            Span::styled("genesis hash ", theme.paragraph.label_inverse),
+            Span::raw(genesis_hash_value),
+        ]);
+        let account_format = Line::from(vec![
+            Span::styled("address prefix ", theme.paragraph.label_inverse),
+            Span::raw(account_format_value),
+        ]);
+        let unit = Line::from(vec![
+            Span::styled("unit ", theme.paragraph.label_inverse),
+            Span::raw(unit_value),
+        ]);
+
+        let details = Paragraph::new(vec![
+            header,
+            runtime_version,
+            genesis_hash,
+            account_format,
+            unit,
+        ])
+        .block(
+            Block::new()
+                .style(theme.block.popup_header)
+                .padding(Padding::proportional(1)),
+        )
         .wrap(Wrap { trim: false });
 
-    let qrcode = MetadataWidget::new(qrcode);
+        let qrcode = QrCodeWidget::new(&qr_bytes);
+        let [details_area, qrcode_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Max(7), Constraint::Length(qrcode.height())])
+            .flex(Flex::End)
+            .areas(area);
 
-    // Split the area into header to chain details QR code
-    let [details_area, qrcode_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Max(7), // Details
-            Constraint::Length(qrcode.height()),
-        ])
-        .flex(Flex::End)
-        .areas(area);
+        Clear.render(details_area, buf);
+        Clear.render(qrcode_area, buf);
+        details.render(details_area, buf);
 
-    Clear.render(details_area, buf);
-    Clear.render(qrcode_area, buf);
+        qrcode
+            .block(Block::default().style(theme.qrcode.base))
+            .style(theme.qrcode.base)
+            .render(qrcode_area, buf);
+    }
 
-    details.render(details_area, buf);
+    fn render_metadata_qrcode(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = CONFIG.theme();
 
-    let block = Block::default().style(theme.qrcode.base);
+        let Context::Metadata(ctx) = &self.context else {
+            return;
+        };
 
-    qrcode
-        .block(block)
-        .style(theme.qrcode.base)
-        .render(qrcode_area, buf);
+        let runtime_version_value = format!("{}/{}", ctx.runtime.legacy_name(), ctx.spec_version);
+        let genesis_hash_value = format!("0x{}", hex::encode(ctx.runtime.chain_genesis_hash().0));
+
+        let Some(metadata_state) = self.metadata.as_ref() else {
+            return;
+        };
+        let Some(qrcode) = metadata_state.frame() else {
+            return;
+        };
+
+        let header = Line::from(vec![Span::styled(
+            "SCAN TO UPDATE METADATA",
+            theme.paragraph.header(true),
+        )])
+        .alignment(Alignment::Right);
+        let runtime_version = Line::from(vec![
+            Span::styled("runtime version ", theme.paragraph.label_inverse),
+            Span::raw(runtime_version_value),
+        ]);
+        let genesis_hash = Line::from(vec![
+            Span::styled("genesis_hash ", theme.paragraph.label_inverse),
+            Span::raw(genesis_hash_value),
+        ]);
+
+        let details = Paragraph::new(vec![header, runtime_version, genesis_hash])
+            .block(
+                Block::new()
+                    .style(theme.block.popup_header)
+                    .padding(Padding::proportional(1)),
+            )
+            .wrap(Wrap { trim: false });
+
+        let qrcode = MetadataWidget::new(qrcode);
+        let [details_area, qrcode_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Max(7), Constraint::Length(qrcode.height())])
+            .flex(Flex::End)
+            .areas(area);
+
+        Clear.render(details_area, buf);
+        Clear.render(qrcode_area, buf);
+        details.render(details_area, buf);
+
+        qrcode
+            .block(Block::default().style(theme.qrcode.base))
+            .style(theme.qrcode.base)
+            .render(qrcode_area, buf);
+    }
 }
 
-pub fn to_row(command: Command<Call>, mode: Mode, msg: Option<&str>) -> Row<'_> {
+pub fn to_row(command: Command<Call>, mode: Mode) -> Row<'static> {
     match command {
         Command::Instruction { call, .. } => {
             let mut cols = Vec::new();
 
-            // Add menu-specific formatting
             if mode == Mode::Menu {
                 cols.push("".to_string());
-                cols.push(format!("/{}", call));
+                cols.push(format!("/{call}"));
                 cols.push(call.description());
                 cols.push("".to_string());
             }
 
             Row::new(cols)
         }
-        Command::Text(t) => match mode {
-            Mode::Transaction | Mode::Update => {
-                let cols = vec![
-                    Cell::from(Line::from(t.to_string())),
-                    Cell::from(
-                        Line::from(msg.unwrap_or("").to_string()).alignment(Alignment::Right),
-                    ),
-                ];
-
-                Row::new(cols)
-            }
-            _ => Row::new(vec![t.to_string()]),
-        },
+        Command::Text(text) => Row::new(vec![text.to_string()]),
         _ => Row::new(vec!["".to_string()]),
     }
 }
 
-fn _calculate_text_wrapped_lines(text: &str, area_width: u16) -> u16 {
-    let mut total_lines = 0;
-
-    for line in text.lines() {
-        let line_width = line.width();
-        let area_width = area_width as usize;
-
-        if line_width == 0 {
-            total_lines += 1;
-        } else {
-            // Calculate how many lines this single line will wrap into
-            let wrapped = line_width.div_ceil(area_width);
-            total_lines += wrapped as u16;
-        }
+fn truncate_method(call: &Call, max_length: usize) -> String {
+    let method = call.to_method();
+    if method.len() > max_length {
+        format!("{}..", method.chars().take(max_length).collect::<String>())
+    } else {
+        method
     }
+}
 
-    total_lines.max(1)
+fn truncate_hex(bytes: &[u8], max_length: usize) -> String {
+    let encoded = hex::encode(bytes);
+    if encoded.len() > max_length {
+        format!(
+            "0x{}..",
+            encoded.chars().take(max_length).collect::<String>()
+        )
+    } else {
+        format!("0x{encoded}")
+    }
 }
