@@ -63,9 +63,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_validators_widget(app, frame, left_layout[1]);
     }
 
-    if config.features.collators_enabled() {
-        render_collators_widget(app, frame, left_layout[2]);
-    }
+    // TODO: Collators
+    // if config.features.collators_enabled() {
+    //     render_collators_widget(app, frame, left_layout[2]);
+    // }
 
     if config.features.rpcs_enabled() {
         render_rpcs_widget(app, frame, left_layout[3]);
@@ -133,9 +134,9 @@ fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_stateful_widget(ValidatorsCompactWidget::new(), area, &mut app.validators);
 }
 
-fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.collators, area);
-}
+// fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+//     frame.render_widget(&app.collators, area);
+// }
 
 fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_widget(

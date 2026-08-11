@@ -2,7 +2,6 @@ use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsList,
-    collators::CollatorsListWidget,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
     validators::ValidatorsList,
@@ -77,7 +76,7 @@ pub struct App {
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
-    pub collators: CollatorsListWidget,
+    // TODO: pub collators: CollatorsListWidget,
     /// Manages popup state and rendering.
     pub popup: Popup,
     /// Logs state.
@@ -105,7 +104,7 @@ impl App {
             section: Section::default(),
             chains: ChainsList::default(),
             validators: ValidatorsList::default(),
-            collators: CollatorsListWidget::default(),
+            // collators: CollatorsListWidget::default(),
             popup: Popup::default(),
             logs: LogsState::new(rx_logs),
             masked: true,
@@ -942,9 +941,9 @@ impl App {
                     self.validators.move_up();
                 }
             }
-            Section::Collators => {
-                self.collators.move_up();
-            }
+            // Section::Collators => {
+            //     self.collators.move_up();
+            // }
             _ => {}
         };
     }
@@ -966,9 +965,9 @@ impl App {
                     self.validators.move_down();
                 }
             }
-            Section::Collators => {
-                self.collators.move_down();
-            }
+            // Section::Collators => {
+            //     self.collators.move_down();
+            // }
             _ => {}
         };
     }
@@ -980,8 +979,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        self.collators
-            .set_active(self.section == Section::Collators);
+        // self.collators
+        //     .set_active(self.section == Section::Collators);
     }
 
     /// Moves the active section down.
@@ -991,8 +990,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        self.collators
-            .set_active(self.section == Section::Collators);
+        // self.collators
+        //     .set_active(self.section == Section::Collators);
     }
 
     /// Selects the previous window.
@@ -1691,7 +1690,7 @@ impl App {
     pub fn reset_selection(&mut self) {
         self.chains.set_active(false);
         self.validators.set_active(false);
-        self.collators.set_active(false);
+        // self.collators.set_active(false);
     }
 
     /// Copy to clipboard
