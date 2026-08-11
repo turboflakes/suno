@@ -1,26 +1,29 @@
 use crate::widgets::scrollbar::render_scrollbar;
-use crate::widgets::validators::ValidatorsListState;
+use crate::widgets::validators::ValidatorsList;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
     style::Styled,
     text::Text,
-    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, Widget},
+    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
-use std::sync::{Arc, RwLock};
 use suno_config::CONFIG;
 
-#[derive(Debug, Clone)]
-pub struct ValidatorsCompactWidget {
-    pub state: Arc<RwLock<ValidatorsListState>>,
+#[derive(Debug, Default)]
+pub struct ValidatorsCompactWidget;
+
+impl ValidatorsCompactWidget {
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 /// Validators compact view widget implementation, mostly to be used on the left menu
-impl Widget for &ValidatorsCompactWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+impl StatefulWidget for ValidatorsCompactWidget {
+    type State = ValidatorsList;
 
-        let mut state = self.state.write().unwrap();
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let theme = CONFIG.theme();
 
         let block = Block::new()
             .set_style(theme.block.pane_body(state.is_active()))

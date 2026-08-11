@@ -5,7 +5,7 @@ use crate::widgets::{
     collators::CollatorsListWidget,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
-    validators::ValidatorsListWidget,
+    validators::ValidatorsList,
     window::Window,
 };
 use crate::{
@@ -75,7 +75,7 @@ pub struct App {
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
     /// Holds the validators list for the selected relay-chain.
-    pub validators: ValidatorsListWidget,
+    pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
     pub collators: CollatorsListWidget,
     /// Manages popup state and rendering.
@@ -104,7 +104,7 @@ impl App {
             window: Window::default(),
             section: Section::default(),
             chains: ChainsList::default(),
-            validators: ValidatorsListWidget::new(),
+            validators: ValidatorsList::default(),
             collators: CollatorsListWidget::default(),
             popup: Popup::default(),
             logs: LogsState::new(rx_logs),

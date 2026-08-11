@@ -1,25 +1,29 @@
-use crate::widgets::validators::ValidatorsListState;
+use crate::widgets::validators::ValidatorsList;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
     style::{Color, Style, Styled},
     text::Text,
-    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table, Widget},
+    widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table},
 };
-use std::sync::{Arc, RwLock};
 use suno_config::CONFIG;
 use suno_primitives::display::format_planks;
 
-#[derive(Debug, Clone)]
-pub struct ValidatorsDetailedListWidget {
-    pub state: Arc<RwLock<ValidatorsListState>>,
+#[derive(Debug, Default)]
+pub struct ValidatorsDetailedListWidget;
+
+impl ValidatorsDetailedListWidget {
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 /// Validators detailed list view widget implementation, to be used as an alternative of the grouped view
-impl Widget for &ValidatorsDetailedListWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+impl StatefulWidget for ValidatorsDetailedListWidget {
+    type State = ValidatorsList;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = CONFIG.theme();
-        let mut state = self.state.write().unwrap();
 
         let (table_style, highlight_style) = match state.is_active() {
             true => (

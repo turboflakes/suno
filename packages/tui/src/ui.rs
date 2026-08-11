@@ -1,5 +1,7 @@
 use crate::app::App;
 use crate::widgets::logs::LogsWidget;
+use crate::widgets::validators_compact::ValidatorsCompactWidget;
+use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -128,7 +130,7 @@ fn render_chains_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(&app.validators.as_compact(), area);
+    frame.render_stateful_widget(ValidatorsCompactWidget::new(), area, &mut app.validators);
 }
 
 fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -157,7 +159,8 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    frame.render_widget(&app.validators.as_detailed_group(&app.chains), block_area);
+    let widget = ValidatorsDetailedGroupWidget::new(&app.chains);
+    frame.render_stateful_widget(widget, block_area, &mut app.validators);
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {

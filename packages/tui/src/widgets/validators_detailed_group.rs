@@ -1,6 +1,6 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::scrollbar::render_scrollbar;
-use crate::widgets::validators::ValidatorsListState;
+use crate::widgets::validators::ValidatorsList;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -8,7 +8,6 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
-use std::sync::{Arc, RwLock};
 use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_blocks, format_planks},
@@ -19,16 +18,22 @@ use suno_theme::Theme;
 pub const GROUP_HEADER_HEIGHT: u16 = 6;
 pub const PADDING: u16 = 4;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
-    pub state: Arc<RwLock<ValidatorsListState>>,
     pub chains: &'a ChainsList,
 }
 
+impl<'a> ValidatorsDetailedGroupWidget<'a> {
+    pub fn new(chains: &'a ChainsList) -> Self {
+        Self { chains }
+    }
+}
+
 /// Validators grouped view widget implementation, mostly to be used under the validators main tab view
-impl<'a> Widget for &ValidatorsDetailedGroupWidget<'a> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
+impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
+    type State = ValidatorsList;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         state.set_viewport_height(area.height);
         let validators_grouped = state.get_validators_grouped_by_runtime();
         let total_height = state.total_detailed_group_height();
