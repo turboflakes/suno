@@ -25,7 +25,10 @@ impl Scanner {
         let index = CameraIndex::Index(0);
         let requested =
             RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestResolution);
-        let camera = Camera::new(index, requested)?;
+        // AVFoundation logs a harmless "AVCaptureDeviceTypeExternal is deprecated"
+        // notice to stderr while nokhwa enumerates devices on macOS. Until nokhwa removes the
+        // warning, silence stderr for the duration of the call.
+        let camera = silence_stderr(|| Camera::new(index, requested))?;
         Ok(Self {
             camera,
             reader: QRCodeReader,
@@ -33,7 +36,7 @@ impl Scanner {
     }
 
     pub fn open(&mut self) -> Result<(), Error> {
-        self.camera.open_stream()?;
+        silence_stderr(|| self.camera.open_stream())?;
         Ok(())
     }
 
@@ -67,4 +70,48 @@ impl Scanner {
 
         Ok((data, display))
     }
+}
+
+/// Run `f` with the process's stderr temporarily redirected to `/dev/null`.
+///
+/// Used to hide macOS's noisy (and harmless) AVFoundation deprecation
+/// warning — `AVCaptureDeviceTypeExternal is deprecated for Continuity
+/// Cameras` — that nokhwa's vendored bindings trigger on every camera
+/// enumeration and that we can't suppress at the source.
+#[cfg(target_os = "macos")]
+fn silence_stderr<T>(f: impl FnOnce() -> T) -> T {
+    use std::ffi::CString;
+    use std::os::unix::io::RawFd;
+
+    const STDERR_FD: RawFd = 2;
+
+    // SAFETY: standard POSIX fd juggling — duplicate stderr so it can be
+    // restored, then point fd 2 at /dev/null for the duration of `f`.
+    let saved_fd = unsafe { libc::dup(STDERR_FD) };
+    if saved_fd < 0 {
+        return f();
+    }
+
+    let devnull_path = CString::new("/dev/null").unwrap();
+    let devnull_fd = unsafe { libc::open(devnull_path.as_ptr(), libc::O_WRONLY) };
+    if devnull_fd >= 0 {
+        unsafe {
+            libc::dup2(devnull_fd, STDERR_FD);
+            libc::close(devnull_fd);
+        }
+    }
+
+    let result = f();
+
+    unsafe {
+        libc::dup2(saved_fd, STDERR_FD);
+        libc::close(saved_fd);
+    }
+
+    result
+}
+
+#[cfg(not(target_os = "macos"))]
+fn silence_stderr<T>(f: impl FnOnce() -> T) -> T {
+    f()
 }

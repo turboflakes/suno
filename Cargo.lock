@@ -7212,6 +7212,7 @@ version = "0.5.0"
 dependencies = [
  "hex",
  "image",
+ "libc",
  "nokhwa",
  "parity-scale-codec",
  "qrcodegen",

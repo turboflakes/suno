@@ -12,6 +12,7 @@ edition.workspace = true
 codec = { workspace = true }
 hex = { workspace = true }
 image = { workspace = true }
+libc = { workspace = true }
 nokhwa = { workspace = true }
 qrcodegen = { workspace = true }
 raptorq = { workspace = true }

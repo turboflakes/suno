@@ -50,6 +50,7 @@ hex = "0.4"
 image = "0.25"
 indoc = "2"
 lazy_static = "1.5"
+libc = "0.2"
 nokhwa = { version = "0.10", features = ["input-native"] }
 openssh = { version = "0.11", features = ["native-mux"] }
 qrcodegen = "1.8"
