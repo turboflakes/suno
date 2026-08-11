@@ -11,7 +11,7 @@ use std::result::Result;
 use tokio::sync::mpsc;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt;
-use tracing_subscriber::{prelude::*, EnvFilter, Registry};
+use tracing_subscriber::{prelude::*, Registry};
 
 pub fn init_cli(file_path: Option<&str>) -> Result<Option<WorkerGuard>, Error> {
     let (file_layer, guard) = match file_path {
@@ -31,8 +31,13 @@ pub fn init_cli(file_path: Option<&str>) -> Result<Option<WorkerGuard>, Error> {
     };
 
     let cli_layer = fmt::layer().with_target(false).with_ansi(true);
+
+    let default_level = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing::Level::INFO.into())
+        .from_env_lossy();
+
     Registry::default()
-        .with(EnvFilter::from_default_env())
+        .with(default_level)
         .with(cli_layer)
         .with(file_layer)
         .init();
@@ -60,8 +65,12 @@ pub fn init_tui(
         None => (None, None),
     };
 
+    let default_level = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing::Level::INFO.into())
+        .from_env_lossy();
+
     Registry::default()
-        .with(EnvFilter::from_default_env())
+        .with(default_level)
         .with(TuiLayer::new(tx))
         .with(file_layer)
         .init();
