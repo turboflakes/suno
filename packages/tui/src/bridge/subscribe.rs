@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 /// Maximum time to wait to initialize subscription before
 /// considering it offline and breaking out of the task.
-const SUBSCRIPTION_TIMEOUT: Duration = Duration::from_millis(6_000);
+const SUBSCRIPTION_TIMEOUT: Duration = Duration::from_millis(12_000);
 
 /// Maximum time to wait for the next block stream before
 /// considering it stalled and breaking out of the task.
@@ -17,7 +17,7 @@ const BLOCK_TIMEOUT: Duration = Duration::from_millis(30_000);
 
 /// Maximum time to wait for network requests before
 /// considering it stalled and breaking out of the task.
-const NETWORK_TIMEOUT: Duration = Duration::from_millis(10_000);
+const NETWORK_TIMEOUT: Duration = Duration::from_millis(6_000);
 
 /// Background task that subscribes head block and sends response over channel.
 pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
