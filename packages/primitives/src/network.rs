@@ -7,11 +7,11 @@ pub type BlockHash = H256;
 pub enum ConnectionState {
     #[default]
     Idle,
-    Reconnecting,
+    Offline,
     Connected,
     Validated,
-    BestBlockSubcriptionDropped(String),
-    FinalizedSubscriptionDropped(String),
+    BestBlockSubcriptionDropped,
+    FinalizedSubscriptionDropped,
     Error(String),
 }
 
@@ -19,12 +19,12 @@ impl std::fmt::Display for ConnectionState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Idle => write!(f, "◯ "),
-            // Self::Connected => write!(f, "●"),
             Self::Validated => write!(f, "✔︎ "),
-            Self::Connected => write!(f, ""),
-            Self::Reconnecting => write!(f, "↺ "),
-            Self::BestBlockSubcriptionDropped(_) => write!(f, "❗ "),
-            Self::FinalizedSubscriptionDropped(_) => write!(f, "❗ "),
+            // Self::Connected => write!(f, "●"),
+            Self::Connected => write!(f, "⇄ "),
+            Self::Offline => write!(f, "✕ "),
+            Self::BestBlockSubcriptionDropped => write!(f, "⤰ "),
+            Self::FinalizedSubscriptionDropped => write!(f, "⤰ "),
             Self::Error(_) => write!(f, "❗ "),
         }
     }

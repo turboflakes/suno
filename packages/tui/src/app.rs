@@ -37,7 +37,7 @@ use suno_qrcode::{
 use suno_tracing::LogEntry;
 use suno_update::update;
 use tokio::sync::mpsc;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use zeroize::Zeroizing;
 
 /// Application result type.
@@ -411,14 +411,16 @@ impl App {
                             _ => {}
                         }
                     }
-                    (true, ConnectionState::BestBlockSubcriptionDropped(e)) => {
-                        warn!("{}", e);
+                    (true, ConnectionState::BestBlockSubcriptionDropped) => {
+                        self.chains
+                            .update_connection_state(&chain_key, ConnectionState::Offline);
                         if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
                             self.chains.subscribe_best_block(&chain, self.tx.clone());
                         }
                     }
-                    (true, ConnectionState::FinalizedSubscriptionDropped(e)) => {
-                        warn!("{}", e);
+                    (true, ConnectionState::FinalizedSubscriptionDropped) => {
+                        self.chains
+                            .update_connection_state(&chain_key, ConnectionState::Offline);
                         if let Some(chain) = self.chains.get_chain_by_runtime(chain_key) {
                             self.chains
                                 .subscribe_finalized_block(&chain, self.tx.clone());

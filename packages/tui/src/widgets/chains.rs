@@ -45,6 +45,12 @@ impl ChainsList {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if chain.best_block() != block_number {
                 chain.set_best_block(block_number);
+                chain.set_best_block_ts(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis(),
+                );
                 return true;
             }
         }

@@ -15,6 +15,8 @@ pub struct Chain {
     client: OnlineClient<CustomConfig>,
     // Best block number
     best_block: BlockNumber,
+    // Best block timestamp in milliseconds
+    best_block_ts: u128,
     // Finalized block number
     finalized_block: BlockNumber,
     // Finalized block timestamp
@@ -45,6 +47,7 @@ impl Chain {
             runtime,
             client,
             best_block: 0,
+            best_block_ts: 0,
             finalized_block: 0,
             finalized_block_hash: None,
             finalized_block_ts: 0,
@@ -81,6 +84,10 @@ impl Chain {
 
     pub fn best_block(&self) -> u64 {
         self.best_block
+    }
+
+    pub fn best_block_ts(&self) -> u128 {
+        self.best_block_ts
     }
 
     pub fn finalized_block(&self) -> u64 {
@@ -159,7 +166,7 @@ impl Chain {
     pub fn is_offline(&self) -> bool {
         matches!(
             self.state,
-            ConnectionState::Idle | ConnectionState::Reconnecting | ConnectionState::Error(_)
+            ConnectionState::Idle | ConnectionState::Offline | ConnectionState::Error(_)
         )
     }
 
@@ -169,6 +176,10 @@ impl Chain {
 
     pub fn set_best_block(&mut self, block_number: BlockNumber) {
         self.best_block = block_number;
+    }
+
+    pub fn set_best_block_ts(&mut self, ts: u128) {
+        self.best_block_ts = ts;
     }
 
     pub fn set_finalized_block(&mut self, block_number: BlockNumber) {
