@@ -35,11 +35,12 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Sign transactions using **Polkadot Vault**.
 - [&check;] Support **Multi-proxy** setup
 - [&check;] Use **Smoldot** as the default connection type.
+- [&check;] New release notification and updates within the TUI or CLI.
+- [&check;] Chain-specs and Metadata QR codes to update Polkadot Vault.
 
 ## Future / Ideas / Work in Progress
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
- - [] RPC manual restarts and health check metrics
  - [] Support for `/kick`, `/nominate` extrinsics
 
 ### Implementation constraints / goals
