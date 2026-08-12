@@ -1,6 +1,6 @@
 use crate::widgets::validators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use ratatui::widgets::TableState;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 use suno_config::{fetch_validators_from_source, NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
@@ -188,7 +188,7 @@ impl ValidatorsList {
         }
     }
 
-    pub fn set_proxies(&mut self, validator_key: &AccountKey, proxies: Vec<ProxyKey>) {
+    pub fn set_proxies(&mut self, validator_key: &AccountKey, proxies: HashSet<ProxyKey>) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
             validator.proxies = proxies;
         }
@@ -196,7 +196,7 @@ impl ValidatorsList {
 
     pub fn add_proxy(&mut self, validator_key: &AccountKey, proxy: ProxyKey) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            validator.proxies.push(proxy);
+            validator.proxies.insert(proxy);
         }
     }
 

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
@@ -65,7 +67,7 @@ pub struct Validator {
     // the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
     pub is_chilled: bool,
-    pub proxies: Vec<ProxyKey>,
+    pub proxies: HashSet<ProxyKey>,
     pub commands: Vec<CustomCommand>,
     pub status: ValidatorStatus,
 }
@@ -89,7 +91,7 @@ impl Validator {
             old_points_ts: 0,
             era_points: 0,
             is_chilled: false,
-            proxies: Vec::new(),
+            proxies: HashSet::new(),
             commands: Vec::new(),
             status: ValidatorStatus::default(),
         }
