@@ -91,10 +91,16 @@ themes:
   path: "themes"
 
 # signer: # global signer configuration, overridden by chain-specific signer config
-#  proxy_path: ".proxy_private.json"
+#  proxy_path: "keys/.proxy_private.json"
 
-explorer:
-  url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+# vault:
+#   secret_path: "keys/.vault_private.seed"
+
+logs:
+  file_path: "logs/suno.log"
+
+# explorer:
+#   url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
   # A few other explorers commented out below
   # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
   # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"

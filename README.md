@@ -32,23 +32,21 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Define and **run** user-specific commands linked to each configured validator.
 - [&check;] Explicitly **use** advanced builtin commands: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`.
 - [&check;] Execute custom commands locally or remotely.
-- [&check;] Sign transactions using **Polkadot Vault**.
+- [&check;] Valid QR codes for Chain-specs, Metadata and Signing to work with **Polkadot Vault**.
 - [&check;] Support **Multi-proxy** setup
-- [&check;] Use **Smoldot** as the default connection type.
+- [&check;] Use **Smoldot** as the default network connection type.
 - [&check;] New release notification and updates within the TUI or CLI.
-- [&check;] Chain-specs and Metadata QR codes to update Polkadot Vault.
-
-## Future / Ideas / Work in Progress
- - [] Pro / Advanced mode to show validators key insight metrics
- - [] Collator metrics and extrinsics
- - [] Support for `/kick`, `/nominate` extrinsics
 
 ### Implementation constraints / goals
  - Runs on the terminal.
  - No backend APIs. No indexers.
- - Users are free to swap between any RPC node provider of their choice. Connect to Local, Private or Public nodes.
+ - Users are free to choose the network type, Light Client ([Smoldot](https://github.com/paritytech/smoldot)) or any Trusted Provider (Local, Private or Public RPC node).
  - Restricted Proxy-Only operations on Asset Hub, with only two proxy types supported:
-    - Staking or StakingOperator
+    - _Staking_ or _StakingOperator_
+
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
+</p>
 
 ## Installation
 
@@ -86,14 +84,87 @@ suno-aarch64-apple-darwin.ta 100%[===========================================>] 
 — Enjoy suno v0.6.0
 ```
 
+## Usage 
+### Option 1 is the easy path, first time user or just run it on the go
+Let's say you operate validator `1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd` on the Polkadot Network through the staking proxy `14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3` configured in Polkadot Vault.
+
+From your favourite terminal, run:
+```bash
+suno polkadot -v 1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
+```
+
+That's it. SUNO will open a TUI, start syncing, and give you access to all the essential staking and session key management features you already know about. No configuration files, no built-in RPCs, and all network connections are handled via light clients. Signing is performed using air-gapped QR codes, with transaction confirmation handled through your Polkadot Vault.
+
+If you have a list of validators on some public site, just use the URL: 
+```bash
+suno kusama -u <VALIDATORS_URL> -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
+```
+
+If your list is private, also provide the Personal Access Token via `--pat <PERSONAL_ACCESS_TOKEN>`. 
+
+SUNO will just run and work.
+
+### Option 2 is for advanced users who prefer a more static configuration.
+Start with the default configuration file provided during installation and customize it to your needs. If `config.yaml` is located in a different directory than the SUNO binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.yaml`. For all configuration options, have a look at the [configuration](#configuration) section below.
+
+### To know about all flags available, type `suno --help`:
+
+```bash
+suno --help
+Yet another way to manage Substrate Node Operations from your terminal.
+
+Usage: suno [OPTIONS] [COMMAND]
+
+Commands:
+  update    Update SUNO latest or specified version for your host platform
+  polkadot  Launch SUNO in light client mode on Polkadot
+  kusama    Launch SUNO in light client mode on Kusama
+  paseo     Launch SUNO in light client mode on Paseo
+  westend   Launch SUNO in light client mode on Westend
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --config-path <FILE>             Sets a custom config file path. [default: .config.yaml]
+  -p, --proxy-account <PROXY_ADDRESS>  Sets a global proxy account used by Polkadot Vault.
+      --proxy-path <FILE>              Sets a global proxy account file path. [default: .proxy_account.json]
+      --vault-secret-path <FILE>       Sets a global vault secret file path.
+  -h, --help                           Print help
+  -V, --version                        Print version
+```
+
+Or to know about a specific subcommand, for example:
+
+```bash
+suno polkadot --help
+Launch SUNO in light client mode on Polkadot
+
+Usage: suno polkadot [OPTIONS]
+
+Options:
+  -v, --validators <STASH_ADDRESS>...  Validator stash addresses. Specify one or multiple addresses (e.g. stash_1,stash_2,stash_3).
+  -u, --validators-url <URL>           Validator source URL for stash addresses.
+      --pat <PAT>                      Personal Access Token for the validators source URL.
+  -p, --proxy-account <PROXY_ADDRESS>  Proxy account used by Polkadot Vault.
+  -h, --help
+```
+
+### List of keybindings
+
+```bash
+'tab' to input focus, to command autocomplete or just to navigate between pane sections
+'esc' to close popup or unfocus from input field
+'ctrl+e' to show list of enabled commands for the selected validator
+'ctrl+w' to switch window
+'ctrl+m' to mask or unmask hosts
+'ctrl+h / ctrl+l / left / right' to navigate between pane sections
+'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
+'ctrl+c' to quit suno
+```
+
 ## Configuration
 
-<p align="center">
-    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
-</p>
-
-### Validator **stashes** and **RPCs**
-Most configuration is done via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
+### Chains, Validators, RPCs, Custom Commands, Themes
+Are all available via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
 
 ```yaml
 chains:
@@ -167,16 +238,22 @@ themes:
 
 signer: # global signer configuration, overridden by chain-specific signer config
   proxy_account: "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
-  # proxy_path: ".proxy_account.json"
+  # proxy_path: "keys/.proxy_private.json"
+
+# vault:
+#   secret_path: "keys/.vault_private.seed"
+
+logs:
+  file_path: "logs/suno.log"
   
-explorer:
-    url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
+# explorer:
+#   url: "https://polkadot.js.org/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
     # A few other explorers commented out below
     # url: "https://dev.papi.how/explorer/{block_hash}#networkId=localhost&endpoint=wss://{chain}.rpc.turboflakes.io"
     # url: "https://polkadot.chainconsole.com/apps/?rpc=wss://{chain}.rpc.turboflakes.io#/explorer/query/{block_hash}"
 ```
 
-## Signer Account (Proxy-Only)
+### Signer Account (Proxy-Only)
 To operate and execute extrinsics onchain, a proxy account with at least one of the following types `Staking`, `StakingOperator` must be set-up for the stashes listed in the configuration file. For example, `Staking` (short form as visualized in the tool `[S]`) or `StakingOperator` `[SO]` must be setup on the Asset-Hub chain.
 
 ### Commands supported per Proxy Type
@@ -259,7 +336,7 @@ suno --proxy-path /home/suno/suno-proxy-account.json
 
 **NOTE:** If you create a brand new account, don't forget to transfer some funds to it and configure the appropriate proxy types for the target stash accounts you want to manage with `suno`. This can be done using any other tool in the Polkadot ecosystem that supports proxy management.
 
-## Custom Commands
+### Custom Commands
 
 Custom commands are user defined commands or a composition of builtin commands. These are defined in the `config.yaml` file and tied to each configured `stash`. 
 
@@ -307,38 +384,6 @@ Below is how you can define custom commands in the `config.yaml`:
               uses: "calls/rotate_and_set_keys"
 ```
 
-## Usage
-From your favourite terminal, simply call `suno`. If you use a custom configuration file, located in a different directory than the `suno` binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.json`
-
-Check all flags available:
-
-```bash
-suno --help
-Yet another way to manage Substrate Node Operations from your terminal.
-
-Usage: suno [OPTIONS]
-
-Options:
-  -c, --config-path <FILE>       Sets a custom config file path. [default: .config.yaml]
-  -p, --proxy-path <FILE>        Sets a global proxy account file path. [default: .proxy_account.json]
-  -a, --proxy-account <ADDRESS>  Sets a global proxy account used by Polkadot Vault.
-  -h, --help                     Print help
-  -V, --version                  Print version
-```
-
-### List of keybindings
-
-```bash
-'tab' to input focus, to command autocomplete or just to navigate between pane sections
-'esc' to close popup or unfocus from input field
-'ctrl+e' to show list of enabled commands for the selected validator
-'ctrl+w' to switch window
-'ctrl+m' to mask or unmask hosts
-'ctrl+h / ctrl+l / left / right' to navigate between pane sections
-'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
-'ctrl+c' to quit suno
-```
-
 ### Change or Build your own **theme**
 
 The `Suno Dark` and `Suno Light` themes are built-in, you can swap between them by updating the configuration file.
@@ -356,6 +401,13 @@ When you are done, make a [PR](https://github.com/turboflakes/suno/pulls) with y
 <p align="center">
     <img alt="suno-light" src="https://github.com/turboflakes/suno/blob/main/assets/suno-light.gif?raw=true" />
 </p>
+
+## Future / Ideas / Work in Progress
+ - [] Pro / Advanced mode to show validators key insight metrics
+ - [] Collator metrics and extrinsics
+ - [] Support for `/kick`, `/nominate` extrinsics
+ - [] Support dynamic theme selection
+ - [] Support validator rewards
 
 ## Development / Build from Source
 
