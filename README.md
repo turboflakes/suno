@@ -81,7 +81,7 @@ suno-aarch64-apple-darwin.ta 100%[===========================================>] 
 ```
 
 ## Usage 
-### Option 1
+#### Option 1
 
 _The easy path, first time user or just run it on the go._
 
@@ -103,12 +103,14 @@ If your list is private, also provide the Personal Access Token via `--pat <PERS
 
 SUNO will just run and work.
 
-### Option 2
+#### Option 2
 _For advanced users who prefer a more static configuration._
 
 Start with the default configuration file provided during installation and customize it to your needs. If `config.yaml` is located in a different directory than the SUNO binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.yaml`. For all configuration options, have a look at the [configuration](#configuration) section below.
 
-### To know about all flags available, type `suno --help`:
+### CLI options and commands
+
+Type `suno --help` , to know about all flags available:
 
 ```bash
 suno --help
@@ -133,7 +135,7 @@ Options:
   -V, --version                        Print version
 ```
 
-Or to know about a specific subcommand, for example:
+Or to know the options available under a specific subcommand:
 
 ```bash
 suno polkadot --help
@@ -149,7 +151,7 @@ Options:
   -h, --help
 ```
 
-### List of keybindings
+### TUI list of keybindings
 
 ```bash
 'tab' to input focus, to command autocomplete or just to navigate between pane sections
