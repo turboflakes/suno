@@ -85,15 +85,14 @@ suno-aarch64-apple-darwin.ta 100%[===========================================>] 
 
 _The easy path, first time user or just run it on the go._
 
-Let's say you operate validator `1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd` on the Polkadot Network through the staking proxy `14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3` configured in Polkadot Vault.
+Let's say you operate validator `1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd` on the Polkadot Network through the staking proxy `14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3` configured in [Polkadot Vault](https://github.com/novasamatech/parity-signer).
 
 From your favourite terminal, run:
 ```bash
 suno polkadot -v 1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
 ```
 
-That's it. SUNO will open a TUI, start syncing, and give you access to all the essential staking and session key management features you already know about. No configuration files, no built-in RPCs, and all network connections are handled via light clients. Signing is performed using air-gapped QR codes, with transaction confirmation handled through your Polkadot Vault.
-
+That's it. SUNO will open a TUI, start syncing, and give you access to all the essential staking and session key management features you already know about. No configuration files, no built-in RPCs, and all network connections are handled via light clients. Signing is performed using air-gapped QR codes, with transaction confirmation handled through your [Polkadot Vault](https://github.com/novasamatech/parity-signer).
 If you have a list of validators on some public site, just use the URL: 
 ```bash
 suno kusama -u <VALIDATORS_URL> -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
