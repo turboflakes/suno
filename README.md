@@ -48,10 +48,10 @@ As a nominator you can just as easily check the validators you nominate.
 
 **Note: Binary release available for Linux and macOS**
 
-### Option 1
+#### Option 1
 Download and extract the latest binary from GitHub [Releases](https://github.com/turboflakes/suno/releases).
 
-### Option 2
+#### Option 2
 Alternatively, run the bash script in [/scripts/install.sh](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/scripts/install.sh) with the command below:
 
 ```bash
@@ -92,7 +92,7 @@ From your favourite terminal, run:
 suno polkadot -v 1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
 ```
 
-That's it. SUNO will open a TUI, start syncing, and give you access to all the essential staking and session key management features you already know about. No configuration files, no built-in RPCs, and all network connections are handled via light clients. Signing is performed using air-gapped QR codes, with transaction confirmation handled through your [Polkadot Vault](https://github.com/novasamatech/parity-signer).
+That's it, **suno** will open a TUI, start syncing, and give you access to all the essential staking and session key management features you already know about. No configuration files, no built-in RPCs, and all network connections are handled via light clients. Signing is performed using air-gapped QR codes, with transaction confirmation handled through your [Polkadot Vault](https://github.com/novasamatech/parity-signer).
 If you have a list of validators on some public site, just use the URL: 
 ```bash
 suno kusama -u <VALIDATORS_URL> -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3
@@ -100,12 +100,12 @@ suno kusama -u <VALIDATORS_URL> -p 14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcK
 
 If your list is private, also provide the Personal Access Token via `--pat <PERSONAL_ACCESS_TOKEN>`. 
 
-SUNO will just run and work.
+**suno** will just run and work.
 
 #### Option 2
 _For advanced users who prefer a more static configuration._
 
-Start with the default configuration file provided during installation and customize it to your needs. If `config.yaml` is located in a different directory than the SUNO binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.yaml`. For all configuration options, have a look at the [configuration](#configuration) section below.
+Start with the default configuration file provided during installation and customize it to your needs. If `config.yaml` is located in a different directory than the **suno** binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.yaml`. For all configuration options, have a look at the [configuration](#configuration) section below.
 
 ### CLI options and commands
 
@@ -167,7 +167,7 @@ Options:
 
 Since `suno v0.6.0`, full compatibility is provided with Polkadot Vault, allowing you to keep your Proxy Staking key offline at all times. Transactions are signed in an air-gapped environment using QR codes.
 
-SUNO also provides the required Chain Specs and Metadata for each supported chain, allowing you to keep the networks in Polkadot Vault up to date. It is recommended to use a dedicated key that is not used for transactions to sign these updates. Note that using unsigned updates is strongly discouraged.
+**suno** also provides the required Chain Specs and Metadata for each supported chain, allowing you to keep the networks in Polkadot Vault up to date. It is recommended to use a dedicated key that is not used for transactions to sign these updates. Note that using unsigned updates is strongly discouraged.
 
 The key used to sign updates can be configured in `config.yaml` using the following:
 
