@@ -13,7 +13,7 @@ As a node operator, to manage your own or third-party nodes from the terminal.
 As a nominator you can just as easily check the validators you nominate.
 
 <p align="center">
-    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun-qrcode.gif?raw=true" />
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark-qrcode.gif?raw=true" />
 </p>
 
 ## Features
@@ -43,10 +43,6 @@ As a nominator you can just as easily check the validators you nominate.
  - Users are free to choose the network type, Light Client ([Smoldot](https://github.com/paritytech/smoldot)) or any Trusted Provider (Local, Private or Public RPC node).
  - Restricted Proxy-Only operations on Asset Hub, with only two proxy types supported:
     - _Staking_ or _StakingOperator_
-
-<p align="center">
-    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
-</p>
 
 ## Installation
 
@@ -85,7 +81,10 @@ suno-aarch64-apple-darwin.ta 100%[===========================================>] 
 ```
 
 ## Usage 
-### Option 1 is the easy path, first time user or just run it on the go
+### Option 1
+
+_The easy path, first time user or just run it on the go._
+
 Let's say you operate validator `1LfAfKweyPjXs4JkKW4AxHPTe7pu4w4HjcZbEtB6a8vMqkd` on the Polkadot Network through the staking proxy `14E5nqKAp3oAJcmzgZhUD2RcptBeUBScxKHgJKU4HPNcKVf3` configured in Polkadot Vault.
 
 From your favourite terminal, run:
@@ -104,7 +103,9 @@ If your list is private, also provide the Personal Access Token via `--pat <PERS
 
 SUNO will just run and work.
 
-### Option 2 is for advanced users who prefer a more static configuration.
+### Option 2
+_For advanced users who prefer a more static configuration._
+
 Start with the default configuration file provided during installation and customize it to your needs. If `config.yaml` is located in a different directory than the SUNO binary, provide the path with the `--config-path` flag, eg. `suno --config-path ~/suno/suno-custom-config.yaml`. For all configuration options, have a look at the [configuration](#configuration) section below.
 
 ### To know about all flags available, type `suno --help`:
@@ -161,10 +162,26 @@ Options:
 'ctrl+c' to quit suno
 ```
 
+### Polkadot Vault, Chain Specs and Metadata upload
+
+Since `suno v0.6.0`, full compatibility is provided with Polkadot Vault, allowing you to keep your Proxy Staking key offline at all times. Transactions are signed in an air-gapped environment using QR codes.
+
+SUNO also provides the required Chain Specs and Metadata for each supported chain, allowing you to keep the networks in Polkadot Vault up to date. It is recommended to use a dedicated key that is not used for transactions to sign these updates. Note that using unsigned updates is strongly discouraged.
+
+The key used to sign updates can be configured in `config.yaml` using the following:
+
+```
+vault:
+  secret_path: "keys/.vault_private.seed"
+```
+
+<p align="center">
+    <img alt="suno-nightrun" src="https://github.com/turboflakes/suno/blob/main/assets/suno-nightrun-metadata.gif?raw=true" />
+</p>
+
 ## Configuration
 
-### Chains, Validators, RPCs, Custom Commands, Themes
-Are all available via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
+Chains, Validators, RPCs, Custom Commands, Themes, are all available via a config file. Here is a full example [.config.example.yaml](https://raw.githubusercontent.com/turboflakes/suno/refs/heads/main/.config.example.yaml), showing all available options:
 
 ```yaml
 chains:
@@ -286,6 +303,10 @@ To operate and execute extrinsics onchain, a proxy account with at least one of 
 You have two options for signing transactions: either by using Polkadot Vault (recommended) with air-gapped QR codes, or by using a proxy account configured in a local JSON file exported from [PJS](https://polkadot.js.org/extension/).
 
 You can also configure multiple proxy accounts for different chains using the signer section in the configuration file, or configure a single proxy account that is shared across all chains.
+
+<p align="center">
+    <img alt="suno-dark" src="https://github.com/turboflakes/suno/blob/main/assets/suno-dark.gif?raw=true" />
+</p>
 
 #### Option 1
 The `proxy_account` field accepts a proxy account address, allowing `suno` to sign transactions via Polkadot Vault. `suno` generates the call data as QR codes and requests access to your webcam to scan the signed QR code from Polkadot Vault.
