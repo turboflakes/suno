@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 /// Maximum time to wait to initialize subscription before
 /// considering it offline and breaking out of the task.
-const SUBSCRIPTION_TIMEOUT: Duration = Duration::from_millis(12_000);
+const SUBSCRIPTION_TIMEOUT: Duration = Duration::from_millis(60_000);
 
 /// Maximum time to wait for the next block stream before
 /// considering it stalled and breaking out of the task.
