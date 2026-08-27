@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-27
+- Increase subscription timeout
+- Update chain-specs
+- Update metadata asset-hub-westend/1024002
+
 ## [0.6.0] - 2026-08-12
 - Add support for smoldot see PR [#23](https://github.com/turboflakes/suno/pull/23)
 - Add binary updates support see PR [#28](https://github.com/turboflakes/suno/pull/28)
