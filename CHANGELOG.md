@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-02
+- Update chain-specs
+- Update metadata polkadot/2004000
+- Update metadata asset-hub-polkadot/2004000
+- Update metadata people-polkadot/2004000
+
 ## [0.6.1] - 2026-08-27
 - Increase subscription timeout
 - Update chain-specs
