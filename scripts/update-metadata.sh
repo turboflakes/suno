@@ -5,16 +5,36 @@
 #
 # > subxt-cli must be installed to update metadata
 # cargo install subxt-cli --force
-
+#
+# Optionally restrict the run to a single network (e.g. "polkadot", "kusama",
+# "paseo", "westend"), fetching only its relay/asset-hub/people chains:
+# `update-metadata.sh polkadot`
 BASE="packages/chains"
-RC_PALLETS="Session,StakingAhClient,Proxy,Babe,ParasShared"
+RC_PALLETS="System,Session,StakingAhClient,Proxy,Babe,ParasShared"
 AH_PALLETS="System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
-PEOPLE_PALLETS="Identity"
+PEOPLE_PALLETS="System,Identity"
+NETWORK="$1"
+
+# Where to write the spec versions fetched in this run.
+# Override with the METADATA_VERSIONS_FILE env var (e.g. to keep it out of the repo).
+VERSIONS_FILE="${METADATA_VERSIONS_FILE:-metadata_versions.md}"
+
+# Returns success if $chain belongs to $NETWORK, or if no network filter is set.
+chain_in_network() {
+  local chain="$1"
+  [ -z "$NETWORK" ] && return 0
+  case "$chain" in
+    "$NETWORK"|*-"$NETWORK") return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 fetch_metadata() {
   local chain="$1"      # e.g. "westend", "asset-hub-westend", "people-westend"
   local host="$2"       # e.g. "westend.rpc.turboflakes.io"
   local pallets="$3"
+
+  chain_in_network "$chain" || return 0
 
   # Derive output filename: replace hyphens with underscores
   local filename="${chain//-/_}_metadata_small.scale"
@@ -49,10 +69,17 @@ fetch_metadata "asset-hub-kusama"   "asset-hub-kusama.rpc.turboflakes.io"   "$AH
 fetch_metadata "asset-hub-polkadot" "asset-hub-polkadot.rpc.turboflakes.io" "$AH_PALLETS"
 
 # People Chains
-fetch_metadata "people-westend"  "people-westend.rpc.turboflakes.io"  "$PEOPLE_PALLETS"
-fetch_metadata "people-paseo"    "people-paseo.rpc.turboflakes.io"    "$PEOPLE_PALLETS"
-fetch_metadata "people-kusama"   "people-kusama.rpc.turboflakes.io"   "$PEOPLE_PALLETS"
-fetch_metadata "people-polkadot" "people-polkadot.rpc.turboflakes.io" "$PEOPLE_PALLETS"
+fetch_metadata "people-westend"  "people-westend.rpc.turboflakes.io"    "$PEOPLE_PALLETS"
+fetch_metadata "people-paseo"    "people-paseo.rpc.turboflakes.io"      "$PEOPLE_PALLETS"
+fetch_metadata "people-kusama"   "people-kusama.rpc.turboflakes.io"     "$PEOPLE_PALLETS"
+fetch_metadata "people-polkadot" "people-polkadot.rpc.turboflakes.io"   "$PEOPLE_PALLETS"
+
+# Report all spec versions, flagging the chains whose metadata actually changed.
+changed_chains=$(git status --porcelain -- "$BASE" \
+  | awk '{print $2}' \
+  | sed -E "s#$BASE/([^/]+)/.*#\1#" \
+  | sort -u)
+NETWORK_FILTER="$NETWORK" bash "$(dirname "$0")/print-metadata-versions.sh" $changed_chains > "$VERSIONS_FILE"
 
 # Generate runtime API client code from metadata.
 
