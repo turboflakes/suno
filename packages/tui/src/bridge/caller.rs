@@ -6,7 +6,10 @@ use subxt::{
     OnlineClient,
 };
 use subxt_signer::sr25519::Keypair;
-use suno_config::{CustomConfig, CustomExtrinsicParamsBuilder, Runtime};
+use suno_config::{
+    transactions::{should_use_v5_transaction, sign_and_submit_then_watch_default},
+    CustomConfig, CustomExtrinsicParamsBuilder, Runtime,
+};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call,
@@ -265,11 +268,7 @@ impl RuntimeCaller for Runtime {
         let at_block = api.at_current_block().await.boxed()?;
         let metadata = at_block.metadata();
         let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
-        let response = api
-            .tx()
-            .await
-            .boxed()?
-            .sign_and_submit_then_watch_default(&payload, proxy_signer)
+        let response = sign_and_submit_then_watch_default(&at_block, &payload, proxy_signer)
             .await
             .boxed()?;
 
@@ -290,10 +289,17 @@ impl RuntimeCaller for Runtime {
         let nonce = at_block.tx().account_nonce(proxy_signer).await.boxed()?;
         let params = CustomExtrinsicParamsBuilder::new().nonce(nonce).build();
 
-        let mut signable = at_block
-            .tx()
-            .create_signable_offline(&payload, params)
-            .boxed()?;
+        let mut signable = if should_use_v5_transaction(at_block.metadata_ref()) {
+            at_block
+                .tx()
+                .create_v5_signable_offline(&payload, params)
+                .boxed()?
+        } else {
+            at_block
+                .tx()
+                .create_v4_signable_offline(&payload, params)
+                .boxed()?
+        };
 
         let signature = extract_signature(signature)?;
 
