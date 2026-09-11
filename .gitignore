@@ -41,3 +41,6 @@ bump-version.sh
 
 # Other
 .DS_Store
+
+# Claude
+.claude/settings.local.json
