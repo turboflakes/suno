@@ -8,6 +8,7 @@ mod runtime;
 mod signer;
 mod substrate;
 mod themes;
+pub mod transactions;
 mod vault;
 
 pub use crate::access::{NodeAccess, SshConfig};
@@ -18,3 +19,4 @@ pub use crate::fetch::fetch_validators_from_source;
 pub use crate::runtime::{Runtime, SupportedRuntime};
 pub use crate::substrate::{CustomConfig, CustomExtrinsicParamsBuilder};
 pub use crate::themes::Themes;
+pub use crate::transactions::{should_use_v5_transaction, sign_and_submit_then_watch_default};
