@@ -2,7 +2,7 @@ name: Rust CI - Update Artifacts
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Daily at 06:00 UTC
+    - cron: '0 5 * * *' # Daily at 05:00 UTC
   workflow_dispatch: # Allow manual triggers
 
 env:
@@ -78,9 +78,10 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: chore/update-artifacts
-          commit-message: 'chore: update artifacts'
-          title: 'chore: update artifacts'
+          branch: chore/update-artifacts-${{ matrix.network }}
+          add-paths: ${{ steps.changes.outputs.network_paths }}
+          commit-message: 'chore: update ${{ matrix.network }} artifacts'
+          title: 'chore: update ${{ matrix.network }} artifacts'
           body-path: ${{ runner.temp }}/pr_body-${{ matrix.network }}.md
-          labels: automated, chain-specs, metadata
+          labels: automated, chain-specs, metadata, ${{ matrix.network }}
           delete-branch: true
