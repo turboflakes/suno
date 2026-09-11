@@ -35,6 +35,9 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Install subxt
         run: cargo install subxt-cli --locked --features chain-spec-pruning
 
@@ -44,6 +47,8 @@ jobs:
         run: bash scripts/update-metadata.sh ${{ matrix.network }}
 
       - name: Run update-chain-specs script
+        env:
+          CHAIN_SPECS_VERSIONS_FILE: ${{ runner.temp }}/chain_specs_versions-${{ matrix.network }}.md
         run: bash scripts/update-chain-specs.sh ${{ matrix.network }}
 
       - name: Check for changes
@@ -53,7 +58,7 @@ jobs:
             packages/chains/${{ matrix.network }}
             packages/chains/asset-hub-${{ matrix.network }}
             packages/chains/people-${{ matrix.network }}
-            packages/support/chain-specs/${{ matrix.network }}.json
+            packages/config/chain-specs/${{ matrix.network }}.json
         run: |
           if git diff --quiet -- $NETWORK_PATHS && git diff --staged --quiet -- $NETWORK_PATHS; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -69,6 +74,7 @@ jobs:
             echo "Automated ${{ matrix.network }} chain specs and metadata update."
             echo
             echo '```'
+            cat "${{ runner.temp }}/chain_specs_versions-${{ matrix.network }}.md"
             cat "${{ runner.temp }}/metadata_versions-${{ matrix.network }}.md"
             echo '```'
           } > "${{ runner.temp }}/pr_body-${{ matrix.network }}.md"
