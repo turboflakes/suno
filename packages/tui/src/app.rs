@@ -303,33 +303,42 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    sync::spawn_fetch_epoch_data(
-                                        &api, block_hash, runtime, &self.tx,
-                                    );
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
 
-                                    sync::spawn_fetch_validators_authority_status(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
+                                        sync::spawn_fetch_epoch_data(&api_at, runtime, &tx);
 
-                                    sync::spawn_fetch_validators_queued_keys(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
+                                        sync::spawn_fetch_validators_authority_status(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
 
-                                    sync::spawn_fetch_validators_next_keys(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
+                                        sync::spawn_fetch_validators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+
+                                        sync::spawn_fetch_validators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+                                    });
                                 }
                             }
                             SupportedRuntime::AssetHubPolkadot
@@ -339,57 +348,66 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    sync::spawn_fetch_era_data(&api, block_hash, runtime, &self.tx);
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
 
-                                    sync::spawn_fetch_total_validators_count(
-                                        &api, block_hash, runtime, &self.tx,
-                                    );
-                                    sync::spawn_fetch_total_nominators_count(
-                                        &api, block_hash, runtime, &self.tx,
-                                    );
+                                        sync::spawn_fetch_era_data(&api_at, runtime, &tx);
 
-                                    sync::spawn_fetch_validators_prefs_next(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
+                                        sync::spawn_fetch_total_validators_count(
+                                            &api_at, runtime, &tx,
+                                        );
+                                        sync::spawn_fetch_total_nominators_count(
+                                            &api_at, runtime, &tx,
+                                        );
 
-                                    sync::spawn_fetch_validators_staking_ledger(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
-
-                                    sync::spawn_fetch_validators_payee(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
-
-                                    sync::spawn_fetch_account_balance(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
-
-                                    if let Ok(proxy) = runtime.signer_account_id() {
-                                        sync::spawn_fetch_validators_proxy_status(
-                                            &api,
-                                            block_hash,
+                                        sync::spawn_fetch_validators_prefs_next(
+                                            &api_at,
                                             runtime,
                                             &validator_keys,
-                                            &proxy,
-                                            &self.tx,
+                                            &tx,
                                         );
-                                    };
+
+                                        sync::spawn_fetch_validators_staking_ledger(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+
+                                        sync::spawn_fetch_validators_payee(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+
+                                        sync::spawn_fetch_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+
+                                        if let Ok(proxy) = runtime.signer_account_id() {
+                                            sync::spawn_fetch_validators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &validator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
+                                        };
+                                    });
                                 }
                             }
                             SupportedRuntime::PeoplePolkadot
@@ -399,13 +417,26 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    sync::spawn_fetch_validators_identity(
-                                        &api,
-                                        block_hash,
-                                        runtime,
-                                        &validator_keys,
-                                        &self.tx,
-                                    );
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
+
+                                        sync::spawn_fetch_validators_identity(
+                                            &api_at,
+                                            runtime,
+                                            &validator_keys,
+                                            &tx,
+                                        );
+                                    });
                                 }
                             }
                             _ => {}
@@ -447,17 +478,29 @@ impl App {
                     | SupportedRuntime::Paseo
                     | SupportedRuntime::Westend => {
                         if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
-                            let api = chain.client();
+                            let api = chain.client().clone();
                             let validator_keys =
                                 self.validators.get_validator_keys_by_runtime(runtime);
+                            let tx = self.tx.clone();
 
-                            sync::spawn_fetch_validators_points(
-                                api,
-                                block_hash,
-                                runtime,
-                                &validator_keys,
-                                &self.tx,
-                            )
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                sync::spawn_fetch_validators_points(
+                                    &api_at,
+                                    runtime,
+                                    &validator_keys,
+                                    &tx,
+                                )
+                            });
                         }
                     }
                     _ => {}
@@ -475,59 +518,56 @@ impl App {
                     | SupportedRuntime::AssetHubWestend => {
                         if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
-                            sync::spawn_fetch_active_validators_count(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &self.tx,
-                            );
-
-                            sync::spawn_fetch_active_nominators_count(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &self.tx,
-                            );
-
-                            sync::spawn_fetch_total_staked(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &self.tx,
-                            );
-
                             let validator_keys =
                                 self.validators.get_validator_keys_by_runtime(runtime);
+                            let era_index = era.index();
+                            let tx = self.tx.clone();
 
-                            sync::spawn_fetch_validators_prefs(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &validator_keys,
-                                &self.tx,
-                            );
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
 
-                            sync::spawn_fetch_validators_era_points(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &validator_keys,
-                                &self.tx,
-                            );
+                                sync::spawn_fetch_active_validators_count(
+                                    &api_at, runtime, era_index, &tx,
+                                );
 
-                            sync::spawn_fetch_validators_stake_overview(
-                                &api,
-                                block_hash,
-                                runtime,
-                                era.index(),
-                                &validator_keys,
-                                &self.tx,
-                            );
+                                sync::spawn_fetch_active_nominators_count(
+                                    &api_at, runtime, era_index, &tx,
+                                );
+
+                                sync::spawn_fetch_total_staked(&api_at, runtime, era_index, &tx);
+
+                                sync::spawn_fetch_validators_prefs(
+                                    &api_at,
+                                    runtime,
+                                    era_index,
+                                    &validator_keys,
+                                    &tx,
+                                );
+
+                                sync::spawn_fetch_validators_era_points(
+                                    &api_at,
+                                    runtime,
+                                    era_index,
+                                    &validator_keys,
+                                    &tx,
+                                );
+
+                                sync::spawn_fetch_validators_stake_overview(
+                                    &api_at,
+                                    runtime,
+                                    era_index,
+                                    &validator_keys,
+                                    &tx,
+                                );
+                            });
                         }
                     }
                     _ => {}
@@ -547,29 +587,39 @@ impl App {
                     | SupportedRuntime::Westend => {
                         if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
-                            sync::spawn_fetch_validators_authority_status(
-                                &api,
-                                block_hash,
-                                runtime,
-                                &validator_keys,
-                                &self.tx,
-                            );
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
 
-                            sync::spawn_fetch_validators_queued_keys(
-                                &api,
-                                block_hash,
-                                runtime,
-                                &validator_keys,
-                                &self.tx,
-                            );
+                                sync::spawn_fetch_validators_authority_status(
+                                    &api_at,
+                                    runtime,
+                                    &validator_keys,
+                                    &tx,
+                                );
 
-                            sync::spawn_fetch_validators_next_keys(
-                                &api,
-                                block_hash,
-                                runtime,
-                                &validator_keys,
-                                &self.tx,
-                            );
+                                sync::spawn_fetch_validators_queued_keys(
+                                    &api_at,
+                                    runtime,
+                                    &validator_keys,
+                                    &tx,
+                                );
+
+                                sync::spawn_fetch_validators_next_keys(
+                                    &api_at,
+                                    runtime,
+                                    &validator_keys,
+                                    &tx,
+                                );
+                            });
                         }
                     }
                     SupportedRuntime::AssetHubPolkadot
@@ -578,12 +628,21 @@ impl App {
                     | SupportedRuntime::AssetHubWestend => {
                         if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
-                            sync::spawn_fetch_total_validators_count(
-                                &api, block_hash, runtime, &self.tx,
-                            );
-                            sync::spawn_fetch_total_nominators_count(
-                                &api, block_hash, runtime, &self.tx,
-                            );
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                sync::spawn_fetch_total_validators_count(&api_at, runtime, &tx);
+                                sync::spawn_fetch_total_nominators_count(&api_at, runtime, &tx);
+                            });
                         }
                     }
                     _ => {}
@@ -656,20 +715,27 @@ impl App {
                 let runtime = validator_key.runtime().asset_hub_runtime();
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
-                    sync::spawn_fetch_validators_staking_ledger(
-                        &api,
-                        block_hash,
-                        runtime,
-                        &validator_keys,
-                        &self.tx,
-                    );
-                    sync::spawn_fetch_account_balance(
-                        &api,
-                        block_hash,
-                        runtime,
-                        &validator_keys,
-                        &self.tx,
-                    );
+                    let tx = self.tx.clone();
+                    tokio::spawn(async move {
+                        let api_at = match api.at_block(block_hash).await.boxed() {
+                            Ok(api_at) => api_at,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to client at_block: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+
+                        sync::spawn_fetch_validators_staking_ledger(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
+                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                    });
                 }
             }
             ValidatorAction::SubChunkFromStakeLedger(validator_key, chunk) => {
@@ -679,13 +745,21 @@ impl App {
                 let runtime = validator_key.runtime().asset_hub_runtime();
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
-                    sync::spawn_fetch_account_balance(
-                        &api,
-                        block_hash,
-                        runtime,
-                        &validator_keys,
-                        &self.tx,
-                    );
+                    let tx = self.tx.clone();
+                    tokio::spawn(async move {
+                        let api_at = match api.at_block(block_hash).await.boxed() {
+                            Ok(api_at) => api_at,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to client at_block: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+
+                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                    });
                 }
             }
             ValidatorAction::AddProxy(validator_key, proxy) => {
@@ -704,13 +778,26 @@ impl App {
                 let runtime = validator_key.runtime().asset_hub_runtime();
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
-                    sync::spawn_fetch_validators_staking_ledger(
-                        &api,
-                        block_hash,
-                        runtime,
-                        &validator_keys,
-                        &self.tx,
-                    );
+                    let tx = self.tx.clone();
+                    tokio::spawn(async move {
+                        let api_at = match api.at_block(block_hash).await.boxed() {
+                            Ok(api_at) => api_at,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to client at_block: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+
+                        sync::spawn_fetch_validators_staking_ledger(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
+                    });
                 }
             }
         }

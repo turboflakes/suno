@@ -7,8 +7,8 @@ use subxt::{
     events::Events,
     extrinsics::Extrinsics,
     tx::{TransactionInBlock, TransactionProgress, TransactionStatus},
-    utils::{AccountId32, H256},
-    OnlineClient,
+    utils::AccountId32,
+    OnlineClient, OnlineClientAtBlock,
 };
 use subxt_signer::sr25519::Keypair;
 use suno_actions::{Action, SystemAction, TxAction};
@@ -20,22 +20,19 @@ use tracing::error;
 
 /// Default spawner for making asynchronous fetch requests.
 struct DefaultSpawner {
-    api: OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     tx: UnboundedSender<Action>,
 }
 
 impl DefaultSpawner {
     fn new(
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         runtime: SupportedRuntime,
         tx: &UnboundedSender<Action>,
     ) -> Self {
         Self {
             api: api.clone(),
-            block_hash,
             runtime,
             tx: tx.clone(),
         }
@@ -43,18 +40,13 @@ impl DefaultSpawner {
 
     fn spawn<F, Fut>(self, fetch_fn: F)
     where
-        F: Fn(OnlineClient<CustomConfig>, H256) -> Fut + Send + 'static,
+        F: Fn(OnlineClientAtBlock<CustomConfig>) -> Fut + Send + 'static,
         Fut: Future<Output = Result<Response, Error>> + Send,
     {
-        let Self {
-            api,
-            block_hash,
-            runtime,
-            tx,
-        } = self;
+        let Self { api, runtime, tx } = self;
 
         tokio::spawn(async move {
-            let result = fetch_fn(api, block_hash).await;
+            let result = fetch_fn(api).await;
             match result {
                 Ok(response) => {
                     if let Err(e) = dispatch_response_action(response, runtime, &tx) {
@@ -77,8 +69,7 @@ impl DefaultSpawner {
 
 /// Validator spawner for making asynchronous fetch requests.
 struct ValidatorSpawner {
-    api: OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: Vec<AccountKey>,
     tx: UnboundedSender<Action>,
@@ -86,15 +77,13 @@ struct ValidatorSpawner {
 
 impl ValidatorSpawner {
     fn new(
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         runtime: SupportedRuntime,
         validator_keys: &[AccountKey],
         tx: &UnboundedSender<Action>,
     ) -> Self {
         Self {
             api: api.clone(),
-            block_hash,
             runtime,
             validator_keys: validator_keys.to_vec(),
             tx: tx.clone(),
@@ -103,12 +92,11 @@ impl ValidatorSpawner {
 
     fn spawn_unordered<F, Fut>(self, fetch_fn: F, n: usize)
     where
-        F: Fn(OnlineClient<CustomConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClientAtBlock<CustomConfig>, AccountId32) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Response, Error>> + Send,
     {
         let Self {
             api,
-            block_hash,
             runtime,
             validator_keys,
             tx,
@@ -119,7 +107,7 @@ impl ValidatorSpawner {
                 .map(|key| {
                     let api = api.clone();
                     let stash = key.stash();
-                    fetch_fn(api, block_hash, stash)
+                    fetch_fn(api, stash)
                 })
                 .buffer_unordered(n);
 
@@ -146,12 +134,11 @@ impl ValidatorSpawner {
 
     fn spawn_unordered_multi<F, Fut>(self, fetch_fn: F, n: usize)
     where
-        F: Fn(OnlineClient<CustomConfig>, H256, AccountId32) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClientAtBlock<CustomConfig>, AccountId32) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
         let Self {
             api,
-            block_hash,
             runtime,
             validator_keys,
             tx,
@@ -162,7 +149,7 @@ impl ValidatorSpawner {
                 .map(|key| {
                     let api = api.clone();
                     let stash = key.stash();
-                    fetch_fn(api, block_hash, stash)
+                    fetch_fn(api, stash)
                 })
                 .buffer_unordered(n);
 
@@ -191,19 +178,18 @@ impl ValidatorSpawner {
 
     fn spawn_batch<F, Fut>(self, fetch_fn: F)
     where
-        F: Fn(OnlineClient<CustomConfig>, H256, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
+        F: Fn(OnlineClientAtBlock<CustomConfig>, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
         let Self {
             api,
-            block_hash,
             runtime,
             validator_keys,
             tx,
         } = self;
 
         tokio::spawn(async move {
-            let result = fetch_fn(api, block_hash, validator_keys).await;
+            let result = fetch_fn(api, validator_keys).await;
 
             match result {
                 Ok(responses) => {
@@ -231,82 +217,71 @@ impl ValidatorSpawner {
 // ----
 
 pub fn spawn_fetch_era_data(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx)
-        .spawn(move |api, bh| async move { runtime.fetch_era_data(&api, bh).await });
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_era_data(&api).await });
 }
 
 pub fn spawn_fetch_epoch_data(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx)
-        .spawn(move |api, bh| async move { runtime.fetch_epoch_data(&api, bh).await });
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_epoch_data(&api).await });
 }
 
 pub fn spawn_fetch_total_staked(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx)
-        .spawn(move |api, bh| async move { runtime.fetch_total_staked(&api, bh, era_index).await });
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_total_staked(&api, era_index).await });
 }
 
 pub fn spawn_fetch_active_validators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx).spawn(move |api, bh| async move {
-        runtime
-            .fetch_active_validators_count(&api, bh, era_index)
-            .await
+    DefaultSpawner::new(api, runtime, tx).spawn(move |api| async move {
+        runtime.fetch_active_validators_count(&api, era_index).await
     });
 }
 
 pub fn spawn_fetch_active_nominators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx).spawn(move |api, bh| async move {
-        runtime
-            .fetch_active_nominators_count(&api, bh, era_index)
-            .await
+    DefaultSpawner::new(api, runtime, tx).spawn(move |api| async move {
+        runtime.fetch_active_nominators_count(&api, era_index).await
     });
 }
 
 pub fn spawn_fetch_total_validators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx)
-        .spawn(move |api, bh| async move { runtime.fetch_total_validators_count(&api, bh).await });
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_total_validators_count(&api).await });
 }
 
 pub fn spawn_fetch_total_nominators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     tx: &UnboundedSender<Action>,
 ) {
-    DefaultSpawner::new(api, block_hash, runtime, tx)
-        .spawn(move |api, bh| async move { runtime.fetch_total_nominators_count(&api, bh).await });
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_total_nominators_count(&api).await });
 }
 
 // ----
@@ -314,178 +289,157 @@ pub fn spawn_fetch_total_nominators_count(
 // ----
 //
 pub fn spawn_fetch_validators_era_points(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
-        move |api, bh, vk| async move {
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_batch(
+        move |api, vk| async move {
             runtime
-                .fetch_validators_era_points(&api, bh, era_index, &vk)
+                .fetch_validators_era_points(&api, era_index, &vk)
                 .await
         },
     );
 }
 
 pub fn spawn_fetch_validators_authority_status(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
-        move |api, bh, vk| async move {
-            runtime
-                .fetch_validators_authority_status(&api, bh, &vk)
-                .await
-        },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_batch(
+        move |api, vk| async move { runtime.fetch_validators_authority_status(&api, &vk).await },
     );
 }
 
 pub fn spawn_fetch_validators_queued_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_batch(
-        move |api, bh, vk| async move { runtime.fetch_validators_queued_keys(&api, bh, &vk).await },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_batch(
+        move |api, vk| async move { runtime.fetch_validators_queued_keys(&api, &vk).await },
     );
 }
 
 pub fn spawn_fetch_validators_stake_overview(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move {
-            runtime
-                .fetch_stake_overview(&api, bh, era_index, &stash)
-                .await
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move {
+            runtime.fetch_stake_overview(&api, era_index, &stash).await
         },
         3,
     );
 }
 
 pub fn spawn_fetch_validators_staking_ledger(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_stake_ledger(&api, bh, &stash).await },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_stake_ledger(&api, &stash).await },
         3,
     );
 }
 
 pub fn spawn_fetch_validators_points(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_validator_points(&api, bh, &stash).await },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_validator_points(&api, &stash).await },
         3,
     );
 }
 
 pub fn spawn_fetch_validators_prefs(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     era_index: u32,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move {
-            runtime
-                .fetch_validator_prefs(&api, bh, era_index, &stash)
-                .await
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move {
+            runtime.fetch_validator_prefs(&api, era_index, &stash).await
         },
         3,
     );
 }
 
 pub fn spawn_fetch_validators_prefs_next(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move {
-            runtime
-                .fetch_validator_prefs_next(&api, bh, &stash)
-                .await
-        }, 3,
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_validator_prefs_next(&api, &stash).await },
+        3,
     );
 }
 
 pub fn spawn_fetch_validators_payee(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_validator_payee(&api, bh, &stash).await },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_validator_payee(&api, &stash).await },
         3,
     );
 }
 
 pub fn spawn_fetch_validators_next_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_validator_next_keys(&api, bh, &stash).await }, 3,
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_validator_next_keys(&api, &stash).await },
+        3,
     );
 }
 
 pub fn spawn_fetch_validators_identity(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_validator_identity(&api, bh, &stash).await }, 3,
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_validator_identity(&api, &stash).await },
+        3,
     );
 }
 
 pub fn spawn_fetch_validators_proxy_status(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     proxy: &AccountId32,
     tx: &UnboundedSender<Action>,
 ) {
     let proxy = *proxy;
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered_multi(
-        move |api, bh, stash| async move {
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
+        move |api, stash| async move {
             runtime
-                .fetch_and_validate_proxy_account(&api, bh, &stash, &proxy)
+                .fetch_and_validate_proxy_account(&api, &stash, &proxy)
                 .await
         },
         3,
@@ -493,14 +447,13 @@ pub fn spawn_fetch_validators_proxy_status(
 }
 
 pub fn spawn_fetch_account_balance(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, block_hash, runtime, validator_keys, tx).spawn_unordered(
-        move |api, bh, stash| async move { runtime.fetch_account_balance(&api, bh, &stash).await },
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_account_balance(&api, &stash).await },
         3,
     );
 }
@@ -727,8 +680,7 @@ async fn process_transaction_wait_for_success(
 }
 
 pub fn spawn_process_runtime_events(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     events: Events<CustomConfig>,
     tx: &UnboundedSender<Action>,
@@ -737,9 +689,7 @@ pub fn spawn_process_runtime_events(
     let tx = tx.clone();
 
     tokio::spawn(async move {
-        let result = runtime
-            .process_runtime_events(&api, block_hash, events)
-            .await;
+        let result = runtime.process_runtime_events(&api, events).await;
         match result {
             Ok(responses) => {
                 for response in responses {
@@ -762,8 +712,7 @@ pub fn spawn_process_runtime_events(
 }
 
 pub fn spawn_process_block_extrinsics(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     tx: &UnboundedSender<Action>,
@@ -773,9 +722,7 @@ pub fn spawn_process_block_extrinsics(
     let tx = tx.clone();
 
     tokio::spawn(async move {
-        let result = runtime
-            .process_block_extrinsics(&api, block_hash, extrinsics)
-            .await;
+        let result = runtime.process_block_extrinsics(&api, extrinsics).await;
         match result {
             Ok(responses) => {
                 for response in responses {

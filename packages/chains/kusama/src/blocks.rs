@@ -11,16 +11,15 @@ use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,
     extrinsics::{ExtrinsicEvents, Extrinsics},
-    utils::{MultiAddress, H256},
-    OnlineClient,
+    utils::MultiAddress,
+    OnlineClientAtBlock,
 };
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::Response;
 
 pub async fn process_runtime_events(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     events: Events<CustomConfig>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
@@ -28,7 +27,7 @@ pub async fn process_runtime_events(
         let event = event.boxed()?;
 
         if event.is::<NewSession>() {
-            let res = fetch_epoch_data(api, block_hash).await?;
+            let res = fetch_epoch_data(api).await?;
             processed_events.push(res);
         }
         // else if let Some(ev) = event.decode_fields_as::<SessionKeysSet>().boxed()? {}
@@ -39,8 +38,7 @@ pub async fn process_runtime_events(
 }
 
 pub async fn process_block_extrinsics(
-    _api: &OnlineClient<CustomConfig>,
-    _block_hash: H256,
+    _api: &OnlineClientAtBlock<CustomConfig>,
     extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_extrinsics: Vec<Response> = Vec::new();

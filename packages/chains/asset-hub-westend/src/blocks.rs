@@ -16,8 +16,8 @@ use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,
     extrinsics::{ExtrinsicEvents, Extrinsics},
-    utils::{MultiAddress, H256},
-    OnlineClient,
+    utils::MultiAddress,
+    OnlineClientAtBlock,
 };
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
@@ -28,8 +28,7 @@ use suno_primitives::{
 };
 
 pub async fn process_runtime_events(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     events: Events<CustomConfig>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_events: Vec<Response> = Vec::new();
@@ -37,7 +36,7 @@ pub async fn process_runtime_events(
         let event = event.boxed()?;
 
         if event.is::<EraPaid>() {
-            let response = fetch_era_data(api, block_hash).await?;
+            let response = fetch_era_data(api).await?;
             processed_events.push(response);
         } else if let Some(ev) = event.decode_fields_as::<Bonded>() {
             let ev = ev.boxed()?;
@@ -46,8 +45,8 @@ pub async fn process_runtime_events(
             processed_events.push(response);
         } else if let Some(ev) = event.decode_fields_as::<Unbonded>() {
             let ev = ev.boxed()?;
-            let era_info = fetch_active_era_info(api, block_hash).await?;
-            let duration = fetch_bonding_duration(api, block_hash).await?;
+            let era_info = fetch_active_era_info(api).await?;
+            let duration = fetch_bonding_duration(api).await?;
             let chunk = Chunk::new(era_info.index + duration, ev.amount);
             let account_bytes = *(ev.stash).as_ref();
             let response = Response::event_unbonded(account_bytes, chunk);
@@ -78,8 +77,7 @@ pub async fn process_runtime_events(
 }
 
 pub async fn process_block_extrinsics(
-    _api: &OnlineClient<CustomConfig>,
-    _block_hash: H256,
+    _api: &OnlineClientAtBlock<CustomConfig>,
     extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_extrinsics: Vec<Response> = Vec::new();

@@ -5,33 +5,28 @@ use node_runtime::runtime_types::{
     pallet_identity::types::Registration, people_westend_runtime::people::IdentityInfo,
 };
 use std::result::Result;
-use subxt::{
-    utils::{AccountId32, H256},
-    OnlineClient,
-};
+use subxt::{utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{identity::Identity, Response};
 
 pub async fn fetch_identity(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let identity = get_identity(api, block_hash, stash, None).await?;
+    let identity = get_identity(api, stash, None).await?;
     Ok(Response::identity(account_bytes, identity))
 }
 
 #[async_recursion]
 pub async fn get_identity(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
     sub_account_name: Option<String>,
 ) -> Result<Option<Identity>, Error> {
     // First, fetch the main identity data
-    let identity_data = fetch_identity_of(api, block_hash, stash).await?;
+    let identity_data = fetch_identity_of(api, stash).await?;
 
     if let Some(registration) = identity_data {
         let parent = parse_identity_data(registration.info.display);
@@ -43,25 +38,23 @@ pub async fn get_identity(
     }
 
     // If no main identity, check if this is a sub-account
-    let super_account = fetch_super_of(api, block_hash, stash).await?;
+    let super_account = fetch_super_of(api, stash).await?;
 
     if let Some((parent_account, sub_data)) = super_account {
         let sub_name = parse_identity_data(sub_data);
-        return get_identity(api, block_hash, &parent_account, Some(sub_name.to_string())).await;
+        return get_identity(api, &parent_account, Some(sub_name.to_string())).await;
     }
 
     Ok(None)
 }
 
 async fn fetch_identity_of(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Option<Registration<u128, IdentityInfo>>, Error> {
     let addr = node_runtime::storage().identity().identity_of();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let result = api_at
+    let result = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -76,14 +69,12 @@ async fn fetch_identity_of(
 }
 
 async fn fetch_super_of(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Option<(AccountId32, Data)>, Error> {
     let addr = node_runtime::storage().identity().super_of();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let result = api_at
+    let result = api
         .storage()
         .entry(addr)
         .boxed()?
