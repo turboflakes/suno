@@ -33,9 +33,9 @@ mod tests {
     /// metadata refresh flips this, the signing path for this network changes too, so it
     /// deserves a deliberate look rather than a silent behavior change.
     ///
-    /// As of the 2026-09-11 artifacts refresh, asset-hub-polkadot's metadata added a
-    /// second pipeline (unlike kusama/paseo/westend, which still have only the baseline
-    /// one), so this network now needs the V5 path.
+    /// As of the artifacts refresh from `chore/update-artifacts-polkadot`, asset-hub-polkadot's
+    /// metadata added a second pipeline (unlike kusama/paseo/westend, which still have only the
+    /// baseline one), so this network now needs the V5 path.
     #[test]
     fn should_use_v5_transaction_matches_expectations() {
         let bytes = include_bytes!("../artifacts/metadata/asset_hub_polkadot_metadata_small.scale");
