@@ -160,7 +160,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                     };
 
                     // Process block events in a separate task
-                    spawn_process_runtime_events(&api, block.hash(), runtime, events, &tx);
+                    spawn_process_runtime_events(&at_block, runtime, events, &tx);
 
                     // Fetch block extrinsics
                     let extrinsics = match with_timeout_and_connection_state(
@@ -178,7 +178,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                     };
 
                     // Process block extrinsics in a separate task
-                    spawn_process_block_extrinsics(&api, block.hash(), runtime, extrinsics, &tx);
+                    spawn_process_block_extrinsics(&at_block, runtime, extrinsics, &tx);
                 }
                 Err(e) => {
                     error!("{e}");

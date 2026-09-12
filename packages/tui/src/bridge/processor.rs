@@ -3,8 +3,7 @@ use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,
     extrinsics::{ExtrinsicEvents, Extrinsics},
-    utils::H256,
-    OnlineClient,
+    OnlineClientAtBlock,
 };
 use suno_config::{CustomConfig, Runtime};
 use suno_error::Error;
@@ -19,15 +18,13 @@ pub trait RuntimeProcessor {
 
     async fn process_runtime_events(
         &self,
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         events: Events<CustomConfig>,
     ) -> Result<Vec<Response>, Error>;
 
     async fn process_block_extrinsics(
         &self,
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<Response>, Error>;
 }
@@ -55,28 +52,25 @@ impl RuntimeProcessor for Runtime {
 
     async fn process_runtime_events(
         &self,
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         events: Events<CustomConfig>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
-            Runtime::Polkadot => {
-                suno_polkadot::process_runtime_events(api, block_hash, events).await
-            }
-            Runtime::Kusama => suno_kusama::process_runtime_events(api, block_hash, events).await,
-            Runtime::Paseo => suno_paseo::process_runtime_events(api, block_hash, events).await,
-            Runtime::Westend => suno_westend::process_runtime_events(api, block_hash, events).await,
+            Runtime::Polkadot => suno_polkadot::process_runtime_events(api, events).await,
+            Runtime::Kusama => suno_kusama::process_runtime_events(api, events).await,
+            Runtime::Paseo => suno_paseo::process_runtime_events(api, events).await,
+            Runtime::Westend => suno_westend::process_runtime_events(api, events).await,
             Runtime::AssetHubPolkadot => {
-                suno_asset_hub_polkadot::process_runtime_events(api, block_hash, events).await
+                suno_asset_hub_polkadot::process_runtime_events(api, events).await
             }
             Runtime::AssetHubKusama => {
-                suno_asset_hub_kusama::process_runtime_events(api, block_hash, events).await
+                suno_asset_hub_kusama::process_runtime_events(api, events).await
             }
             Runtime::AssetHubPaseo => {
-                suno_asset_hub_paseo::process_runtime_events(api, block_hash, events).await
+                suno_asset_hub_paseo::process_runtime_events(api, events).await
             }
             Runtime::AssetHubWestend => {
-                suno_asset_hub_westend::process_runtime_events(api, block_hash, events).await
+                suno_asset_hub_westend::process_runtime_events(api, events).await
             }
             _ => Ok(vec![]),
         }
@@ -84,34 +78,25 @@ impl RuntimeProcessor for Runtime {
 
     async fn process_block_extrinsics(
         &self,
-        api: &OnlineClient<CustomConfig>,
-        block_hash: H256,
+        api: &OnlineClientAtBlock<CustomConfig>,
         extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
     ) -> Result<Vec<Response>, Error> {
         match &self {
-            Runtime::Polkadot => {
-                suno_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
-            }
-            Runtime::Kusama => {
-                suno_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
-            }
-            Runtime::Paseo => {
-                suno_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
-            }
-            Runtime::Westend => {
-                suno_westend::process_block_extrinsics(api, block_hash, extrinsics).await
-            }
+            Runtime::Polkadot => suno_polkadot::process_block_extrinsics(api, extrinsics).await,
+            Runtime::Kusama => suno_kusama::process_block_extrinsics(api, extrinsics).await,
+            Runtime::Paseo => suno_paseo::process_block_extrinsics(api, extrinsics).await,
+            Runtime::Westend => suno_westend::process_block_extrinsics(api, extrinsics).await,
             Runtime::AssetHubPolkadot => {
-                suno_asset_hub_polkadot::process_block_extrinsics(api, block_hash, extrinsics).await
+                suno_asset_hub_polkadot::process_block_extrinsics(api, extrinsics).await
             }
             Runtime::AssetHubKusama => {
-                suno_asset_hub_kusama::process_block_extrinsics(api, block_hash, extrinsics).await
+                suno_asset_hub_kusama::process_block_extrinsics(api, extrinsics).await
             }
             Runtime::AssetHubPaseo => {
-                suno_asset_hub_paseo::process_block_extrinsics(api, block_hash, extrinsics).await
+                suno_asset_hub_paseo::process_block_extrinsics(api, extrinsics).await
             }
             Runtime::AssetHubWestend => {
-                suno_asset_hub_westend::process_block_extrinsics(api, block_hash, extrinsics).await
+                suno_asset_hub_westend::process_block_extrinsics(api, extrinsics).await
             }
             _ => Ok(vec![]),
         }

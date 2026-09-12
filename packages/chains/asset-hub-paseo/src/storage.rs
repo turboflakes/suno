@@ -15,11 +15,7 @@ use crate::node_runtime::runtime_types::{
 use crate::utils::map_reward_destination;
 use sp_arithmetic::{Perbill, Permill};
 use std::collections::HashSet;
-use subxt::{
-    ext::futures::StreamExt,
-    utils::{AccountId32, H256},
-    OnlineClient,
-};
+use subxt::{ext::futures::StreamExt, utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -33,13 +29,12 @@ use suno_primitives::{
 
 /// Fetch balance for a given stash at the specified block hash
 pub async fn fetch_balance(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
 
-    let account_info = fetch_system_account(api, block_hash, stash).await?;
+    let account_info = fetch_system_account(api, stash).await?;
 
     Ok(Response::balance(
         account_bytes,
@@ -53,15 +48,14 @@ pub async fn fetch_balance(
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
 pub async fn fetch_and_validate_proxy_account(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
     proxy: &AccountId32,
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
     let account_bytes = *stash.as_ref();
 
-    let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
+    let (BoundedVec(proxies), _) = fetch_account_proxies(api, stash).await?;
 
     for def in proxies {
         if def.delegate == *proxy && def.proxy_type == ProxyType::Staking {
@@ -90,13 +84,12 @@ pub async fn fetch_and_validate_proxy_account(
 
 /// Fetch validator prefs
 pub async fn fetch_validator_prefs(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    if let Some(data) = fetch_eras_validator_prefs(api, block_hash, era, stash).await? {
+    if let Some(data) = fetch_eras_validator_prefs(api, era, stash).await? {
         let prefs =
             staking::ValidatorPrefs::new(Perbill::from_parts(data.commission.0), data.blocked);
         return Ok(Response::validator_prefs(account_bytes, Some(prefs)));
@@ -107,25 +100,23 @@ pub async fn fetch_validator_prefs(
 
 /// Fetch validator next prefs
 pub async fn fetch_validator_prefs_next(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let data = fetch_validators(api, block_hash, stash).await?;
+    let data = fetch_validators(api, stash).await?;
     let prefs = staking::ValidatorPrefs::new(Perbill::from_parts(data.commission.0), data.blocked);
     Ok(Response::validator_prefs_next(account_bytes, Some(prefs)))
 }
 
 /// Fetch validator stake overview
 pub async fn fetch_validator_stake_overview(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    if let Some(data) = fetch_eras_stakers_overview(api, block_hash, era, stash).await? {
+    if let Some(data) = fetch_eras_stakers_overview(api, era, stash).await? {
         let stake_overview =
             staking::StakeOverview::new(data.own, data.total, data.nominator_count);
         return Ok(Response::stake_overview(
@@ -137,13 +128,12 @@ pub async fn fetch_validator_stake_overview(
 }
 
 pub async fn fetch_validator_staking_ledger(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
 
-    if let Some(data) = fetch_staking_ledger(api, block_hash, stash).await? {
+    if let Some(data) = fetch_staking_ledger(api, stash).await? {
         let mut unbounding: Vec<Chunk> = Vec::new();
         let BoundedVec(unlocking) = data.unlocking;
         for chunk in unlocking {
@@ -157,13 +147,12 @@ pub async fn fetch_validator_staking_ledger(
 
 /// Fetch validators era points
 pub async fn fetch_validators_era_points(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
     validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
-    if let Some(reward_points) = fetch_era_reward_points(api, block_hash, era).await? {
+    if let Some(reward_points) = fetch_era_reward_points(api, era).await? {
         let validator_bytes: HashSet<[u8; 32]> =
             validator_keys.iter().map(|key| key.bytes()).collect();
 
@@ -181,13 +170,10 @@ pub async fn fetch_validators_era_points(
 }
 
 /// Fetch era data at the specified block hash
-pub async fn fetch_era_data(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
-) -> Result<Response, Error> {
-    let sessions_per_era = fetch_sessions_per_era(api, block_hash).await?;
-    let era_info = fetch_active_era_info(api, block_hash).await?;
-    let BoundedVec(bonded_eras) = fetch_bonded_eras(api, block_hash).await?;
+pub async fn fetch_era_data(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Response, Error> {
+    let sessions_per_era = fetch_sessions_per_era(api).await?;
+    let era_info = fetch_active_era_info(api).await?;
+    let BoundedVec(bonded_eras) = fetch_bonded_eras(api).await?;
     let start_session: u64 = bonded_eras
         .iter()
         .find(|b| b.0 == era_info.index)
@@ -204,15 +190,13 @@ pub async fn fetch_era_data(
 
 /// Fetch active validators and nominators at the specified block hash
 pub async fn fetch_active_nominators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
     let mut validators_set = HashSet::<[u8; 32]>::new();
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let mut iter = api_at
+    let mut iter = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -226,14 +210,7 @@ pub async fn fetch_active_nominators_count(
 
     let mut nominators_count = 0u32;
     let addr = node_runtime::storage().staking().nominators();
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let mut iter = api_at
-        .storage()
-        .entry(addr)
-        .boxed()?
-        .iter(())
-        .await
-        .boxed()?;
+    let mut iter = api.storage().entry(addr).boxed()?.iter(()).await.boxed()?;
     while let Some(Ok(storage_kv)) = iter.next().await {
         // Check if any of the nominator's targets is in the validators_set
         let nominations = storage_kv.value().decode().boxed()?;
@@ -252,14 +229,12 @@ pub async fn fetch_active_nominators_count(
 
 /// Fetch active validators at the specified block hash
 pub async fn fetch_active_validators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let iter = api_at
+    let iter = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -273,13 +248,11 @@ pub async fn fetch_active_validators_count(
 
 /// Fetch total validators at the specified block hash
 pub async fn fetch_total_validators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_validators();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -294,13 +267,11 @@ pub async fn fetch_total_validators_count(
 
 /// Fetch total nominators at the specified block hash
 pub async fn fetch_total_nominators_count(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Response, Error> {
     let addr = node_runtime::storage().staking().counter_for_nominators();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -315,13 +286,12 @@ pub async fn fetch_total_nominators_count(
 
 /// Fetch total total staked for a specific era at the specified block hash
 pub async fn fetch_total_staked(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
 ) -> Result<Response, Error> {
-    let total_issuance = fetch_total_issuance(api, block_hash).await?;
-    let inactive_issuance = fetch_inactive_issuance(api, block_hash).await?;
-    let total_staked = fetch_eras_total_stake(api, block_hash, era).await?;
+    let total_issuance = fetch_total_issuance(api).await?;
+    let inactive_issuance = fetch_inactive_issuance(api).await?;
+    let total_staked = fetch_eras_total_stake(api, era).await?;
 
     let active_issuance = total_issuance.saturating_sub(inactive_issuance);
 
@@ -337,12 +307,11 @@ pub async fn fetch_total_staked(
 
 /// Fetch validator payee for a specific stash at the specified block hash
 pub async fn fetch_validator_payee(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let destination = fetch_payee(api, block_hash, stash).await?;
+    let destination = fetch_payee(api, stash).await?;
     let payee = map_reward_destination(destination);
 
     Ok(Response::validator_payee(account_bytes, payee))
@@ -354,13 +323,11 @@ pub async fn fetch_validator_payee(
 
 /// Fetch bonded eras at the specified block hash
 async fn fetch_bonded_eras(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<BoundedVec<(u32, u32)>, Error> {
     let addr = node_runtime::storage().staking().bonded_eras();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -375,14 +342,12 @@ async fn fetch_bonded_eras(
 
 /// Fetch eras total stake for a specific era at the specified block hash
 async fn fetch_eras_total_stake(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
 ) -> Result<u128, Error> {
     let addr = node_runtime::storage().staking().eras_total_stake();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -396,14 +361,10 @@ async fn fetch_eras_total_stake(
 }
 
 /// Fetch total issuance for at the specified block hash
-async fn fetch_total_issuance(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
-) -> Result<u128, Error> {
+async fn fetch_total_issuance(api: &OnlineClientAtBlock<CustomConfig>) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().total_issuance();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -417,14 +378,10 @@ async fn fetch_total_issuance(
 }
 
 /// Fetch inactive issuance for at the specified block hash
-async fn fetch_inactive_issuance(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
-) -> Result<u128, Error> {
+async fn fetch_inactive_issuance(api: &OnlineClientAtBlock<CustomConfig>) -> Result<u128, Error> {
     let addr = node_runtime::storage().balances().inactive_issuance();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -439,14 +396,12 @@ async fn fetch_inactive_issuance(
 
 /// Fetch validator prefs at the specified block hash
 async fn fetch_validators(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<ValidatorPrefs, Error> {
     let addr = node_runtime::storage().staking().validators();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -461,15 +416,13 @@ async fn fetch_validators(
 
 /// Fetch validator prefs at the specified block hash and era
 async fn fetch_eras_validator_prefs(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
     stash: &AccountId32,
 ) -> Result<Option<ValidatorPrefs>, Error> {
     let addr = node_runtime::storage().staking().eras_validator_prefs();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -485,14 +438,12 @@ async fn fetch_eras_validator_prefs(
 
 /// Fetch staking ledger at the specified block hash
 async fn fetch_staking_ledger(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Option<StakingLedger>, Error> {
     let addr = node_runtime::storage().staking().ledger();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -508,13 +459,11 @@ async fn fetch_staking_ledger(
 
 /// Fetch active era at the specified block hash
 pub async fn fetch_active_era_info(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<ActiveEraInfo, Error> {
     let addr = node_runtime::storage().staking().active_era();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -529,14 +478,12 @@ pub async fn fetch_active_era_info(
 
 /// Fetch era reward points at the specified block hash
 async fn fetch_era_reward_points(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
 ) -> Result<Option<EraRewardPoints>, Error> {
     let addr = node_runtime::storage().staking().eras_reward_points();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -552,15 +499,13 @@ async fn fetch_era_reward_points(
 
 /// Fetch eras_stakers_overview at the specified block hash for the given era and stash
 async fn fetch_eras_stakers_overview(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     era: u32,
     stash: &AccountId32,
 ) -> Result<Option<PagedExposureMetadata<u128>>, Error> {
     let addr = node_runtime::storage().staking().eras_stakers_overview();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -576,14 +521,12 @@ async fn fetch_eras_stakers_overview(
 
 /// Fetch nominators at the specified block hash
 async fn _fetch_nominators(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Nominations, Error> {
     let addr = node_runtime::storage().staking().nominators();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -598,14 +541,12 @@ async fn _fetch_nominators(
 
 /// Fetch payee at the specified block hash
 pub async fn fetch_payee(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<RewardDestination<AccountId32>, Error> {
     let addr = node_runtime::storage().staking().payee();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -620,8 +561,7 @@ pub async fn fetch_payee(
 
 /// Fetch proxies for a given account at the specified block hash
 async fn fetch_account_proxies(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<
     (
@@ -632,8 +572,7 @@ async fn fetch_account_proxies(
 > {
     let addr = node_runtime::storage().proxy().proxies();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -648,14 +587,12 @@ async fn fetch_account_proxies(
 
 /// Fetch balance for a given account at the specified block hash
 async fn fetch_system_account(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<AccountInfo<u32, AccountData<u128>>, Error> {
     let addr = node_runtime::storage().system().account();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?

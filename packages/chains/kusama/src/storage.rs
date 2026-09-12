@@ -9,10 +9,7 @@ use crate::{
     },
 };
 use std::collections::{HashMap, HashSet};
-use subxt::{
-    utils::{AccountId32, H256},
-    OnlineClient,
-};
+use subxt::{utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -24,15 +21,14 @@ type BlockNumber = u32;
 
 /// Fetch and validate a proxy account for a given stash at the specified block hash
 pub async fn fetch_and_validate_proxy_account(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
     proxy: &AccountId32,
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
     let account_bytes = *stash.as_ref();
 
-    let (BoundedVec(proxies), _) = fetch_account_proxies(api, block_hash, stash).await?;
+    let (BoundedVec(proxies), _) = fetch_account_proxies(api, stash).await?;
 
     for def in proxies {
         if def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer {
@@ -55,8 +51,7 @@ pub async fn fetch_and_validate_proxy_account(
 
 /// Fetch validator points at the specified block hash
 pub async fn fetch_validator_points(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
@@ -65,8 +60,7 @@ pub async fn fetch_validator_points(
         .staking_ah_client()
         .validator_points();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -80,14 +74,11 @@ pub async fn fetch_validator_points(
 }
 
 /// Fetch epoch data at the specified block hash
-pub async fn fetch_epoch_data(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
-) -> Result<Response, Error> {
-    let duration = fetch_epoch_duration(api, block_hash).await?;
-    let block_time = fetch_expected_block_time(api, block_hash).await?;
-    let (_, start) = fetch_epoch_start(api, block_hash).await?;
-    let index = fetch_epoch_index(api, block_hash).await?;
+pub async fn fetch_epoch_data(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Response, Error> {
+    let duration = fetch_epoch_duration(api).await?;
+    let block_time = fetch_expected_block_time(api).await?;
+    let (_, start) = fetch_epoch_start(api).await?;
+    let index = fetch_epoch_index(api).await?;
 
     Ok(Response::epoch(Epoch::new(
         index, start, duration, block_time,
@@ -96,13 +87,12 @@ pub async fn fetch_epoch_data(
 
 /// Fetch validators authority status
 pub async fn fetch_validators_authority_status(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
-    let validators = fetch_session_validators(api, block_hash).await?;
-    let validator_indices = fetch_active_validator_indices(api, block_hash).await?;
+    let validators = fetch_session_validators(api).await?;
+    let validator_indices = fetch_active_validator_indices(api).await?;
     let validator_bytes: HashSet<[u8; 32]> = validator_keys.iter().map(|key| key.bytes()).collect();
 
     for (i, stash) in validators.iter().enumerate() {
@@ -127,12 +117,11 @@ pub async fn fetch_validators_authority_status(
 
 /// Fetch validators queued keys
 pub async fn fetch_validators_queued_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     validator_keys: &[AccountKey],
 ) -> Result<Vec<Response>, Error> {
     let mut responses: Vec<Response> = Vec::new();
-    let queued_keys = fetch_session_queued_keys(api, block_hash).await?;
+    let queued_keys = fetch_session_queued_keys(api).await?;
     let mut validator_bytes: HashMap<[u8; 32], bool> = validator_keys
         .iter()
         .map(|key| (key.bytes(), false))
@@ -159,12 +148,11 @@ pub async fn fetch_validators_queued_keys(
 
 /// Fetch validator next session key
 pub async fn fetch_validator_next_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    if let Some(session_keys) = fetch_session_next_keys(api, block_hash, stash).await? {
+    if let Some(session_keys) = fetch_session_next_keys(api, stash).await? {
         let keys = map_keys_from_session_keys(&session_keys);
         return Ok(Response::validator_next_keys(account_bytes, Some(keys)));
     };
@@ -173,14 +161,10 @@ pub async fn fetch_validator_next_keys(
 }
 
 /// Fetch babe epoch index at the specified block hash
-async fn fetch_epoch_index(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
-) -> Result<Index, Error> {
+async fn fetch_epoch_index(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Index, Error> {
     let addr = node_runtime::storage().babe().epoch_index();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -195,13 +179,11 @@ async fn fetch_epoch_index(
 
 /// Fetch babe epoch start at the specified block hash
 async fn fetch_epoch_start(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<(BlockNumber, BlockNumber), Error> {
     let addr = node_runtime::storage().babe().epoch_start();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -216,13 +198,11 @@ async fn fetch_epoch_start(
 
 /// Fetch session validators at the specified block hash
 async fn fetch_session_validators(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Vec<AccountId32>, Error> {
     let addr = node_runtime::storage().session().validators();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -237,15 +217,13 @@ async fn fetch_session_validators(
 
 /// Fetch active validator indices at the specified block hash
 async fn fetch_active_validator_indices(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Vec<ValidatorIndex>, Error> {
     let addr = node_runtime::storage()
         .paras_shared()
         .active_validator_indices();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -260,14 +238,12 @@ async fn fetch_active_validator_indices(
 
 /// Fetch queued keys for the next session for a stash at the specified block hash
 async fn fetch_session_next_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<Option<SessionKeys>, Error> {
     let addr = node_runtime::storage().session().next_keys();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -283,13 +259,11 @@ async fn fetch_session_next_keys(
 
 /// Fetch queued keys for the next session at the specified block hash
 async fn fetch_session_queued_keys(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Vec<(AccountId32, SessionKeys)>, Error> {
     let addr = node_runtime::storage().session().queued_keys();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
@@ -304,8 +278,7 @@ async fn fetch_session_queued_keys(
 
 /// Fetch proxies for a given account at the specified block hash
 async fn fetch_account_proxies(
-    api: &OnlineClient<CustomConfig>,
-    block_hash: H256,
+    api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
 ) -> Result<
     (
@@ -316,8 +289,7 @@ async fn fetch_account_proxies(
 > {
     let addr = node_runtime::storage().proxy().proxies();
 
-    let api_at = api.at_block(block_hash).await.boxed()?;
-    let value = api_at
+    let value = api
         .storage()
         .entry(addr)
         .boxed()?
