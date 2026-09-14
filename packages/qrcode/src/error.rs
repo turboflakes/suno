@@ -7,6 +7,12 @@ pub enum Error {
     NokhwaError(#[from] nokhwa::error::NokhwaError),
     #[error("Genesis hash not available")]
     GenesisHashNotAvailable,
+    #[error("Runtime API error: {0}")]
+    RuntimeApi(#[from] Box<subxt::error::RuntimeApiError>),
+    #[error("Codec error: {0}")]
+    Codec(#[from] subxt::ext::codec::Error),
+    #[error("Metadata V14 not available")]
+    MetadataV14NotAvailable,
     #[error("Other error: {0}")]
     Other(String),
 }

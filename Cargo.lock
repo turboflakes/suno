@@ -7223,6 +7223,7 @@ dependencies = [
  "subxt",
  "suno-config",
  "thiserror 2.0.19",
+ "tracing",
 ]
 
 [[package]]
