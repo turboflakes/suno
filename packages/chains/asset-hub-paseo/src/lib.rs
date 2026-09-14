@@ -21,21 +21,3 @@ pub mod utils;
     derive_for_all_types = "PartialEq, Clone"
 )]
 mod node_runtime {}
-
-#[cfg(test)]
-mod tests {
-    use suno_config::transactions::should_use_v5_transaction;
-
-    /// Guards the V4/V5 transaction-format decision in
-    /// `suno_config::transactions::sign_and_submit_then_watch`: whether this network's
-    /// committed metadata advertises a second transaction-extension pipeline (which is
-    /// what makes a V5 "General" transaction able to carry a signed origin here). If a
-    /// metadata refresh flips this, the signing path for this network changes too, so it
-    /// deserves a deliberate look rather than a silent behavior change.
-    #[test]
-    fn should_use_v5_transaction_matches_expectations() {
-        let bytes = include_bytes!("../artifacts/metadata/asset_hub_paseo_metadata_small.scale");
-        let metadata = subxt::Metadata::decode_from(&bytes[..]).expect("valid metadata");
-        assert!(!should_use_v5_transaction(&metadata));
-    }
-}

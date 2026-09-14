@@ -6,15 +6,12 @@ use subxt::{
     OnlineClient,
 };
 use subxt_signer::sr25519::Keypair;
-use suno_config::{transactions::sign_and_submit_then_watch_default, CustomConfig, Runtime};
-use suno_error::{Error, ResultExt};
-use suno_primitives::{
-    call::Call,
-    proxy::SupportedProxy,
-    tx::{Bytes, RawPayload},
-    Response,
+use suno_config::{
+    transactions::{build_signed_extrinsic, build_signing_payload, signed_extrinsic_bytes},
+    CustomConfig, Runtime,
 };
-use suno_qrcode::build::build_signed_extrinsic;
+use suno_error::{Error, ResultExt};
+use suno_primitives::{call::Call, proxy::SupportedProxy, tx::Bytes, Response};
 
 #[async_trait]
 pub trait RuntimeCaller {
@@ -264,9 +261,30 @@ impl RuntimeCaller for Runtime {
         call_data: &[u8],
     ) -> Result<Response, Error> {
         let at_block = api.at_current_block().await.boxed()?;
-        let metadata = at_block.metadata();
-        let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
-        let response = sign_and_submit_then_watch_default(&at_block, &payload, proxy_signer)
+
+        // subxt's typed `create_v4_signable`/`create_v5_signable` (used by
+        // `sign_and_submit_then_watch_default`) are driven by `CustomConfig`'s
+        // compile-time-fixed `TransactionExtensions` tuple, which doesn't cover several
+        // extensions this chain actually declares (e.g. `AuthorizeCall`, `CheckWeight`,
+        // `CheckNonZeroSender`) — that fails outright with a `NotFound` error. Build and
+        // sign the extrinsic manually instead, driven by the chain's real metadata, exactly
+        // like the Vault QR flow does — see `suno_qrcode::build::encode_extensions`.
+        let account_id = AccountId32(proxy_signer.public_key().0);
+
+        let (signing_payload, extra) =
+            build_signing_payload(&at_block, &account_id, call_data)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
+
+        let signature = proxy_signer.sign(&signing_payload);
+
+        let extrinsic_bytes =
+            signed_extrinsic_bytes(&account_id.0, &signature.0, &extra, call_data);
+
+        let response = at_block
+            .tx()
+            .from_bytes(extrinsic_bytes)
+            .submit_and_watch()
             .await
             .boxed()?;
 

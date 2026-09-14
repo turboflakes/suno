@@ -72,6 +72,7 @@ sha2 = "0.11.0"
 shellexpand = "3.1.2"
 sp-arithmetic = "28.0.1"
 sp-core = "43.0.0"
+sp-crypto-hashing = "0.1"
 strum = { version = "0.26.3", features = ["derive"] }
 subxt = { git = "https://github.com/turboflakes/subxt", branch = "pm-smoldot", features = ["reconnecting-rpc-client", "light-client", "jsonrpsee"] }
 subxt-signer = { git = "https://github.com/turboflakes/subxt", branch = "pm-smoldot", features = ["polkadot-js-compat"] }

@@ -22,4 +22,3 @@ rxing = { workspace = true }
 subxt = { workspace = true }
 suno-config = { path = "../config" }
 thiserror = { workspace = true }
-tracing = { workspace = true }
