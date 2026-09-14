@@ -194,7 +194,10 @@ mod tests {
         assert_eq!(&content[offset..offset + 32], &signer);
         offset += 32;
 
-        assert_eq!(&content[offset..offset + call_data_encoded.len()], &call_data_encoded[..]);
+        assert_eq!(
+            &content[offset..offset + call_data_encoded.len()],
+            &call_data_encoded[..]
+        );
         offset += call_data_encoded.len();
 
         assert_eq!(&content[offset..offset + extensions.len()], &extensions[..]);

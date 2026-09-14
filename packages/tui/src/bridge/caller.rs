@@ -271,10 +271,9 @@ impl RuntimeCaller for Runtime {
         // like the Vault QR flow does — see `suno_qrcode::build::encode_extensions`.
         let account_id = AccountId32(proxy_signer.public_key().0);
 
-        let (signing_payload, extra) =
-            build_signing_payload(&at_block, &account_id, call_data)
-                .await
-                .map_err(|e| Error::Other(e.to_string()))?;
+        let (signing_payload, extra) = build_signing_payload(&at_block, &account_id, call_data)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
 
         let signature = proxy_signer.sign(&signing_payload);
 

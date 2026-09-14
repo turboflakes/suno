@@ -273,10 +273,8 @@ mod tests {
         network: &str,
         metadata_bytes: &[u8],
     ) {
-        let metadata =
-            Metadata::decode_from(metadata_bytes).unwrap_or_else(|e| {
-                panic!("[{network}] decode bundled metadata: {e}")
-            });
+        let metadata = Metadata::decode_from(metadata_bytes)
+            .unwrap_or_else(|e| panic!("[{network}] decode bundled metadata: {e}"));
 
         let extensions: Vec<_> = metadata
             .extrinsic()
