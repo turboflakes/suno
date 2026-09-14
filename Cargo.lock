@@ -7075,6 +7075,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shellexpand",
+ "sp-crypto-hashing",
  "subxt",
  "subxt-signer",
  "suno-theme",

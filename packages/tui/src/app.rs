@@ -1432,6 +1432,7 @@ impl App {
                     return;
                 }
             };
+            info!("qr_bytes: 0x{}", hex::encode(&qr_bytes));
 
             let spec_version = at_block.spec_version();
             let ctx = Box::new(ConfirmationContext {
@@ -1554,6 +1555,7 @@ impl App {
                                         return;
                                     }
                                 };
+                                info!("qr_bytes: 0x{}", hex::encode(&qr_bytes));
 
                                 let spec_version = at_block.spec_version();
                                 let ctx = Box::new(ConfirmationContext {

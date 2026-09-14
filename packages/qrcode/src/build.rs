@@ -1,8 +1,8 @@
-use crate::error::{Error, ResultExt};
+use crate::error::Error;
 use subxt::client::{ClientAtBlock, OnlineClientAtBlockImpl};
-use subxt::ext::codec::{Compact, Encode};
+use subxt::ext::codec::Encode;
 use subxt::utils::AccountId32;
-use suno_config::{CustomConfig, SupportedRuntime};
+use suno_config::{transactions::encode_extensions, CustomConfig, SupportedRuntime};
 
 #[derive(Encode)]
 #[repr(u8)]
@@ -125,14 +125,19 @@ pub async fn build_transaction_qrcode(
 ) -> Result<Vec<u8>, Error> {
     let bytes_encoded = call_data_bytes.encode();
     let genesis_hash = api.genesis_hash().ok_or(Error::GenesisHashNotAvailable)?;
-    let extensions = encode_extensions(api, signer, &genesis_hash.0).await?;
+    let (extra, additional) = encode_extensions(api, signer, &genesis_hash.0)
+        .await
+        .map_err(|e| Error::Other(e.to_string()))?;
+    let mut extensions = extra;
+    extensions.extend_from_slice(&additional);
     let data = transaction(&signer.0, &bytes_encoded, &extensions, &genesis_hash.0);
     Ok(data)
 }
 
 fn transaction(
-    signer: &[u8; 32],         // signer's public key
-    call_data_encoded: &[u8],  // SCALE-encoded call bytes
+    signer: &[u8; 32],        // signer's public key
+    call_data_encoded: &[u8], // call data, Compact<u32>-length-prefixed (Vault splits method from
+    // extensions using this length prefix — see `cut_method_extensions` in Vault's parser)
     extensions_encoded: &[u8], // SCALE-encoded extensions
     genesis_hash: &[u8; 32],
 ) -> Vec<u8> {
@@ -144,7 +149,7 @@ fn transaction(
     // signer public key
     content.extend_from_slice(signer);
 
-    // call_data_encoded (already SCALE-encoded)
+    // call_data_encoded (already SCALE-encoded, length-prefixed)
     content.extend_from_slice(call_data_encoded);
 
     // extensions (already SCALE-encoded)
@@ -166,73 +171,48 @@ fn wrap_single_frame(content: &[u8]) -> Vec<u8> {
     frame
 }
 
-async fn encode_extensions(
-    api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
-    signer: &AccountId32,
-    genesis_hash_bytes: &[u8],
-) -> Result<Vec<u8>, Error> {
-    let nonce = api.tx().account_nonce(signer).await.boxed()?;
-    let spec_version = api.spec_version();
-    let tx_version = api.transaction_version();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use subxt::ext::codec::Compact;
 
-    let mut data = Vec::new(); //  "extra" data, sent inside the extrinsic and needs to be signed by the user
-    let mut additional_part = Vec::new(); // additional data, needs to be signed but not sent
+    /// `transaction()` packs the QR content as prelude + pubkey + Compact<u32>-length-prefixed
+    /// call + extensions blob + trailing genesis hash. This pins down that layout regardless of
+    /// where the extensions bytes come from (see `suno_config::transactions` for that).
+    #[test]
+    fn transaction_embeds_call_and_extensions_at_the_expected_offsets() {
+        let signer = [0x11u8; 32];
+        let genesis_hash = [0xAAu8; 32];
+        let call_data = b"call-data-\x01\x02\x03".to_vec();
+        let call_data_encoded = call_data.encode();
+        let extensions = vec![0xDEu8, 0xAD, 0xBE, 0xEF];
 
-    for ext in api
-        .metadata()
-        .extrinsic()
-        .transaction_extensions_to_use_for_encoding()
-    {
-        match ext.identifier() {
-            "CheckMortality" | "CheckEra" => {
-                data.push(0x00); // Era::Immortal
-                additional_part.extend_from_slice(genesis_hash_bytes); // block_hash = genesis_hash for immortal
-            }
-            "CheckNonce" => {
-                data.extend_from_slice(&Compact(nonce).encode());
-            }
-            "ChargeTransactionPayment" => {
-                data.extend_from_slice(&Compact(0u128).encode()); // tip = 0
-            }
-            "ChargeAssetTxPayment" => {
-                data.extend_from_slice(&Compact(0u128).encode()); // tip = 0
-                data.push(0x00); // Option<AssetId>::None
-            }
-            "CheckMetadataHash" => {
-                data.push(0x00); // Mode::Disabled
-                additional_part.push(0x00); // None (no hash)
-            }
-            "CheckSpecVersion" => {
-                additional_part.extend_from_slice(&spec_version.encode());
-            }
-            "CheckTxVersion" => {
-                additional_part.extend_from_slice(&tx_version.encode());
-            }
-            "CheckGenesis" => {
-                additional_part.extend_from_slice(genesis_hash_bytes);
-            }
-            "AuthorizeValueTransfer" => {
-                data.push(0x00); // Option<[u8; 64]>::None
-            }
-            "AsPgas" => {
-                data.push(0x00); // Option<AsPgasInfo>::None
-            }
-            "AsRingAlias" => {
-                data.push(0x00); // Option<AsRingAliasInfo>::None
-            }
-            "AsDotnsGateway" => {
-                data.push(0x00); // Option<AsDotnsGatewayInfo>::None
-            }
-            "AuthorizeCall" => {
-                // no value encoded
-            }
-            "RestrictOrigins" => {
-                data.push(0x01); // bool = true (restricted)
-            }
-            _ => {} // CheckNonZeroSender and others have empty ty + additional_signed
-        }
+        let content = transaction(&signer, &call_data_encoded, &extensions, &genesis_hash);
+
+        // frame(5) + prelude(3) + pubkey(32)
+        let mut offset = 5 + 3;
+        assert_eq!(&content[offset..offset + 32], &signer);
+        offset += 32;
+
+        assert_eq!(
+            &content[offset..offset + call_data_encoded.len()],
+            &call_data_encoded[..]
+        );
+        offset += call_data_encoded.len();
+
+        assert_eq!(&content[offset..offset + extensions.len()], &extensions[..]);
+        offset += extensions.len();
+
+        assert_eq!(&content[offset..offset + 32], &genesis_hash);
+        offset += 32;
+
+        assert_eq!(content.len(), offset);
+
+        // Sanity-check the length prefix itself matches a plain `Vec<u8>` encoding of call_data.
+        assert_eq!(call_data_encoded, {
+            let mut v = Compact(call_data.len() as u32).encode();
+            v.extend_from_slice(&call_data);
+            v
+        });
     }
-
-    data.extend_from_slice(&additional_part);
-    Ok(data)
 }

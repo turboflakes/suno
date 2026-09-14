@@ -19,4 +19,6 @@ pub use crate::fetch::fetch_validators_from_source;
 pub use crate::runtime::{Runtime, SupportedRuntime};
 pub use crate::substrate::{CustomConfig, CustomExtrinsicParamsBuilder};
 pub use crate::themes::Themes;
-pub use crate::transactions::{should_use_v5_transaction, sign_and_submit_then_watch_default};
+pub use crate::transactions::{
+    build_signed_extrinsic, build_signing_payload, signed_extrinsic_bytes,
+};

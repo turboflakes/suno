@@ -7,16 +7,11 @@ use subxt::{
 };
 use subxt_signer::sr25519::Keypair;
 use suno_config::{
-    transactions::{should_use_v5_transaction, sign_and_submit_then_watch_default},
-    CustomConfig, CustomExtrinsicParamsBuilder, Runtime,
+    transactions::{build_signed_extrinsic, build_signing_payload, signed_extrinsic_bytes},
+    CustomConfig, Runtime,
 };
 use suno_error::{Error, ResultExt};
-use suno_primitives::{
-    call::Call,
-    proxy::SupportedProxy,
-    tx::{Bytes, RawPayload},
-    Response,
-};
+use suno_primitives::{call::Call, proxy::SupportedProxy, tx::Bytes, Response};
 
 #[async_trait]
 pub trait RuntimeCaller {
@@ -266,9 +261,29 @@ impl RuntimeCaller for Runtime {
         call_data: &[u8],
     ) -> Result<Response, Error> {
         let at_block = api.at_current_block().await.boxed()?;
-        let metadata = at_block.metadata();
-        let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
-        let response = sign_and_submit_then_watch_default(&at_block, &payload, proxy_signer)
+
+        // subxt's typed `create_v4_signable`/`create_v5_signable` (used by
+        // `sign_and_submit_then_watch_default`) are driven by `CustomConfig`'s
+        // compile-time-fixed `TransactionExtensions` tuple, which doesn't cover several
+        // extensions this chain actually declares (e.g. `AuthorizeCall`, `CheckWeight`,
+        // `CheckNonZeroSender`) — that fails outright with a `NotFound` error. Build and
+        // sign the extrinsic manually instead, driven by the chain's real metadata, exactly
+        // like the Vault QR flow does — see `suno_qrcode::build::encode_extensions`.
+        let account_id = AccountId32(proxy_signer.public_key().0);
+
+        let (signing_payload, extra) = build_signing_payload(&at_block, &account_id, call_data)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+
+        let signature = proxy_signer.sign(&signing_payload);
+
+        let extrinsic_bytes =
+            signed_extrinsic_bytes(&account_id.0, &signature.0, &extra, call_data);
+
+        let response = at_block
+            .tx()
+            .from_bytes(extrinsic_bytes)
+            .submit_and_watch()
             .await
             .boxed()?;
 
@@ -283,29 +298,31 @@ impl RuntimeCaller for Runtime {
         signature: &[u8],
     ) -> Result<Response, Error> {
         let at_block = api.at_current_block().await.boxed()?;
-        let metadata = at_block.metadata();
-        let payload = RawPayload::from_bytes(&metadata, call_data).boxed()?;
 
-        let nonce = at_block.tx().account_nonce(proxy_signer).await.boxed()?;
-        let params = CustomExtrinsicParamsBuilder::new().nonce(nonce).build();
-
-        let mut signable = if should_use_v5_transaction(at_block.metadata_ref()) {
-            at_block
-                .tx()
-                .create_v5_signable_offline(&payload, params)
-                .boxed()?
-        } else {
-            at_block
-                .tx()
-                .create_v4_signable_offline(&payload, params)
-                .boxed()?
+        // This signature always comes from an air-gapped signer (Polkadot Vault), which was
+        // shown a transaction built by `suno_qrcode::build::build_transaction_qrcode`. That
+        // function encodes extensions by walking the chain's actual metadata (not subxt's
+        // compile-time-fixed `TransactionExtensions` tuple), so we must reconstruct the final
+        // extrinsic the same way here — see `build_signed_extrinsic` — otherwise the bytes we
+        // submit won't match what was actually signed, and the chain rejects it as a bad
+        // signature.
+        let sig_bytes = match extract_signature(signature)? {
+            MultiSignature::Sr25519(sig) => sig,
+            _ => {
+                return Err(Error::Other(
+                    "Only Sr25519 signatures are supported".to_string(),
+                ))
+            }
         };
 
-        let signature = extract_signature(signature)?;
+        let extrinsic_bytes =
+            build_signed_extrinsic(&at_block, proxy_signer, call_data, &sig_bytes)
+                .await
+                .map_err(|e| Error::Other(e.to_string()))?;
 
-        let response = signable
-            .sign_with_account_and_signature(proxy_signer, &signature)
-            .boxed()?
+        let response = at_block
+            .tx()
+            .from_bytes(extrinsic_bytes)
             .submit_and_watch()
             .await
             .boxed()?;

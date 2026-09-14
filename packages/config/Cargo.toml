@@ -22,6 +22,7 @@ semver = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 shellexpand = { workspace = true }
+sp-crypto-hashing = { workspace = true }
 subxt = { workspace = true }
 subxt-signer = { workspace = true }
 suno-theme = { path = "../theme" }

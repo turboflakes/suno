@@ -39,6 +39,16 @@ pub enum Error {
     InvalidVersion(semver::Error),
     #[error("Reqwest error: {0}")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Extrinsic error: {0}")]
+    Extrinsic(#[from] Box<subxt::error::ExtrinsicError>),
+    #[error("Runtime API error: {0}")]
+    RuntimeApi(#[from] Box<subxt::error::RuntimeApiError>),
+    #[error("Codec error: {0}")]
+    Codec(#[from] subxt::ext::codec::Error),
+    #[error("Genesis hash not available")]
+    GenesisHashNotAvailable,
+    #[error("Metadata V14 not available")]
+    MetadataV14NotAvailable,
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -54,5 +64,16 @@ impl From<&str> for Error {
 impl From<String> for Error {
     fn from(error: String) -> Self {
         Self::Other(error)
+    }
+}
+
+/// Extension trait to box errors in Results, keeping the `Error` enum small.
+pub trait ResultExt<T, E> {
+    fn boxed(self) -> Result<T, Box<E>>;
+}
+
+impl<T, E> ResultExt<T, E> for Result<T, E> {
+    fn boxed(self) -> Result<T, Box<E>> {
+        self.map_err(Box::new)
     }
 }
