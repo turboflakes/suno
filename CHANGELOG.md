@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-15
+- Fix AHP transaction signing for runtime 2005000 see PR [#54](https://github.com/turboflakes/suno/pull/54)
+- Improve performance see PR [#45](https://github.com/turboflakes/suno/pull/45)
+- Update chain-specs
+- polkadot/2005000
+- asset-hub-polkadot/2005000
+- people-polkadot/2005000
+- asset-hub-paseo/2005002
+- people-paseo/2005002
+- westend/1025000
+- asset-hub-westend/1025000
+- people-westend/1025000
+- 
 ## [0.7.0] - 2026-09-02
 - Update chain-specs
 - Update metadata polkadot/2004000
