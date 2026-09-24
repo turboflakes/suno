@@ -3,8 +3,11 @@ use scale_info::PortableRegistry;
 use subxt::{
     config::{
         substrate::{DynamicHasher256, SubstrateHeader},
-        transaction_extensions, ClientState, DefaultExtrinsicParamsBuilder, Hasher,
-        TransactionExtension, TransactionExtensions,
+        transaction_extensions::{
+            self, ChargeAssetTxPaymentParams, ChargeTransactionPaymentParams, CheckMortalityParams,
+            CheckNonceParams,
+        },
+        ClientState, Hasher, TransactionExtension, TransactionExtensions,
     },
     error::TransactionExtensionError,
     ext::frame_decode::extrinsics::{
@@ -43,39 +46,55 @@ pub type SubstrateExtrinsicParams<T> = (
     RestrictOrigins,
 );
 
-// Wraps subxt's [`DefaultExtrinsicParamsBuilder`], extended with the parameters.
-#[derive(Default)]
-pub struct CustomExtrinsicParamsBuilder<T: subxt::Config>(DefaultExtrinsicParamsBuilder<T>);
+// Mirrors subxt's [`DefaultExtrinsicParamsBuilder`], building the parameters for
+// [`SubstrateExtrinsicParams`] directly.
+pub struct CustomExtrinsicParamsBuilder<T: subxt::Config> {
+    nonce: CheckNonceParams,
+    mortality: CheckMortalityParams<T>,
+    tip: u128,
+}
+
+impl<T: subxt::Config> Default for CustomExtrinsicParamsBuilder<T> {
+    fn default() -> Self {
+        Self {
+            nonce: CheckNonceParams::from_chain(),
+            mortality: CheckMortalityParams::default(),
+            tip: 0,
+        }
+    }
+}
 
 impl<T: subxt::Config> CustomExtrinsicParamsBuilder<T> {
     pub fn new() -> Self {
-        Self(DefaultExtrinsicParamsBuilder::new())
+        Self::default()
     }
 
-    pub fn nonce(self, nonce: u64) -> Self {
-        Self(self.0.nonce(nonce))
+    pub fn nonce(mut self, nonce: u64) -> Self {
+        self.nonce = CheckNonceParams::with_nonce(nonce);
+        self
     }
 
-    pub fn mortal(self, for_n_blocks: u64) -> Self {
-        Self(self.0.mortal(for_n_blocks))
+    pub fn mortal(mut self, for_n_blocks: u64) -> Self {
+        self.mortality = CheckMortalityParams::mortal(for_n_blocks);
+        self
     }
 
-    pub fn tip(self, tip: u128) -> Self {
-        Self(self.0.tip(tip))
+    pub fn tip(mut self, tip: u128) -> Self {
+        self.tip = tip;
+        self
     }
 
     pub fn build(self) -> <SubstrateExtrinsicParams<T> as TransactionExtensions<T>>::Params {
-        let default = self.0.build();
         (
-            default.0,
-            default.1,
-            default.2,
-            default.3,
-            default.4,
-            default.5,
-            default.6,
-            default.7,
-            default.8,
+            (),
+            (),
+            (),
+            self.nonce,
+            (),
+            self.mortality,
+            ChargeAssetTxPaymentParams::tip(self.tip),
+            ChargeTransactionPaymentParams::tip(self.tip),
+            (),
             // Additional extensions take no parameters.
             (),
         )
