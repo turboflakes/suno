@@ -1,4 +1,5 @@
-use crate::palette::{Palette, SUNO_DARK_PALETTE};
+use crate::palette::Palette;
+use crate::themes::suno::SUNO_DARK_PALETTE;
 use ratatui::style::{Modifier, Style};
 
 /// A trait for objects that have an active style.

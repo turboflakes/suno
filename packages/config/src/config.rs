@@ -1167,11 +1167,11 @@ explorer:
         std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
         std::fs::write(
             dir.path().join(".config.local.yaml"),
-            "active_theme: Nightrun\n",
+            "active_theme: Ghost\n",
         )
         .unwrap();
 
         let config = Config::from_file(&config_path).unwrap();
-        assert_ne!(config.themes.active, "Nightrun");
+        assert_ne!(config.themes.active, "Ghost");
     }
 }
