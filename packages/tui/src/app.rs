@@ -20,7 +20,10 @@ use suno_actions::{
     NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction,
     UpdateAction, ValidatorAction,
 };
-use suno_config::{CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime, CONFIG};
+use suno_config::{
+    save_active_theme, CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime,
+    CONFIG,
+};
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, Chain,
@@ -1167,6 +1170,7 @@ impl App {
             return;
         };
         self.apply_theme_by_name(&name);
+        save_active_theme(&name);
         self.close_popup();
     }
 
