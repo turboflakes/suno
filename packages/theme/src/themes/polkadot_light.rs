@@ -11,8 +11,8 @@ const PINK: Color = Color::Rgb(230, 0, 122);
 
 type Name = &'static str;
 
-pub const SUNO_POLKADOT_ORIGINAL_PALETTE: (Name, Palette) = (
-    "Polkadot Original",
+pub const SUNO_POLKADOT_LIGHT_PALETTE: (Name, Palette) = (
+    "Polkadot Light",
     Palette {
         color_00: BLACK,
         color_01: BLACK,
