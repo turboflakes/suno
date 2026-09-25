@@ -17,7 +17,7 @@ const COLOR_09: Color = Color::Rgb(0, 0, 164); // 0000a4 (background)
 const COLOR_10: Color = Color::Rgb(255, 255, 214);
 const COLOR_11: Color = Color::Rgb(243, 234, 171);
 const COLOR_12: Color = Color::Rgb(231, 213, 128);
-const COLOR_13: Color = Color::Rgb(220, 192, 86); // Secondary
+const COLOR_13: Color = Color::Rgb(255, 115, 253); // Secondary - ff73fd (headers)
 const COLOR_14: Color = Color::Rgb(208, 171, 43);
 const COLOR_15: Color = Color::Rgb(196, 150, 0);
 

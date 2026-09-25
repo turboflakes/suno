@@ -28,7 +28,7 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
 - [&check;] Support [commands](#commands-supported-per-proxy-type) for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
-- [&check;] Builtin themes [`Suno Dark`, `Suno Light`]. Load user specific **custom themes**. View and switch themes live.
+- [&check;] Builtin themes [`Suno Dark`, `Suno Light`, `Nightrun`, `Dracula`, `Borland`, `Homebrew`, `Monokai Remastered`, `Monokai Pro Light`, `Polkadot`]. Load user specific **custom themes**. View and switch themes live.
 - [&check;] Define and **run** user-specific commands linked to each configured validator.
 - [&check;] Explicitly **use** advanced builtin commands: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`.
 - [&check;] Execute custom commands locally or remotely.
@@ -409,7 +409,7 @@ Below is how you can define custom commands in the `config.yaml`:
 
 ### Change or Build your own **theme**
 
-The `Suno Dark` and `Suno Light` themes are built-in, you can swap between them by updating the configuration file.
+`Suno Dark`, `Suno Light`, `Nightrun`, `Dracula`, `Borland`, `Homebrew`, `Monokai Remastered`, `Monokai Pro Light` and `Polkadot` are built-in, you can cycle through them live with the `ctrl+t` menu, or set one as the default via the configuration file.
 
 To create your own **theme**, pick one of the ones available in the [/themes](https://github.com/turboflakes/suno/tree/main/themes) directory, copy and rename it, adjust the colors as you please. The filename will serve as the theme name. Under the **themes** section in the configuration file (see below), specify the new theme name and adjust the directory path as needed; It should point to the custom themes folder.
 
