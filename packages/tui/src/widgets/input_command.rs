@@ -1,4 +1,5 @@
 use crate::widgets::input_field::InputField;
+use crate::widgets::spinner::render_spinner;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Position, Rect},
@@ -6,18 +7,19 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
 use std::sync::{Arc, RwLock};
-use suno_config::CONFIG;
 use suno_primitives::{call::Call, entry::ToPlaceholder};
+use suno_theme::Theme;
 
 #[derive(Debug)]
 pub struct InputCommandWidget {
     pub state: Arc<RwLock<InputField>>,
     pub call: Option<Call>,
+    pub theme: Theme,
 }
 
 impl Widget for &InputCommandWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
         let mut state = self.state.write().unwrap();
 
         // Split area into two parts vertically for the main input field
@@ -120,8 +122,7 @@ impl Widget for &InputCommandWidget {
 
         // Lock and show spinner when input is busy
         if state.is_busy() {
-            let spinner = state.spinner();
-            spinner.render(input_area[2], buf);
+            render_spinner(theme, state.spinner(), input_area[2], buf);
         }
 
         // Show invalid message when input is invalid

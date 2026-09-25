@@ -34,6 +34,7 @@ use suno_qrcode::{
     scanner::Scanner,
     NetworkSpecsToSend,
 };
+use suno_theme::Theme;
 use suno_tracing::LogEntry;
 use suno_update::update;
 use tokio::sync::mpsc;
@@ -83,6 +84,12 @@ pub struct App {
     pub logs: LogsState,
     /// Is any sensitive data masked?
     pub masked: bool,
+    /// The currently active theme, picked from the `ctrl+t` menu.
+    pub theme: Theme,
+    /// Index of the active theme within `CONFIG.theme_catalog()`.
+    theme_index: usize,
+    /// Theme index to restore if the theme menu is cancelled.
+    theme_index_before_menu: usize,
     /// New version available
     pub new_version: Option<String>,
     /// The sender to send actions to update the state to the app.
@@ -97,17 +104,34 @@ impl App {
         // Define the channel to send actions to update the app state.
         let (tx, rx) = mpsc::unbounded_channel::<Action>();
 
+        let theme_index = CONFIG.theme_active_index();
+        let theme = CONFIG
+            .theme_catalog()
+            .get(theme_index)
+            .map(|(_, theme)| *theme)
+            .unwrap_or_default();
+
+        let mut chains = ChainsList::default();
+        chains.set_theme(theme);
+        let mut popup = Popup::default();
+        popup.set_theme(theme);
+        let mut logs = LogsState::new(rx_logs);
+        logs.set_theme(theme);
+
         Self {
             running: true,
             focus: Focus::default(),
             window: Window::default(),
             section: Section::default(),
-            chains: ChainsList::default(),
+            chains,
             validators: ValidatorsList::default(),
             // collators: CollatorsListWidget::default(),
-            popup: Popup::default(),
-            logs: LogsState::new(rx_logs),
+            popup,
+            logs,
             masked: true,
+            theme,
+            theme_index,
+            theme_index_before_menu: theme_index,
             new_version: None,
             tx,
             rx,
@@ -230,6 +254,7 @@ impl App {
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
+            PopupAction::OpenThemeMenu => self.open_theme_menu(),
             PopupAction::ShowConfirmAndSign(ctx) => {
                 self.open_confirm_and_sign_popup(&ctx);
             }
@@ -270,8 +295,14 @@ impl App {
             InputAction::AutoComplete => {
                 self.popup.set_input_autocomplete();
             }
-            InputAction::Char(new_char) => self.popup.insert_input_char(new_char),
-            InputAction::Delete => self.popup.delete_input_char(),
+            InputAction::Char(new_char) => {
+                self.popup.insert_input_char(new_char);
+                self.preview_theme_selection();
+            }
+            InputAction::Delete => {
+                self.popup.delete_input_char();
+                self.preview_theme_selection();
+            }
             InputAction::CursorLeft => self.popup.move_cursor_left(),
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.on_input_enter(),
@@ -1015,48 +1046,40 @@ impl App {
 
     /// Moves row selection up.
     pub fn move_up(&mut self) {
+        if self.popup.is_visible() {
+            self.popup.move_up();
+            self.preview_theme_selection();
+            return;
+        }
+
         match self.section {
             Section::Chains => {
-                if self.popup.is_visible() {
-                    self.popup.move_up();
-                } else {
-                    self.chains.move_up();
-                }
+                self.chains.move_up();
             }
             Section::Validators => {
-                if self.popup.is_visible() {
-                    self.popup.move_up();
-                } else {
-                    self.validators.move_up();
-                }
+                self.validators.move_up();
             }
-            // Section::Collators => {
-            //     self.collators.move_up();
-            // }
+            // Section::Collators => self.collators.move_up(),
             _ => {}
         };
     }
 
     /// Moves row selection down.
     pub fn move_down(&mut self) {
+        if self.popup.is_visible() {
+            self.popup.move_down();
+            self.preview_theme_selection();
+            return;
+        }
+
         match self.section {
             Section::Chains => {
-                if self.popup.is_visible() {
-                    self.popup.move_down();
-                } else {
-                    self.chains.move_down();
-                }
+                self.chains.move_down();
             }
             Section::Validators => {
-                if self.popup.is_visible() {
-                    self.popup.move_down();
-                } else {
-                    self.validators.move_down();
-                }
+                self.validators.move_down();
             }
-            // Section::Collators => {
-            //     self.collators.move_down();
-            // }
+            // Section::Collators => self.collators.move_down(),
             _ => {}
         };
     }
@@ -1091,6 +1114,60 @@ impl App {
     /// Selects the next window.
     fn next_window(&mut self) {
         self.window = self.window.next();
+    }
+
+    /// Opens the theme selection popup.
+    fn open_theme_menu(&mut self) {
+        if self.popup.is_visible() {
+            return;
+        }
+
+        let catalog = CONFIG.theme_catalog();
+        if catalog.is_empty() {
+            return;
+        }
+
+        self.theme_index_before_menu = self.theme_index;
+        let active_name = catalog[self.theme_index].0.clone();
+
+        let names: Vec<String> = catalog.into_iter().map(|(name, _)| name).collect();
+        self.popup.show_theme_menu(names, active_name);
+
+        // Dispatch focus to the input field so typing filters and up/down/enter/esc navigate.
+        let _ = self.tx.send(Action::Input(InputAction::Editing));
+    }
+
+    /// Applies the theme named `name` from `CONFIG.theme_catalog()`, if any.
+    fn apply_theme_by_name(&mut self, name: &str) {
+        let catalog = CONFIG.theme_catalog();
+        let Some(index) = catalog.iter().position(|(n, _)| n == name) else {
+            return;
+        };
+        self.theme_index = index;
+        self.theme = catalog[index].1;
+        self.chains.set_theme(self.theme);
+        self.popup.set_theme(self.theme);
+        self.logs.set_theme(self.theme);
+        info!("Theme changed to: {}", name);
+    }
+
+    /// Live-previews the theme currently highlighted in the theme menu.
+    fn preview_theme_selection(&mut self) {
+        if self.popup.get_mode() != PopupMode::ThemeMenu {
+            return;
+        }
+        if let Some(name) = self.popup.get_selected_theme() {
+            self.apply_theme_by_name(&name);
+        }
+    }
+
+    /// Handle enter when the popup is showing the theme menu.
+    fn on_theme_menu_enter(&mut self) {
+        let Some(name) = self.popup.get_confirmed_theme() else {
+            return;
+        };
+        self.apply_theme_by_name(&name);
+        self.close_popup();
     }
 
     /// Toggles the masked state of the application.
@@ -1305,6 +1382,11 @@ impl App {
     /// Handle input enter depending on the context
     pub fn on_input_enter(&mut self) {
         if !self.popup.is_visible() {
+            return;
+        }
+
+        if self.popup.get_mode() == PopupMode::ThemeMenu {
+            self.on_theme_menu_enter();
             return;
         }
 
@@ -1770,6 +1852,14 @@ impl App {
     pub fn cancel(&mut self) {
         if !self.popup.is_visible() {
             return;
+        }
+
+        if self.popup.get_mode() == PopupMode::ThemeMenu {
+            let catalog = CONFIG.theme_catalog();
+            if let Some((name, _)) = catalog.get(self.theme_index_before_menu) {
+                let name = name.clone();
+                self.apply_theme_by_name(&name);
+            }
         }
 
         if self.popup.can_close() {

@@ -490,8 +490,18 @@ impl Config {
         self.subcommand.as_ref()
     }
 
-    pub fn theme(&self) -> &Theme {
+    pub fn theme(&self) -> Theme {
         self.themes.theme()
+    }
+
+    /// Returns the available themes ordered by name, useful to loop through them.
+    pub fn theme_catalog(&self) -> Vec<(String, Theme)> {
+        self.themes.catalog()
+    }
+
+    /// Returns the index of the active theme within the catalog.
+    pub fn theme_active_index(&self) -> usize {
+        self.themes.active_index()
     }
 
     pub fn chains(&self) -> &Chains {

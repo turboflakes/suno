@@ -6,15 +6,17 @@ use ratatui::{
     text::Text,
     widgets::{Block, BorderType, Borders, Cell, Row, StatefulWidget, Table},
 };
-use suno_config::CONFIG;
 use suno_primitives::display::format_planks;
+use suno_theme::Theme;
 
 #[derive(Debug, Default)]
-pub struct ValidatorsDetailedListWidget;
+pub struct ValidatorsDetailedListWidget {
+    theme: Theme,
+}
 
 impl ValidatorsDetailedListWidget {
-    pub fn new() -> Self {
-        Self
+    pub fn new(theme: Theme) -> Self {
+        Self { theme }
     }
 }
 
@@ -23,7 +25,7 @@ impl StatefulWidget for ValidatorsDetailedListWidget {
     type State = ValidatorsList;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let (table_style, highlight_style) = match state.is_active() {
             true => (

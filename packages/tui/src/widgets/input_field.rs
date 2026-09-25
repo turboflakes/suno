@@ -1,5 +1,8 @@
 use crate::widgets::spinner::Spinner;
-use crate::widgets::{input_command::InputCommandWidget, input_password::InputPasswordWidget};
+use crate::widgets::{
+    input_command::InputCommandWidget, input_filter::InputFilterWidget,
+    input_password::InputPasswordWidget,
+};
 use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
 use suno_config::CustomCommand;
@@ -7,6 +10,7 @@ use suno_primitives::{
     call::{Call, CallError},
     display::pasted_string_info,
 };
+use suno_theme::Theme;
 use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Zeroize)]
@@ -57,6 +61,7 @@ pub enum Type {
     #[default]
     Command,
     Password,
+    Filter,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -226,6 +231,9 @@ impl InputField {
                 } else {
                     self.status = Status::None
                 }
+            }
+            Type::Filter => {
+                self.status = Status::None;
             }
         }
     }
@@ -410,6 +418,10 @@ impl InputField {
         self.metadata = metadata;
     }
 
+    const fn as_filter(&mut self) {
+        self.r#type = Type::Filter;
+    }
+
     pub fn reset_as_password(&mut self) {
         self.reset();
         self.as_password();
@@ -418,6 +430,11 @@ impl InputField {
     pub fn reset_as_command(&mut self, metadata: Option<Metadata>) {
         self.reset();
         self.as_command(metadata);
+    }
+
+    pub fn reset_as_filter(&mut self) {
+        self.reset();
+        self.as_filter();
     }
 
     pub fn reset(&mut self) {
@@ -436,18 +453,34 @@ pub struct InputFieldWidget {
 }
 
 impl InputFieldWidget {
-    pub fn as_password(&self) -> InputPasswordWidget {
+    pub fn as_password(&self, theme: Theme) -> InputPasswordWidget {
         let mut state = self.state.write().unwrap();
         state.as_password();
         InputPasswordWidget {
             state: self.state.clone(),
+            theme,
         }
     }
 
-    pub fn as_command(&self, call: Option<Call>) -> InputCommandWidget {
+    pub fn as_command(&self, call: Option<Call>, theme: Theme) -> InputCommandWidget {
         InputCommandWidget {
             state: self.state.clone(),
             call,
+            theme,
+        }
+    }
+
+    pub fn as_filter(
+        &self,
+        theme: Theme,
+        placeholder: Option<String>,
+        has_match: bool,
+    ) -> InputFilterWidget {
+        InputFilterWidget {
+            state: self.state.clone(),
+            theme,
+            placeholder,
+            has_match,
         }
     }
 }
@@ -488,6 +521,11 @@ impl InputFieldWidget {
     pub fn reset_as_password(&mut self) {
         let mut state = self.state.write().unwrap();
         state.reset_as_password();
+    }
+
+    pub fn reset_as_filter(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.reset_as_filter();
     }
 
     pub fn set_value(&mut self, value: String) {

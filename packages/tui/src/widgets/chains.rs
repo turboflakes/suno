@@ -19,6 +19,7 @@ use suno_primitives::{
     network::ConnectionState,
     BlockHash, BlockNumber, Chain, Epoch, Era,
 };
+use suno_theme::Theme;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::debug;
 
@@ -30,6 +31,7 @@ pub struct ChainsList {
     chains_order: Vec<ChainKey>,
     table_state: TableState,
     is_active: bool,
+    theme: Theme,
 }
 
 impl ChainsList {
@@ -276,6 +278,10 @@ impl ChainsList {
         self.is_active = active;
     }
 
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
+    }
+
     pub fn get_selected(&self) -> Option<Chain> {
         self.table_state
             .selected()
@@ -353,7 +359,7 @@ impl ChainsList {
 
 impl Widget for &mut ChainsList {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let block = Block::new()
             .set_style(theme.block.pane_header(self.is_active))
@@ -412,7 +418,7 @@ impl Widget for &mut ChainsList {
                 height: area.height.saturating_sub(2),
             };
             if let Some(row_index) = self.table_state.selected() {
-                render_scrollbar(row_index, self.chains.len(), scrollbar_area, buf);
+                render_scrollbar(theme, row_index, self.chains.len(), scrollbar_area, buf);
             }
         }
     }

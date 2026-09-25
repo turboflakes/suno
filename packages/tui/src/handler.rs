@@ -30,6 +30,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
                 // Mask/Unmask Host IP addresses
                 KeyCode::Char('m') => Action::Navigation(NavigationAction::ToggleMask),
+                // Open the theme selection popup
+                KeyCode::Char('t') => Action::Popup(PopupAction::OpenThemeMenu),
                 _ => match app_focus {
                     Focus::Main => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),

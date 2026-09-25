@@ -8,6 +8,7 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use suno_config::{NodeConfig, CONFIG};
 use suno_primitives::Collator;
+use suno_theme::Theme;
 use tracing::warn;
 
 #[derive(Debug, Clone, Default)]
@@ -143,7 +144,13 @@ impl Widget for &CollatorsListWidget {
                 ..area
             };
             if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(row_index, state.collators.len(), scrollbar_area, buf);
+                render_scrollbar(
+                    Theme::default(),
+                    row_index,
+                    state.collators.len(),
+                    scrollbar_area,
+                    buf,
+                );
             }
         }
     }

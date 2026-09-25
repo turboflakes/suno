@@ -3,10 +3,9 @@ use ratatui::{
     layout::Rect,
     widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget},
 };
-use suno_config::CONFIG;
+use suno_theme::Theme;
 
-pub fn render_scrollbar(position: usize, max: usize, area: Rect, buf: &mut Buffer) {
-    let theme = CONFIG.theme();
+pub fn render_scrollbar(theme: Theme, position: usize, max: usize, area: Rect, buf: &mut Buffer) {
     let mut state = ScrollbarState::new(max)
         .viewport_content_length(area.height as usize)
         .position(position);

@@ -29,11 +29,32 @@ pub struct Themes {
 }
 
 impl Themes {
-    pub fn theme(&self) -> &Theme {
-        self.themes
+    pub fn theme(&self) -> Theme {
+        *self
+            .themes
             .get(&self.active)
             .or_else(|| self.themes.get(&default_active_theme()))
             .expect("No theme loaded")
+    }
+
+    /// Returns the available themes ordered by name, useful to cycle through them.
+    pub fn catalog(&self) -> Vec<(Name, Theme)> {
+        let mut catalog: Vec<(Name, Theme)> = self
+            .themes
+            .iter()
+            .map(|(name, theme)| (name.clone(), *theme))
+            .collect();
+        catalog.sort_by(|a, b| a.0.cmp(&b.0));
+        catalog
+    }
+
+    /// Returns the index of the active theme within the catalog, useful to
+    /// initialize theme cycling from the configured theme.
+    pub fn active_index(&self) -> usize {
+        self.catalog()
+            .iter()
+            .position(|(name, _)| name == &self.active)
+            .unwrap_or(0)
     }
 
     pub fn set_themes(&mut self, themes: ThemesMap) {

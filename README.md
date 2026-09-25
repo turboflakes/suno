@@ -28,7 +28,7 @@ As a nominator you can just as easily check the validators you nominate.
 - [&check;] Autocomplete, select or filter commands (extrinsics) based on proxy type context.
 - [&check;] Support [commands](#commands-supported-per-proxy-type) for most of **Staking Operations** as well as **Rotate session keys**.
 - [&check;] Verify and sign call_data. Display and log transaction progress.
-- [&check;] Add builtin themes [`Suno Dark`, `Suno Light`] and load user specific **custom themes**.
+- [&check;] Builtin themes [`Suno Dark`, `Suno Light`]. Load user specific **custom themes**. View and switch themes live.
 - [&check;] Define and **run** user-specific commands linked to each configured validator.
 - [&check;] Explicitly **use** advanced builtin commands: `calls/rotate_and_set_keys`, `calls/has_keys`, `calls/has_queued_keys`.
 - [&check;] Execute custom commands locally or remotely.
@@ -158,6 +158,7 @@ Options:
 'ctrl+e' to show list of enabled commands for the selected validator
 'ctrl+w' to switch window
 'ctrl+m' to mask or unmask hosts
+'ctrl+t' to show the list of available themes
 'ctrl+h / ctrl+l / left / right' to navigate between pane sections
 'ctrl+j / ctrl+k / up / down' to select a chain, validator, or extrinsic depending on the highlighted area
 'ctrl+c' to quit suno
@@ -428,7 +429,6 @@ When you are done, make a [PR](https://github.com/turboflakes/suno/pulls) with y
  - [] Pro / Advanced mode to show validators key insight metrics
  - [] Collator metrics and extrinsics
  - [] Support for `/kick`, `/nominate` extrinsics
- - [] Support dynamic theme selection
  - [] Support validator rewards
 
 ## Development / Build from Source

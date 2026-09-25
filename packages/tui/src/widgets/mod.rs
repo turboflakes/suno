@@ -2,6 +2,7 @@ pub mod chains;
 pub mod collators;
 pub mod input_command;
 pub mod input_field;
+pub mod input_filter;
 pub mod input_password;
 pub mod logo;
 pub mod logs;

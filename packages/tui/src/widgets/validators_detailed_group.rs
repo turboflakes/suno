@@ -21,11 +21,12 @@ pub const PADDING: u16 = 4;
 #[derive(Debug)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
     pub chains: &'a ChainsList,
+    theme: Theme,
 }
 
 impl<'a> ValidatorsDetailedGroupWidget<'a> {
-    pub fn new(chains: &'a ChainsList) -> Self {
-        Self { chains }
+    pub fn new(chains: &'a ChainsList, theme: Theme) -> Self {
+        Self { chains, theme }
     }
 }
 
@@ -113,6 +114,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
             };
 
             render_scrollbar(
+                self.theme,
                 state.scroll_offset as usize + selected_pos,
                 total_height as usize,
                 scrollbar_area,
@@ -165,7 +167,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
@@ -326,7 +328,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         table_state: &mut TableState,
         is_masked: bool,
     ) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
         let features = CONFIG.features();
         let Some(ah_chain) = self
             .chains
@@ -388,7 +390,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         columns: &Columns,
         era: u32,
         masked: bool,
-        theme: &Theme,
+        theme: Theme,
         symbol: &Span<'static>,
     ) -> Vec<Row<'static>> {
         validators
@@ -405,7 +407,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         columns: &Columns,
         era: u32,
         masked: bool,
-        theme: &Theme,
+        theme: Theme,
         symbol: &Span<'static>,
     ) -> Row<'static> {
         Row::new(self.validator_cells(validator, selected, columns, era, masked, theme, symbol))
@@ -419,7 +421,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         columns: &Columns,
         era: u32,
         masked: bool,
-        theme: &Theme,
+        theme: Theme,
         symbol: &Span<'static>,
     ) -> Vec<Cell<'static>> {
         let decimals = validator.runtime().token_decimals();

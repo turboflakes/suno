@@ -15,7 +15,7 @@ use ratatui::{
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
-use suno_config::{SupportedRuntime, CONFIG};
+use suno_config::SupportedRuntime;
 use suno_primitives::{
     call::Call,
     entry::{Command, Entry, ToDescription, ToMethod},
@@ -24,6 +24,7 @@ use suno_primitives::{
     Chain, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
+use suno_theme::Theme;
 use tokio::sync::mpsc::UnboundedSender;
 use unicode_width::UnicodeWidthStr;
 
@@ -37,6 +38,11 @@ struct ValidatorContext {
 
 struct ChainContext {
     runtime: SupportedRuntime,
+}
+
+struct ThemeMenuContext {
+    names: Vec<String>,
+    active_name: String,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -56,6 +62,7 @@ enum Context {
     None,
     ValidatorMenu(Box<ValidatorContext>),
     ChainMenu(Box<ChainContext>),
+    ThemeMenu(Box<ThemeMenuContext>),
     Confirmation(Box<ConfirmationContext>),
     Message(MessageContext),
     ChainSpecs(Box<ChainSpecsContext>),
@@ -68,6 +75,7 @@ impl Context {
             Context::None => Mode::Hidden,
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
+            Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Message(_) => Mode::Message,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
@@ -81,6 +89,7 @@ pub enum Mode {
     #[default]
     Hidden,
     Menu,
+    ThemeMenu,
     Confirmation,
     Message,
     ChainSpecs,
@@ -111,6 +120,7 @@ pub struct Popup {
     picker: Picker,
     masked: bool,
     metadata: Option<MetadataState>,
+    theme: Theme,
 }
 
 impl Default for Popup {
@@ -126,6 +136,7 @@ impl Default for Popup {
             picker,
             masked: true,
             metadata: None,
+            theme: Theme::default(),
         }
     }
 }
@@ -140,6 +151,11 @@ impl Popup {
         match &context {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::ThemeMenu(ctx) => {
+                self.input.reset_as_filter();
+                let index = ctx.names.iter().position(|n| n == &ctx.active_name);
+                self.table_state.select(index.or(Some(0)));
+            }
             Context::Confirmation(ctx) => {
                 if !ctx.runtime.is_qrcode_enabled() {
                     self.input.reset_as_password();
@@ -341,6 +357,47 @@ impl Popup {
         self.on_init(Context::ChainMenu(Box::new(ctx)));
     }
 
+    pub fn show_theme_menu(&mut self, names: Vec<String>, active_name: String) {
+        let ctx = ThemeMenuContext { names, active_name };
+        self.on_init(Context::ThemeMenu(Box::new(ctx)));
+    }
+
+    /// Returns the theme names matching the current filter text, when the
+    /// popup is showing the theme menu.
+    pub fn get_theme_names_filtered(&self) -> Vec<String> {
+        let Context::ThemeMenu(ctx) = &self.context else {
+            return Vec::new();
+        };
+        let query = self.input.raw_value().to_lowercase();
+        ctx.names
+            .iter()
+            .filter(|name| to_slug_body(name).contains(&query))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the name of the currently highlighted theme, when the popup
+    /// is showing the theme menu.
+    pub fn get_selected_theme(&self) -> Option<String> {
+        let names = self.get_theme_names_filtered();
+        if names.is_empty() {
+            return None;
+        }
+        let index = self.table_state.selected()?.min(names.len() - 1);
+        names.into_iter().nth(index)
+    }
+
+    /// Returns the highlighted theme only when the typed filter text fully
+    /// matches its slug, e.g. via autocomplete or manual typing.
+    pub fn get_confirmed_theme(&self) -> Option<String> {
+        let name = self.get_selected_theme()?;
+        if self.input.raw_value().to_lowercase() == to_slug_body(&name) {
+            Some(name)
+        } else {
+            None
+        }
+    }
+
     pub fn show_confirm_and_sign(&mut self, ctx: &ConfirmationContext) {
         self.on_init(Context::Confirmation(Box::new(ctx.clone())));
     }
@@ -371,7 +428,35 @@ impl Popup {
         !self.is_hidden()
     }
 
+    fn move_theme_selection(&mut self, forward: bool) {
+        if !matches!(self.context, Context::ThemeMenu(_)) {
+            return;
+        }
+        let len = self.get_theme_names_filtered().len();
+        if len == 0 {
+            return;
+        }
+        let selected = self.table_state.selected().unwrap_or(0).min(len - 1);
+        let next = if forward {
+            if selected == len - 1 {
+                0
+            } else {
+                selected + 1
+            }
+        } else if selected == 0 {
+            len - 1
+        } else {
+            selected - 1
+        };
+        self.table_state.select(Some(next));
+    }
+
     pub fn move_down(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::ThemeMenu(_)) {
+            self.move_theme_selection(true);
+            return None;
+        }
+
         let options = self.get_options_filtered();
         if options.is_empty() {
             self.table_state.select(None);
@@ -393,6 +478,11 @@ impl Popup {
     }
 
     pub fn move_up(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::ThemeMenu(_)) {
+            self.move_theme_selection(false);
+            return None;
+        }
+
         let options = self.get_options_filtered();
         if options.is_empty() {
             self.table_state.select(None);
@@ -491,6 +581,7 @@ impl Popup {
             self.context,
             Context::ValidatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::ThemeMenu(_)
                 | Context::ChainSpecs(_)
                 | Context::Metadata(_)
                 | Context::Confirmation(_)
@@ -503,6 +594,10 @@ impl Popup {
 
     pub fn toggle_mask(&mut self) {
         self.masked = !self.is_masked();
+    }
+
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
     }
 
     pub fn update_message(&mut self, msg: impl Into<String>) {
@@ -553,6 +648,7 @@ impl Popup {
 
     pub fn insert_input_char(&mut self, new_char: char) {
         self.input.insert_char(new_char);
+        self.reset_theme_selection_after_filter();
     }
 
     pub fn delete_input_char(&mut self) {
@@ -564,6 +660,22 @@ impl Popup {
                 self.table_state.select(None);
                 return;
             }
+            self.table_state.select(Some(0));
+        }
+
+        self.reset_theme_selection_after_filter();
+    }
+
+    /// Resets the highlighted row to the top match after the theme filter
+    /// text changes.
+    fn reset_theme_selection_after_filter(&mut self) {
+        if !matches!(self.context, Context::ThemeMenu(_)) {
+            return;
+        }
+        let names = self.get_theme_names_filtered();
+        if names.is_empty() {
+            self.table_state.select(None);
+        } else {
             self.table_state.select(Some(0));
         }
     }
@@ -583,6 +695,12 @@ impl Popup {
     pub fn set_input_autocomplete(&mut self) {
         if let Some(call) = self.get_selected_call() {
             self.input.set_value(call.to_string());
+            return;
+        }
+
+        if let Some(name) = self.get_selected_theme() {
+            self.input.set_value(to_slug_body(&name));
+            self.reset_theme_selection_after_filter();
         }
     }
 
@@ -602,6 +720,7 @@ impl Widget for &mut Popup {
     fn render(self, area: Rect, buf: &mut Buffer) {
         match self.get_mode() {
             Mode::Menu => self.render_menu(area, buf),
+            Mode::ThemeMenu => self.render_theme_menu(area, buf),
             Mode::Confirmation => self.render_confirm_and_sign(area, buf),
             Mode::Message => self.render_message(area, buf),
             Mode::ChainSpecs => self.render_chain_specs_qrcode(area, buf),
@@ -613,7 +732,7 @@ impl Widget for &mut Popup {
 
 impl Popup {
     fn render_menu(&mut self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
         let options = self.get_options_filtered();
         let rows = options
             .iter()
@@ -692,11 +811,72 @@ impl Popup {
         StatefulWidget::render(table, details_area, buf, &mut self.table_state);
 
         let call = self.get_selected_call();
-        self.input.as_command(call).render(input_area, buf);
+        self.input
+            .as_command(call, self.theme)
+            .render(input_area, buf);
+    }
+
+    fn render_theme_menu(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+
+        if !matches!(self.context, Context::ThemeMenu(_)) {
+            return;
+        }
+        let names = self.get_theme_names_filtered();
+        let selected_display_name = self.get_selected_theme().map(|name| to_slug_body(&name));
+
+        let rows = names
+            .iter()
+            .map(|name| Row::new([Cell::from(""), Cell::from(to_slug(name))]));
+
+        let details_len = (names.len() as u16 + 5).clamp(4, 10);
+        let [top_area, details_area, hint_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Max(details_len),
+                Constraint::Length(5),
+            ])
+            .flex(Flex::End)
+            .areas(area);
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::new(1, 1, 1, 0));
+
+        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.header(true))])
+            .alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        let widths = [Constraint::Length(2), Constraint::Fill(1)];
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::bottom(1));
+
+        let table = Table::new(rows, widths)
+            .block(block)
+            .header(Row::new(["", "theme"]).style(theme.table.header))
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(true));
+
+        Clear.render(details_area, buf);
+        StatefulWidget::render(table, details_area, buf, &mut self.table_state);
+
+        let has_match = self.get_confirmed_theme().is_some();
+        let [input_area] = Layout::vertical([Constraint::Length(3)]).areas(hint_area);
+        self.input
+            .as_filter(theme, selected_display_name, has_match)
+            .render(input_area, buf);
     }
 
     fn render_confirm_and_sign(&mut self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let Context::Confirmation(ctx) = &self.context else {
             return;
@@ -781,7 +961,7 @@ impl Popup {
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let qrcode = QrCodeWidget::new(qr_bytes);
 
@@ -824,11 +1004,11 @@ impl Popup {
             .areas(area);
 
         details.render(details_area, buf);
-        self.input.as_password().render(sign_area, buf);
+        self.input.as_password(self.theme).render(sign_area, buf);
     }
 
     fn render_message(&mut self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let Context::Message(ctx) = &self.context else {
             return;
@@ -855,7 +1035,7 @@ impl Popup {
     }
 
     fn render_chain_specs_qrcode(&self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let Context::ChainSpecs(ctx) = &self.context else {
             return;
@@ -921,7 +1101,7 @@ impl Popup {
     }
 
     fn render_metadata_qrcode(&mut self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let Context::Metadata(ctx) = &self.context else {
             return;
@@ -994,6 +1174,16 @@ pub fn to_row(command: Command<Call>, mode: Mode) -> Row<'static> {
         Command::Text(text) => Row::new(vec![text.to_string()]),
         _ => Row::new(vec!["".to_string()]),
     }
+}
+
+/// Formats a theme name as a slug, e.g. "Suno Dark" -> "suno_dark".
+fn to_slug_body(name: &str) -> String {
+    name.to_lowercase().replace(' ', "_")
+}
+
+/// Formats a theme name as a `/command`-style slug, e.g. "Suno Dark" -> "/suno_dark".
+fn to_slug(name: &str) -> String {
+    format!("/{}", to_slug_body(name))
 }
 
 fn truncate_method(call: &Call, max_length: usize) -> String {
