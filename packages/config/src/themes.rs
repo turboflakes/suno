@@ -2,7 +2,7 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use suno_theme::{Palette, Theme, SUNO_DARK_PALETTE, SUNO_LIGHT_PALETTE};
+use suno_theme::{Palette, Theme, BUILTIN_PALETTES, SUNO_DARK_PALETTE};
 use tracing::{info, warn};
 
 type Name = String;
@@ -29,11 +29,32 @@ pub struct Themes {
 }
 
 impl Themes {
-    pub fn theme(&self) -> &Theme {
-        self.themes
+    pub fn theme(&self) -> Theme {
+        *self
+            .themes
             .get(&self.active)
             .or_else(|| self.themes.get(&default_active_theme()))
             .expect("No theme loaded")
+    }
+
+    /// Returns the available themes ordered by name, useful to cycle through them.
+    pub fn catalog(&self) -> Vec<(Name, Theme)> {
+        let mut catalog: Vec<(Name, Theme)> = self
+            .themes
+            .iter()
+            .map(|(name, theme)| (name.clone(), *theme))
+            .collect();
+        catalog.sort_by(|a, b| a.0.cmp(&b.0));
+        catalog
+    }
+
+    /// Returns the index of the active theme within the catalog, useful to
+    /// initialize theme cycling from the configured theme.
+    pub fn active_index(&self) -> usize {
+        self.catalog()
+            .iter()
+            .position(|(name, _)| name == &self.active)
+            .unwrap_or(0)
     }
 
     pub fn set_themes(&mut self, themes: ThemesMap) {
@@ -51,16 +72,11 @@ impl Themes {
     pub fn load<P: AsRef<Path>>(path_dir: P) -> Result<ThemesMap, Error> {
         let path_dir = path_dir.as_ref();
 
-        // Register SUNO builtins Themes
+        // Register SUNO builtin themes
         let mut themes = HashMap::new();
-        themes.insert(
-            SUNO_DARK_PALETTE.0.into(),
-            Theme::from_palette(&SUNO_DARK_PALETTE.1),
-        );
-        themes.insert(
-            SUNO_LIGHT_PALETTE.0.into(),
-            Theme::from_palette(&SUNO_LIGHT_PALETTE.1),
-        );
+        for (name, palette) in BUILTIN_PALETTES {
+            themes.insert(name.to_string(), Theme::from_palette(palette));
+        }
 
         if !path_dir.is_dir() {
             warn!("Themes directory does not exist: {}", path_dir.display());

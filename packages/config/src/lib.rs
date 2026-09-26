@@ -12,7 +12,9 @@ pub mod transactions;
 mod vault;
 
 pub use crate::access::{NodeAccess, SshConfig};
-pub use crate::config::{ChainConfig, Config, Features, Host, NodeConfig, Subcommand, CONFIG};
+pub use crate::config::{
+    save_active_theme, ChainConfig, Config, Features, Host, NodeConfig, Subcommand, CONFIG,
+};
 pub use crate::custom::{CommandKind, CustomCalls, CustomCommand};
 pub use crate::error::Error;
 pub use crate::fetch::fetch_validators_from_source;

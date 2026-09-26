@@ -7,6 +7,7 @@ use ratatui::{
 use std::collections::VecDeque;
 use suno_config::CONFIG;
 use suno_primitives::display::format_date;
+use suno_theme::Theme;
 use suno_tracing::Log;
 use suno_tracing::LogEntry;
 use tokio::sync::mpsc;
@@ -14,6 +15,7 @@ use tokio::sync::mpsc;
 pub struct LogsState {
     logs: Log,
     table_state: TableState,
+    theme: Theme,
 }
 
 impl LogsState {
@@ -22,7 +24,12 @@ impl LogsState {
         Self {
             logs: Log::new(rx, config.logs_max_entries()),
             table_state: TableState::default(),
+            theme: Theme::default(),
         }
+    }
+
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
     }
 
     pub fn entries(&self) -> &VecDeque<LogEntry> {
@@ -56,7 +63,7 @@ impl StatefulWidget for LogsWidget<'_> {
     type State = LogsState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let theme = CONFIG.theme();
+        let theme = state.theme;
 
         let inner = match self.block {
             Some(b) => {

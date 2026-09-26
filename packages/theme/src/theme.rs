@@ -1,4 +1,5 @@
-use crate::palette::{Palette, SUNO_DARK_PALETTE};
+use crate::palette::Palette;
+use crate::themes::suno::SUNO_DARK_PALETTE;
 use ratatui::style::{Modifier, Style};
 
 /// A trait for objects that have an active style.
@@ -14,7 +15,7 @@ pub trait Themed {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Theme {
     pub block: Block,
     pub table: Table,
@@ -99,7 +100,7 @@ impl Theme {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Block {
     pub base: Style,
     pub pane_header: Style,
@@ -135,7 +136,7 @@ impl Themed for Block {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Table {
     pub base: Style,
     pub header: Style,
@@ -170,7 +171,7 @@ impl Table {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Paragraph {
     pub base: Style,
     pub base_active: Style,
@@ -209,12 +210,12 @@ impl Paragraph {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Scrollbar {
     pub base: Style,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Input {
     pub base: Style,
     pub base_active: Style,
@@ -254,7 +255,7 @@ impl Input {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Logo {
     pub base: Style,
     pub base_dark: Style,
@@ -262,7 +263,7 @@ pub struct Logo {
     pub only_shadow: Style,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Qrcode {
     pub base: Style,
     pub scanner: Style,

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Add dynamic theme switching with `ctrl+t` see PR [#64](https://github.com/turboflakes/suno/pull/64)
+- Update chain-specs
 
 ## [0.8.0] - 2026-09-15
 - Fix AHP transaction signing for runtime 2005000 see PR [#54](https://github.com/turboflakes/suno/pull/54)

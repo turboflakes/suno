@@ -12,11 +12,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use subxt::utils::AccountId32;
 use suno_theme::Theme;
+use tracing::warn;
 
 // Set Config struct into a CONFIG lazy_static to avoid multiple processing
 lazy_static! {
@@ -60,6 +61,16 @@ pub enum Subcommand {
     Update { version: Option<String> },
 }
 
+/// Runtime preferences saved from the TUI, layered on top of `config.yaml`
+/// on load without ever touching the user's own file. Grows over time as
+/// more things become editable from the TUI, each as its own optional
+/// field so unrelated prefs are preserved on every write.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct Prefs {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active_theme: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// CLI subcommand to execute.
@@ -86,6 +97,10 @@ pub struct Config {
     /// Logs configuration.
     #[serde(default = "default_logs")]
     pub logs: Logs,
+    /// Path the config was loaded from, used to locate the sibling prefs
+    /// file that persists runtime preferences (e.g. the active theme).
+    #[serde(skip)]
+    config_path: PathBuf,
 }
 
 impl Default for Config {
@@ -99,6 +114,7 @@ impl Default for Config {
             explorer: default_explorer(),
             themes: default_themes(),
             logs: default_logs(),
+            config_path: PathBuf::new(),
         }
     }
 }
@@ -388,16 +404,22 @@ impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref();
 
-        if !path.exists() {
-            return Err(Error::InvalidPath(path.display().to_string()));
-        }
+        let mut config = if !path.exists() {
+            warn!(
+                "Config file not found at {}, using defaults",
+                path.display()
+            );
+            Self::default()
+        } else {
+            let content = fs::read_to_string(path)?;
+            if content.is_empty() {
+                Self::default()
+            } else {
+                serde_yaml::from_str(&content)?
+            }
+        };
 
-        let content = fs::read_to_string(path)?;
-        if content.is_empty() {
-            return Ok(Self::default());
-        }
-
-        let mut config: Config = serde_yaml::from_str(&content)?;
+        config.config_path = path.to_path_buf();
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
@@ -412,7 +434,53 @@ impl Config {
         let themes = Themes::load(&config.themes.path)?;
         config.themes.set_themes(themes);
 
+        // Apply the last theme selected at runtime, if any, overriding
+        // whatever is configured in the file.
+        if let Some(active) = config.load_prefs_active_theme() {
+            config.themes.active = active;
+        }
+
         Ok(config)
+    }
+
+    /// Path of the small sibling file used to persist runtime preferences
+    /// across restarts, without touching the user's own config file.
+    fn prefs_path(&self) -> PathBuf {
+        let dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
+        dir.join(".config.local.yaml")
+    }
+
+    /// Reads the prefs file, if it exists and is well-formed. Defaults to
+    /// an empty `Prefs` otherwise, so a missing or corrupt file never
+    /// blocks startup.
+    fn read_prefs(&self) -> Prefs {
+        fs::read_to_string(self.prefs_path())
+            .ok()
+            .and_then(|content| serde_yaml::from_str(&content).ok())
+            .unwrap_or_default()
+    }
+
+    /// Reads the persisted active theme name, if the prefs file exists,
+    /// is well-formed, and names a theme that's still in the catalog.
+    fn load_prefs_active_theme(&self) -> Option<String> {
+        let active = self.read_prefs().active_theme?;
+        if self.themes.catalog().iter().any(|(n, _)| n == &active) {
+            Some(active)
+        } else {
+            None
+        }
+    }
+
+    /// Persists the prefs file, overwriting it with the given snapshot.
+    /// Writes to a temp file and renames over the original, so a crash
+    /// mid-write can't leave a corrupt file behind.
+    fn write_prefs(&self, prefs: &Prefs) -> Result<(), Error> {
+        let path = self.prefs_path();
+        let content = serde_yaml::to_string(prefs)?;
+        let tmp_path = path.with_file_name(".config.local.yaml.tmp");
+        fs::write(&tmp_path, content)?;
+        fs::rename(&tmp_path, &path)?;
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), Error> {
@@ -490,8 +558,18 @@ impl Config {
         self.subcommand.as_ref()
     }
 
-    pub fn theme(&self) -> &Theme {
+    pub fn theme(&self) -> Theme {
         self.themes.theme()
+    }
+
+    /// Returns the available themes ordered by name, useful to loop through them.
+    pub fn theme_catalog(&self) -> Vec<(String, Theme)> {
+        self.themes.catalog()
+    }
+
+    /// Returns the index of the active theme within the catalog.
+    pub fn theme_active_index(&self) -> usize {
+        self.themes.active_index()
     }
 
     pub fn chains(&self) -> &Chains {
@@ -732,6 +810,16 @@ fn get_config() -> Result<Config, Error> {
     Ok(config)
 }
 
+/// Persists the active theme so it's restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_active_theme(name: &str) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.active_theme = Some(name.to_string());
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist active theme: {}", e);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -853,6 +941,7 @@ mod tests {
             explorer: Explorer::default(),
             themes: Themes::default(),
             logs: Logs::default(),
+            config_path: PathBuf::new(),
         };
         assert!(config.validate().is_err());
     }
@@ -1018,5 +1107,71 @@ explorer:
         let mut file = NamedTempFile::new().unwrap();
         file.write_all(content.as_bytes()).unwrap();
         file
+    }
+
+    #[test]
+    fn test_missing_config_file_falls_back_to_defaults() {
+        let config = Config::from_file("/nonexistent/path/config.yaml").unwrap();
+        assert!(config.chains.is_empty());
+    }
+
+    #[test]
+    fn test_active_theme_persists_across_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+        let catalog = config.themes.catalog();
+        let other = catalog
+            .iter()
+            .find(|(name, _)| name != &config.themes.active)
+            .map(|(name, _)| name.clone())
+            .expect("at least two builtin themes");
+        assert_ne!(other, config.themes.active);
+
+        let mut prefs = config.read_prefs();
+        prefs.active_theme = Some(other.clone());
+        config.write_prefs(&prefs).unwrap();
+        assert!(dir.path().join(".config.local.yaml").exists());
+
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert_eq!(reloaded.themes.active, other);
+    }
+
+    #[test]
+    fn test_write_prefs_preserves_other_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+
+        let mut prefs = config.read_prefs();
+        prefs.active_theme = Some("Suno Light".to_string());
+        config.write_prefs(&prefs).unwrap();
+
+        // A second, unrelated write shouldn't need to know about
+        // active_theme, and shouldn't lose it either.
+        let prefs = config.read_prefs();
+        config.write_prefs(&prefs).unwrap();
+
+        let reloaded = config.read_prefs();
+        assert_eq!(reloaded.active_theme.as_deref(), Some("Suno Light"));
+    }
+
+    #[test]
+    fn test_unknown_persisted_theme_is_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+        std::fs::write(
+            dir.path().join(".config.local.yaml"),
+            "active_theme: Ghost\n",
+        )
+        .unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+        assert_ne!(config.themes.active, "Ghost");
     }
 }

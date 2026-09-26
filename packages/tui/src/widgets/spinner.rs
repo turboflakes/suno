@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Block, Padding, Paragraph, Widget},
 };
 use std::time::Instant;
-use suno_config::CONFIG;
+use suno_theme::Theme;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Status {
@@ -73,16 +73,13 @@ impl Spinner {
     }
 }
 
-impl Widget for &Spinner {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
-        let spinner = self.status();
-        let block = Block::new()
-            .style(theme.input.base)
-            .padding(Padding::new(0, 2, 1, 1));
-        Paragraph::new(spinner)
-            .block(block)
-            .style(theme.input.suffix)
-            .render(area, buf);
-    }
+pub fn render_spinner(theme: Theme, spinner: &Spinner, area: Rect, buf: &mut Buffer) {
+    let status = spinner.status();
+    let block = Block::new()
+        .style(theme.input.base)
+        .padding(Padding::new(0, 2, 1, 1));
+    Paragraph::new(status)
+        .block(block)
+        .style(theme.input.suffix)
+        .render(area, buf);
 }

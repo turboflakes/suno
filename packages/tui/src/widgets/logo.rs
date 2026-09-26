@@ -5,11 +5,12 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Widget},
 };
-use suno_config::CONFIG;
+use suno_theme::Theme;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone)]
 pub struct Logo {
     size: Size,
+    theme: Theme,
 }
 
 /// The size of the logo
@@ -61,34 +62,41 @@ pub enum Size {
 }
 
 impl Logo {
-    pub const fn new(size: Size) -> Self {
-        Self { size }
+    pub fn new(size: Size) -> Self {
+        Self {
+            size,
+            theme: Theme::default(),
+        }
     }
 
     #[must_use]
-    pub const fn size(self, size: Size) -> Self {
-        let _ = self;
-        Self { size }
+    pub fn size(self, size: Size) -> Self {
+        Self { size, ..self }
     }
 
-    pub const fn inline() -> Self {
+    #[must_use]
+    pub fn theme(self, theme: Theme) -> Self {
+        Self { theme, ..self }
+    }
+
+    pub fn inline() -> Self {
         Self::new(Size::Inline)
     }
 
-    pub const fn medium() -> Self {
+    pub fn medium() -> Self {
         Self::new(Size::Medium)
     }
 
-    pub const fn large() -> Self {
+    pub fn large() -> Self {
         Self::new(Size::Large)
     }
 
-    pub const fn original() -> Self {
+    pub fn original() -> Self {
         Self::new(Size::Original)
     }
 
     pub fn render_original(&self, area: Rect, buf: &mut Buffer) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
         let mut lines = vec![];
         lines.push(Line::from(vec![
             Span::styled("            ", theme.logo.base),

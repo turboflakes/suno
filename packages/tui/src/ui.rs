@@ -2,7 +2,7 @@ use crate::app::App;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
-use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::Window};
+use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
@@ -77,7 +77,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         Window::Main => render_body_widget(app, frame, outer_layout[1]),
         Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
         Window::Help => {
-            frame.render_widget(&app.window, outer_layout[1]);
+            render_help(app.theme, outer_layout[1], frame.buffer_mut());
         }
     }
 
@@ -131,7 +131,11 @@ fn render_chains_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_stateful_widget(ValidatorsCompactWidget::new(), area, &mut app.validators);
+    frame.render_stateful_widget(
+        ValidatorsCompactWidget::new(app.theme),
+        area,
+        &mut app.validators,
+    );
 }
 
 // fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -154,18 +158,18 @@ fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    let theme = CONFIG.theme();
+    let theme = app.theme;
     let block = Block::default()
         .style(theme.block.main)
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    let widget = ValidatorsDetailedGroupWidget::new(&app.chains);
+    let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
     frame.render_stateful_widget(widget, block_area, &mut app.validators);
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    let theme = CONFIG.theme();
+    let theme = app.theme;
     let block = Block::default()
         .style(theme.block.main)
         .padding(Padding::proportional(1));
@@ -174,7 +178,7 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-    let theme = CONFIG.theme();
+    let theme = app.theme;
     let block = Block::default()
         .style(theme.block.footer_right)
         .padding(Padding::new(0, 2, 1, 1));
@@ -213,6 +217,28 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("confirm".to_string(), theme.paragraph.label));
+                legend.push(Span::raw("   "));
+                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
+            }
+            PopupMode::ThemeMenu => {
+                legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled(
+                    "autocomplete".to_string(),
+                    theme.paragraph.label,
+                ));
+                legend.push(Span::raw("   "));
+                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
+                if app.popup.get_confirmed_theme().is_some() {
+                    legend.push(Span::raw("   "));
+                    legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
+                    legend.push(Span::raw(" "));
+                    legend.push(Span::styled("confirm".to_string(), theme.paragraph.label));
+                }
                 legend.push(Span::raw("   "));
                 legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
@@ -261,6 +287,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         "switch window".to_string(),
         theme.paragraph.label,
     ));
+    if app.popup.get_mode() != PopupMode::ThemeMenu {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+t".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("themes".to_string(), theme.paragraph.label));
+    }
     legend.push(Span::raw("   "));
     legend.push(Span::styled("ctrl+c".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));
@@ -283,13 +315,13 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_widget(footer, area);
 }
 
-fn render_logo_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-    let theme = CONFIG.theme();
+fn render_logo_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = app.theme;
     let block = Block::default()
         .style(theme.block.pane_body)
         .padding(Padding::new(2, 0, 1, 1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    let logo = Logo::inline();
+    let logo = Logo::inline().theme(theme);
     frame.render_widget(&logo, block_area);
 }

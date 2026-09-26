@@ -100,6 +100,7 @@ pub struct MetadataContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PopupAction {
     Open,
+    OpenThemeMenu,
     ShowConfirmAndSign(Box<ConfirmationContext>),
     ShowChainSpecsQrcode(Box<ChainSpecsContext>),
     ShowMetadataQrcode(Box<MetadataContext>),

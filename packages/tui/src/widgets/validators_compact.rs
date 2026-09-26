@@ -7,14 +7,16 @@ use ratatui::{
     text::Text,
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
-use suno_config::CONFIG;
+use suno_theme::Theme;
 
 #[derive(Debug, Default)]
-pub struct ValidatorsCompactWidget;
+pub struct ValidatorsCompactWidget {
+    theme: Theme,
+}
 
 impl ValidatorsCompactWidget {
-    pub fn new() -> Self {
-        Self
+    pub fn new(theme: Theme) -> Self {
+        Self { theme }
     }
 }
 
@@ -23,7 +25,7 @@ impl StatefulWidget for ValidatorsCompactWidget {
     type State = ValidatorsList;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let theme = CONFIG.theme();
+        let theme = self.theme;
 
         let block = Block::new()
             .set_style(theme.block.pane_body(state.is_active()))
@@ -82,7 +84,13 @@ impl StatefulWidget for ValidatorsCompactWidget {
                 height: area.height.saturating_sub(2),
             };
             if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(row_index, state.validators.len(), scrollbar_area, buf);
+                render_scrollbar(
+                    theme,
+                    row_index,
+                    state.validators.len(),
+                    scrollbar_area,
+                    buf,
+                );
             }
         }
     }

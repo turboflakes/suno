@@ -22,7 +22,7 @@ target/
 #
 
 # Config files
-.config.yaml
+.config.*yaml
 
 # Contain local seed files
 *.seed
