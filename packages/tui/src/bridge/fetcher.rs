@@ -130,6 +130,21 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_aura_authorities(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_current_slot(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_slot_duration(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
     async fn fetch_metadata(
         &self,
         api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
@@ -521,6 +536,36 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_balance(api, stash).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_balance(api, stash).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_balance(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_aura_authorities(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_aura_authorities(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_current_slot(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_current_slot(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_slot_duration(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_slot_duration(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

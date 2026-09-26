@@ -275,6 +275,33 @@ pub fn spawn_fetch_total_validators_count(
         .spawn(move |api| async move { runtime.fetch_total_validators_count(&api).await });
 }
 
+pub fn spawn_fetch_aura_authorities(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_aura_authorities(&api).await });
+}
+
+pub fn spawn_fetch_current_slot(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_current_slot(&api).await });
+}
+
+pub fn spawn_fetch_slot_duration(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_slot_duration(&api).await });
+}
+
 pub fn spawn_fetch_total_nominators_count(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,

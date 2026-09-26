@@ -153,6 +153,9 @@ pub enum Response {
     EventWithdrawn(Data<AmountData>),
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
+    AuraAuthorities(Data<Vec<AccountBytes>>),
+    CurrentSlot(Data<u64>),
+    SlotDuration(Data<u64>),
 }
 
 // Some constructors for convenience
@@ -257,5 +260,17 @@ impl Response {
 
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {
         Response::Balance(Data::new(BalanceData { account, balance }))
+    }
+
+    pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
+        Response::AuraAuthorities(Data::new(authorities))
+    }
+
+    pub fn current_slot(slot: u64) -> Self {
+        Response::CurrentSlot(Data::new(slot))
+    }
+
+    pub fn slot_duration(duration_ms: u64) -> Self {
+        Response::SlotDuration(Data::new(duration_ms))
     }
 }

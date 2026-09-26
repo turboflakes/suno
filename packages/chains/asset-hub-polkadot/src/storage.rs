@@ -284,6 +284,44 @@ pub async fn fetch_total_nominators_count(
     Ok(Response::total_nominators(value))
 }
 
+/// Fetch the current Aura authority set (collators) at the specified block hash
+pub async fn fetch_aura_authorities(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage().aura().authorities();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let authorities = value.0.iter().map(|public| public.0).collect();
+
+    Ok(Response::aura_authorities(authorities))
+}
+
+/// Fetch the current Aura slot at the specified block hash
+pub async fn fetch_current_slot(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Response, Error> {
+    let addr = node_runtime::storage().aura().current_slot();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(Response::current_slot(value.0))
+}
+
 /// Fetch total total staked for a specific era at the specified block hash
 pub async fn fetch_total_staked(
     api: &OnlineClientAtBlock<CustomConfig>,

@@ -2,6 +2,7 @@ use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsList,
+    collators::CollatorsList,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
     validators::ValidatorsList,
@@ -16,9 +17,9 @@ use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, thread, time::Duration};
 use suno_actions::{
-    Action, ChainAction, ChainSpecsContext, ConfirmationContext, InputAction, MetadataContext,
-    NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction,
-    UpdateAction, ValidatorAction,
+    Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, InputAction,
+    MetadataContext, NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction,
+    TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
     save_active_theme, CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime,
@@ -80,7 +81,7 @@ pub struct App {
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
-    // TODO: pub collators: CollatorsListWidget,
+    pub collators: CollatorsList,
     /// Manages popup state and rendering.
     pub popup: Popup,
     /// Logs state.
@@ -128,7 +129,7 @@ impl App {
             section: Section::default(),
             chains,
             validators: ValidatorsList::default(),
-            // collators: CollatorsListWidget::default(),
+            collators: CollatorsList::default(),
             popup,
             logs,
             masked: true,
@@ -143,6 +144,7 @@ impl App {
 
     async fn init(&mut self) {
         self.validators.on_init().await;
+        self.collators.on_init();
         self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
     }
@@ -221,6 +223,7 @@ impl App {
                 Action::Input(act) => self.handle_input_actions(act),
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
+                Action::Collator(act) => self.handle_collator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
                 Action::Update(act) => self.handle_update_actions(act),
@@ -441,6 +444,15 @@ impl App {
                                                 &tx,
                                             );
                                         };
+
+                                        if runtime == SupportedRuntime::AssetHubPolkadot {
+                                            sync::spawn_fetch_aura_authorities(
+                                                &api_at, runtime, &tx,
+                                            );
+                                            sync::spawn_fetch_slot_duration(
+                                                &api_at, runtime, &tx,
+                                            );
+                                        }
                                     });
                                 }
                             }
@@ -534,6 +546,26 @@ impl App {
                                     &validator_keys,
                                     &tx,
                                 )
+                            });
+                        }
+                    }
+                    SupportedRuntime::AssetHubPolkadot => {
+                        if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
+                            let api = chain.client().clone();
+                            let tx = self.tx.clone();
+
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                sync::spawn_fetch_current_slot(&api_at, runtime, &tx);
                             });
                         }
                     }
@@ -697,6 +729,12 @@ impl App {
             ChainAction::UpdateTotalStaked(chain_key, value) => {
                 self.chains.update_total_staked(&chain_key, value);
             }
+            ChainAction::UpdateCurrentSlot(chain_key, slot) => {
+                self.chains.update_current_slot(&chain_key, slot);
+            }
+            ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
+                self.chains.update_slot_duration(&chain_key, duration_ms);
+            }
 
             _ => {}
         }
@@ -833,6 +871,14 @@ impl App {
                         );
                     });
                 }
+            }
+        }
+    }
+
+    fn handle_collator_actions(&mut self, action: CollatorAction) {
+        match action {
+            CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
+                self.collators.update_aura_authorities(runtime, &authorities);
             }
         }
     }
@@ -1062,7 +1108,9 @@ impl App {
             Section::Validators => {
                 self.validators.move_up();
             }
-            // Section::Collators => self.collators.move_up(),
+            Section::Collators => {
+                self.collators.move_up();
+            }
             _ => {}
         };
     }
@@ -1082,7 +1130,9 @@ impl App {
             Section::Validators => {
                 self.validators.move_down();
             }
-            // Section::Collators => self.collators.move_down(),
+            Section::Collators => {
+                self.collators.move_down();
+            }
             _ => {}
         };
     }
@@ -1094,8 +1144,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        // self.collators
-        //     .set_active(self.section == Section::Collators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 
     /// Moves the active section down.
@@ -1105,8 +1155,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        // self.collators
-        //     .set_active(self.section == Section::Collators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 
     /// Selects the previous window.
@@ -1875,7 +1925,7 @@ impl App {
     pub fn reset_selection(&mut self) {
         self.chains.set_active(false);
         self.validators.set_active(false);
-        // self.collators.set_active(false);
+        self.collators.set_active(false);
     }
 
     /// Copy to clipboard

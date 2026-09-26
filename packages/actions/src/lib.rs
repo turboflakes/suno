@@ -19,6 +19,7 @@ use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
+type AccountBytes = [u8; 32];
 type BlockNumber = u64;
 type BlockHash = H256;
 type Amount = u128;
@@ -41,8 +42,8 @@ pub enum Action {
     Validator(ValidatorAction),
     /// Transaction related actions
     Transaction(TxAction),
-    //TODO: Collator actions
-    // Collator(CollatorAction),
+    /// Collator actions
+    Collator(CollatorAction),
     ///
     /// QrScanner actions
     Scanner(ScannerAction),
@@ -136,8 +137,15 @@ pub enum ChainAction {
     UpdateTotalValidators(ChainKey, Counter),
     UpdateActiveNominators(ChainKey, Counter),
     UpdateTotalNominators(ChainKey, Counter),
+    UpdateCurrentSlot(ChainKey, u64),
+    UpdateSlotDuration(ChainKey, u64),
     FetchValidatorData(ValidatorKey),
     FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CollatorAction {
+    UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

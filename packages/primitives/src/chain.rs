@@ -37,6 +37,10 @@ pub struct Chain {
     total_noms: u32,
     // Total staked rate
     total_staked_pm: Permill,
+    // Current Aura slot (parachains only)
+    current_slot: Option<u64>,
+    // Aura slot duration in milliseconds, constant for the runtime (parachains only)
+    slot_duration: Option<u64>,
     // RPC Connection status
     state: ConnectionState,
 }
@@ -58,6 +62,8 @@ impl Chain {
             active_noms: 0,
             total_noms: 0,
             total_staked_pm: Permill::zero(),
+            current_slot: None,
+            slot_duration: None,
             state: ConnectionState::default(),
         }
     }
@@ -108,6 +114,14 @@ impl Chain {
 
     pub fn epoch(&self) -> &Option<Epoch> {
         &self.epoch
+    }
+
+    pub fn current_slot(&self) -> Option<u64> {
+        self.current_slot
+    }
+
+    pub fn slot_duration(&self) -> Option<u64> {
+        self.slot_duration
     }
 
     pub fn active_validators_count(&self) -> u32 {
@@ -200,6 +214,14 @@ impl Chain {
 
     pub fn set_epoch(&mut self, epoch: Option<Epoch>) {
         self.epoch = epoch;
+    }
+
+    pub fn set_current_slot(&mut self, current_slot: Option<u64>) {
+        self.current_slot = current_slot;
+    }
+
+    pub fn set_slot_duration(&mut self, slot_duration: Option<u64>) {
+        self.slot_duration = slot_duration;
     }
 
     pub fn set_active_vals(&mut self, counter: u32) {

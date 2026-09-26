@@ -11,7 +11,7 @@
 # `update-metadata.sh polkadot`
 BASE="packages/chains"
 RC_PALLETS="System,Session,StakingAhClient,Proxy,Babe,ParasShared"
-AH_PALLETS="System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
+AH_PALLETS="System,Aura,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
 PEOPLE_PALLETS="System,Identity"
 NETWORK="$1"
 
