@@ -1,3 +1,4 @@
+pub mod aura;
 pub mod babe;
 pub mod balance;
 pub mod call;
@@ -16,6 +17,7 @@ pub mod storage;
 pub mod tx;
 pub mod validator;
 
+pub use aura::Aura;
 pub use babe::Epoch;
 pub use chain::{BlockHash, BlockNumber, Chain};
 pub use collator::Collator;

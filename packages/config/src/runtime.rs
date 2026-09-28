@@ -291,6 +291,22 @@ impl SupportedRuntime {
         }
     }
 
+    /// Target number of blocks this parachain is expected to author per relay chain slot
+    /// (`BLOCK_PROCESSING_VELOCITY` in the runtime source).
+    pub fn block_processing_velocity(&self) -> u32 {
+        match &self {
+            Self::AssetHubPolkadot
+            | Self::AssetHubKusama
+            | Self::AssetHubPaseo
+            | Self::AssetHubWestend
+            | Self::PeoplePolkadot
+            | Self::PeoplePaseo
+            | Self::PeopleWestend => 3,
+            Self::PeopleKusama => 1,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
     pub fn _token_decimals(&self) -> u32 {
         match &self {
             Self::Polkadot => get_decimals(POLKADOT_SPEC),

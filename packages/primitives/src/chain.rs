@@ -1,5 +1,6 @@
+use crate::display::format_millis;
 use crate::network::ConnectionState;
-use crate::{Epoch, Era};
+use crate::{Aura, Epoch, Era};
 use sp_arithmetic::Permill;
 use subxt::{utils::H256, OnlineClient};
 use suno_config::{CustomConfig, SupportedRuntime};
@@ -37,10 +38,8 @@ pub struct Chain {
     total_noms: u32,
     // Total staked rate
     total_staked_pm: Permill,
-    // Current Aura slot (parachains only)
-    current_slot: Option<u64>,
-    // Aura slot duration in milliseconds, constant for the runtime (parachains only)
-    slot_duration: Option<u64>,
+    // Aura consensus details (parachains only)
+    aura: Option<Aura>,
     // RPC Connection status
     state: ConnectionState,
 }
@@ -62,8 +61,7 @@ impl Chain {
             active_noms: 0,
             total_noms: 0,
             total_staked_pm: Permill::zero(),
-            current_slot: None,
-            slot_duration: None,
+            aura: None,
             state: ConnectionState::default(),
         }
     }
@@ -116,12 +114,47 @@ impl Chain {
         &self.epoch
     }
 
-    pub fn current_slot(&self) -> Option<u64> {
-        self.current_slot
+    pub fn aura(&self) -> &Option<Aura> {
+        &self.aura
     }
 
-    pub fn slot_duration(&self) -> Option<u64> {
-        self.slot_duration
+    pub fn current_slot(&self) -> u64 {
+        self.aura
+            .as_ref()
+            .and_then(|a| a.current_slot())
+            .unwrap_or(0)
+    }
+
+    pub fn current_slot_ts(&self) -> u128 {
+        self.aura.as_ref().map(|a| a.current_slot_ts()).unwrap_or(0)
+    }
+
+    pub fn aura_number_blocks_expected(&self) -> Option<u64> {
+        self.slot_duration_ms()?
+            .checked_div(self.aura_block_time_ms()?)
+    }
+
+    pub fn slot_duration_ms(&self) -> Option<u64> {
+        self.aura.as_ref().and_then(|a| a.slot_duration_ms())
+    }
+
+    pub fn aura_block_time_ms(&self) -> Option<u64> {
+        self.aura.as_ref().and_then(|a| a.block_time_ms())
+    }
+
+    pub fn aura_authorities(&self) -> &[[u8; 32]] {
+        self.aura.as_ref().map(|a| a.authorities()).unwrap_or(&[])
+    }
+
+    pub fn slot_progress(&self) -> f64 {
+        self.aura.as_ref().map(|a| a.slot_progress()).unwrap_or(0.0)
+    }
+
+    pub fn slot_countdown_time(&self) -> String {
+        self.aura
+            .as_ref()
+            .map(|a| a.slot_countdown_time())
+            .unwrap_or_else(|| format_millis(0, true))
     }
 
     pub fn active_validators_count(&self) -> u32 {
@@ -216,14 +249,6 @@ impl Chain {
         self.epoch = epoch;
     }
 
-    pub fn set_current_slot(&mut self, current_slot: Option<u64>) {
-        self.current_slot = current_slot;
-    }
-
-    pub fn set_slot_duration(&mut self, slot_duration: Option<u64>) {
-        self.slot_duration = slot_duration;
-    }
-
     pub fn set_active_vals(&mut self, counter: u32) {
         self.active_vals = counter;
     }
@@ -242,6 +267,36 @@ impl Chain {
 
     pub fn set_total_staked_pm(&mut self, value: Permill) {
         self.total_staked_pm = value;
+    }
+
+    pub fn set_current_slot(&mut self, current_slot: Option<u64>) {
+        self.aura
+            .get_or_insert_with(Aura::default)
+            .set_current_slot(current_slot);
+    }
+
+    pub fn set_current_slot_ts(&mut self, ts: u128) {
+        self.aura
+            .get_or_insert_with(Aura::default)
+            .set_current_slot_ts(ts);
+    }
+
+    pub fn set_slot_duration_ms(&mut self, slot_duration_ms: Option<u64>) {
+        self.aura
+            .get_or_insert_with(Aura::default)
+            .set_slot_duration_ms(slot_duration_ms);
+    }
+
+    pub fn set_aura_block_time_ms(&mut self, block_time_ms: Option<u64>) {
+        self.aura
+            .get_or_insert_with(Aura::default)
+            .set_block_time_ms(block_time_ms);
+    }
+
+    pub fn set_aura_authorities(&mut self, aura_authorities: Vec<[u8; 32]>) {
+        self.aura
+            .get_or_insert_with(Aura::default)
+            .set_authorities(aura_authorities);
     }
 }
 

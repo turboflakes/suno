@@ -284,6 +284,52 @@ pub fn spawn_fetch_aura_authorities(
         .spawn(move |api| async move { runtime.fetch_aura_authorities(&api).await });
 }
 
+pub fn spawn_fetch_session_validators(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_session_validators(&api).await });
+}
+
+pub fn spawn_fetch_invulnerables(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_invulnerables(&api).await });
+}
+
+pub fn spawn_fetch_collators_last_authored_block(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
+        move |api, stash| async move {
+            runtime
+                .fetch_collator_last_authored_block(&api, &stash)
+                .await
+        },
+        3,
+    );
+}
+
+pub fn spawn_fetch_collators_identity(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_collator_identity(&api, &stash).await },
+        3,
+    );
+}
+
 pub fn spawn_fetch_current_slot(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,

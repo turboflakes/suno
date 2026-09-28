@@ -118,6 +118,13 @@ pub struct BalanceData {
     pub balance: Balance,
 }
 
+/// Last authored block data combining account and block number
+#[derive(Debug)]
+pub struct LastAuthoredBlockData {
+    pub account: AccountBytes,
+    pub block: u64,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -154,6 +161,10 @@ pub enum Response {
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
+    SessionValidators(Data<Vec<AccountBytes>>),
+    Invulnerables(Data<Vec<AccountBytes>>),
+    LastAuthoredBlock(Data<LastAuthoredBlockData>),
+    CollatorIdentity(Data<IdentityData>),
     CurrentSlot(Data<u64>),
     SlotDuration(Data<u64>),
 }
@@ -264,6 +275,22 @@ impl Response {
 
     pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
         Response::AuraAuthorities(Data::new(authorities))
+    }
+
+    pub fn session_validators(validators: Vec<AccountBytes>) -> Self {
+        Response::SessionValidators(Data::new(validators))
+    }
+
+    pub fn invulnerables(invulnerables: Vec<AccountBytes>) -> Self {
+        Response::Invulnerables(Data::new(invulnerables))
+    }
+
+    pub fn last_authored_block(account: AccountBytes, block: u64) -> Self {
+        Response::LastAuthoredBlock(Data::new(LastAuthoredBlockData { account, block }))
+    }
+
+    pub fn collator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
+        Response::CollatorIdentity(Data::new(IdentityData { account, identity }))
     }
 
     pub fn current_slot(slot: u64) -> Self {

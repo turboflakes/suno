@@ -449,9 +449,11 @@ impl App {
                                             sync::spawn_fetch_aura_authorities(
                                                 &api_at, runtime, &tx,
                                             );
-                                            sync::spawn_fetch_slot_duration(
+                                            sync::spawn_fetch_session_validators(
                                                 &api_at, runtime, &tx,
                                             );
+                                            sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                            sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         }
                                     });
                                 }
@@ -463,6 +465,10 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
+                                    let collator_keys =
+                                        self.collators.get_collator_keys_by_runtime(
+                                            SupportedRuntime::AssetHubPolkadot,
+                                        );
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -482,6 +488,15 @@ impl App {
                                             &validator_keys,
                                             &tx,
                                         );
+
+                                        if runtime == SupportedRuntime::PeoplePolkadot {
+                                            sync::spawn_fetch_collators_identity(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &tx,
+                                            );
+                                        }
                                     });
                                 }
                             }
@@ -641,7 +656,6 @@ impl App {
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
-
                 // Fetch data relevant to be synced whenever session changes
                 //
                 let runtime = chain_key;
@@ -686,6 +700,39 @@ impl App {
                                     &tx,
                                 );
                             });
+                        }
+
+                        // Aura's expected block time is derived from this relay chain's
+                        // epoch data, so only fetch the collators last authored now that
+                        // the epoch has just been processed above.
+                        if runtime == SupportedRuntime::Polkadot {
+                            if let Some((api, block_hash)) = self
+                                .chains
+                                .get_api_and_block_hash(SupportedRuntime::AssetHubPolkadot)
+                            {
+                                let collator_keys = self.collators.get_collator_keys_by_runtime(
+                                    SupportedRuntime::AssetHubPolkadot,
+                                );
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    sync::spawn_fetch_collators_last_authored_block(
+                                        &api_at,
+                                        SupportedRuntime::AssetHubPolkadot,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                });
+                            }
                         }
                     }
                     SupportedRuntime::AssetHubPolkadot
@@ -733,7 +780,7 @@ impl App {
                 self.chains.update_current_slot(&chain_key, slot);
             }
             ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
-                self.chains.update_slot_duration(&chain_key, duration_ms);
+                self.chains.update_slot_duration_ms(&chain_key, duration_ms);
             }
 
             _ => {}
@@ -878,7 +925,51 @@ impl App {
     fn handle_collator_actions(&mut self, action: CollatorAction) {
         match action {
             CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
-                self.collators.update_aura_authorities(runtime, &authorities);
+                self.collators
+                    .update_aura_authorities(runtime, &authorities);
+                self.chains.update_aura_authorities(&runtime, authorities);
+            }
+            CollatorAction::UpdateInvulnerables(runtime, invulnerables) => {
+                self.collators.update_invulnerables(runtime, &invulnerables);
+            }
+            CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
+                if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
+                    self.collators.update_authored_block(
+                        runtime,
+                        chain.aura_authorities(),
+                        block_number,
+                        slot,
+                    );
+                }
+            }
+            CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
+                // Calculate the expected Aura block time and update the chain
+                if let Some(rc_chain) = self.chains.get_chain_by_runtime(runtime.relay_chain()) {
+                    let block_time_ms = rc_chain
+                        .epoch()
+                        .as_ref()
+                        .map(|e| e.block_time_ms())
+                        .unwrap_or(0);
+
+                    let expected_aura_block_time_ms =
+                        block_time_ms / runtime.block_processing_velocity() as u64;
+                    self.chains
+                        .update_aura_block_time_ms(&runtime, expected_aura_block_time_ms);
+                }
+
+                if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
+                    self.collators.update_last_authored_block(
+                        runtime,
+                        stash_bytes,
+                        block_number,
+                        chain.finalized_block(),
+                        chain.aura_block_time_ms(),
+                    );
+                }
+            }
+            CollatorAction::UpdateIdentity(runtime, stash_bytes, identity) => {
+                self.collators
+                    .update_identity(runtime, stash_bytes, identity);
             }
         }
     }

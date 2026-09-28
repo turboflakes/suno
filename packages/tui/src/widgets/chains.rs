@@ -109,15 +109,39 @@ impl ChainsList {
 
     pub fn set_current_slot(&mut self, chain_key: &ChainKey, data: u64) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.set_current_slot(Some(data));
+            if chain.current_slot() != data {
+                chain.set_current_slot(Some(data));
+                chain.set_current_slot_ts(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis(),
+                );
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn set_aura_authorities(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.set_aura_authorities(data);
             return true;
         }
         false
     }
 
-    pub fn set_slot_duration(&mut self, chain_key: &ChainKey, data: u64) -> bool {
+    pub fn set_slot_duration_ms(&mut self, chain_key: &ChainKey, data: u64) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.set_slot_duration(Some(data));
+            chain.set_slot_duration_ms(Some(data));
+            return true;
+        }
+        false
+    }
+
+    pub fn set_aura_block_time_ms(&mut self, chain_key: &ChainKey, data: u64) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.set_aura_block_time_ms(Some(data));
             return true;
         }
         false
@@ -356,8 +380,20 @@ impl ChainsList {
         self.set_current_slot(chain_key, current_slot)
     }
 
-    pub fn update_slot_duration(&mut self, chain_key: &ChainKey, slot_duration: u64) -> bool {
-        self.set_slot_duration(chain_key, slot_duration)
+    pub fn update_aura_authorities(
+        &mut self,
+        chain_key: &ChainKey,
+        authorities: Vec<[u8; 32]>,
+    ) -> bool {
+        self.set_aura_authorities(chain_key, authorities)
+    }
+
+    pub fn update_slot_duration_ms(&mut self, chain_key: &ChainKey, slot_duration_ms: u64) -> bool {
+        self.set_slot_duration_ms(chain_key, slot_duration_ms)
+    }
+
+    pub fn update_aura_block_time_ms(&mut self, chain_key: &ChainKey, block_time_ms: u64) -> bool {
+        self.set_aura_block_time_ms(chain_key, block_time_ms)
     }
 
     pub fn update_active_validators(&mut self, chain_key: &ChainKey, count: u32) -> bool {

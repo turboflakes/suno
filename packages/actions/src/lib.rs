@@ -146,6 +146,10 @@ pub enum ChainAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CollatorAction {
     UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
+    UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
+    UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
+    UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
+    UpdateIdentity(SupportedRuntime, AccountBytes, Identity),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

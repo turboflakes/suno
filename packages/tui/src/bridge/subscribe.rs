@@ -1,8 +1,8 @@
 use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_events};
 use std::{fmt::Display, future::Future, time::Duration};
-use suno_actions::{Action, ChainAction};
+use suno_actions::{Action, ChainAction, CollatorAction};
 use suno_config::SupportedRuntime;
-use suno_primitives::{chain::Chain, network::ConnectionState};
+use suno_primitives::{aura::extract_aura_slot, chain::Chain, network::ConnectionState};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::timeout;
 use tracing::{error, info};
@@ -121,6 +121,16 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                         block.number(),
                         block.hash(),
                     )));
+
+                    if runtime == SupportedRuntime::AssetHubPolkadot {
+                        if let Some(slot) = extract_aura_slot(&block.header().digest.logs) {
+                            let _ = tx.send(Action::Collator(CollatorAction::UpdateAuthoredBlock(
+                                runtime,
+                                block.number(),
+                                slot,
+                            )));
+                        }
+                    }
 
                     // Everytime a new block is received, update the connection state to connected.
                     // Used as KEEPALIVE in case of reconnections and initialization

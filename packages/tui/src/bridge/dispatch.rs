@@ -244,11 +244,46 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
-        Response::AuraAuthorities(data) => {
+        Response::AuraAuthorities(_data) => {
+            // Raw Aura session public keys, not stashes - not yet consumed by app state.
+            // See Response::SessionValidators for the stash-addressable authority set.
+        }
+        Response::SessionValidators(data) => {
             tx.send(Action::Collator(CollatorAction::UpdateAuraAuthorities(
                 runtime, data.value,
             )))
             .boxed()?;
+        }
+        Response::Invulnerables(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateInvulnerables(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
+        Response::LastAuthoredBlock(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateLastAuthoredBlock(
+                runtime,
+                data.value.account,
+                data.value.block,
+            )))
+            .boxed()?;
+        }
+        Response::CollatorIdentity(data) => {
+            // Identity is fetched from the People chain, but collators are keyed by
+            // their own parachain runtime, so `runtime` here can't be used directly.
+            if let Some(identity) = data.value.identity {
+                tx.send(Action::Collator(CollatorAction::UpdateIdentity(
+                    SupportedRuntime::AssetHubPolkadot,
+                    data.value.account,
+                    identity,
+                )))
+                .boxed()?;
+            } else {
+                warn!(
+                    "No identity data found for collator {:?}",
+                    data.value.account
+                );
+            }
         }
         Response::CurrentSlot(data) => {
             tx.send(Action::Chain(ChainAction::UpdateCurrentSlot(

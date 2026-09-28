@@ -284,7 +284,7 @@ pub async fn fetch_total_nominators_count(
     Ok(Response::total_nominators(value))
 }
 
-/// Fetch the current Aura authority set (collators) at the specified block hash
+/// Fetch the current Aura authority set (session public keys) at the specified block hash
 pub async fn fetch_aura_authorities(
     api: &OnlineClientAtBlock<CustomConfig>,
 ) -> Result<Response, Error> {
@@ -305,8 +305,73 @@ pub async fn fetch_aura_authorities(
     Ok(Response::aura_authorities(authorities))
 }
 
+/// Fetch the current session validators (collator stashes) at the specified block hash
+pub async fn fetch_session_validators(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage().session().validators();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let validators = value.iter().map(|stash| *stash.as_ref()).collect();
+
+    Ok(Response::session_validators(validators))
+}
+
+/// Fetch the fixed invulnerable collator set at the specified block hash
+pub async fn fetch_invulnerables(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage().collator_selection().invulnerables();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let invulnerables = value.0.iter().map(|stash| *stash.as_ref()).collect();
+
+    Ok(Response::invulnerables(invulnerables))
+}
+
+/// Fetch the last block authored by a given collator stash at the specified block hash
+pub async fn fetch_collator_last_authored_block(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    let addr = node_runtime::storage().collator_selection().last_authored_block();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(Response::last_authored_block(account_bytes, value as u64))
+}
+
 /// Fetch the current Aura slot at the specified block hash
-pub async fn fetch_current_slot(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Response, Error> {
+pub async fn fetch_current_slot(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
     let addr = node_runtime::storage().aura().current_slot();
 
     let value = api

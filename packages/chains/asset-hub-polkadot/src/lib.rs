@@ -11,10 +11,11 @@ pub use runtime_apis::fetch_metadata;
 pub use constants::fetch_slot_duration;
 pub use storage::{
     fetch_active_nominators_count, fetch_active_validators_count, fetch_and_validate_proxy_account,
-    fetch_aura_authorities, fetch_balance, fetch_current_slot, fetch_era_data,
-    fetch_total_nominators_count, fetch_total_staked, fetch_total_validators_count,
-    fetch_validator_payee, fetch_validator_prefs, fetch_validator_prefs_next,
-    fetch_validator_stake_overview, fetch_validator_staking_ledger, fetch_validators_era_points,
+    fetch_aura_authorities, fetch_balance, fetch_collator_last_authored_block, fetch_current_slot,
+    fetch_era_data, fetch_invulnerables, fetch_session_validators, fetch_total_nominators_count,
+    fetch_total_staked, fetch_total_validators_count, fetch_validator_payee,
+    fetch_validator_prefs, fetch_validator_prefs_next, fetch_validator_stake_overview,
+    fetch_validator_staking_ledger, fetch_validators_era_points,
 };
 
 #[subxt::subxt(

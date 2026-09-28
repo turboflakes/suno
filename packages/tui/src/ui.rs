@@ -1,5 +1,7 @@
 use crate::app::App;
+use crate::section::Section;
 use crate::widgets::collators_compact::CollatorsCompactWidget;
+use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
@@ -168,8 +170,17 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
-    frame.render_stateful_widget(widget, block_area, &mut app.validators);
+
+    match app.section {
+        Section::Collators => {
+            let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.collators);
+        }
+        _ => {
+            let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.validators);
+        }
+    }
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {

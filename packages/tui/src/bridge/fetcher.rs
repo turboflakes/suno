@@ -117,6 +117,12 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_collator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -133,6 +139,22 @@ pub trait RuntimeFetcher {
     async fn fetch_aura_authorities(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_session_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_invulnerables(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_collator_last_authored_block(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
     ) -> Result<Response, Error>;
 
     async fn fetch_current_slot(
@@ -502,6 +524,31 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_collator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // Identity storage is keyed by stash regardless of whether the account is a
+        // validator or a collator, so reuse the same per-chain fetch and just relabel
+        // the response so dispatch routes it into collator state instead of validator state.
+        let response = match self {
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_identity(api, stash).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_identity(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, stash).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_identity(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }?;
+
+        match response {
+            Response::Identity(data) => Ok(Response::collator_identity(
+                data.value.account,
+                data.value.identity,
+            )),
+            other => Ok(other),
+        }
+    }
+
     async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -546,6 +593,39 @@ impl RuntimeFetcher for Runtime {
     ) -> Result<Response, Error> {
         match self {
             Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_aura_authorities(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_session_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_session_validators(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_invulnerables(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_invulnerables(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collator_last_authored_block(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
