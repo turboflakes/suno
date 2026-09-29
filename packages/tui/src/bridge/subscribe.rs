@@ -27,7 +27,7 @@ pub fn subscribe_best_block(chain: &Chain, tx: UnboundedSender<Action>) {
 
     tokio::spawn(async move {
         let mut blocks_sub = match with_timeout_and_connection_state(
-            api.stream_blocks(),
+            api.stream_best_blocks(),
             "Subscription for best block",
             runtime,
             &tx,
