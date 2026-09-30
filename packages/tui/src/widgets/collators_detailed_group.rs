@@ -359,7 +359,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, &aura, theme, show_next_keys))
+            .map(|c| self.collator_row(c, selected_collator, aura, theme, show_next_keys))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -404,12 +404,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let last_block_str = collator
             .last_block_authored()
             .map(|b| format!("#{}", b))
-            .unwrap_or_else(|| "".to_string());
+            .unwrap_or_default();
 
         let next_slot_str = collator
             .next_slot(authorities, current_slot)
             .map(|s| format!("#{}", s))
-            .unwrap_or_else(|| "".to_string());
+            .unwrap_or_default();
 
         let next_slot_countdown_str = match aura.slot_duration_ms() {
             Some(slot_duration_ms) => collator
@@ -419,7 +419,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                     slot_duration_ms,
                     aura.current_slot_ts(),
                 )
-                .unwrap_or_else(|| "".to_string()),
+                .unwrap_or_default(),
             None => "".to_string(),
         };
 

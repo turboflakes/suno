@@ -120,7 +120,7 @@ impl Aura {
     /// Block number at which the next session is expected to start.
     pub fn next_session_expected_block(&self, current_block_number: u64, duration_bn: u64) -> u64 {
         current_block_number - self.session_blocks_elapsed(current_block_number, duration_bn)
-            + duration_bn as u64
+            + duration_bn
     }
 
     /// Human-readable time until the current session ends, using the Aura slot duration
