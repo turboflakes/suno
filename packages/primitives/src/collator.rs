@@ -42,6 +42,10 @@ pub struct Collator {
     // consecutive blocks have been observed authored under that same slot.
     last_slot: Option<u64>,
     blocks_in_slot: u32,
+    // Aura session public key currently active, from `Session::NextKeys`
+    next_keys: Option<[u8; 32]>,
+    // Aura session public key queued for the next session, from `Session::QueuedKeys`
+    queued_keys: Option<[u8; 32]>,
 }
 
 impl Collator {
@@ -53,6 +57,8 @@ impl Collator {
             last_block_authored_ts: None,
             last_slot: None,
             blocks_in_slot: 0,
+            next_keys: None,
+            queued_keys: None,
         }
     }
 
@@ -139,6 +145,42 @@ impl Collator {
         } else {
             self.last_slot = Some(slot);
             self.blocks_in_slot = 1;
+        }
+    }
+
+    pub fn queued_keys(&self) -> Option<[u8; 32]> {
+        self.queued_keys
+    }
+
+    pub fn set_queued_keys(&mut self, keys: Option<[u8; 32]>) {
+        self.queued_keys = keys;
+    }
+
+    pub fn next_keys(&self) -> Option<[u8; 32]> {
+        self.next_keys
+    }
+
+    pub fn set_next_keys(&mut self, keys: Option<[u8; 32]>) {
+        self.next_keys = keys;
+    }
+
+    /// True if a next-session key has been set and differs from the currently queued one,
+    /// i.e. the collator has rotated keys and the change hasn't taken effect yet.
+    pub fn is_next_keys_changed(&self) -> bool {
+        self.next_keys.is_some() && self.next_keys != self.queued_keys
+    }
+
+    pub fn display_queued_keys(&self, size: usize) -> String {
+        match self.queued_keys {
+            Some(keys) => format!("[{}..]", &hex::encode(keys)[..size]),
+            None => "".to_string(),
+        }
+    }
+
+    pub fn display_next_keys(&self, size: usize) -> String {
+        match self.next_keys {
+            Some(keys) => format!("[{}..]", &hex::encode(keys)[..size]),
+            None => "".to_string(),
         }
     }
 

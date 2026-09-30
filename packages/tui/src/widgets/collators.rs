@@ -275,4 +275,36 @@ impl CollatorsList {
             }
         }
     }
+
+    pub fn update_next_keys(
+        &mut self,
+        runtime: SupportedRuntime,
+        stash_bytes: [u8; 32],
+        keys: Option<[u8; 32]>,
+    ) {
+        for collator in self.collators.iter_mut() {
+            if collator.runtime() == runtime {
+                let collator_stash: [u8; 32] = *collator.stash().as_ref();
+                if collator_stash == stash_bytes {
+                    collator.set_next_keys(keys);
+                }
+            }
+        }
+    }
+
+    pub fn update_queued_keys(
+        &mut self,
+        runtime: SupportedRuntime,
+        stash_bytes: [u8; 32],
+        keys: Option<[u8; 32]>,
+    ) {
+        for collator in self.collators.iter_mut() {
+            if collator.runtime() == runtime {
+                let collator_stash: [u8; 32] = *collator.stash().as_ref();
+                if collator_stash == stash_bytes {
+                    collator.set_queued_keys(keys);
+                }
+            }
+        }
+    }
 }

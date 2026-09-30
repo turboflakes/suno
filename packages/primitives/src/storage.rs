@@ -125,6 +125,13 @@ pub struct LastAuthoredBlockData {
     pub block: u64,
 }
 
+/// Collator keys data combining account and Aura session public key
+#[derive(Debug)]
+pub struct CollatorKeysData {
+    pub account: AccountBytes,
+    pub keys: Option<[u8; 32]>,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -165,6 +172,8 @@ pub enum Response {
     Invulnerables(Data<Vec<AccountBytes>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
+    CollatorNextKeys(Data<CollatorKeysData>),
+    CollatorQueuedKeys(Data<CollatorKeysData>),
     CurrentSlot(Data<u64>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
@@ -292,6 +301,14 @@ impl Response {
 
     pub fn collator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
         Response::CollatorIdentity(Data::new(IdentityData { account, identity }))
+    }
+
+    pub fn collator_next_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
+        Response::CollatorNextKeys(Data::new(CollatorKeysData { account, keys }))
+    }
+
+    pub fn collator_queued_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
+        Response::CollatorQueuedKeys(Data::new(CollatorKeysData { account, keys }))
     }
 
     pub fn current_slot(slot: u64) -> Self {

@@ -328,27 +328,38 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let header = Row::new(vec![
+        let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
+
+        let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("in slot").alignment(Alignment::Right)),
             Cell::from(Text::from("(last block)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
             Cell::from(Text::from("(in)").alignment(Alignment::Left)),
-        ]);
+            Cell::from(Text::from("keys").alignment(Alignment::Right)),
+        ];
+        if show_next_keys {
+            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
+        }
+        let header = Row::new(header_cells);
 
-        let widths = [
+        let mut widths = vec![
             Constraint::Length(3),
             Constraint::Length(24),
             Constraint::Fill(2),
             Constraint::Fill(1),
             Constraint::Fill(2),
             Constraint::Fill(1),
+            Constraint::Fill(2),
         ];
+        if show_next_keys {
+            widths.push(Constraint::Length(10));
+        }
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, &aura, theme))
+            .map(|c| self.collator_row(c, selected_collator, &aura, theme, show_next_keys))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -369,6 +380,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         selected: Option<&Collator>,
         aura: &Aura,
         theme: Theme,
+        show_next_keys: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -411,7 +423,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             None => "".to_string(),
         };
 
-        Row::new(vec![
+        let mut cells = vec![
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
@@ -419,6 +431,19 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from(last_block_str).alignment(Alignment::Left)),
             Cell::from(Text::from(next_slot_str).alignment(Alignment::Right)),
             Cell::from(Text::from(next_slot_countdown_str).alignment(Alignment::Left)),
-        ])
+            Cell::from(Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right)),
+        ];
+
+        if show_next_keys {
+            if collator.is_next_keys_changed() {
+                cells.push(Cell::from(
+                    Text::from(collator.display_next_keys(6)).alignment(Alignment::Left),
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
+        }
+
+        Row::new(cells)
     }
 }

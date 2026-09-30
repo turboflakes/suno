@@ -1,7 +1,7 @@
 use crate::constants::fetch_sessions_per_era;
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
-    asset_hub_polkadot_runtime::ProxyType,
+    asset_hub_polkadot_runtime::{ProxyType, SessionKeys},
     bounded_collections::bounded_vec::BoundedVec,
     frame_system::AccountInfo,
     pallet_balances::types::AccountData,
@@ -14,7 +14,7 @@ use crate::node_runtime::runtime_types::{
 };
 use crate::utils::map_reward_destination;
 use sp_arithmetic::{Perbill, Permill};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use subxt::{ext::futures::StreamExt, utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
@@ -408,6 +408,55 @@ pub async fn fetch_current_slot(
     Ok(Response::current_slot(value.0))
 }
 
+/// Fetch collators queued keys
+pub async fn fetch_collators_queued_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    collator_keys: &[AccountKey],
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
+    let queued_keys = fetch_session_queued_keys(api).await?;
+    let mut collator_bytes: HashMap<[u8; 32], bool> = collator_keys
+        .iter()
+        .map(|key| (key.bytes(), false))
+        .collect();
+
+    for (stash, session_keys) in queued_keys.iter() {
+        let bytes: [u8; 32] = *stash.as_ref();
+        if let Some(found) = collator_bytes.get_mut(&bytes) {
+            *found = true;
+            responses.push(Response::collator_queued_keys(
+                bytes,
+                Some(session_keys.aura.0),
+            ));
+        }
+    }
+
+    // Emit None responses for collators not found in queued_keys
+    for (bytes, found) in &collator_bytes {
+        if !found {
+            responses.push(Response::collator_queued_keys(*bytes, None));
+        }
+    }
+
+    Ok(responses)
+}
+
+/// Fetch collator next session key
+pub async fn fetch_collator_next_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    if let Some(session_keys) = fetch_session_next_keys(api, stash).await? {
+        return Ok(Response::collator_next_keys(
+            account_bytes,
+            Some(session_keys.aura.0),
+        ));
+    }
+
+    Ok(Response::collator_next_keys(account_bytes, None))
+}
+
 /// Fetch total total staked for a specific era at the specified block hash
 pub async fn fetch_total_staked(
     api: &OnlineClientAtBlock<CustomConfig>,
@@ -513,6 +562,46 @@ async fn fetch_inactive_issuance(api: &OnlineClientAtBlock<CustomConfig>) -> Res
         .await
         .boxed()?
         .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch queued keys for the next session at the specified block hash
+async fn fetch_session_queued_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Vec<(AccountId32, SessionKeys)>, Error> {
+    let addr = node_runtime::storage().session().queued_keys();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
+
+/// Fetch next session keys for a stash at the specified block hash
+async fn fetch_session_next_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<Option<SessionKeys>, Error> {
+    let addr = node_runtime::storage().session().next_keys();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .try_fetch((*stash,))
+        .await
+        .boxed()?
+        .map(|entry| entry.decode())
+        .transpose()
         .boxed()?;
 
     Ok(value)

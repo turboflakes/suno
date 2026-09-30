@@ -151,6 +151,8 @@ pub enum CollatorAction {
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
     UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
     UpdateIdentity(SupportedRuntime, AccountBytes, Identity),
+    UpdateNextKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
+    UpdateQueuedKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

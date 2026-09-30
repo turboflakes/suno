@@ -157,6 +157,18 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_collators_queued_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        collator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_collator_next_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_current_slot(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -630,6 +642,32 @@ impl RuntimeFetcher for Runtime {
         match self {
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collators_queued_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        collator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collator_next_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collator_next_keys(api, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }

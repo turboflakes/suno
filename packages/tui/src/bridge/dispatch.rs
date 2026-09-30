@@ -285,6 +285,22 @@ pub fn dispatch_response_action(
                 );
             }
         }
+        Response::CollatorNextKeys(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateNextKeys(
+                runtime,
+                data.value.account,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
+        Response::CollatorQueuedKeys(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateQueuedKeys(
+                runtime,
+                data.value.account,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
         Response::CurrentSlot(data) => {
             tx.send(Action::Chain(ChainAction::UpdateCurrentSlot(
                 runtime, data.value,
