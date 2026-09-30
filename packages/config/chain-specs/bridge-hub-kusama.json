@@ -1,0 +1,25 @@
+{
+  "name": "Kusama Bridge Hub",
+  "id": "bridge-hub-kusama",
+  "chainType": "Live",
+  "bootNodes": [
+    "/dns/kusama-bridge-hub-connect-ew1-0.polkadot.io/tcp/30334/p2p/12D3KooWPQQPivrqQ51kRTDc2R1mtqwKT4GGtk2rapkY4FrwHrEp",
+    "/dns/kusama-bridge-hub-connect-ew1-1.polkadot.io/tcp/30334/p2p/12D3KooWPcF9Yk4gYrMju9CyWCV69hAFXbYsnxCLogwLGu9QFTRn",
+    "/dns/kusama-bridge-hub-connect-ew1-0.polkadot.io/tcp/443/wss/p2p/12D3KooWPQQPivrqQ51kRTDc2R1mtqwKT4GGtk2rapkY4FrwHrEp",
+    "/dns/kusama-bridge-hub-connect-ew1-1.polkadot.io/tcp/443/wss/p2p/12D3KooWPcF9Yk4gYrMju9CyWCV69hAFXbYsnxCLogwLGu9QFTRn",
+    "/dns/boot-kusama-bridgehub.luckyfriday.io/tcp/443/wss/p2p/12D3KooWQybw6AFmAvrFfwUQnNxUpS12RovapD6oorh2mAJr4xyd"
+  ],
+  "telemetryEndpoints": null,
+  "protocolId": null,
+  "properties": {
+    "ss58Format": 2,
+    "tokenDecimals": 12,
+    "tokenSymbol": "KSM"
+  },
+  "relay_chain": "kusama",
+  "para_id": 1002,
+  "codeSubstitutes": {},
+  "genesis": {
+    "stateRootHash": "0x583af14f9c4b1a687c219bfccc9c6b8e5a6dd24e50e742c2a733f110c5aad03d"
+  }
+}
