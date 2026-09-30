@@ -269,11 +269,8 @@ pub fn dispatch_response_action(
             .boxed()?;
         }
         Response::CollatorIdentity(data) => {
-            // Identity is fetched from the People chain, but collators are keyed by
-            // their own AssetHub runtime, so translate via the shared relay chain.
             if let Some(identity) = data.value.identity {
                 tx.send(Action::Collator(CollatorAction::UpdateIdentity(
-                    runtime.relay_chain().asset_hub_runtime(),
                     data.value.account,
                     identity,
                 )))

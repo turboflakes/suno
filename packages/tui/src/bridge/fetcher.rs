@@ -608,6 +608,10 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_aura_authorities(api).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_aura_authorities(api).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_aura_authorities(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_aura_authorities(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_aura_authorities(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_aura_authorities(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_aura_authorities(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -623,6 +627,10 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_session_validators(api).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_session_validators(api).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_session_validators(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_session_validators(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_session_validators(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_session_validators(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_session_validators(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -636,6 +644,10 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_invulnerables(api).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_invulnerables(api).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_invulnerables(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_invulnerables(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_invulnerables(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_invulnerables(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_invulnerables(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -657,6 +669,18 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collator_last_authored_block(api, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -680,6 +704,18 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_collators_queued_keys(api, collator_keys).await
             }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collators_queued_keys(api, collator_keys).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -702,6 +738,14 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_collator_next_keys(api, stash).await
             }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::PeopleKusama => suno_people_kusama::fetch_collator_next_keys(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_collator_next_keys(api, stash).await,
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collator_next_keys(api, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -715,6 +759,10 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_slot_duration(api).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_slot_duration(api).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_slot_duration(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_slot_duration(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_slot_duration(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_slot_duration(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_slot_duration(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -728,6 +776,10 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_session_index(api).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_session_index(api).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_session_index(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_session_index(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_session_index(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_session_index(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_session_index(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

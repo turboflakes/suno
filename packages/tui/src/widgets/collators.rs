@@ -259,19 +259,12 @@ impl CollatorsList {
         }
     }
 
-    /// Sets the on-chain identity for whichever collator of `runtime` matches `stash_bytes`.
-    pub fn update_identity(
-        &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
-        identity: Identity,
-    ) {
+    /// Sets the on-chain identity for whichever collator matches `stash_bytes`.
+    pub fn update_identity(&mut self, stash_bytes: [u8; 32], identity: Identity) {
         for collator in self.collators.iter_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes {
-                    collator.set_identity(Some(identity.clone()));
-                }
+            let collator_stash: [u8; 32] = *collator.stash().as_ref();
+            if collator_stash == stash_bytes {
+                collator.set_identity(Some(identity.clone()));
             }
         }
     }

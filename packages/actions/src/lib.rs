@@ -150,7 +150,7 @@ pub enum CollatorAction {
     UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
     UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
-    UpdateIdentity(SupportedRuntime, AccountBytes, Identity),
+    UpdateIdentity(AccountBytes, Identity),
     UpdateNextKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
     UpdateQueuedKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
 }

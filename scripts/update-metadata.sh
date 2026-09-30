@@ -12,7 +12,7 @@
 BASE="packages/chains"
 RC_PALLETS="System,Session,StakingAhClient,Proxy,Babe,ParasShared"
 AH_PALLETS="System,Aura,Session,CollatorSelection,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
-PEOPLE_PALLETS="System,Identity"
+PEOPLE_PALLETS="System,Aura,Session,CollatorSelection,Identity"
 NETWORK="$1"
 
 # Where to write the spec versions fetched in this run.

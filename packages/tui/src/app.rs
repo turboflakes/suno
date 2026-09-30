@@ -474,10 +474,12 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    let collator_keys =
-                                        self.collators.get_collator_keys_by_runtime(
-                                            runtime.relay_chain().asset_hub_runtime(),
-                                        );
+                                    // Collect collator keys for AssetHub and People collators.
+                                    let ah_keys = self.collators.get_collator_keys_by_runtime(
+                                        runtime.relay_chain().asset_hub_runtime(),
+                                    );
+                                    let people_keys =
+                                        self.collators.get_collator_keys_by_runtime(runtime);
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -499,9 +501,31 @@ impl App {
                                         );
 
                                         sync::spawn_fetch_collators_identity(
+                                            &api_at, runtime, &ah_keys, &tx,
+                                        );
+
+                                        sync::spawn_fetch_collators_identity(
                                             &api_at,
                                             runtime,
-                                            &collator_keys,
+                                            &people_keys,
+                                            &tx,
+                                        );
+
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &people_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &people_keys,
                                             &tx,
                                         );
                                     });
@@ -714,6 +738,34 @@ impl App {
                                 sync::spawn_fetch_collators_last_authored_block(
                                     &api_at,
                                     asset_hub_runtime,
+                                    &collator_keys,
+                                    &tx,
+                                );
+                            });
+                        }
+
+                        // Same as above, but for People collators
+                        let people_runtime = runtime.people_runtime();
+                        if let Some((api, block_hash)) =
+                            self.chains.get_api_and_block_hash(people_runtime)
+                        {
+                            let collator_keys =
+                                self.collators.get_collator_keys_by_runtime(people_runtime);
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                sync::spawn_fetch_collators_last_authored_block(
+                                    &api_at,
+                                    people_runtime,
                                     &collator_keys,
                                     &tx,
                                 );
@@ -963,9 +1015,8 @@ impl App {
                     }
                 }
             }
-            CollatorAction::UpdateIdentity(runtime, stash_bytes, identity) => {
-                self.collators
-                    .update_identity(runtime, stash_bytes, identity);
+            CollatorAction::UpdateIdentity(stash_bytes, identity) => {
+                self.collators.update_identity(stash_bytes, identity);
             }
             CollatorAction::UpdateNextKeys(runtime, stash_bytes, keys) => {
                 self.collators.update_next_keys(runtime, stash_bytes, keys);
