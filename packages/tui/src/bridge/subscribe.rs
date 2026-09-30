@@ -137,7 +137,13 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                             slot,
                         )));
 
-                        if runtime == SupportedRuntime::AssetHubPolkadot {
+                        if matches!(
+                            runtime,
+                            SupportedRuntime::AssetHubPolkadot
+                                | SupportedRuntime::AssetHubKusama
+                                | SupportedRuntime::AssetHubPaseo
+                                | SupportedRuntime::AssetHubWestend
+                        ) {
                             let _ = tx.send(Action::Collator(CollatorAction::UpdateAuthoredBlock(
                                 runtime,
                                 block.number(),

@@ -270,10 +270,10 @@ pub fn dispatch_response_action(
         }
         Response::CollatorIdentity(data) => {
             // Identity is fetched from the People chain, but collators are keyed by
-            // their own parachain runtime, so `runtime` here can't be used directly.
+            // their own AssetHub runtime, so translate via the shared relay chain.
             if let Some(identity) = data.value.identity {
                 tx.send(Action::Collator(CollatorAction::UpdateIdentity(
-                    SupportedRuntime::AssetHubPolkadot,
+                    runtime.relay_chain().asset_hub_runtime(),
                     data.value.account,
                     identity,
                 )))

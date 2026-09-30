@@ -165,7 +165,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),    // Network info
-                Constraint::Length(19), // Slot info
+                Constraint::Length(20), // Slot info
                 Constraint::Length(24), // Slot progress bar
                 Constraint::Length(16), // Countdown
             ])
@@ -337,8 +337,8 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("in slot").alignment(Alignment::Right)),
             Cell::from(Text::from("(last block)").alignment(Alignment::Left)),
-            Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("(in)").alignment(Alignment::Left)),
+            Cell::from(Text::from("next slot in").alignment(Alignment::Right)),
+            Cell::from(Text::from("(slot)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
         if show_next_keys {
@@ -410,9 +410,9 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let blocks_in_slot_str = match aura.number_blocks_expected() {
             Some(expected) => {
                 if collator.is_current_slot_author(authorities, current_slot) {
-                    format!("> {:2}/{:2}", collator.blocks_in_slot(), expected)
+                    format!("> {:2}/{}", collator.blocks_in_slot(), expected)
                 } else {
-                    format!("{:2}/{:2}", collator.blocks_in_slot(), expected)
+                    format!("{:2}/{}", collator.blocks_in_slot(), expected)
                 }
             }
             None => format!("{:2}", collator.blocks_in_slot()),
@@ -441,8 +441,8 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 .style(cell_style),
             Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Right)),
             Cell::from(Text::from(last_block_str).alignment(Alignment::Left)),
-            Cell::from(Text::from(next_slot_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(next_slot_countdown_str).alignment(Alignment::Left)),
+            Cell::from(Text::from(next_slot_countdown_str).alignment(Alignment::Right)),
+            Cell::from(Text::from(next_slot_str).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right)),
         ];
 

@@ -447,29 +447,23 @@ impl App {
                                             );
                                         };
 
-                                        if runtime == SupportedRuntime::AssetHubPolkadot {
-                                            sync::spawn_fetch_aura_authorities(
-                                                &api_at, runtime, &tx,
-                                            );
-                                            sync::spawn_fetch_session_validators(
-                                                &api_at, runtime, &tx,
-                                            );
-                                            sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                            sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                            sync::spawn_fetch_session_index(&api_at, runtime, &tx);
-                                            sync::spawn_fetch_collators_queued_keys(
-                                                &api_at,
-                                                runtime,
-                                                &collator_keys,
-                                                &tx,
-                                            );
-                                            sync::spawn_fetch_collators_next_keys(
-                                                &api_at,
-                                                runtime,
-                                                &collator_keys,
-                                                &tx,
-                                            );
-                                        }
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
                                     });
                                 }
                             }
@@ -482,7 +476,7 @@ impl App {
                                 {
                                     let collator_keys =
                                         self.collators.get_collator_keys_by_runtime(
-                                            SupportedRuntime::AssetHubPolkadot,
+                                            runtime.relay_chain().asset_hub_runtime(),
                                         );
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
@@ -504,14 +498,12 @@ impl App {
                                             &tx,
                                         );
 
-                                        if runtime == SupportedRuntime::PeoplePolkadot {
-                                            sync::spawn_fetch_collators_identity(
-                                                &api_at,
-                                                runtime,
-                                                &collator_keys,
-                                                &tx,
-                                            );
-                                        }
+                                        sync::spawn_fetch_collators_identity(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
                                     });
                                 }
                             }
@@ -700,34 +692,32 @@ impl App {
                         // Aura's expected block time is derived from this relay chain's
                         // epoch data, so only fetch the collators last authored now that
                         // the epoch has just been processed above.
-                        if runtime == SupportedRuntime::Polkadot {
-                            if let Some((api, block_hash)) = self
-                                .chains
-                                .get_api_and_block_hash(SupportedRuntime::AssetHubPolkadot)
-                            {
-                                let collator_keys = self.collators.get_collator_keys_by_runtime(
-                                    SupportedRuntime::AssetHubPolkadot,
-                                );
-                                let tx = self.tx.clone();
-                                tokio::spawn(async move {
-                                    let api_at = match api.at_block(block_hash).await.boxed() {
-                                        Ok(api_at) => api_at,
-                                        Err(e) => {
-                                            let _ = tx.send(Action::System(SystemAction::Error(
-                                                format!("Failed to client at_block: {}", e),
-                                            )));
-                                            return;
-                                        }
-                                    };
+                        let asset_hub_runtime = runtime.asset_hub_runtime();
+                        if let Some((api, block_hash)) =
+                            self.chains.get_api_and_block_hash(asset_hub_runtime)
+                        {
+                            let collator_keys = self
+                                .collators
+                                .get_collator_keys_by_runtime(asset_hub_runtime);
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
 
-                                    sync::spawn_fetch_collators_last_authored_block(
-                                        &api_at,
-                                        SupportedRuntime::AssetHubPolkadot,
-                                        &collator_keys,
-                                        &tx,
-                                    );
-                                });
-                            }
+                                sync::spawn_fetch_collators_last_authored_block(
+                                    &api_at,
+                                    asset_hub_runtime,
+                                    &collator_keys,
+                                    &tx,
+                                );
+                            });
                         }
                     }
                     SupportedRuntime::AssetHubPolkadot
