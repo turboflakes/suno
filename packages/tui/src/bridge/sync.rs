@@ -348,6 +348,15 @@ pub fn spawn_fetch_slot_duration(
         .spawn(move |api| async move { runtime.fetch_slot_duration(&api).await });
 }
 
+pub fn spawn_fetch_session_index(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_session_index(&api).await });
+}
+
 pub fn spawn_fetch_total_nominators_count(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,

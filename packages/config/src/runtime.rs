@@ -307,6 +307,26 @@ impl SupportedRuntime {
         }
     }
 
+    /// Number of blocks each session is expected to take
+    /// (`Period`/`PERIOD` = `6 * HOURS` in the runtime source).
+    ///
+    /// `HOURS` is a block count, and its base differs per runtime: People Polkadot and
+    /// People Paseo take it from `parachains_common` (12s blocks, 300/hour), all others
+    /// from a 6s-block base (600/hour). It is *not* scaled by `block_processing_velocity`,
+    /// so the real session duration is `duration_bn * slot_duration_ms`.
+    pub fn duration_bn(&self) -> u64 {
+        match &self {
+            Self::PeoplePolkadot | Self::PeoplePaseo => 6 * 300,
+            Self::AssetHubPolkadot
+            | Self::AssetHubKusama
+            | Self::AssetHubPaseo
+            | Self::AssetHubWestend
+            | Self::PeopleKusama
+            | Self::PeopleWestend => 6 * 600,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
     pub fn _token_decimals(&self) -> u32 {
         match &self {
             Self::Polkadot => get_decimals(POLKADOT_SPEC),

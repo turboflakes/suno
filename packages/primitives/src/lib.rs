@@ -19,7 +19,7 @@ pub mod validator;
 
 pub use aura::Aura;
 pub use babe::Epoch;
-pub use chain::{BlockHash, BlockNumber, Chain};
+pub use chain::{BlockHash, BlockNumber, Chain, RecentBlocks};
 pub use collator::Collator;
 pub use key::AccountKey;
 pub use node_account::{AccountDisplay, NodeAccount};

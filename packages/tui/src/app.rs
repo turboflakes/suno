@@ -454,6 +454,7 @@ impl App {
                                             );
                                             sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
                                             sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                            sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         }
                                     });
                                 }
@@ -779,8 +780,12 @@ impl App {
             ChainAction::UpdateCurrentSlot(chain_key, slot) => {
                 self.chains.update_current_slot(&chain_key, slot);
             }
+            ChainAction::UpdateSessionIndex(chain_key, index) => {
+                self.chains.update_session_index(&chain_key, index);
+            }
             ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
-                self.chains.update_slot_duration_ms(&chain_key, duration_ms);
+                self.chains
+                    .update_aura_slot_duration_ms(&chain_key, duration_ms);
             }
 
             _ => {}
@@ -931,15 +936,21 @@ impl App {
             }
             CollatorAction::UpdateInvulnerables(runtime, invulnerables) => {
                 self.collators.update_invulnerables(runtime, &invulnerables);
+                self.chains
+                    .update_aura_invulnerables(&runtime, invulnerables);
             }
             CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
+                self.chains
+                    .update_recent_block(&runtime, block_number, slot);
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
-                    self.collators.update_authored_block(
-                        runtime,
-                        chain.aura_authorities(),
-                        block_number,
-                        slot,
-                    );
+                    if let Some(aura) = &chain.aura() {
+                        self.collators.update_authored_block(
+                            runtime,
+                            aura.authorities(),
+                            block_number,
+                            slot,
+                        );
+                    }
                 }
             }
             CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
@@ -958,13 +969,15 @@ impl App {
                 }
 
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
-                    self.collators.update_last_authored_block(
-                        runtime,
-                        stash_bytes,
-                        block_number,
-                        chain.finalized_block(),
-                        chain.aura_block_time_ms(),
-                    );
+                    if let Some(aura) = &chain.aura() {
+                        self.collators.update_last_authored_block(
+                            runtime,
+                            stash_bytes,
+                            block_number,
+                            chain.finalized_block(),
+                            aura.block_time_ms(),
+                        );
+                    }
                 }
             }
             CollatorAction::UpdateIdentity(runtime, stash_bytes, identity) => {

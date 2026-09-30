@@ -326,6 +326,25 @@ pub async fn fetch_session_validators(
     Ok(Response::session_validators(validators))
 }
 
+/// Fetch the current session index at the specified block hash
+pub async fn fetch_session_index(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage().session().current_index();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(Response::session_index(value))
+}
+
 /// Fetch the fixed invulnerable collator set at the specified block hash
 pub async fn fetch_invulnerables(
     api: &OnlineClientAtBlock<CustomConfig>,
@@ -353,7 +372,9 @@ pub async fn fetch_collator_last_authored_block(
     stash: &AccountId32,
 ) -> Result<Response, Error> {
     let account_bytes = *stash.as_ref();
-    let addr = node_runtime::storage().collator_selection().last_authored_block();
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .last_authored_block();
 
     let value = api
         .storage()

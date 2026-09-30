@@ -291,6 +291,12 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::SessionIndex(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateSessionIndex(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
         Response::SlotDuration(data) => {
             tx.send(Action::Chain(ChainAction::UpdateSlotDuration(
                 runtime, data.value,

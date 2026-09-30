@@ -107,17 +107,19 @@ impl ChainsList {
         false
     }
 
-    pub fn set_current_slot(&mut self, chain_key: &ChainKey, data: u64) -> bool {
+    pub fn set_aura_current_slot(&mut self, chain_key: &ChainKey, data: u64) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            if chain.current_slot() != data {
-                chain.set_current_slot(Some(data));
-                chain.set_current_slot_ts(
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis(),
-                );
-                return true;
+            if let Some(aura) = chain.get_mut_aura() {
+                if aura.current_slot() != Some(data) {
+                    aura.set_current_slot(Some(data));
+                    aura.set_current_slot_ts(
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis(),
+                    );
+                    return true;
+                }
             }
         }
         false
@@ -125,24 +127,63 @@ impl ChainsList {
 
     pub fn set_aura_authorities(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.set_aura_authorities(data);
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_authorities(data.clone());
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn set_aura_invulnerables(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_invulnerables(data);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn update_recent_block(
+        &mut self,
+        chain_key: &ChainKey,
+        block_number: u64,
+        slot: u64,
+    ) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            chain.add_recent_block(block_number, slot);
             return true;
         }
         false
     }
 
-    pub fn set_slot_duration_ms(&mut self, chain_key: &ChainKey, data: u64) -> bool {
+    pub fn set_session_index(&mut self, chain_key: &ChainKey, data: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.set_slot_duration_ms(Some(data));
-            return true;
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_current_session_index(Some(data));
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn set_aura_slot_duration_ms(&mut self, chain_key: &ChainKey, data: u64) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_slot_duration_ms(Some(data));
+                return true;
+            }
         }
         false
     }
 
     pub fn set_aura_block_time_ms(&mut self, chain_key: &ChainKey, data: u64) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
-            chain.set_aura_block_time_ms(Some(data));
-            return true;
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_block_time_ms(Some(data));
+                return true;
+            }
         }
         false
     }
@@ -377,7 +418,15 @@ impl ChainsList {
     }
 
     pub fn update_current_slot(&mut self, chain_key: &ChainKey, current_slot: u64) -> bool {
-        self.set_current_slot(chain_key, current_slot)
+        self.set_aura_current_slot(chain_key, current_slot)
+    }
+
+    pub fn update_aura_invulnerables(
+        &mut self,
+        chain_key: &ChainKey,
+        invulnerables: Vec<[u8; 32]>,
+    ) -> bool {
+        self.set_aura_invulnerables(chain_key, invulnerables)
     }
 
     pub fn update_aura_authorities(
@@ -388,8 +437,16 @@ impl ChainsList {
         self.set_aura_authorities(chain_key, authorities)
     }
 
-    pub fn update_slot_duration_ms(&mut self, chain_key: &ChainKey, slot_duration_ms: u64) -> bool {
-        self.set_slot_duration_ms(chain_key, slot_duration_ms)
+    pub fn update_session_index(&mut self, chain_key: &ChainKey, index: u32) -> bool {
+        self.set_session_index(chain_key, index)
+    }
+
+    pub fn update_aura_slot_duration_ms(
+        &mut self,
+        chain_key: &ChainKey,
+        slot_duration_ms: u64,
+    ) -> bool {
+        self.set_aura_slot_duration_ms(chain_key, slot_duration_ms)
     }
 
     pub fn update_aura_block_time_ms(&mut self, chain_key: &ChainKey, block_time_ms: u64) -> bool {
@@ -435,7 +492,7 @@ impl Widget for &mut ChainsList {
                 Text::from(format!("#{}", chain.best_block())).alignment(Alignment::Right),
                 Text::from(format!("#{}", chain.finalized_block())).alignment(Alignment::Right),
                 Text::from(progress.to_string()).alignment(Alignment::Right),
-                Text::from(format_millis(elapsed, false)).alignment(Alignment::Right),
+                Text::from(format_millis(elapsed, false, false)).alignment(Alignment::Right),
                 Text::from(""),
             ])
         });

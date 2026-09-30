@@ -167,6 +167,7 @@ pub enum Response {
     CollatorIdentity(Data<IdentityData>),
     CurrentSlot(Data<u64>),
     SlotDuration(Data<u64>),
+    SessionIndex(Data<u32>),
 }
 
 // Some constructors for convenience
@@ -299,5 +300,9 @@ impl Response {
 
     pub fn slot_duration(duration_ms: u64) -> Self {
         Response::SlotDuration(Data::new(duration_ms))
+    }
+
+    pub fn session_index(index: u32) -> Self {
+        Response::SessionIndex(Data::new(index))
     }
 }

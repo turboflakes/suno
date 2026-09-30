@@ -167,6 +167,11 @@ pub trait RuntimeFetcher {
         api: &OnlineClientAtBlock<CustomConfig>,
     ) -> Result<Response, Error>;
 
+    async fn fetch_session_index(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
     async fn fetch_metadata(
         &self,
         api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
@@ -646,6 +651,16 @@ impl RuntimeFetcher for Runtime {
     ) -> Result<Response, Error> {
         match self {
             Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_slot_duration(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_session_index(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_session_index(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

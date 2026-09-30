@@ -121,7 +121,7 @@ impl Collator {
     /// Returns how long ago the last produced block was authored, if known.
     pub fn last_block_authored_ago(&self) -> Option<String> {
         let ts = self.last_block_authored_ts?;
-        Some(format_millis(get_elapsed_millis(ts), true))
+        Some(format_millis(get_elapsed_millis(ts), true, false))
     }
 
     /// Number of consecutive blocks observed authored under the current Aura slot.
@@ -146,6 +146,16 @@ impl Collator {
     pub fn slot_index(&self, authorities: &[[u8; 32]]) -> Option<usize> {
         let stash_bytes: [u8; 32] = *self.stash().as_ref();
         authorities.iter().position(|a| *a == stash_bytes)
+    }
+
+    /// Returns true if this collator is the Aura author for `current_slot`, per the
+    /// round-robin rule `authorities[slot % authorities.len()]`.
+    pub fn is_current_slot_author(&self, authorities: &[[u8; 32]], current_slot: u64) -> bool {
+        let n = authorities.len() as u64;
+        if n == 0 {
+            return false;
+        }
+        self.slot_index(authorities) == Some((current_slot % n) as usize)
     }
 
     /// Returns the next slot at which this collator is expected to author a block,
@@ -176,7 +186,7 @@ impl Collator {
         let total_ms = (next_slot - current_slot) * slot_duration_ms;
         let remaining_ms = total_ms.saturating_sub(get_elapsed_millis(current_slot_ts));
 
-        Some(format_millis(remaining_ms, true))
+        Some(format_millis(remaining_ms, true, false))
     }
 }
 

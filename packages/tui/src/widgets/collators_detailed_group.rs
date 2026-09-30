@@ -9,7 +9,11 @@ use ratatui::{
     widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use suno_config::SupportedRuntime;
-use suno_primitives::{collator::Collator, display::create_progress_bar_by_blocks, Chain};
+use suno_primitives::{
+    collator::Collator,
+    display::{create_progress_bar_by_blocks, format_millis},
+    Aura,
+};
 use suno_theme::Theme;
 
 pub const GROUP_HEADER_HEIGHT: u16 = 5;
@@ -150,6 +154,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
     ) {
         let theme = self.theme;
+
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
@@ -166,25 +171,50 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             ])
             .areas(area);
 
+        let invulnerables_count = chain.aura().as_ref().map_or(0, |a| a.invulnerables().len());
+        let permissionless_count = chain
+            .aura()
+            .as_ref()
+            .map_or(0, |a| a.permissionless().len());
+
+        let total_count = [(invulnerables_count, "inv"), (permissionless_count, "perm")]
+            .into_iter()
+            .filter(|(count, _)| *count > 0)
+            .map(|(count, label)| format!("{} {}", count, label))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         let mut network_lines = vec![
             Line::from(
                 Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
                     .style(theme.paragraph.header_active),
             ),
             Line::from(vec![
+                Span::raw("Average block time ").style(theme.paragraph.label),
+                Span::raw(
+                    chain
+                        .aura()
+                        .as_ref()
+                        .and_then(|a| a.slot_duration_ms())
+                        .and_then(|slot_duration_ms| chain.average_block_time_ms(slot_duration_ms))
+                        .map(|ms| format_millis(ms, true, true))
+                        .unwrap_or_else(|| "-".to_string()),
+                ),
+            ]),
+            Line::from(vec![
                 Span::raw("Total collators ").style(theme.paragraph.label),
-                Span::raw(format!("{}", chain.aura_authorities().len())),
+                Span::raw(total_count),
             ]),
         ];
 
         let invulnerables_count = collators.iter().filter(|c| c.is_invulnerable()).count();
-        let authorities_count = collators.iter().filter(|c| c.is_authority()).count();
+        let permissionless_count = collators.iter().filter(|c| c.is_authority()).count();
         let registered_count = collators.iter().filter(|c| c.is_waiting()).count();
 
         let displayed = [
-            (invulnerables_count, "invulnerables"),
-            (authorities_count, "authorities"),
-            (registered_count, "registered"),
+            (invulnerables_count, "inv"),
+            (permissionless_count, "perm"),
+            (registered_count, "reg"),
         ]
         .into_iter()
         .filter(|(count, _)| *count > 0)
@@ -205,15 +235,31 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         network_info.render(network_area, buf);
 
-        // Draw and render slot progress
+        // Draw and render session and slot progress
 
-        let slot_progress = chain.slot_progress();
+        let Some(aura) = chain.aura() else {
+            // TODO: Handle aura not available, maybe render loading indicator
+            let block = Block::new().set_style(theme.block.main);
+            let area = progress_area.union(progress_bar_area).union(countdown_area);
+            block.render(area, buf);
+            return;
+        };
+
+        let session_progress =
+            aura.session_progress(chain.finalized_block(), chain.runtime().duration_bn());
+        let slot_progress = aura.slot_progress();
 
         let progress_lines = vec![
             Line::from(""),
             Line::from(format!(
-                "slot {} {:.0}% ",
-                chain.current_slot(),
+                "session {} {:3.0}% ",
+                aura.current_session_index().unwrap_or_default(),
+                session_progress * 100_f64
+            ))
+            .alignment(Alignment::Right),
+            Line::from(format!(
+                "slot {} {:3.0}% ",
+                aura.current_slot().unwrap_or_default(),
                 slot_progress * 100_f64
             ))
             .alignment(Alignment::Right),
@@ -226,10 +272,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         progress_info.render(progress_area, buf);
 
+        let session_progress_bar = create_progress_bar_by_blocks(session_progress, 24);
         let slot_progress_bar = create_progress_bar_by_blocks(slot_progress, 24);
 
         let progress_bar_lines = vec![
             Line::from(""),
+            Line::from(session_progress_bar).alignment(Alignment::Right),
             Line::from(slot_progress_bar).alignment(Alignment::Right),
         ];
 
@@ -242,7 +290,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let countdown_lines = vec![
             Line::from(""),
-            Line::from(format!(" {}", chain.slot_countdown_time())).alignment(Alignment::Left),
+            Line::from(format!(
+                " {}",
+                aura.session_countdown_time(chain.finalized_block(), chain.runtime().duration_bn()),
+            ))
+            .alignment(Alignment::Left),
+            Line::from(format!(" {}", aura.slot_countdown_time())).alignment(Alignment::Left),
         ];
 
         let block = Block::new().set_style(theme.block.main);
@@ -269,12 +322,17 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             return;
         };
 
+        let Some(aura) = chain.aura() else {
+            let block = Block::new().set_style(theme.block.main);
+            block.render(area, buf);
+            return;
+        };
+
         let header = Row::new(vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
-            Cell::from(Text::from("produced").alignment(Alignment::Right)),
+            Cell::from(Text::from("in slot").alignment(Alignment::Right)),
+            Cell::from(Text::from("(last block)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
             Cell::from(Text::from("(in)").alignment(Alignment::Left)),
         ]);
@@ -284,14 +342,13 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Constraint::Length(24),
             Constraint::Fill(2),
             Constraint::Fill(1),
+            Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Fill(2),
-            Constraint::Fill(2),
         ];
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, &chain, theme))
+            .map(|c| self.collator_row(c, selected_collator, &aura, theme))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -310,7 +367,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         &self,
         collator: &Collator,
         selected: Option<&Collator>,
-        chain: &Chain,
+        aura: &Aura,
         theme: Theme,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
@@ -318,38 +375,37 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             _ => (theme.paragraph.cell, ""),
         };
 
-        let authorities = chain.aura_authorities();
+        let authorities = aura.authorities();
+        let current_slot = aura.current_slot().unwrap_or_default();
+
+        let blocks_in_slot_str = match aura.number_blocks_expected() {
+            Some(expected) => {
+                if collator.is_current_slot_author(authorities, current_slot) {
+                    format!("> {:2}/{:2}", collator.blocks_in_slot(), expected)
+                } else {
+                    format!("{:2}/{:2}", collator.blocks_in_slot(), expected)
+                }
+            }
+            None => format!("{:2}", collator.blocks_in_slot()),
+        };
 
         let last_block_str = collator
             .last_block_authored()
             .map(|b| format!("#{}", b))
             .unwrap_or_else(|| "".to_string());
 
-        let last_block_ago_str = collator
-            .last_block_authored_ago()
-            .unwrap_or_else(|| "".to_string());
-
-        let blocks_in_slot_str = if collator.blocks_in_slot() > 0 {
-            match chain.aura_number_blocks_expected() {
-                Some(expected) => format!("{}/{}", collator.blocks_in_slot(), expected),
-                None => format!("{}", collator.blocks_in_slot()),
-            }
-        } else {
-            "".to_string()
-        };
-
         let next_slot_str = collator
-            .next_slot(authorities, chain.current_slot())
+            .next_slot(authorities, current_slot)
             .map(|s| format!("#{}", s))
             .unwrap_or_else(|| "".to_string());
 
-        let next_slot_countdown_str = match chain.slot_duration_ms() {
+        let next_slot_countdown_str = match aura.slot_duration_ms() {
             Some(slot_duration_ms) => collator
                 .next_slot_countdown(
                     authorities,
-                    chain.current_slot(),
+                    current_slot,
                     slot_duration_ms,
-                    chain.current_slot_ts(),
+                    aura.current_slot_ts(),
                 )
                 .unwrap_or_else(|| "".to_string()),
             None => "".to_string(),
@@ -359,9 +415,8 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
-            Cell::from(Text::from(last_block_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(last_block_ago_str).alignment(Alignment::Left)),
             Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Right)),
+            Cell::from(Text::from(last_block_str).alignment(Alignment::Left)),
             Cell::from(Text::from(next_slot_str).alignment(Alignment::Right)),
             Cell::from(Text::from(next_slot_countdown_str).alignment(Alignment::Left)),
         ])

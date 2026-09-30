@@ -4,29 +4,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::utils::AccountId32;
 use time::{macros::format_description, OffsetDateTime};
 
-/// Format milliseconds to human-readable string (e.g., "6.5s")
-pub fn format_millis(millis: u64, long: bool) -> String {
+/// Format milliseconds to human-readable string (e.g., "6.512s")
+pub fn format_millis(millis: u64, show_long_format: bool, show_millis: bool) -> String {
     let seconds = millis / 1000;
 
     match seconds {
-        // NOTE: Displaying milliseconds is not really needed
-        // and doesn't bring any additional value.
-        // Is left here commented for completeness.
-        //
-        // s if s < 10 => {
-        //     let seconds_f = millis as f64 / 1000.0;
-        //     format!("{:.1}s", seconds_f)
-        // }
+        s if s < 10 && show_millis => {
+            let seconds_f = millis as f64 / 1000.0;
+            format!("{:.3}s", seconds_f)
+        }
         s if s < 60 => format!("{}s", s),
         s if s < 3600 => {
-            if long {
+            if show_long_format {
                 format!("{} mins", s / 60)
             } else {
                 format!("{}m", s / 60)
             }
         }
         s => {
-            if long {
+            if show_long_format {
                 let hrs = s / 3600;
                 let mins = (s % 3600) / 60;
                 if mins > 0 {
