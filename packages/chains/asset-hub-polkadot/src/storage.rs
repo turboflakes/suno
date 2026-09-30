@@ -389,25 +389,6 @@ pub async fn fetch_collator_last_authored_block(
     Ok(Response::last_authored_block(account_bytes, value as u64))
 }
 
-/// Fetch the current Aura slot at the specified block hash
-pub async fn fetch_current_slot(
-    api: &OnlineClientAtBlock<CustomConfig>,
-) -> Result<Response, Error> {
-    let addr = node_runtime::storage().aura().current_slot();
-
-    let value = api
-        .storage()
-        .entry(addr)
-        .boxed()?
-        .fetch(())
-        .await
-        .boxed()?
-        .decode()
-        .boxed()?;
-
-    Ok(Response::current_slot(value.0))
-}
-
 /// Fetch collators queued keys
 pub async fn fetch_collators_queued_keys(
     api: &OnlineClientAtBlock<CustomConfig>,

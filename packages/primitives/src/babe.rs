@@ -1,4 +1,24 @@
 use crate::display::format_millis;
+use subxt::config::substrate::DigestItem;
+
+/// Consensus engine id used by `pallet_babe` to tag its slot-claim pre-runtime digest.
+const BABE_ENGINE_ID: [u8; 4] = *b"BABE";
+
+/// Extracts the Babe slot a block was authored for, from its pre-runtime digest.
+///
+/// The digest payload is a SCALE-encoded `sp_consensus_babe::digests::PreDigest`, whose
+/// three variants (`Primary`, `SecondaryPlain`, `SecondaryVRF`) all share the same layout
+/// for their first two fields: a 1-byte variant tag, a 4-byte `authority_index`, and an
+/// 8-byte `slot`. Any trailing VRF fields are ignored.
+pub fn extract_babe_slot(digest_logs: &[DigestItem]) -> Option<u64> {
+    digest_logs.iter().find_map(|item| match item {
+        DigestItem::PreRuntime(id, data) if *id == BABE_ENGINE_ID => {
+            let slot_bytes: [u8; 8] = data.get(5..13)?.try_into().ok()?;
+            Some(u64::from_le_bytes(slot_bytes))
+        }
+        _ => None,
+    })
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Epoch {

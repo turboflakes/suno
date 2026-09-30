@@ -353,15 +353,6 @@ pub fn spawn_fetch_collators_next_keys(
     );
 }
 
-pub fn spawn_fetch_current_slot(
-    api: &OnlineClientAtBlock<CustomConfig>,
-    runtime: SupportedRuntime,
-    tx: &UnboundedSender<Action>,
-) {
-    DefaultSpawner::new(api, runtime, tx)
-        .spawn(move |api| async move { runtime.fetch_current_slot(&api).await });
-}
-
 pub fn spawn_fetch_slot_duration(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,

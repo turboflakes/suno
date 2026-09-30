@@ -169,11 +169,6 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
-    async fn fetch_current_slot(
-        &self,
-        api: &OnlineClientAtBlock<CustomConfig>,
-    ) -> Result<Response, Error>;
-
     async fn fetch_slot_duration(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -671,16 +666,6 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubPolkadot => {
                 suno_asset_hub_polkadot::fetch_collator_next_keys(api, stash).await
             }
-            _ => Err(Error::UnsupportedRuntime(*self)),
-        }
-    }
-
-    async fn fetch_current_slot(
-        &self,
-        api: &OnlineClientAtBlock<CustomConfig>,
-    ) -> Result<Response, Error> {
-        match self {
-            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_current_slot(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

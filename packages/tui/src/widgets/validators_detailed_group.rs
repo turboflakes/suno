@@ -10,13 +10,13 @@ use ratatui::{
 };
 use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
-    display::{create_progress_bar_by_blocks, format_planks},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks},
     validator::Validator,
 };
 use suno_theme::Theme;
 
-pub const GROUP_HEADER_HEIGHT: u16 = 6;
-pub const PADDING: u16 = 4;
+pub const GROUP_HEADER_HEIGHT: u16 = 7;
+pub const PADDING: u16 = 3;
 
 #[derive(Debug)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
@@ -200,6 +200,17 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
                     .style(theme.paragraph.header_active),
             ),
+            Line::from(vec![
+                Span::raw("Avg. block time ").style(theme.paragraph.label),
+                Span::raw(
+                    chain
+                        .epoch()
+                        .as_ref()
+                        .and_then(|e| chain.average_block_time_ms(e.block_time_ms()))
+                        .map(|ms| format_millis(ms, true, true))
+                        .unwrap_or_else(|| "-".to_string()),
+                ),
+            ]),
             Line::from(vec![
                 Span::raw("Total validators ").style(theme.paragraph.label),
                 Span::raw(format!(

@@ -301,12 +301,6 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
-        Response::CurrentSlot(data) => {
-            tx.send(Action::Chain(ChainAction::UpdateCurrentSlot(
-                runtime, data.value,
-            )))
-            .boxed()?;
-        }
         Response::SessionIndex(data) => {
             tx.send(Action::Chain(ChainAction::UpdateSessionIndex(
                 runtime, data.value,

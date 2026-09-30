@@ -174,7 +174,6 @@ pub enum Response {
     CollatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
-    CurrentSlot(Data<u64>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
 }
@@ -309,10 +308,6 @@ impl Response {
 
     pub fn collator_queued_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
         Response::CollatorQueuedKeys(Data::new(CollatorKeysData { account, keys }))
-    }
-
-    pub fn current_slot(slot: u64) -> Self {
-        Response::CurrentSlot(Data::new(slot))
     }
 
     pub fn slot_duration(duration_ms: u64) -> Self {

@@ -190,7 +190,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                     .style(theme.paragraph.header_active),
             ),
             Line::from(vec![
-                Span::raw("Average block time ").style(theme.paragraph.label),
+                Span::raw("Avg. block time ").style(theme.paragraph.label),
                 Span::raw(
                     chain
                         .aura()
@@ -245,9 +245,10 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             return;
         };
 
+        let slot_duration_ms = aura.slot_duration_ms().unwrap_or(0);
         let session_progress =
             aura.session_progress(chain.finalized_block(), chain.runtime().duration_bn());
-        let slot_progress = aura.slot_progress();
+        let slot_progress = chain.slot_progress(slot_duration_ms);
 
         let progress_lines = vec![
             Line::from(""),
@@ -259,7 +260,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             .alignment(Alignment::Right),
             Line::from(format!(
                 "slot {} {:3.0}% ",
-                aura.current_slot().unwrap_or_default(),
+                chain.current_slot().unwrap_or_default(),
                 slot_progress * 100_f64
             ))
             .alignment(Alignment::Right),
@@ -295,7 +296,8 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 aura.session_countdown_time(chain.finalized_block(), chain.runtime().duration_bn()),
             ))
             .alignment(Alignment::Left),
-            Line::from(format!(" {}", aura.slot_countdown_time())).alignment(Alignment::Left),
+            Line::from(format!(" {}", chain.slot_countdown_time(slot_duration_ms)))
+                .alignment(Alignment::Left),
         ];
 
         let block = Block::new().set_style(theme.block.main);
@@ -357,9 +359,22 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             widths.push(Constraint::Length(10));
         }
 
+        let current_slot = chain.current_slot().unwrap_or_default();
+        let current_slot_ts = chain.current_slot_ts();
+
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, aura, theme, show_next_keys))
+            .map(|c| {
+                self.collator_row(
+                    c,
+                    selected_collator,
+                    aura,
+                    current_slot,
+                    current_slot_ts,
+                    theme,
+                    show_next_keys,
+                )
+            })
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -374,11 +389,14 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         StatefulWidget::render(table, area, buf, table_state);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn collator_row(
         &self,
         collator: &Collator,
         selected: Option<&Collator>,
         aura: &Aura,
+        current_slot: u64,
+        current_slot_ts: u128,
         theme: Theme,
         show_next_keys: bool,
     ) -> Row<'static> {
@@ -388,7 +406,6 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         };
 
         let authorities = aura.authorities();
-        let current_slot = aura.current_slot().unwrap_or_default();
 
         let blocks_in_slot_str = match aura.number_blocks_expected() {
             Some(expected) => {
@@ -413,12 +430,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let next_slot_countdown_str = match aura.slot_duration_ms() {
             Some(slot_duration_ms) => collator
-                .next_slot_countdown(
-                    authorities,
-                    current_slot,
-                    slot_duration_ms,
-                    aura.current_slot_ts(),
-                )
+                .next_slot_countdown(authorities, current_slot, slot_duration_ms, current_slot_ts)
                 .unwrap_or_default(),
             None => "".to_string(),
         };

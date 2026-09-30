@@ -1,3 +1,4 @@
+use crate::display::{format_millis, get_elapsed_millis};
 use crate::network::ConnectionState;
 use crate::{Aura, Epoch, Era};
 use sp_arithmetic::Permill;
@@ -42,6 +43,10 @@ pub struct Chain {
     aura: Option<Aura>,
     // RPC Connection status
     state: ConnectionState,
+    // Current consensus slot (Babe for relay chains, Aura for parachains)
+    current_slot: Option<u64>,
+    // Timestamp in milliseconds of the last current_slot update
+    current_slot_ts: u128,
     // Most recent `(block number, slot)` pairs observed, oldest first
     recent_blocks: RecentBlocks,
 }
@@ -71,6 +76,8 @@ impl Chain {
             aura,
             state: ConnectionState::default(),
             recent_blocks: RecentBlocks::default(),
+            current_slot: None,
+            current_slot_ts: 0,
         }
     }
 
@@ -195,7 +202,7 @@ impl Chain {
         self.recent_blocks.average_block_time_ms(duration_ms)
     }
 
-    /// Records the Aura `slot` a block was authored in. Blocks must be recorded in order;
+    /// Records the `slot` a block was authored in. Blocks must be recorded in order;
     /// repeated or older blocks are ignored.
     pub fn add_recent_block(&mut self, block_number: u64, slot: u64) {
         self.recent_blocks.record(block_number, slot);
@@ -253,16 +260,38 @@ impl Chain {
         self.total_staked_pm = value;
     }
 
+    pub fn current_slot(&self) -> Option<u64> {
+        self.current_slot
+    }
+
+    pub fn current_slot_ts(&self) -> u128 {
+        self.current_slot_ts
+    }
+
     pub fn set_current_slot(&mut self, current_slot: Option<u64>) {
-        self.aura
-            .get_or_insert_with(Aura::default)
-            .set_current_slot(current_slot);
+        self.current_slot = current_slot;
     }
 
     pub fn set_current_slot_ts(&mut self, ts: u128) {
-        self.aura
-            .get_or_insert_with(Aura::default)
-            .set_current_slot_ts(ts);
+        self.current_slot_ts = ts;
+    }
+
+    /// Progress (0.0-1.0) through the current slot, based on how long ago
+    /// `current_slot` was last observed relative to `slot_duration_ms`.
+    pub fn slot_progress(&self, slot_duration_ms: u64) -> f64 {
+        if slot_duration_ms == 0 {
+            return 0.0;
+        }
+        let elapsed_ms = get_elapsed_millis(self.current_slot_ts);
+        (elapsed_ms as f64 / slot_duration_ms as f64).min(1.0)
+    }
+
+    /// Human-readable countdown until the current slot elapses.
+    pub fn slot_countdown_time(&self, slot_duration_ms: u64) -> String {
+        let elapsed_ms = get_elapsed_millis(self.current_slot_ts);
+        let remaining_ms = slot_duration_ms.saturating_sub(elapsed_ms);
+
+        format_millis(remaining_ms, true, false)
     }
 
     pub fn set_slot_duration_ms(&mut self, slot_duration_ms: Option<u64>) {

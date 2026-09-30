@@ -579,26 +579,6 @@ impl App {
                             });
                         }
                     }
-                    SupportedRuntime::AssetHubPolkadot => {
-                        if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
-                            let api = chain.client().clone();
-                            let tx = self.tx.clone();
-
-                            tokio::spawn(async move {
-                                let api_at = match api.at_block(block_hash).await.boxed() {
-                                    Ok(api_at) => api_at,
-                                    Err(e) => {
-                                        let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Failed to client at_block: {}", e),
-                                        )));
-                                        return;
-                                    }
-                                };
-
-                                sync::spawn_fetch_current_slot(&api_at, runtime, &tx);
-                            });
-                        }
-                    }
                     _ => {}
                 }
             }
@@ -791,8 +771,9 @@ impl App {
             ChainAction::UpdateTotalStaked(chain_key, value) => {
                 self.chains.update_total_staked(&chain_key, value);
             }
-            ChainAction::UpdateCurrentSlot(chain_key, slot) => {
-                self.chains.update_current_slot(&chain_key, slot);
+            ChainAction::UpdateCurrentSlot(chain_key, block_number, slot) => {
+                self.chains
+                    .update_current_slot(&chain_key, block_number, slot);
             }
             ChainAction::UpdateSessionIndex(chain_key, index) => {
                 self.chains.update_session_index(&chain_key, index);
@@ -954,8 +935,6 @@ impl App {
                     .update_aura_invulnerables(&runtime, invulnerables);
             }
             CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
-                self.chains
-                    .update_recent_block(&runtime, block_number, slot);
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                     if let Some(aura) = &chain.aura() {
                         self.collators.update_authored_block(

@@ -2,7 +2,9 @@ use crate::bridge::sync::{spawn_process_block_extrinsics, spawn_process_runtime_
 use std::{fmt::Display, future::Future, time::Duration};
 use suno_actions::{Action, ChainAction, CollatorAction};
 use suno_config::SupportedRuntime;
-use suno_primitives::{aura::extract_aura_slot, chain::Chain, network::ConnectionState};
+use suno_primitives::{
+    aura::extract_aura_slot, babe::extract_babe_slot, chain::Chain, network::ConnectionState,
+};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::timeout;
 use tracing::{error, info};
@@ -122,8 +124,20 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                         block.hash(),
                     )));
 
-                    if runtime == SupportedRuntime::AssetHubPolkadot {
-                        if let Some(slot) = extract_aura_slot(&block.header().digest.logs) {
+                    let slot = if runtime.is_relay_chain() {
+                        extract_babe_slot(&block.header().digest.logs)
+                    } else {
+                        extract_aura_slot(&block.header().digest.logs)
+                    };
+
+                    if let Some(slot) = slot {
+                        let _ = tx.send(Action::Chain(ChainAction::UpdateCurrentSlot(
+                            runtime,
+                            block.number(),
+                            slot,
+                        )));
+
+                        if runtime == SupportedRuntime::AssetHubPolkadot {
                             let _ = tx.send(Action::Collator(CollatorAction::UpdateAuthoredBlock(
                                 runtime,
                                 block.number(),

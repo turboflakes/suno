@@ -137,7 +137,7 @@ pub enum ChainAction {
     UpdateTotalValidators(ChainKey, Counter),
     UpdateActiveNominators(ChainKey, Counter),
     UpdateTotalNominators(ChainKey, Counter),
-    UpdateCurrentSlot(ChainKey, u64),
+    UpdateCurrentSlot(ChainKey, BlockNumber, u64),
     UpdateSlotDuration(ChainKey, u64),
     UpdateSessionIndex(ChainKey, u32),
     FetchValidatorData(ValidatorKey),
