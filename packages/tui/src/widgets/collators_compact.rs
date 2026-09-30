@@ -31,14 +31,36 @@ impl StatefulWidget for CollatorsCompactWidget {
             .set_style(theme.block.pane_body(state.is_active()))
             .padding(Padding::symmetric(0, 1));
 
-        let rows = state.collators_iter().map(|c| {
-            Row::new(vec![
+        // Interleave a non-selectable chain-name row before each chain's collators.
+        // The underlying `table_state` selection index refers to `state.collators`,
+        // so it's translated here to account for the extra header rows.
+        let selected = state.table_state.selected();
+        let mut display_selected = None;
+        let mut rows: Vec<Row> = Vec::new();
+        let mut last_runtime = None;
+
+        for (i, c) in state.collators_iter().enumerate() {
+            if last_runtime != Some(c.runtime()) {
+                rows.push(Row::new(vec![
+                    Text::from(""),
+                    Text::from(c.runtime().to_string()).style(theme.paragraph.label_italic),
+                    Text::from(""),
+                    Text::from(""),
+                ]));
+                last_runtime = Some(c.runtime());
+            }
+
+            if selected == Some(i) {
+                display_selected = Some(rows.len());
+            }
+
+            rows.push(Row::new(vec![
                 Text::from(""),
-                Text::from(format!("{}/{}", c.runtime(), c.display_name(4))),
+                Text::from(c.display_name(4)),
                 Text::from(""),
                 Text::from(""),
-            ])
-        });
+            ]));
+        }
 
         let widths = [
             Constraint::Length(1),
@@ -54,6 +76,7 @@ impl StatefulWidget for CollatorsCompactWidget {
             Cell::from(""),
         ];
 
+        let rows_len = rows.len();
         let table = Table::new(rows, widths)
             .block(block)
             .header(Row::new(header_cells).set_style(theme.table.header(state.is_active())))
@@ -61,18 +84,21 @@ impl StatefulWidget for CollatorsCompactWidget {
             .row_highlight_style(theme.table.row_highlight(state.is_active()))
             .highlight_symbol(theme.table.highlight_symbol(state.is_active()));
 
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
+        let mut display_table_state = state.table_state;
+        display_table_state.select(display_selected);
+
+        StatefulWidget::render(table, area, buf, &mut display_table_state);
 
         // Render scrollbar when active
-        if state.is_active() && state.collators.len() >= area.height.saturating_sub(2) as usize {
+        if state.is_active() && rows_len >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
             };
-            if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(theme, row_index, state.collators.len(), scrollbar_area, buf);
+            if let Some(row_index) = display_selected {
+                render_scrollbar(theme, row_index, rows_len, scrollbar_area, buf);
             }
         }
     }

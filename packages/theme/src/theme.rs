@@ -61,6 +61,7 @@ impl Theme {
                 header_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 label: Style::new().fg(p.color_04),
                 label_active: Style::new().fg(p.color_04).add_modifier(Modifier::BOLD),
+                label_italic: Style::new().fg(p.color_04).add_modifier(Modifier::ITALIC),
                 label_inverse: Style::new().fg(p.color_14),
                 cell: Style::default(),
                 cell_active: Style::new()
@@ -180,6 +181,7 @@ pub struct Paragraph {
     pub label: Style,
     pub label_active: Style,
     pub label_inverse: Style,
+    pub label_italic: Style,
     pub cell: Style,
     pub cell_active: Style,
 }
