@@ -72,13 +72,7 @@ impl StatefulWidget for CollatorsCompactWidget {
                 height: area.height.saturating_sub(2),
             };
             if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(
-                    theme,
-                    row_index,
-                    state.collators.len(),
-                    scrollbar_area,
-                    buf,
-                );
+                render_scrollbar(theme, row_index, state.collators.len(), scrollbar_area, buf);
             }
         }
     }

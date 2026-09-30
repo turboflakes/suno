@@ -336,9 +336,9 @@ pub fn spawn_fetch_collators_queued_keys(
     collator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_batch(
-        move |api, ck| async move { runtime.fetch_collators_queued_keys(&api, &ck).await },
-    );
+    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_batch(move |api, ck| async move {
+        runtime.fetch_collators_queued_keys(&api, &ck).await
+    });
 }
 
 pub fn spawn_fetch_collators_next_keys(

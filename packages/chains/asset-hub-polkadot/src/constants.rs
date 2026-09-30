@@ -21,7 +21,9 @@ pub async fn fetch_bonding_duration(api: &OnlineClientAtBlock<CustomConfig>) -> 
 }
 
 /// Fetch Aura slot duration in milliseconds
-pub async fn fetch_slot_duration(api: &OnlineClientAtBlock<CustomConfig>) -> Result<Response, Error> {
+pub async fn fetch_slot_duration(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
     let addr = node_runtime::constants().aura().slot_duration();
     let value = api.constants().entry(&addr).boxed()?;
 

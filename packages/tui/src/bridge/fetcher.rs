@@ -619,7 +619,9 @@ impl RuntimeFetcher for Runtime {
         api: &OnlineClientAtBlock<CustomConfig>,
     ) -> Result<Response, Error> {
         match self {
-            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_session_validators(api).await,
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_session_validators(api).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
