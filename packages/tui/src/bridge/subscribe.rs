@@ -148,6 +148,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 | SupportedRuntime::PeoplePaseo
                                 | SupportedRuntime::PeopleWestend
                                 | SupportedRuntime::BridgeHubPolkadot
+                                | SupportedRuntime::BridgeHubKusama
                         ) {
                             let _ = tx.send(Action::Collator(CollatorAction::UpdateAuthoredBlock(
                                 runtime,

@@ -480,13 +480,9 @@ impl App {
                                     );
                                     let people_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
-                                    let bh_keys = if runtime == SupportedRuntime::PeoplePolkadot {
-                                        self.collators.get_collator_keys_by_runtime(
-                                            SupportedRuntime::BridgeHubPolkadot,
-                                        )
-                                    } else {
-                                        Vec::new()
-                                    };
+                                    let bh_keys = self.collators.get_collator_keys_by_runtime(
+                                        runtime.relay_chain().bridge_hub_runtime(),
+                                    );
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -518,11 +514,9 @@ impl App {
                                             &tx,
                                         );
 
-                                        if !bh_keys.is_empty() {
-                                            sync::spawn_fetch_collators_identity(
-                                                &api_at, runtime, &bh_keys, &tx,
-                                            );
-                                        }
+                                        sync::spawn_fetch_collators_identity(
+                                            &api_at, runtime, &bh_keys, &tx,
+                                        );
 
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
@@ -544,7 +538,7 @@ impl App {
                                     });
                                 }
                             }
-                            SupportedRuntime::BridgeHubPolkadot => {
+                            SupportedRuntime::BridgeHubPolkadot | SupportedRuntime::BridgeHubKusama => {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {

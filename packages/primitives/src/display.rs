@@ -9,9 +9,9 @@ pub fn format_millis(millis: u64, show_long_format: bool, show_millis: bool) -> 
     let seconds = millis / 1000;
 
     match seconds {
-        s if s < 10 && show_millis => {
+        s if s < 18 && show_millis => {
             let seconds_f = millis as f64 / 1000.0;
-            format!("{:.3}s", seconds_f)
+            format!("{:.2}s", seconds_f)
         }
         s if s < 60 => format!("{}s", s),
         s if s < 3600 => {

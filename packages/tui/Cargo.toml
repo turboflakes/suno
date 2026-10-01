@@ -34,6 +34,7 @@ suno-asset-hub-paseo = { path = "../chains/asset-hub-paseo" }
 suno-asset-hub-polkadot = { path = "../chains/asset-hub-polkadot" }
 suno-asset-hub-kusama = { path = "../chains/asset-hub-kusama" }
 suno-asset-hub-westend = { path = "../chains/asset-hub-westend" }
+suno-bridge-hub-kusama = { path = "../chains/bridge-hub-kusama" }
 suno-bridge-hub-polkadot = { path = "../chains/bridge-hub-polkadot" }
 suno-config = { path = "../config" }
 suno-error = { path = "../error" }
