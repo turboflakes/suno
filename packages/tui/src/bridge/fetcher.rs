@@ -615,12 +615,8 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => {
                 suno_bridge_hub_polkadot::fetch_aura_authorities(api).await
             }
-            Runtime::BridgeHubKusama => {
-                suno_bridge_hub_kusama::fetch_aura_authorities(api).await
-            }
-            Runtime::CoretimePolkadot => {
-                suno_coretime_polkadot::fetch_aura_authorities(api).await
-            }
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_aura_authorities(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_aura_authorities(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -643,9 +639,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => {
                 suno_bridge_hub_polkadot::fetch_session_validators(api).await
             }
-            Runtime::BridgeHubKusama => {
-                suno_bridge_hub_kusama::fetch_session_validators(api).await
-            }
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_session_validators(api).await,
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_session_validators(api).await
             }
