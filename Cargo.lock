@@ -7324,6 +7324,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "suno-coretime-kusama"
+version = "0.9.0"
+dependencies = [
+ "subxt",
+ "suno-config",
+ "suno-error",
+ "suno-primitives",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "suno-coretime-polkadot"
 version = "0.9.0"
 dependencies = [
@@ -7541,6 +7553,7 @@ dependencies = [
  "suno-bridge-hub-kusama",
  "suno-bridge-hub-polkadot",
  "suno-config",
+ "suno-coretime-kusama",
  "suno-coretime-polkadot",
  "suno-error",
  "suno-kusama",

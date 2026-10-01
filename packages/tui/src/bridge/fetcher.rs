@@ -617,6 +617,7 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_aura_authorities(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_aura_authorities(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_aura_authorities(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -643,6 +644,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_session_validators(api).await
             }
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_validators(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -663,6 +665,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_invulnerables(api).await,
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_invulnerables(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_invulnerables(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_invulnerables(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -705,6 +708,9 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collator_last_authored_block(api, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -749,6 +755,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_collators_queued_keys(api, collator_keys).await
             }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -788,6 +797,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_collator_next_keys(api, stash).await
             }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collator_next_keys(api, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -808,6 +820,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_slot_duration(api).await,
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_slot_duration(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_slot_duration(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_slot_duration(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -828,6 +841,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_session_index(api).await,
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_session_index(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_session_index(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_index(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -852,6 +866,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_metadata(api).await,
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_metadata(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_metadata(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_metadata(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

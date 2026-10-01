@@ -126,8 +126,6 @@ impl SupportedRuntime {
         match &self {
             Self::Polkadot => Self::BridgeHubPolkadot,
             Self::Kusama => Self::BridgeHubKusama,
-            Self::Paseo => Self::BridgeHubPaseo,
-            Self::Westend => Self::BridgeHubWestend,
             _ => unimplemented!("BridgeHub runtime not supported"),
         }
     }
@@ -154,7 +152,6 @@ impl SupportedRuntime {
         match &self {
             Self::Polkadot => Self::CoretimePolkadot,
             Self::Kusama => Self::CoretimeKusama,
-            Self::Westend => Self::CoretimeWestend,
             _ => unimplemented!("Coretime runtime not supported"),
         }
     }
@@ -459,7 +456,10 @@ impl SupportedRuntime {
             | Self::PeoplePaseo
             | Self::PeopleWestend => 3000,
             Self::PeopleKusama => 1000,
-            Self::BridgeHubPolkadot | Self::BridgeHubKusama | Self::CoretimePolkadot => 500,
+            Self::BridgeHubPolkadot
+            | Self::BridgeHubKusama
+            | Self::CoretimePolkadot
+            | Self::CoretimeKusama => 500,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -477,7 +477,8 @@ impl SupportedRuntime {
             | Self::PeoplePaseo
             | Self::BridgeHubPolkadot
             | Self::BridgeHubKusama
-            | Self::CoretimePolkadot => 6 * 300,
+            | Self::CoretimePolkadot
+            | Self::CoretimeKusama => 6 * 300,
             Self::AssetHubPolkadot
             | Self::AssetHubKusama
             | Self::AssetHubPaseo

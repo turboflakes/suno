@@ -483,17 +483,10 @@ impl App {
                                     let bh_keys = self.collators.get_collator_keys_by_runtime(
                                         runtime.relay_chain().bridge_hub_runtime(),
                                     );
-                                    // `coretime_runtime()` isn't implemented for every relay yet.
-                                    let ct_keys = match runtime.relay_chain() {
-                                        SupportedRuntime::Polkadot
-                                        | SupportedRuntime::Kusama
-                                        | SupportedRuntime::Westend => {
-                                            self.collators.get_collator_keys_by_runtime(
-                                                runtime.relay_chain().coretime_runtime(),
-                                            )
-                                        }
-                                        _ => Vec::new(),
-                                    };
+                                    let ct_keys = self.collators.get_collator_keys_by_runtime(
+                                        runtime.relay_chain().coretime_runtime(),
+                                    );
+
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -555,7 +548,8 @@ impl App {
                             }
                             SupportedRuntime::BridgeHubPolkadot
                             | SupportedRuntime::BridgeHubKusama
-                            | SupportedRuntime::CoretimePolkadot => {
+                            | SupportedRuntime::CoretimePolkadot
+                            | SupportedRuntime::CoretimeKusama => {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
@@ -864,41 +858,33 @@ impl App {
                             });
                         }
 
-                        // Same as above, but for Coretime collators. `coretime_runtime()`
-                        // isn't implemented for every relay yet.
-                        if matches!(
-                            runtime,
-                            SupportedRuntime::Polkadot
-                                | SupportedRuntime::Kusama
-                                | SupportedRuntime::Westend
-                        ) {
-                            let coretime_runtime = runtime.coretime_runtime();
-                            if let Some((api, block_hash)) =
-                                self.chains.get_api_and_block_hash(coretime_runtime)
-                            {
-                                let collator_keys = self
-                                    .collators
-                                    .get_collator_keys_by_runtime(coretime_runtime);
-                                let tx = self.tx.clone();
-                                tokio::spawn(async move {
-                                    let api_at = match api.at_block(block_hash).await.boxed() {
-                                        Ok(api_at) => api_at,
-                                        Err(e) => {
-                                            let _ = tx.send(Action::System(SystemAction::Error(
-                                                format!("Failed to client at_block: {}", e),
-                                            )));
-                                            return;
-                                        }
-                                    };
+                        // Same as above, but for Coretime collators
+                        let coretime_runtime = runtime.coretime_runtime();
+                        if let Some((api, block_hash)) =
+                            self.chains.get_api_and_block_hash(coretime_runtime)
+                        {
+                            let collator_keys = self
+                                .collators
+                                .get_collator_keys_by_runtime(coretime_runtime);
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
 
-                                    sync::spawn_fetch_collators_last_authored_block(
-                                        &api_at,
-                                        coretime_runtime,
-                                        &collator_keys,
-                                        &tx,
-                                    );
-                                });
-                            }
+                                sync::spawn_fetch_collators_last_authored_block(
+                                    &api_at,
+                                    coretime_runtime,
+                                    &collator_keys,
+                                    &tx,
+                                );
+                            });
                         }
                     }
                     SupportedRuntime::AssetHubPolkadot
