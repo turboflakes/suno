@@ -474,18 +474,29 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    // Collect collator keys for AssetHub, BridgeHub and People collators.
+                                    // Collect collator keys for AssetHub, BridgeHub, Coretime,
+                                    // Collectives and People collators. The latter three don't
+                                    // exist on every relay, so their keys default to empty.
                                     let ah_keys = self.collators.get_collator_keys_by_runtime(
                                         runtime.relay_chain().asset_hub_runtime(),
                                     );
                                     let people_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
-                                    let bh_keys = self.collators.get_collator_keys_by_runtime(
-                                        runtime.relay_chain().bridge_hub_runtime(),
-                                    );
-                                    let ct_keys = self.collators.get_collator_keys_by_runtime(
-                                        runtime.relay_chain().coretime_runtime(),
-                                    );
+                                    let bh_keys = runtime
+                                        .relay_chain()
+                                        .bridge_hub_runtime()
+                                        .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                        .unwrap_or_default();
+                                    let ct_keys = runtime
+                                        .relay_chain()
+                                        .coretime_runtime()
+                                        .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                        .unwrap_or_default();
+                                    let cl_keys = runtime
+                                        .relay_chain()
+                                        .collectives_runtime()
+                                        .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                        .unwrap_or_default();
 
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
@@ -526,6 +537,10 @@ impl App {
                                             &api_at, runtime, &ct_keys, &tx,
                                         );
 
+                                        sync::spawn_fetch_collators_identity(
+                                            &api_at, runtime, &cl_keys, &tx,
+                                        );
+
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
@@ -549,7 +564,9 @@ impl App {
                             SupportedRuntime::BridgeHubPolkadot
                             | SupportedRuntime::BridgeHubKusama
                             | SupportedRuntime::CoretimePolkadot
-                            | SupportedRuntime::CoretimeKusama => {
+                            | SupportedRuntime::CoretimeKusama
+                            | SupportedRuntime::CollectivesPolkadot
+                            | SupportedRuntime::CollectivesWestend => {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
@@ -829,62 +846,41 @@ impl App {
                             });
                         }
 
-                        // Same as above, but for BridgeHub collators
-                        let bridge_hub_runtime = runtime.bridge_hub_runtime();
-                        if let Some((api, block_hash)) =
-                            self.chains.get_api_and_block_hash(bridge_hub_runtime)
+                        // Same as above, but for BridgeHub, Coretime and Collectives collators.
+                        // Each only exists on some relays, when absent skip silently.
+                        for para_runtime in [
+                            runtime.bridge_hub_runtime(),
+                            runtime.coretime_runtime(),
+                            runtime.collectives_runtime(),
+                        ]
+                        .into_iter()
+                        .flatten()
                         {
-                            let collator_keys = self
-                                .collators
-                                .get_collator_keys_by_runtime(bridge_hub_runtime);
-                            let tx = self.tx.clone();
-                            tokio::spawn(async move {
-                                let api_at = match api.at_block(block_hash).await.boxed() {
-                                    Ok(api_at) => api_at,
-                                    Err(e) => {
-                                        let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Failed to client at_block: {}", e),
-                                        )));
-                                        return;
-                                    }
-                                };
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(para_runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(para_runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
 
-                                sync::spawn_fetch_collators_last_authored_block(
-                                    &api_at,
-                                    bridge_hub_runtime,
-                                    &collator_keys,
-                                    &tx,
-                                );
-                            });
-                        }
-
-                        // Same as above, but for Coretime collators
-                        let coretime_runtime = runtime.coretime_runtime();
-                        if let Some((api, block_hash)) =
-                            self.chains.get_api_and_block_hash(coretime_runtime)
-                        {
-                            let collator_keys = self
-                                .collators
-                                .get_collator_keys_by_runtime(coretime_runtime);
-                            let tx = self.tx.clone();
-                            tokio::spawn(async move {
-                                let api_at = match api.at_block(block_hash).await.boxed() {
-                                    Ok(api_at) => api_at,
-                                    Err(e) => {
-                                        let _ = tx.send(Action::System(SystemAction::Error(
-                                            format!("Failed to client at_block: {}", e),
-                                        )));
-                                        return;
-                                    }
-                                };
-
-                                sync::spawn_fetch_collators_last_authored_block(
-                                    &api_at,
-                                    coretime_runtime,
-                                    &collator_keys,
-                                    &tx,
-                                );
-                            });
+                                    sync::spawn_fetch_collators_last_authored_block(
+                                        &api_at,
+                                        para_runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                });
+                            }
                         }
                     }
                     SupportedRuntime::AssetHubPolkadot

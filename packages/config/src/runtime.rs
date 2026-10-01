@@ -122,14 +122,6 @@ impl SupportedRuntime {
         }
     }
 
-    pub fn bridge_hub_runtime(&self) -> Self {
-        match &self {
-            Self::Polkadot => Self::BridgeHubPolkadot,
-            Self::Kusama => Self::BridgeHubKusama,
-            _ => unimplemented!("BridgeHub runtime not supported"),
-        }
-    }
-
     pub fn people_runtime(&self) -> Self {
         match &self {
             Self::Polkadot => Self::PeoplePolkadot,
@@ -140,27 +132,35 @@ impl SupportedRuntime {
         }
     }
 
-    pub fn collectives_runtime(&self) -> Self {
+    pub fn bridge_hub_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::CollectivesPolkadot,
-            Self::Westend => Self::CollectivesWestend,
-            _ => unimplemented!("Collectives runtime not supported"),
+            Self::Polkadot => Some(Self::BridgeHubPolkadot),
+            Self::Kusama => Some(Self::BridgeHubKusama),
+            _ => None,
         }
     }
 
-    pub fn coretime_runtime(&self) -> Self {
+    pub fn collectives_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::CoretimePolkadot,
-            Self::Kusama => Self::CoretimeKusama,
-            _ => unimplemented!("Coretime runtime not supported"),
+            Self::Polkadot => Some(Self::CollectivesPolkadot),
+            Self::Westend => Some(Self::CollectivesWestend),
+            _ => None,
         }
     }
 
-    pub fn bulletin_runtime(&self) -> Self {
+    pub fn coretime_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::BulletinPolkadot,
-            Self::Paseo => Self::BulletinPaseo,
-            _ => unimplemented!("Bulletin runtime not supported"),
+            Self::Polkadot => Some(Self::CoretimePolkadot),
+            Self::Kusama => Some(Self::CoretimeKusama),
+            _ => None,
+        }
+    }
+
+    pub fn bulletin_runtime(&self) -> Option<Self> {
+        match &self {
+            Self::Polkadot => Some(Self::BulletinPolkadot),
+            Self::Paseo => Some(Self::BulletinPaseo),
+            _ => None,
         }
     }
 
@@ -455,11 +455,12 @@ impl SupportedRuntime {
             | Self::PeoplePolkadot
             | Self::PeoplePaseo
             | Self::PeopleWestend => 3000,
-            Self::PeopleKusama => 1000,
+            Self::PeopleKusama | Self::CollectivesWestend => 1000,
             Self::BridgeHubPolkadot
             | Self::BridgeHubKusama
             | Self::CoretimePolkadot
-            | Self::CoretimeKusama => 500,
+            | Self::CoretimeKusama
+            | Self::CollectivesPolkadot => 500,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -478,7 +479,9 @@ impl SupportedRuntime {
             | Self::BridgeHubPolkadot
             | Self::BridgeHubKusama
             | Self::CoretimePolkadot
-            | Self::CoretimeKusama => 6 * 300,
+            | Self::CoretimeKusama
+            | Self::CollectivesPolkadot
+            | Self::CollectivesWestend => 6 * 300,
             Self::AssetHubPolkadot
             | Self::AssetHubKusama
             | Self::AssetHubPaseo

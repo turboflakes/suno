@@ -7297,6 +7297,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "suno-collectives-polkadot"
+version = "0.9.0"
+dependencies = [
+ "subxt",
+ "suno-config",
+ "suno-error",
+ "suno-primitives",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "suno-collectives-westend"
+version = "0.9.0"
+dependencies = [
+ "subxt",
+ "suno-config",
+ "suno-error",
+ "suno-primitives",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "suno-config"
 version = "0.9.0"
 dependencies = [
@@ -7552,6 +7576,8 @@ dependencies = [
  "suno-asset-hub-westend",
  "suno-bridge-hub-kusama",
  "suno-bridge-hub-polkadot",
+ "suno-collectives-polkadot",
+ "suno-collectives-westend",
  "suno-config",
  "suno-coretime-kusama",
  "suno-coretime-polkadot",
