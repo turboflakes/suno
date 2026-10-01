@@ -23,6 +23,7 @@ members = [
     "packages/chains/people-polkadot",
     "packages/chains/people-kusama",
     "packages/chains/people-westend",
+    "packages/chains/bridge-hub-polkadot",
 ]
 
 resolver = "2"

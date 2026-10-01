@@ -335,7 +335,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("in slot").alignment(Alignment::Right)),
+            Cell::from(Text::from("authored/expected").alignment(Alignment::Right)),
             Cell::from(Text::from("(last block)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot in").alignment(Alignment::Right)),
             Cell::from(Text::from("(slot)").alignment(Alignment::Left)),
@@ -410,12 +410,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let blocks_in_slot_str = match aura.number_blocks_expected() {
             Some(expected) => {
                 if collator.is_current_slot_author(authorities, current_slot) {
-                    format!("> {:2}/{}", collator.blocks_in_slot(), expected)
+                    format!("> {:2}/{}", collator.blocks_in_slot(current_slot), expected)
                 } else {
-                    format!("{:2}/{}", collator.blocks_in_slot(), expected)
+                    format!("{:2}/{}", collator.blocks_in_slot(current_slot), expected)
                 }
             }
-            None => format!("{:2}", collator.blocks_in_slot()),
+            None => format!("{:2}", collator.blocks_in_slot(current_slot)),
         };
 
         let last_block_str = collator

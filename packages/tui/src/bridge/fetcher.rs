@@ -612,6 +612,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_aura_authorities(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_aura_authorities(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_aura_authorities(api).await,
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_aura_authorities(api).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -631,6 +634,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_session_validators(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_session_validators(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_session_validators(api).await,
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_session_validators(api).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -648,6 +654,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_invulnerables(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_invulnerables(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_invulnerables(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_invulnerables(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -681,6 +688,9 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::PeopleWestend => {
                 suno_people_westend::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collator_last_authored_block(api, stash).await
             }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
@@ -716,6 +726,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleWestend => {
                 suno_people_westend::fetch_collators_queued_keys(api, collator_keys).await
             }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -746,6 +759,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleWestend => {
                 suno_people_westend::fetch_collator_next_keys(api, stash).await
             }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collator_next_keys(api, stash).await
+            }
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -763,6 +779,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_slot_duration(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_slot_duration(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_slot_duration(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_slot_duration(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -780,6 +797,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_session_index(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_session_index(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_session_index(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_session_index(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -801,6 +819,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_metadata(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_metadata(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_metadata(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_metadata(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

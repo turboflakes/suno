@@ -474,12 +474,19 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    // Collect collator keys for AssetHub and People collators.
+                                    // Collect collator keys for AssetHub, BridgeHub and People collators.
                                     let ah_keys = self.collators.get_collator_keys_by_runtime(
                                         runtime.relay_chain().asset_hub_runtime(),
                                     );
                                     let people_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
+                                    let bh_keys = if runtime == SupportedRuntime::PeoplePolkadot {
+                                        self.collators.get_collator_keys_by_runtime(
+                                            SupportedRuntime::BridgeHubPolkadot,
+                                        )
+                                    } else {
+                                        Vec::new()
+                                    };
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -511,6 +518,12 @@ impl App {
                                             &tx,
                                         );
 
+                                        if !bh_keys.is_empty() {
+                                            sync::spawn_fetch_collators_identity(
+                                                &api_at, runtime, &bh_keys, &tx,
+                                            );
+                                        }
+
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
@@ -526,6 +539,45 @@ impl App {
                                             &api_at,
                                             runtime,
                                             &people_keys,
+                                            &tx,
+                                        );
+                                    });
+                                }
+                            }
+                            SupportedRuntime::BridgeHubPolkadot => {
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    let collator_keys =
+                                        self.collators.get_collator_keys_by_runtime(runtime);
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
+
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
                                             &tx,
                                         );
                                     });
@@ -771,6 +823,35 @@ impl App {
                                 );
                             });
                         }
+
+                        // Same as above, but for BridgeHub collators
+                        let bridge_hub_runtime = runtime.bridge_hub_runtime();
+                        if let Some((api, block_hash)) =
+                            self.chains.get_api_and_block_hash(bridge_hub_runtime)
+                        {
+                            let collator_keys = self
+                                .collators
+                                .get_collator_keys_by_runtime(bridge_hub_runtime);
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let api_at = match api.at_block(block_hash).await.boxed() {
+                                    Ok(api_at) => api_at,
+                                    Err(e) => {
+                                        let _ = tx.send(Action::System(SystemAction::Error(
+                                            format!("Failed to client at_block: {}", e),
+                                        )));
+                                        return;
+                                    }
+                                };
+
+                                sync::spawn_fetch_collators_last_authored_block(
+                                    &api_at,
+                                    bridge_hub_runtime,
+                                    &collator_keys,
+                                    &tx,
+                                );
+                            });
+                        }
                     }
                     SupportedRuntime::AssetHubPolkadot
                     | SupportedRuntime::AssetHubKusama
@@ -989,7 +1070,9 @@ impl App {
                 }
             }
             CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
-                // Calculate the expected Aura block time and update the chain
+                // Calculate the expected Aura block time and update the chain. This is
+                // the minimum per-block cadence the relay chain can absorb, per the
+                // runtime source: `RELAY_CHAIN_SLOT_DURATION_MILLIS / BLOCK_PROCESSING_VELOCITY`.
                 if let Some(rc_chain) = self.chains.get_chain_by_runtime(runtime.relay_chain()) {
                     let block_time_ms = rc_chain
                         .epoch()
@@ -998,7 +1081,7 @@ impl App {
                         .unwrap_or(0);
 
                     let expected_aura_block_time_ms =
-                        block_time_ms / runtime.block_processing_velocity() as u64;
+                        (block_time_ms / runtime.block_processing_velocity()) * 1000;
                     self.chains
                         .update_aura_block_time_ms(&runtime, expected_aura_block_time_ms);
                 }

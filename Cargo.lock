@@ -7273,6 +7273,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "suno-bridge-hub-polkadot"
+version = "0.9.0"
+dependencies = [
+ "subxt",
+ "suno-config",
+ "suno-error",
+ "suno-primitives",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "suno-config"
 version = "0.9.0"
 dependencies = [
@@ -7502,6 +7514,7 @@ dependencies = [
  "suno-asset-hub-paseo",
  "suno-asset-hub-polkadot",
  "suno-asset-hub-westend",
+ "suno-bridge-hub-polkadot",
  "suno-config",
  "suno-error",
  "suno-kusama",

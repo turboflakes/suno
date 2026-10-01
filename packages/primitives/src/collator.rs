@@ -130,11 +130,17 @@ impl Collator {
         Some(format_millis(get_elapsed_millis(ts), true, false))
     }
 
-    /// Number of consecutive blocks observed authored under the current Aura slot.
+    /// Number of blocks this collator has authored under `current_slot` so far.
     /// With async backing, a single slot claim can cover more than one block, up
-    /// to the runtime's `block_processing_velocity`.
-    pub fn blocks_in_slot(&self) -> u32 {
-        self.blocks_in_slot
+    /// to the runtime's `block_processing_velocity`. Returns 0 once `current_slot`
+    /// moves past the slot the stored count was last recorded for, so the count
+    /// doesn't linger from a previous turn before this collator authors again.
+    pub fn blocks_in_slot(&self, current_slot: u64) -> u32 {
+        if self.last_slot == Some(current_slot) {
+            self.blocks_in_slot
+        } else {
+            0
+        }
     }
 
     /// Increments the block count for the given Aura slot, either starting a new

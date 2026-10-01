@@ -448,8 +448,8 @@ impl SupportedRuntime {
     }
 
     /// Target number of blocks this parachain is expected to author per relay chain slot
-    /// (`BLOCK_PROCESSING_VELOCITY` in the runtime source).
-    pub fn block_processing_velocity(&self) -> u32 {
+    /// (`BLOCK_PROCESSING_VELOCITY` from the runtime source in milli units).
+    pub fn block_processing_velocity(&self) -> u64 {
         match &self {
             Self::AssetHubPolkadot
             | Self::AssetHubKusama
@@ -457,8 +457,9 @@ impl SupportedRuntime {
             | Self::AssetHubWestend
             | Self::PeoplePolkadot
             | Self::PeoplePaseo
-            | Self::PeopleWestend => 3,
-            Self::PeopleKusama => 1,
+            | Self::PeopleWestend => 3000,
+            Self::PeopleKusama => 1000,
+            Self::BridgeHubPolkadot => 500,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -472,7 +473,7 @@ impl SupportedRuntime {
     /// so the real session duration is `duration_bn * slot_duration_ms`.
     pub fn duration_bn(&self) -> u64 {
         match &self {
-            Self::PeoplePolkadot | Self::PeoplePaseo => 6 * 300,
+            Self::PeoplePolkadot | Self::PeoplePaseo | Self::BridgeHubPolkadot => 6 * 300,
             Self::AssetHubPolkadot
             | Self::AssetHubKusama
             | Self::AssetHubPaseo

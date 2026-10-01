@@ -87,7 +87,12 @@ impl Aura {
         current_block_number % duration_bn
     }
 
-    /// Number of blocks expected per slot, based on the slot duration and block time.
+    /// Expected number of blocks a collator can author across one Aura slot's wall-clock
+    /// duration: `slot_duration_ms / block_time_ms`, where `block_time_ms` is the minimum
+    /// per-block cadence the relay chain can absorb (`RELAY_CHAIN_SLOT_DURATION_MILLIS /
+    /// BLOCK_PROCESSING_VELOCITY`). This is a throughput figure, not a backlog cap: as blocks
+    /// get included by the relay chain, a collator can keep authoring past any single-instant
+    /// "unincluded segment" limit for as long as their Aura slot lasts.
     pub fn number_blocks_expected(&self) -> Option<u64> {
         self.slot_duration_ms()?.checked_div(self.block_time_ms()?)
     }
