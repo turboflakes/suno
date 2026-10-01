@@ -280,7 +280,7 @@ impl SupportedRuntime {
                     .expect("Invalid genesis hash")
             }
             Self::CoretimePolkadot => {
-                H256::from_str("0xe3209063a7d2b7256e749869b1fc7a77ce6341e1a887225da3d45d1321fe612b")
+                H256::from_str("0xefb56e30d9b4a24099f88820987d0f45fb645992416535d87650d98e00f46fc4")
                     .expect("Invalid genesis hash")
             }
             Self::CoretimeKusama => {
@@ -459,7 +459,7 @@ impl SupportedRuntime {
             | Self::PeoplePaseo
             | Self::PeopleWestend => 3000,
             Self::PeopleKusama => 1000,
-            Self::BridgeHubPolkadot | Self::BridgeHubKusama => 500,
+            Self::BridgeHubPolkadot | Self::BridgeHubKusama | Self::CoretimePolkadot => 500,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -473,9 +473,11 @@ impl SupportedRuntime {
     /// so the real session duration is `duration_bn * slot_duration_ms`.
     pub fn duration_bn(&self) -> u64 {
         match &self {
-            Self::PeoplePolkadot | Self::PeoplePaseo | Self::BridgeHubPolkadot | Self::BridgeHubKusama => {
-                6 * 300
-            }
+            Self::PeoplePolkadot
+            | Self::PeoplePaseo
+            | Self::BridgeHubPolkadot
+            | Self::BridgeHubKusama
+            | Self::CoretimePolkadot => 6 * 300,
             Self::AssetHubPolkadot
             | Self::AssetHubKusama
             | Self::AssetHubPaseo
@@ -530,13 +532,13 @@ impl SupportedRuntime {
             Self::AssetHubWestend => "Westend Hub",
             Self::BridgeHubWestend => "Westend Bridge",
             Self::PeopleWestend => "Westend People",
-            Self::CoretimePolkadot => "Coretime Polkadot",
-            Self::CollectivesPolkadot => "Collectives Polkadot",
-            Self::CoretimeKusama => "Coretime Kusama",
-            Self::CoretimeWestend => "Coretime Westend",
-            Self::CollectivesWestend => "Collectives Westend",
-            Self::BulletinPolkadot => "Bulletin Polkadot",
-            Self::BulletinPaseo => "Bulletin Paseo",
+            Self::CoretimePolkadot => "Polkadot Coretime",
+            Self::CollectivesPolkadot => "Polkadot Collectives",
+            Self::CoretimeKusama => "Kusama Coretime",
+            Self::CoretimeWestend => "Westend Coretime",
+            Self::CollectivesWestend => "Westend Collectives",
+            Self::BulletinPolkadot => "Polkadot Bulletin",
+            Self::BulletinPaseo => "Paseo Bulletin",
         }
     }
 

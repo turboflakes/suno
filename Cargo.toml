@@ -25,6 +25,7 @@ members = [
     "packages/chains/people-westend",
     "packages/chains/bridge-hub-polkadot",
     "packages/chains/bridge-hub-kusama",
+    "packages/chains/coretime-polkadot",
 ]
 
 resolver = "2"
