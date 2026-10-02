@@ -215,6 +215,7 @@ async fn fetch_session_next_keys(
     Ok(value)
 }
 
+#[allow(clippy::double_must_use)]
 #[async_recursion]
 pub async fn get_identity(
     api: &OnlineClientAtBlock<CustomConfig>,
