@@ -112,23 +112,23 @@ impl SupportedRuntime {
         }
     }
 
-    pub fn asset_hub_runtime(&self) -> Self {
+    pub fn asset_hub_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::AssetHubPolkadot,
-            Self::Kusama => Self::AssetHubKusama,
-            Self::Paseo => Self::AssetHubPaseo,
-            Self::Westend => Self::AssetHubWestend,
-            _ => unimplemented!("AssetHub runtime not supported"),
+            Self::Polkadot => Some(Self::AssetHubPolkadot),
+            Self::Kusama => Some(Self::AssetHubKusama),
+            Self::Paseo => Some(Self::AssetHubPaseo),
+            Self::Westend => Some(Self::AssetHubWestend),
+            _ => None,
         }
     }
 
-    pub fn people_runtime(&self) -> Self {
+    pub fn people_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::PeoplePolkadot,
-            Self::Kusama => Self::PeopleKusama,
-            Self::Paseo => Self::PeoplePaseo,
-            Self::Westend => Self::PeopleWestend,
-            _ => unimplemented!("People runtime not supported"),
+            Self::Polkadot => Some(Self::PeoplePolkadot),
+            Self::Kusama => Some(Self::PeopleKusama),
+            Self::Paseo => Some(Self::PeoplePaseo),
+            Self::Westend => Some(Self::PeopleWestend),
+            _ => None,
         }
     }
 

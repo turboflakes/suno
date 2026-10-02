@@ -174,10 +174,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let Some(ah_chain) = self
-            .chains
-            .get_chain_by_runtime(runtime.asset_hub_runtime())
-        else {
+        let Some(ah_chain) = self.chains.get_chain_by_runtime(
+            runtime
+                .asset_hub_runtime()
+                .expect("every relay has an AssetHub chain"),
+        ) else {
             let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
@@ -341,10 +342,11 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) {
         let theme = self.theme;
         let features = CONFIG.features();
-        let Some(ah_chain) = self
-            .chains
-            .get_chain_by_runtime(runtime.asset_hub_runtime())
-        else {
+        let Some(ah_chain) = self.chains.get_chain_by_runtime(
+            runtime
+                .asset_hub_runtime()
+                .expect("every relay has an AssetHub chain"),
+        ) else {
             let block = Block::new().set_style(theme.block.main);
             block.render(area, buf);
             return;
