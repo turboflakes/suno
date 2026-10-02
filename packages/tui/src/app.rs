@@ -526,6 +526,7 @@ impl App {
                                         runtime.relay_chain().bridge_hub_runtime(),
                                         runtime.relay_chain().coretime_runtime(),
                                         runtime.relay_chain().collectives_runtime(),
+                                        runtime.relay_chain().bulletin_runtime(),
                                     ]
                                     .into_iter()
                                     .flatten()
@@ -567,7 +568,9 @@ impl App {
                             | SupportedRuntime::CoretimePolkadot
                             | SupportedRuntime::CoretimeKusama
                             | SupportedRuntime::CollectivesPolkadot
-                            | SupportedRuntime::CollectivesWestend => {
+                            | SupportedRuntime::CollectivesWestend
+                            | SupportedRuntime::BulletinPolkadot
+                            | SupportedRuntime::BulletinPaseo => {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
@@ -797,6 +800,7 @@ impl App {
                             runtime.bridge_hub_runtime(),
                             runtime.coretime_runtime(),
                             runtime.collectives_runtime(),
+                            runtime.bulletin_runtime(),
                         ]
                         .into_iter()
                         .flatten()
@@ -1066,6 +1070,7 @@ impl App {
 
                     let expected_aura_block_time_ms =
                         (block_time_ms / runtime.block_processing_velocity()) * 1000;
+
                     self.chains
                         .update_aura_block_time_ms(&runtime, expected_aura_block_time_ms);
                 }

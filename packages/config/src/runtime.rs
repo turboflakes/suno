@@ -455,7 +455,10 @@ impl SupportedRuntime {
             | Self::PeoplePolkadot
             | Self::PeoplePaseo
             | Self::PeopleWestend => 3000,
-            Self::PeopleKusama | Self::CollectivesWestend => 1000,
+            Self::PeopleKusama
+            | Self::CollectivesWestend
+            | Self::BulletinPolkadot
+            | Self::BulletinPaseo => 1000,
             Self::BridgeHubPolkadot
             | Self::BridgeHubKusama
             | Self::CoretimePolkadot
@@ -487,7 +490,9 @@ impl SupportedRuntime {
             | Self::AssetHubPaseo
             | Self::AssetHubWestend
             | Self::PeopleKusama
-            | Self::PeopleWestend => 6 * 600,
+            | Self::PeopleWestend
+            | Self::BulletinPolkadot
+            | Self::BulletinPaseo => 6 * 600,
             _ => panic!("Unsupported chain"),
         }
     }

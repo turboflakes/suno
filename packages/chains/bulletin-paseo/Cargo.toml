@@ -1,0 +1,16 @@
+[package]
+name = "suno-bulletin-paseo"
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+
+[dependencies]
+subxt = { workspace = true }
+suno-config = { path = "../../config" }
+suno-error = { path = "../../error" }
+suno-primitives = { path = "../../primitives" }
+thiserror = { workspace = true }
+tracing = { workspace = true }

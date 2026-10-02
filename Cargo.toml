@@ -15,6 +15,8 @@ members = [
     "packages/chains/asset-hub-paseo",
     "packages/chains/asset-hub-polkadot",
     "packages/chains/asset-hub-westend",
+    "packages/chains/bulletin-paseo",
+    "packages/chains/bulletin-polkadot",
     "packages/chains/bridge-hub-kusama",
     "packages/chains/bridge-hub-polkadot",
     "packages/chains/kusama",
