@@ -48,7 +48,7 @@ use zeroize::Zeroizing;
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Error>;
 
-// Constants
+/// The tick rate at 100 ms represents 10 FPS
 const TICK_RATE: u64 = 100;
 
 /// Application active focus.

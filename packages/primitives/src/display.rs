@@ -91,17 +91,28 @@ pub fn get_elapsed_millis(last_updated: u128) -> u64 {
 /// Create a three phase progress bar based on elapsed time
 pub fn create_progress_bar_by_millis(elapsed_ms: u64, bar_width: usize) -> String {
     const PHASE_1_TIMEOUT: u64 = 6_000; // 6 seconds
-    const PHASE_2_TIMEOUT: u64 = 60_000; // 60 seconds
+    const PHASE_2_TIMEOUT: u64 = 12_000; // 12 seconds
+    const PHASE_3_TIMEOUT: u64 = 60_000; // 60 seconds
 
-    let (ratio, empty, filled) = if elapsed_ms > PHASE_1_TIMEOUT {
+    let (ratio, empty, filled) = if elapsed_ms > PHASE_2_TIMEOUT {
+        let phase_elapsed = elapsed_ms - PHASE_2_TIMEOUT;
+        let duration = PHASE_3_TIMEOUT - PHASE_2_TIMEOUT;
         (
-            (elapsed_ms.min(PHASE_2_TIMEOUT)) as f64 / PHASE_2_TIMEOUT as f64,
-            "░",
+            phase_elapsed.min(duration) as f64 / duration as f64,
+            "▓",
             "█",
+        )
+    } else if elapsed_ms > PHASE_1_TIMEOUT {
+        let phase_elapsed = elapsed_ms - PHASE_1_TIMEOUT;
+        let duration = PHASE_2_TIMEOUT - PHASE_1_TIMEOUT;
+        (
+            phase_elapsed.min(duration) as f64 / duration as f64,
+            "░",
+            "▓",
         )
     } else {
         (
-            (elapsed_ms.min(PHASE_1_TIMEOUT)) as f64 / PHASE_1_TIMEOUT as f64,
+            elapsed_ms.min(PHASE_1_TIMEOUT) as f64 / PHASE_1_TIMEOUT as f64,
             "·",
             "░",
         )
@@ -121,10 +132,39 @@ pub fn create_progress_bar_by_blocks(progress: f64, bar_width: usize) -> String 
     let filled_chars = (progress * bar_width as f64).round() as usize;
     let empty_chars = bar_width.saturating_sub(filled_chars);
 
-    let filled = "█".repeat(filled_chars);
+    let filled = "▓".repeat(filled_chars);
     let empty = "░".repeat(empty_chars);
 
     format!("{}{}", filled, empty)
+}
+
+const EIGHTS: [char; 7] = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+
+pub fn create_progress_bar_by_eighths(progress: f64, bar_width: usize) -> String {
+    create_progress_bar_by_eighths_raw(progress, bar_width, '█', '·')
+}
+
+pub fn create_progress_bar_by_eighths_raw(
+    progress: f64,
+    bar_width: usize,
+    filled: char,
+    empty: char,
+) -> String {
+    let total_eighths = (progress * bar_width as f64 * 8.0).round() as usize;
+    let full_cells = (total_eighths / 8).min(bar_width);
+    let remainder = if full_cells < bar_width {
+        total_eighths % 8
+    } else {
+        0
+    };
+
+    let mut bar = filled.to_string().repeat(full_cells);
+    if remainder > 0 {
+        bar.push(EIGHTS[remainder - 1]);
+    }
+    let empty_cells = bar_width - full_cells - if remainder > 0 { 1 } else { 0 };
+    bar.push_str(&empty.to_string().repeat(empty_cells));
+    bar
 }
 
 pub fn to_compact_string(account: &AccountId32, format: u16, size: usize) -> String {

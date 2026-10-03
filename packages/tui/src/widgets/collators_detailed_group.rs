@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::Styled,
     text::{Line, Span, Text},
-    widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use suno_config::SupportedRuntime;
 use suno_primitives::{
@@ -38,6 +38,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         state.set_viewport_height(area.height);
         let collators_grouped = state.get_collators_grouped_by_runtime();
+        let group_count = collators_grouped.len();
         let total_height = state.total_detailed_group_height();
         let is_scroll_visible = state.is_active() && area.height < total_height;
         let area_width = if is_scroll_visible {
@@ -53,7 +54,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
         let mut current_y_group = 0;
 
         // Iterate and render each group
-        for (runtime, collators) in collators_grouped {
+        for (group_index, (runtime, collators)) in collators_grouped.into_iter().enumerate() {
             let group_height = GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
             let group_area = Rect::new(0, current_y_group, area_width, group_height);
 
@@ -65,6 +66,16 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 _ => None,
             };
 
+            let is_odd = group_index % 2 == 1;
+            let padding = if group_count > 1 {
+                Padding::proportional(1)
+            } else {
+                Padding::ZERO
+            };
+            let block = Block::default()
+                .style(self.theme.block.alt(is_odd))
+                .padding(padding);
+
             self.render_group(
                 runtime,
                 &collators,
@@ -72,6 +83,8 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 group_area,
                 &mut full_content_buf,
                 &mut state.table_state.clone(),
+                is_odd,
+                block,
             );
 
             current_y_group += group_height;
@@ -121,6 +134,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
 }
 
 impl<'a> CollatorsDetailedGroupWidget<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn render_group(
         &self,
         runtime: SupportedRuntime,
@@ -129,13 +143,18 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
+        is_odd: bool,
+        block: Block,
     ) {
+        let content_area = block.inner(area);
+        block.render(area, buf);
+
         let [header_area, body_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(GROUP_HEADER_HEIGHT), Constraint::Min(0)])
-            .areas(area);
+            .areas(content_area);
 
-        self.render_table_header(runtime, collators, header_area, buf);
+        self.render_table_header(runtime, collators, header_area, buf, is_odd);
         self.render_table_body(
             runtime,
             collators,
@@ -143,6 +162,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             body_area,
             buf,
             table_state,
+            is_odd,
         );
     }
 
@@ -152,11 +172,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         collators: &[&Collator],
         area: Rect,
         buf: &mut Buffer,
+        is_odd: bool,
     ) {
         let theme = self.theme;
-
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
@@ -186,7 +206,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let mut network_lines = vec![
             Line::from(
-                Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
+                Span::raw(format!("{} CHAIN", runtime.to_string().to_uppercase()))
                     .style(theme.paragraph.header_active),
             ),
             Line::from(vec![
@@ -228,7 +248,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         ]));
         network_lines.push(Line::from(""));
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let network_info = Paragraph::new(network_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -239,7 +259,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let Some(aura) = chain.aura() else {
             // TODO: Handle aura not available, maybe render loading indicator
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             let area = progress_area.union(progress_bar_area).union(countdown_area);
             block.render(area, buf);
             return;
@@ -266,7 +286,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             .alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let progress_info = Paragraph::new(progress_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -282,7 +302,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Line::from(slot_progress_bar).alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let progress_bar = Paragraph::new(progress_bar_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -300,7 +320,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 .alignment(Alignment::Left),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let countdown_info = Paragraph::new(countdown_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -308,6 +328,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         countdown_info.render(countdown_area, buf);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_table_body(
         &self,
         runtime: SupportedRuntime,
@@ -316,16 +337,18 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
+        is_odd: bool,
     ) {
         let theme = self.theme;
+
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
 
         let Some(aura) = chain.aura() else {
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
@@ -335,10 +358,10 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("authored/expected").alignment(Alignment::Right)),
-            Cell::from(Text::from("(last block)").alignment(Alignment::Left)),
-            Cell::from(Text::from("next slot in").alignment(Alignment::Right)),
-            Cell::from(Text::from("(slot)").alignment(Alignment::Left)),
+            Cell::from(Text::from("last block").alignment(Alignment::Right)),
+            Cell::from(Text::from("").alignment(Alignment::Left)),
+            Cell::from(Text::from("next slot").alignment(Alignment::Right)),
+            Cell::from(Text::from("").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
         if show_next_keys {
@@ -381,7 +404,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         // that table_state offset is ALWAYS 0. Has we always want to start from the top.
         *table_state.offset_mut() = 0;
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
             .header(header.set_style(theme.table.header));
@@ -407,44 +430,67 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let authorities = aura.authorities();
 
+        let blocks = collator.blocks_in_slot(current_slot);
+
         let blocks_in_slot_str = match aura.number_blocks_expected() {
-            Some(expected) => {
-                if collator.is_current_slot_author(authorities, current_slot) {
-                    format!("> {:2}/{}", collator.blocks_in_slot(current_slot), expected)
-                } else {
-                    format!("{:2}/{}", collator.blocks_in_slot(current_slot), expected)
-                }
-            }
-            None => format!("{:2}", collator.blocks_in_slot(current_slot)),
+            Some(expected) => format!("{blocks:2}/{expected}"),
+            None => format!("{blocks:2}"),
         };
 
         let last_block_str = collator
             .last_block_authored()
-            .map(|b| format!("#{}", b))
-            .unwrap_or_default();
+            .map(|b| {
+                let prefix = if collator.is_current_slot_author(authorities, current_slot) {
+                    "> "
+                } else {
+                    ""
+                };
 
-        let next_slot_str = collator
-            .next_slot(authorities, current_slot)
-            .map(|s| format!("#{}", s))
+                format!("{prefix}#{b}")
+            })
             .unwrap_or_default();
-
-        let next_slot_countdown_str = match aura.slot_duration_ms() {
-            Some(slot_duration_ms) => collator
-                .next_slot_countdown(authorities, current_slot, slot_duration_ms, current_slot_ts)
-                .unwrap_or_default(),
-            None => "".to_string(),
-        };
 
         let mut cells = vec![
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
-            Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(last_block_str).alignment(Alignment::Left)),
-            Cell::from(Text::from(next_slot_countdown_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(next_slot_str).alignment(Alignment::Left)),
-            Cell::from(Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right)),
+            Cell::from(Text::from(last_block_str).alignment(Alignment::Right)),
+            Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Left)),
         ];
+
+        if collator.is_current_slot_author(authorities, current_slot) {
+            cells.push(Cell::from(
+                Text::from(format!("#{}", current_slot)).alignment(Alignment::Right),
+            ));
+            cells.push(Cell::from(Text::from("").alignment(Alignment::Left)));
+        } else {
+            let next_slot_str = collator
+                .next_slot(authorities, current_slot)
+                .map(|s| format!("#{}", s))
+                .unwrap_or_default();
+
+            let next_slot_countdown_str = match aura.slot_duration_ms() {
+                Some(slot_duration_ms) => collator
+                    .next_slot_countdown(
+                        authorities,
+                        current_slot,
+                        slot_duration_ms,
+                        current_slot_ts,
+                    )
+                    .unwrap_or_default(),
+                None => "".to_string(),
+            };
+            cells.push(Cell::from(
+                Text::from(next_slot_str).alignment(Alignment::Right),
+            ));
+            cells.push(Cell::from(
+                Text::from(next_slot_countdown_str).alignment(Alignment::Left),
+            ));
+        };
+
+        cells.push(Cell::from(
+            Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
+        ));
 
         if show_next_keys {
             if collator.is_next_keys_changed() {
