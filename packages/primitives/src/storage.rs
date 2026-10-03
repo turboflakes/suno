@@ -118,6 +118,20 @@ pub struct BalanceData {
     pub balance: Balance,
 }
 
+/// Last authored block data combining account and block number
+#[derive(Debug)]
+pub struct LastAuthoredBlockData {
+    pub account: AccountBytes,
+    pub block: u64,
+}
+
+/// Collator keys data combining account and Aura session public key
+#[derive(Debug)]
+pub struct CollatorKeysData {
+    pub account: AccountBytes,
+    pub keys: Option<[u8; 32]>,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -153,6 +167,15 @@ pub enum Response {
     EventWithdrawn(Data<AmountData>),
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
+    AuraAuthorities(Data<Vec<AccountBytes>>),
+    SessionValidators(Data<Vec<AccountBytes>>),
+    Invulnerables(Data<Vec<AccountBytes>>),
+    LastAuthoredBlock(Data<LastAuthoredBlockData>),
+    CollatorIdentity(Data<IdentityData>),
+    CollatorNextKeys(Data<CollatorKeysData>),
+    CollatorQueuedKeys(Data<CollatorKeysData>),
+    SlotDuration(Data<u64>),
+    SessionIndex(Data<u32>),
 }
 
 // Some constructors for convenience
@@ -257,5 +280,41 @@ impl Response {
 
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {
         Response::Balance(Data::new(BalanceData { account, balance }))
+    }
+
+    pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
+        Response::AuraAuthorities(Data::new(authorities))
+    }
+
+    pub fn session_validators(validators: Vec<AccountBytes>) -> Self {
+        Response::SessionValidators(Data::new(validators))
+    }
+
+    pub fn invulnerables(invulnerables: Vec<AccountBytes>) -> Self {
+        Response::Invulnerables(Data::new(invulnerables))
+    }
+
+    pub fn last_authored_block(account: AccountBytes, block: u64) -> Self {
+        Response::LastAuthoredBlock(Data::new(LastAuthoredBlockData { account, block }))
+    }
+
+    pub fn collator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
+        Response::CollatorIdentity(Data::new(IdentityData { account, identity }))
+    }
+
+    pub fn collator_next_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
+        Response::CollatorNextKeys(Data::new(CollatorKeysData { account, keys }))
+    }
+
+    pub fn collator_queued_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
+        Response::CollatorQueuedKeys(Data::new(CollatorKeysData { account, keys }))
+    }
+
+    pub fn slot_duration(duration_ms: u64) -> Self {
+        Response::SlotDuration(Data::new(duration_ms))
+    }
+
+    pub fn session_index(index: u32) -> Self {
+        Response::SessionIndex(Data::new(index))
     }
 }

@@ -54,10 +54,10 @@ if [ -n "$NETWORK_FILTER" ]; then
 else
   echo "❒ Current builtin runtime metadata"
 fi
-for chain in polkadot asset-hub-polkadot people-polkadot \
-             kusama asset-hub-kusama people-kusama \
-             paseo asset-hub-paseo people-paseo \
-             westend asset-hub-westend people-westend; do
+for chain in polkadot asset-hub-polkadot people-polkadot bridge-hub-polkadot coretime-polkadot collectives-polkadot bulletin-polkadot \
+             kusama asset-hub-kusama people-kusama bridge-hub-kusama coretime-kusama \
+             paseo asset-hub-paseo people-paseo bulletin-paseo \
+             westend asset-hub-westend people-westend coretime-westend collectives-westend; do
   chain_in_network "$chain" || continue
   suffix=""
   is_updated "$chain" "$@" && suffix=" (updated)"

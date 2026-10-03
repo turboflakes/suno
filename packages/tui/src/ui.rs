@@ -1,4 +1,7 @@
 use crate::app::App;
+use crate::section::Section;
+use crate::widgets::collators_compact::CollatorsCompactWidget;
+use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
@@ -63,10 +66,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_validators_widget(app, frame, left_layout[1]);
     }
 
-    // TODO: Collators
-    // if config.features.collators_enabled() {
-    //     render_collators_widget(app, frame, left_layout[2]);
-    // }
+    if config.features.collators_enabled() {
+        render_collators_widget(app, frame, left_layout[2]);
+    }
 
     if config.features.rpcs_enabled() {
         render_rpcs_widget(app, frame, left_layout[3]);
@@ -138,9 +140,13 @@ fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-// fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-//     frame.render_widget(&app.collators, area);
-// }
+fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    frame.render_stateful_widget(
+        CollatorsCompactWidget::new(app.theme),
+        area,
+        &mut app.collators,
+    );
+}
 
 fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_widget(
@@ -164,8 +170,17 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
-    frame.render_stateful_widget(widget, block_area, &mut app.validators);
+
+    match app.section {
+        Section::Collators => {
+            let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.collators);
+        }
+        _ => {
+            let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.validators);
+        }
+    }
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {

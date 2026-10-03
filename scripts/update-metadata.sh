@@ -11,8 +11,12 @@
 # `update-metadata.sh polkadot`
 BASE="packages/chains"
 RC_PALLETS="System,Session,StakingAhClient,Proxy,Babe,ParasShared"
-AH_PALLETS="System,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
-PEOPLE_PALLETS="System,Identity"
+AH_PALLETS="System,Aura,Session,CollatorSelection,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
+PEOPLE_PALLETS="System,Aura,Session,CollatorSelection,Identity"
+BH_PALLETS="System,Aura,Session,CollatorSelection"
+CORETIME_PALLETS="System,Aura,Session,CollatorSelection"
+COLLECTIVES_PALLETS="System,Aura,Session,CollatorSelection"
+BULLETIN_PALLETS="System,Aura,Session,CollatorSelection"
 NETWORK="$1"
 
 # Where to write the spec versions fetched in this run.
@@ -73,6 +77,24 @@ fetch_metadata "people-westend"  "people-westend.rpc.turboflakes.io"    "$PEOPLE
 fetch_metadata "people-paseo"    "people-paseo.rpc.turboflakes.io"      "$PEOPLE_PALLETS"
 fetch_metadata "people-kusama"   "people-kusama.rpc.turboflakes.io"     "$PEOPLE_PALLETS"
 fetch_metadata "people-polkadot" "people-polkadot.rpc.turboflakes.io"   "$PEOPLE_PALLETS"
+
+# BridgeHub Chains
+fetch_metadata "bridge-hub-kusama"   "kusama-bridge-hub-rpc.polkadot.io"     "$BH_PALLETS"
+fetch_metadata "bridge-hub-polkadot" "polkadot-bridge-hub-rpc.polkadot.io"   "$BH_PALLETS"
+
+# Coretime Chains
+fetch_metadata "coretime-kusama"   "kusama-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
+fetch_metadata "coretime-polkadot" "polkadot-coretime-rpc.polkadot.io"   "$CORETIME_PALLETS"
+
+# Collectives Chains
+fetch_metadata "collectives-westend"  "westend-collectives-rpc.polkadot.io"    "$COLLECTIVES_PALLETS"
+fetch_metadata "collectives-polkadot" "polkadot-collectives-rpc.polkadot.io"   "$COLLECTIVES_PALLETS"
+
+# Bulletin Chains
+fetch_metadata "bulletin-paseo"    "bullet.tunastaking.eu"      "$BULLETIN_PALLETS"
+fetch_metadata "bulletin-polkadot" "bulletin-rpc.polkadot.io"   "$BULLETIN_PALLETS"
+
+wss://bulletin-paseo.tservices.es:8443
 
 # Report all spec versions, flagging the chains whose metadata actually changed.
 changed_chains=$(git status --porcelain -- "$BASE" \

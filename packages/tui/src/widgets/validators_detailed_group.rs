@@ -6,17 +6,17 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Styled},
     text::{Line, Span, Text},
-    widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
-    display::{create_progress_bar_by_blocks, format_planks},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks},
     validator::Validator,
 };
 use suno_theme::Theme;
 
-pub const GROUP_HEADER_HEIGHT: u16 = 6;
-pub const PADDING: u16 = 4;
+pub const GROUP_HEADER_HEIGHT: u16 = 7;
+pub const PADDING: u16 = 3;
 
 #[derive(Debug)]
 pub struct ValidatorsDetailedGroupWidget<'a> {
@@ -37,6 +37,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         state.set_viewport_height(area.height);
         let validators_grouped = state.get_validators_grouped_by_runtime();
+        let group_count = validators_grouped.len();
         let total_height = state.total_detailed_group_height();
         let is_scroll_visible = state.is_active() && area.height < total_height;
         let area_width = if is_scroll_visible {
@@ -52,7 +53,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
         let mut current_y_group = 0;
 
         // Iterate and render each group
-        for (runtime, validators) in validators_grouped {
+        for (group_index, (runtime, validators)) in validators_grouped.into_iter().enumerate() {
             let group_height = GROUP_HEADER_HEIGHT + validators.len() as u16 + PADDING;
             let group_area = Rect::new(0, current_y_group, area_width, group_height);
 
@@ -64,6 +65,16 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 _ => None,
             };
 
+            let is_odd = group_index % 2 == 1;
+            let padding = if group_count > 1 {
+                Padding::proportional(1)
+            } else {
+                Padding::ZERO
+            };
+            let block = Block::default()
+                .style(self.theme.block.alt(is_odd))
+                .padding(padding);
+
             self.render_group(
                 runtime,
                 &validators,
@@ -72,6 +83,8 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 &mut full_content_buf,
                 &mut state.table_state.clone(),
                 state.is_masked(),
+                is_odd,
+                block,
             );
 
             current_y_group += group_height;
@@ -135,7 +148,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
         table_state: &mut TableState,
         is_masked: bool,
+        is_odd: bool,
+        block: Block,
     ) {
+        let content_area = block.inner(area);
+        block.render(area, buf);
+
         // Split area into header and body
         let [header_area, body_area] = Layout::default()
             .direction(Direction::Vertical)
@@ -143,10 +161,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Constraint::Length(GROUP_HEADER_HEIGHT), // Header height
                 Constraint::Min(0),                      // Body takes remaining
             ])
-            .areas(area);
+            .areas(content_area);
 
         // Render network header
-        self.render_table_header(runtime, validators, header_area, buf);
+        self.render_table_header(runtime, validators, header_area, buf, is_odd);
 
         // Render network validators table
         self.render_table_body(
@@ -157,6 +175,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             buf,
             table_state,
             is_masked,
+            is_odd,
         );
     }
 
@@ -166,19 +185,21 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         validators: &[&Validator],
         area: Rect,
         buf: &mut Buffer,
+        is_odd: bool,
     ) {
         let theme = self.theme;
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
 
-        let Some(ah_chain) = self
-            .chains
-            .get_chain_by_runtime(runtime.asset_hub_runtime())
-        else {
-            let block = Block::new().set_style(theme.block.main);
+        let Some(ah_chain) = self.chains.get_chain_by_runtime(
+            runtime
+                .asset_hub_runtime()
+                .expect("every relay has an AssetHub chain"),
+        ) else {
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
@@ -200,6 +221,17 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
                     .style(theme.paragraph.header_active),
             ),
+            Line::from(vec![
+                Span::raw("Avg. block time ").style(theme.paragraph.label),
+                Span::raw(
+                    chain
+                        .epoch()
+                        .as_ref()
+                        .and_then(|e| chain.average_block_time_ms(e.block_time_ms()))
+                        .map(|ms| format_millis(ms, true, true))
+                        .unwrap_or_else(|| "-".to_string()),
+                ),
+            ]),
             Line::from(vec![
                 Span::raw("Total validators ").style(theme.paragraph.label),
                 Span::raw(format!(
@@ -230,7 +262,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             ]),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let network_info = Paragraph::new(network_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -241,7 +273,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let Some(epoch) = chain.epoch() else {
             // TODO: Handle epoch not available, maybe render loading indicator
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             let area = progress_area.union(progress_bar_area).union(countdown_area);
             block.render(area, buf);
             return;
@@ -249,7 +281,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let Some(era) = ah_chain.era() else {
             // TODO: Handle era not available, maybe render loading indicator
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             let area = progress_area.union(progress_bar_area).union(countdown_area);
             block.render(area, buf);
             return;
@@ -274,7 +306,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             .alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let progress_info = Paragraph::new(progress_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -291,7 +323,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(epoch_progress_bar).alignment(Alignment::Right),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let progress_bar = Paragraph::new(progress_bar_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -309,7 +341,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
         ];
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let countdown_info = Paragraph::new(countdown_lines)
             .block(block)
             .style(theme.paragraph.base);
@@ -327,20 +359,22 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
         table_state: &mut TableState,
         is_masked: bool,
+        is_odd: bool,
     ) {
         let theme = self.theme;
         let features = CONFIG.features();
-        let Some(ah_chain) = self
-            .chains
-            .get_chain_by_runtime(runtime.asset_hub_runtime())
-        else {
-            let block = Block::new().set_style(theme.block.main);
+        let Some(ah_chain) = self.chains.get_chain_by_runtime(
+            runtime
+                .asset_hub_runtime()
+                .expect("every relay has an AssetHub chain"),
+        ) else {
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
 
         let Some(era) = ah_chain.era() else {
-            let block = Block::new().set_style(theme.block.main);
+            let block = Block::new().set_style(theme.block.alt(is_odd));
             block.render(area, buf);
             return;
         };
@@ -374,7 +408,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
         *table_state.offset_mut() = 0;
 
-        let block = Block::new().set_style(theme.block.main);
+        let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
             .header(header.set_style(theme.table.header));
