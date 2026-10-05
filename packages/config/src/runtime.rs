@@ -9,18 +9,28 @@ use tracing::info;
 pub const POLKADOT_SPEC: &str = include_str!("../chain-specs/polkadot.json");
 pub const ASSET_HUB_POLKADOT_SPEC: &str = include_str!("../chain-specs/asset-hub-polkadot.json");
 pub const PEOPLE_POLKADOT_SPEC: &str = include_str!("../chain-specs/people-polkadot.json");
+pub const BRIDGE_HUB_POLKADOT_SPEC: &str = include_str!("../chain-specs/bridge-hub-polkadot.json");
+pub const CORETIME_POLKADOT_SPEC: &str = include_str!("../chain-specs/coretime-polkadot.json");
+pub const COLLECTIVES_POLKADOT_SPEC: &str =
+    include_str!("../chain-specs/collectives-polkadot.json");
+pub const BULLETIN_POLKADOT_SPEC: &str = include_str!("../chain-specs/bulletin-polkadot.json");
 
 pub const KUSAMA_SPEC: &str = include_str!("../chain-specs/kusama.json");
 pub const ASSET_HUB_KUSAMA_SPEC: &str = include_str!("../chain-specs/asset-hub-kusama.json");
 pub const PEOPLE_KUSAMA_SPEC: &str = include_str!("../chain-specs/people-kusama.json");
+pub const BRIDGE_HUB_KUSAMA_SPEC: &str = include_str!("../chain-specs/bridge-hub-kusama.json");
+pub const CORETIME_KUSAMA_SPEC: &str = include_str!("../chain-specs/coretime-kusama.json");
 
 pub const PASEO_SPEC: &str = include_str!("../chain-specs/paseo.json");
 pub const ASSET_HUB_PASEO_SPEC: &str = include_str!("../chain-specs/asset-hub-paseo.json");
 pub const PEOPLE_PASEO_SPEC: &str = include_str!("../chain-specs/people-paseo.json");
+pub const BULLETIN_PASEO_SPEC: &str = include_str!("../chain-specs/bulletin-paseo.json");
 
 pub const WESTEND_SPEC: &str = include_str!("../chain-specs/westend.json");
 pub const ASSET_HUB_WESTEND_SPEC: &str = include_str!("../chain-specs/asset-hub-westend.json");
 pub const PEOPLE_WESTEND_SPEC: &str = include_str!("../chain-specs/people-westend.json");
+pub const CORETIME_WESTEND_SPEC: &str = include_str!("../chain-specs/coretime-westend.json");
+pub const COLLECTIVES_WESTEND_SPEC: &str = include_str!("../chain-specs/collectives-westend.json");
 
 pub type Runtime = SupportedRuntime;
 
@@ -34,28 +44,42 @@ pub enum SupportedRuntime {
     Westend,
     #[serde(rename = "asset_hub_polkadot")]
     AssetHubPolkadot,
-    #[serde(rename = "bridge_hub_polkadot")]
-    BridgeHubPolkadot,
     #[serde(rename = "people_polkadot")]
     PeoplePolkadot,
+    #[serde(rename = "bridge_hub_polkadot")]
+    BridgeHubPolkadot,
+    #[serde(rename = "coretime_polkadot")]
+    CoretimePolkadot,
+    #[serde(rename = "collectives_polkadot")]
+    CollectivesPolkadot,
+    #[serde(rename = "bulletin_polkadot")]
+    BulletinPolkadot,
     #[serde(rename = "asset_hub_kusama")]
     AssetHubKusama,
-    #[serde(rename = "bridge_hub_kusama")]
-    BridgeHubKusama,
     #[serde(rename = "people_kusama")]
     PeopleKusama,
+    #[serde(rename = "bridge_hub_kusama")]
+    BridgeHubKusama,
+    #[serde(rename = "coretime_kusama")]
+    CoretimeKusama,
     #[serde(rename = "asset_hub_paseo")]
     AssetHubPaseo,
     #[serde(rename = "bridge_hub_paseo")]
     BridgeHubPaseo,
     #[serde(rename = "people_paseo")]
     PeoplePaseo,
+    #[serde(rename = "bulletin_paseo")]
+    BulletinPaseo,
     #[serde(rename = "asset_hub_westend")]
     AssetHubWestend,
-    #[serde(rename = "bridge_hub_westend")]
-    BridgeHubWestend,
     #[serde(rename = "people_westend")]
     PeopleWestend,
+    #[serde(rename = "bridge_hub_westend")]
+    BridgeHubWestend,
+    #[serde(rename = "coretime_westend")]
+    CoretimeWestend,
+    #[serde(rename = "collectives_westend")]
+    CollectivesWestend,
 }
 
 impl SupportedRuntime {
@@ -65,56 +89,104 @@ impl SupportedRuntime {
             Self::Polkadot
             | Self::AssetHubPolkadot
             | Self::BridgeHubPolkadot
-            | Self::PeoplePolkadot => Self::Polkadot,
-            Self::Kusama | Self::AssetHubKusama | Self::BridgeHubKusama | Self::PeopleKusama => {
-                Self::Kusama
-            }
-            Self::Paseo | Self::AssetHubPaseo | Self::BridgeHubPaseo | Self::PeoplePaseo => {
-                Self::Paseo
-            }
+            | Self::PeoplePolkadot
+            | Self::CoretimePolkadot
+            | Self::CollectivesPolkadot
+            | Self::BulletinPolkadot => Self::Polkadot,
+            Self::Kusama
+            | Self::AssetHubKusama
+            | Self::BridgeHubKusama
+            | Self::PeopleKusama
+            | Self::CoretimeKusama => Self::Kusama,
+            Self::Paseo
+            | Self::AssetHubPaseo
+            | Self::BridgeHubPaseo
+            | Self::PeoplePaseo
+            | Self::BulletinPaseo => Self::Paseo,
             Self::Westend
             | Self::AssetHubWestend
             | Self::BridgeHubWestend
-            | Self::PeopleWestend => Self::Westend,
+            | Self::PeopleWestend
+            | Self::CoretimeWestend
+            | Self::CollectivesWestend => Self::Westend,
         }
     }
 
-    pub fn asset_hub_runtime(&self) -> Self {
+    pub fn asset_hub_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::AssetHubPolkadot,
-            Self::Kusama => Self::AssetHubKusama,
-            Self::Paseo => Self::AssetHubPaseo,
-            Self::Westend => Self::AssetHubWestend,
-            _ => unimplemented!("AssetHub runtime not supported"),
+            Self::Polkadot => Some(Self::AssetHubPolkadot),
+            Self::Kusama => Some(Self::AssetHubKusama),
+            Self::Paseo => Some(Self::AssetHubPaseo),
+            Self::Westend => Some(Self::AssetHubWestend),
+            _ => None,
         }
     }
 
-    pub fn bridge_hub_runtime(&self) -> Self {
+    pub fn people_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::BridgeHubPolkadot,
-            Self::Kusama => Self::BridgeHubKusama,
-            Self::Paseo => Self::BridgeHubPaseo,
-            Self::Westend => Self::BridgeHubWestend,
-            _ => unimplemented!("BridgeHub runtime not supported"),
+            Self::Polkadot => Some(Self::PeoplePolkadot),
+            Self::Kusama => Some(Self::PeopleKusama),
+            Self::Paseo => Some(Self::PeoplePaseo),
+            Self::Westend => Some(Self::PeopleWestend),
+            _ => None,
         }
     }
 
-    pub fn people_runtime(&self) -> Self {
+    pub fn bridge_hub_runtime(&self) -> Option<Self> {
         match &self {
-            Self::Polkadot => Self::PeoplePolkadot,
-            Self::Kusama => Self::PeopleKusama,
-            Self::Paseo => Self::PeoplePaseo,
-            Self::Westend => Self::PeopleWestend,
-            _ => unimplemented!("People runtime not supported"),
+            Self::Polkadot => Some(Self::BridgeHubPolkadot),
+            Self::Kusama => Some(Self::BridgeHubKusama),
+            _ => None,
+        }
+    }
+
+    pub fn collectives_runtime(&self) -> Option<Self> {
+        match &self {
+            Self::Polkadot => Some(Self::CollectivesPolkadot),
+            Self::Westend => Some(Self::CollectivesWestend),
+            _ => None,
+        }
+    }
+
+    pub fn coretime_runtime(&self) -> Option<Self> {
+        match &self {
+            Self::Polkadot => Some(Self::CoretimePolkadot),
+            Self::Kusama => Some(Self::CoretimeKusama),
+            _ => None,
+        }
+    }
+
+    pub fn bulletin_runtime(&self) -> Option<Self> {
+        match &self {
+            Self::Polkadot => Some(Self::BulletinPolkadot),
+            Self::Paseo => Some(Self::BulletinPaseo),
+            _ => None,
         }
     }
 
     pub fn default_system_chains(&self) -> Vec<Self> {
         match &self {
-            Self::Polkadot => vec![Self::AssetHubPolkadot, Self::PeoplePolkadot],
-            Self::Kusama => vec![Self::AssetHubKusama, Self::PeopleKusama],
-            Self::Paseo => vec![Self::AssetHubPaseo, Self::PeoplePaseo],
-            Self::Westend => vec![Self::AssetHubWestend, Self::PeopleWestend],
+            Self::Polkadot => vec![
+                Self::AssetHubPolkadot,
+                Self::PeoplePolkadot,
+                Self::CoretimePolkadot,
+                Self::BridgeHubPolkadot,
+                Self::CollectivesPolkadot,
+                Self::BulletinPolkadot,
+            ],
+            Self::Kusama => vec![
+                Self::AssetHubKusama,
+                Self::PeopleKusama,
+                Self::CoretimeKusama,
+                Self::BridgeHubKusama,
+            ],
+            Self::Paseo => vec![Self::AssetHubPaseo, Self::PeoplePaseo, Self::BulletinPaseo],
+            Self::Westend => vec![
+                Self::AssetHubWestend,
+                Self::PeopleWestend,
+                Self::CoretimeWestend,
+                Self::CollectivesWestend,
+            ],
             _ => panic!("Unsupported relay-chain"),
         }
     }
@@ -133,6 +205,15 @@ impl SupportedRuntime {
             Self::AssetHubKusama => ASSET_HUB_KUSAMA_SPEC,
             Self::AssetHubWestend => ASSET_HUB_WESTEND_SPEC,
             Self::AssetHubPaseo => ASSET_HUB_PASEO_SPEC,
+            Self::BridgeHubPolkadot => BRIDGE_HUB_POLKADOT_SPEC,
+            Self::BridgeHubKusama => BRIDGE_HUB_KUSAMA_SPEC,
+            Self::CoretimePolkadot => CORETIME_POLKADOT_SPEC,
+            Self::CoretimeKusama => CORETIME_KUSAMA_SPEC,
+            Self::CoretimeWestend => CORETIME_WESTEND_SPEC,
+            Self::CollectivesPolkadot => COLLECTIVES_POLKADOT_SPEC,
+            Self::CollectivesWestend => COLLECTIVES_WESTEND_SPEC,
+            Self::BulletinPolkadot => BULLETIN_POLKADOT_SPEC,
+            Self::BulletinPaseo => BULLETIN_PASEO_SPEC,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -195,14 +276,35 @@ impl SupportedRuntime {
                 H256::from_str("0x00dcb981df86429de8bbacf9803401f09485366c44efbf53af9ecfab03adc7e5")
                     .expect("Invalid genesis hash")
             }
-            Self::BridgeHubWestend => {
-                H256::from_str("0x0441383e31d1266a92b4cb2ddd4c2e3661ac476996db7e5844c52433b81fe782")
+            Self::CoretimePolkadot => {
+                H256::from_str("0xefb56e30d9b4a24099f88820987d0f45fb645992416535d87650d98e00f46fc4")
                     .expect("Invalid genesis hash")
             }
-            Self::BridgeHubPaseo => {
-                H256::from_str("0xcc624979479dc37afee4cb23cb72b1772bbf377c0d3e8fa257c0fe6146572e3e")
+            Self::CoretimeKusama => {
+                H256::from_str("0x638cd2b9af4b3bb54b8c1f0d22711fc89924ca93300f0caf25a580432b29d050")
                     .expect("Invalid genesis hash")
             }
+            Self::CoretimeWestend => {
+                H256::from_str("0xf938510edee7c23efa6e9db74f227c827a1b518bffe92e2f6c9842dc53d38840")
+                    .expect("Invalid genesis hash")
+            }
+            Self::CollectivesPolkadot => {
+                H256::from_str("0x46ee89aa2eedd13e988962630ec9fb7565964cf5023bb351f2b6b25c1b68b0b2")
+                    .expect("Invalid genesis hash")
+            }
+            Self::CollectivesWestend => {
+                H256::from_str("0x713daf193a6301583ff467be736da27ef0a72711b248927ba413f573d2b38e44")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BulletinPolkadot => {
+                H256::from_str("0x2761c95259d59e55ae3daf756c1413b46e45a5a2987299f8ef8e5d8e4776cbc4")
+                    .expect("Invalid genesis hash")
+            }
+            Self::BulletinPaseo => {
+                H256::from_str("0xe101f0fa4627d29a257645e02be86d80378fea1a2bf8fa6a918d150ebc760a59")
+                    .expect("Invalid genesis hash")
+            }
+
             _ => panic!("Unsupported chain"),
         }
     }
@@ -221,16 +323,39 @@ impl SupportedRuntime {
             Self::AssetHubKusama => get_state_root_hash(ASSET_HUB_KUSAMA_SPEC),
             Self::AssetHubWestend => get_state_root_hash(ASSET_HUB_WESTEND_SPEC),
             Self::AssetHubPaseo => get_state_root_hash(ASSET_HUB_PASEO_SPEC),
+            Self::BridgeHubPolkadot => get_state_root_hash(BRIDGE_HUB_POLKADOT_SPEC),
+            Self::BridgeHubKusama => get_state_root_hash(BRIDGE_HUB_KUSAMA_SPEC),
+            Self::CoretimePolkadot => get_state_root_hash(CORETIME_POLKADOT_SPEC),
+            Self::CoretimeKusama => get_state_root_hash(CORETIME_KUSAMA_SPEC),
+            Self::CoretimeWestend => get_state_root_hash(CORETIME_WESTEND_SPEC),
+            Self::CollectivesPolkadot => get_state_root_hash(COLLECTIVES_POLKADOT_SPEC),
+            Self::CollectivesWestend => get_state_root_hash(COLLECTIVES_WESTEND_SPEC),
+            Self::BulletinPolkadot => get_state_root_hash(BULLETIN_POLKADOT_SPEC),
+            Self::BulletinPaseo => get_state_root_hash(BULLETIN_PASEO_SPEC),
             _ => panic!("Unsupported chain"),
         }
     }
 
     pub fn account_format(&self) -> u16 {
         match &self {
-            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => 0,
-            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => 2,
-            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => 42,
-            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 42,
+            Self::Polkadot
+            | Self::AssetHubPolkadot
+            | Self::PeoplePolkadot
+            | Self::CoretimePolkadot
+            | Self::CollectivesPolkadot
+            | Self::BridgeHubPolkadot
+            | Self::BulletinPolkadot => 0,
+            Self::Kusama
+            | Self::AssetHubKusama
+            | Self::PeopleKusama
+            | Self::CoretimeKusama
+            | Self::BridgeHubKusama => 2,
+            Self::Westend
+            | Self::AssetHubWestend
+            | Self::PeopleWestend
+            | Self::CoretimeWestend
+            | Self::CollectivesWestend => 42,
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo | Self::BulletinPaseo => 42,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -255,10 +380,24 @@ impl SupportedRuntime {
 
     pub fn token_symbol(&self) -> &'static str {
         match &self {
-            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => "DOT",
-            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => "KSM",
-            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => "WND",
-            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => "PAS",
+            Self::Polkadot
+            | Self::AssetHubPolkadot
+            | Self::PeoplePolkadot
+            | Self::CoretimePolkadot
+            | Self::CollectivesPolkadot
+            | Self::BridgeHubPolkadot
+            | Self::BulletinPolkadot => "DOT",
+            Self::Kusama
+            | Self::AssetHubKusama
+            | Self::PeopleKusama
+            | Self::CoretimeKusama
+            | Self::BridgeHubKusama => "KSM",
+            Self::Westend
+            | Self::AssetHubWestend
+            | Self::PeopleWestend
+            | Self::CoretimeWestend
+            | Self::CollectivesWestend => "WND",
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo | Self::BulletinPaseo => "PAS",
             _ => panic!("Unsupported chain"),
         }
     }
@@ -283,10 +422,77 @@ impl SupportedRuntime {
 
     pub fn token_decimals(&self) -> u32 {
         match &self {
-            Self::Polkadot | Self::AssetHubPolkadot | Self::PeoplePolkadot => 10,
-            Self::Kusama | Self::AssetHubKusama | Self::PeopleKusama => 12,
-            Self::Westend | Self::AssetHubWestend | Self::PeopleWestend => 12,
-            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo => 10,
+            Self::Polkadot
+            | Self::AssetHubPolkadot
+            | Self::PeoplePolkadot
+            | Self::CoretimePolkadot
+            | Self::CollectivesPolkadot
+            | Self::BridgeHubPolkadot
+            | Self::BulletinPolkadot => 10,
+            Self::Kusama
+            | Self::AssetHubKusama
+            | Self::PeopleKusama
+            | Self::CoretimeKusama
+            | Self::BridgeHubKusama => 12,
+            Self::Westend
+            | Self::AssetHubWestend
+            | Self::PeopleWestend
+            | Self::CoretimeWestend
+            | Self::CollectivesWestend => 12,
+            Self::Paseo | Self::AssetHubPaseo | Self::PeoplePaseo | Self::BulletinPaseo => 10,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    /// Target number of blocks this parachain is expected to author per relay chain slot
+    /// (`BLOCK_PROCESSING_VELOCITY` from the runtime source in milli units).
+    pub fn block_processing_velocity(&self) -> u64 {
+        match &self {
+            Self::AssetHubPolkadot
+            | Self::AssetHubKusama
+            | Self::AssetHubPaseo
+            | Self::AssetHubWestend
+            | Self::PeoplePolkadot
+            | Self::PeoplePaseo
+            | Self::PeopleWestend => 3000,
+            Self::PeopleKusama
+            | Self::CollectivesWestend
+            | Self::BulletinPolkadot
+            | Self::BulletinPaseo => 1000,
+            Self::BridgeHubPolkadot
+            | Self::BridgeHubKusama
+            | Self::CoretimePolkadot
+            | Self::CoretimeKusama
+            | Self::CollectivesPolkadot => 500,
+            _ => panic!("Unsupported chain"),
+        }
+    }
+
+    /// Number of blocks each session is expected to take
+    /// (`Period`/`PERIOD` = `6 * HOURS` in the runtime source).
+    ///
+    /// `HOURS` is a block count, and its base differs per runtime: People Polkadot and
+    /// People Paseo take it from `parachains_common` (12s blocks, 300/hour), all others
+    /// from a 6s-block base (600/hour). It is *not* scaled by `block_processing_velocity`,
+    /// so the real session duration is `duration_bn * slot_duration_ms`.
+    pub fn duration_bn(&self) -> u64 {
+        match &self {
+            Self::PeoplePolkadot
+            | Self::PeoplePaseo
+            | Self::BridgeHubPolkadot
+            | Self::BridgeHubKusama
+            | Self::CoretimePolkadot
+            | Self::CoretimeKusama
+            | Self::CollectivesPolkadot
+            | Self::CollectivesWestend => 6 * 300,
+            Self::AssetHubPolkadot
+            | Self::AssetHubKusama
+            | Self::AssetHubPaseo
+            | Self::AssetHubWestend
+            | Self::PeopleKusama
+            | Self::PeopleWestend
+            | Self::BulletinPolkadot
+            | Self::BulletinPaseo => 6 * 600,
             _ => panic!("Unsupported chain"),
         }
     }
@@ -335,6 +541,13 @@ impl SupportedRuntime {
             Self::AssetHubWestend => "Westend Hub",
             Self::BridgeHubWestend => "Westend Bridge",
             Self::PeopleWestend => "Westend People",
+            Self::CoretimePolkadot => "Polkadot Coretime",
+            Self::CollectivesPolkadot => "Polkadot Collectives",
+            Self::CoretimeKusama => "Kusama Coretime",
+            Self::CoretimeWestend => "Westend Coretime",
+            Self::CollectivesWestend => "Westend Collectives",
+            Self::BulletinPolkadot => "Polkadot Bulletin",
+            Self::BulletinPaseo => "Paseo Bulletin",
         }
     }
 
@@ -357,11 +570,60 @@ impl SupportedRuntime {
             Self::AssetHubWestend => "Asset Hub Westend",
             Self::BridgeHubWestend => "Bridge Hub Westend",
             Self::PeopleWestend => "People Westend",
+            Self::CoretimePolkadot => "Coretime Polkadot",
+            Self::CollectivesPolkadot => "Collectives Polkadot",
+            Self::CoretimeKusama => "Coretime Kusama",
+            Self::CoretimeWestend => "Coretime Westend",
+            Self::CollectivesWestend => "Collectives Westend",
+            Self::BulletinPolkadot => "Bulletin Polkadot",
+            Self::BulletinPaseo => "Bulletin Paseo",
+        }
+    }
+
+    pub fn as_str_short(&self) -> &'static str {
+        match self {
+            Self::Local => "Local",
+            Self::Polkadot => "Polkadot",
+            Self::Kusama => "Kusama",
+            Self::Westend => "Westend",
+            Self::Paseo => "Paseo",
+            Self::AssetHubPolkadot => "AHP",
+            Self::BridgeHubPolkadot => "BHP",
+            Self::PeoplePolkadot => "PP",
+            Self::AssetHubKusama => "AHK",
+            Self::BridgeHubKusama => "BHK",
+            Self::PeopleKusama => "PK",
+            Self::AssetHubPaseo => "AHP",
+            Self::BridgeHubPaseo => "BHP",
+            Self::PeoplePaseo => "PP",
+            Self::AssetHubWestend => "AHW",
+            Self::BridgeHubWestend => "BHW",
+            Self::PeopleWestend => "PW",
+            Self::CoretimePolkadot => "CTP",
+            Self::CollectivesPolkadot => "CLP",
+            Self::CoretimeKusama => "CTK",
+            Self::CoretimeWestend => "CTW",
+            Self::CollectivesWestend => "CLW",
+            Self::BulletinPolkadot => "BP",
+            Self::BulletinPaseo => "BP",
         }
     }
 
     pub fn chain_name(&self) -> String {
         self.as_str_long().to_lowercase().replace(' ', "-")
+    }
+
+    pub fn system_name(&self) -> String {
+        let full = self.as_str_long();
+        if self.is_relay_chain() {
+            return full.to_string();
+        }
+
+        let relay_name = self.relay_chain().as_str();
+        full.strip_prefix(relay_name)
+            .or_else(|| full.strip_suffix(relay_name))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| full.to_string())
     }
 
     pub fn legacy_name(&self) -> String {
@@ -440,6 +702,13 @@ impl FromStr for SupportedRuntime {
             "asset_hub_westend" => Ok(SupportedRuntime::AssetHubWestend),
             "bridge_hub_westend" => Ok(SupportedRuntime::BridgeHubWestend),
             "people_westend" => Ok(SupportedRuntime::PeopleWestend),
+            "coretime_polkadot" => Ok(SupportedRuntime::CoretimePolkadot),
+            "collectives_polkadot" => Ok(SupportedRuntime::CollectivesPolkadot),
+            "coretime_kusama" => Ok(SupportedRuntime::CoretimeKusama),
+            "coretime_westend" => Ok(SupportedRuntime::CoretimeWestend),
+            "collectives_westend" => Ok(SupportedRuntime::CollectivesWestend),
+            "bulletin_polkadot" => Ok(SupportedRuntime::BulletinPolkadot),
+            "bulletin_paseo" => Ok(SupportedRuntime::BulletinPaseo),
             _ => Err(Error::UnsupportedChain(s.to_string())),
         }
     }

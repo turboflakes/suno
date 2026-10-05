@@ -2,6 +2,7 @@ use crate::bridge::{custom, sync, RuntimeCaller, RuntimeFetcher};
 use crate::section::Section;
 use crate::widgets::{
     chains::ChainsList,
+    collators::CollatorsList,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
     validators::ValidatorsList,
@@ -14,11 +15,11 @@ use crate::{
 };
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{io, thread, time::Duration};
+use std::{collections::HashSet, io, thread, time::Duration};
 use suno_actions::{
-    Action, ChainAction, ChainSpecsContext, ConfirmationContext, InputAction, MetadataContext,
-    NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction, TxAction,
-    UpdateAction, ValidatorAction,
+    Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, InputAction,
+    MetadataContext, NavigationAction, PopupAction, ScannerAction, SystemAction, ThreadAction,
+    TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
     save_active_theme, CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime,
@@ -26,8 +27,8 @@ use suno_config::{
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
-    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, Chain,
-    Validator,
+    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, AccountKey,
+    Chain, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -47,7 +48,7 @@ use zeroize::Zeroizing;
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Error>;
 
-// Constants
+/// The tick rate at 100 ms represents 10 FPS
 const TICK_RATE: u64 = 100;
 
 /// Application active focus.
@@ -80,7 +81,7 @@ pub struct App {
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
-    // TODO: pub collators: CollatorsListWidget,
+    pub collators: CollatorsList,
     /// Manages popup state and rendering.
     pub popup: Popup,
     /// Logs state.
@@ -128,7 +129,7 @@ impl App {
             section: Section::default(),
             chains,
             validators: ValidatorsList::default(),
-            // collators: CollatorsListWidget::default(),
+            collators: CollatorsList::default(),
             popup,
             logs,
             masked: true,
@@ -143,6 +144,7 @@ impl App {
 
     async fn init(&mut self) {
         self.validators.on_init().await;
+        self.collators.on_init();
         self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
     }
@@ -221,6 +223,7 @@ impl App {
                 Action::Input(act) => self.handle_input_actions(act),
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
+                Action::Collator(act) => self.handle_collator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
                 Action::Update(act) => self.handle_update_actions(act),
@@ -251,6 +254,7 @@ impl App {
             NavigationAction::Reset => self.reset_selection(),
             NavigationAction::Copy => self.copy_to_clipboard(),
             NavigationAction::ToggleMask => self.toggle_mask(),
+            NavigationAction::ToggleView => self.toggle_view(),
         }
     }
 
@@ -382,6 +386,8 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
+                                    let collator_keys =
+                                        self.collators.get_collator_keys_by_runtime(runtime);
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -441,6 +447,24 @@ impl App {
                                                 &tx,
                                             );
                                         };
+
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
                                     });
                                 }
                             }
@@ -451,6 +475,8 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
+                                    let collator_keys =
+                                        self.collators.get_collator_keys_by_runtime(runtime);
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -468,6 +494,117 @@ impl App {
                                             &api_at,
                                             runtime,
                                             &validator_keys,
+                                            &tx,
+                                        );
+
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                    });
+                                }
+
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    // Fetch collators for each parachain, so we can sync their identity
+                                    let collator_keys: Vec<Vec<AccountKey>> = [
+                                        Some(runtime), // the People chain's own collators
+                                        runtime.relay_chain().asset_hub_runtime(),
+                                        runtime.relay_chain().bridge_hub_runtime(),
+                                        runtime.relay_chain().coretime_runtime(),
+                                        runtime.relay_chain().collectives_runtime(),
+                                        runtime.relay_chain().bulletin_runtime(),
+                                    ]
+                                    .into_iter()
+                                    .flatten()
+                                    .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                    .collect();
+
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
+
+                                        // Since collator_keys could be the same stash accross different
+                                        // chains, we need to dedupe the keys before fetching their identity
+                                        // so we dont end up fetching the same key multiple times
+                                        let mut seen = HashSet::new();
+                                        let keys: Vec<AccountKey> = collator_keys
+                                            .iter()
+                                            .flatten()
+                                            .filter(|k| seen.insert(k.bytes))
+                                            .cloned()
+                                            .collect();
+
+                                        sync::spawn_fetch_collators_identity(
+                                            &api_at, runtime, &keys, &tx,
+                                        );
+                                    });
+                                }
+                            }
+                            SupportedRuntime::BridgeHubPolkadot
+                            | SupportedRuntime::BridgeHubKusama
+                            | SupportedRuntime::CoretimePolkadot
+                            | SupportedRuntime::CoretimeKusama
+                            | SupportedRuntime::CollectivesPolkadot
+                            | SupportedRuntime::CollectivesWestend
+                            | SupportedRuntime::BulletinPolkadot
+                            | SupportedRuntime::BulletinPaseo => {
+                                if let Some((api, block_hash)) =
+                                    self.chains.get_api_and_block_hash(runtime)
+                                {
+                                    let collator_keys =
+                                        self.collators.get_collator_keys_by_runtime(runtime);
+                                    let tx = self.tx.clone();
+                                    tokio::spawn(async move {
+                                        let api_at = match api.at_block(block_hash).await.boxed() {
+                                            Ok(api_at) => api_at,
+                                            Err(e) => {
+                                                let _ =
+                                                    tx.send(Action::System(SystemAction::Error(
+                                                        format!("Failed to client at_block: {}", e),
+                                                    )));
+                                                return;
+                                            }
+                                        };
+
+                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_queued_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
                                             &tx,
                                         );
                                     });
@@ -609,7 +746,6 @@ impl App {
             }
             ChainAction::UpdateEpoch(chain_key, epoch) => {
                 self.chains.update_epoch(&chain_key, epoch);
-
                 // Fetch data relevant to be synced whenever session changes
                 //
                 let runtime = chain_key;
@@ -655,6 +791,47 @@ impl App {
                                 );
                             });
                         }
+
+                        // Aura's expected block time is derived from this relay chain's
+                        // epoch data, so only fetch the collators last authored now that
+                        // the epoch has just been processed above.
+                        for para_runtime in [
+                            runtime.asset_hub_runtime(),
+                            runtime.people_runtime(),
+                            runtime.bridge_hub_runtime(),
+                            runtime.coretime_runtime(),
+                            runtime.collectives_runtime(),
+                            runtime.bulletin_runtime(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(para_runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(para_runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    sync::spawn_fetch_collators_last_authored_block(
+                                        &api_at,
+                                        para_runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                });
+                            }
+                        }
                     }
                     SupportedRuntime::AssetHubPolkadot
                     | SupportedRuntime::AssetHubKusama
@@ -696,6 +873,17 @@ impl App {
             }
             ChainAction::UpdateTotalStaked(chain_key, value) => {
                 self.chains.update_total_staked(&chain_key, value);
+            }
+            ChainAction::UpdateCurrentSlot(chain_key, block_number, slot) => {
+                self.chains
+                    .update_current_slot(&chain_key, block_number, slot);
+            }
+            ChainAction::UpdateSessionIndex(chain_key, index) => {
+                self.chains.update_session_index(&chain_key, index);
+            }
+            ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
+                self.chains
+                    .update_aura_slot_duration_ms(&chain_key, duration_ms);
             }
 
             _ => {}
@@ -746,7 +934,10 @@ impl App {
                 // subtracted from unlocking vec.
                 // To keep things in sync, a fetch for this respective stash is being called here.
                 // And also a fetch to the account balance is being called here.
-                let runtime = validator_key.runtime().asset_hub_runtime();
+                let runtime = validator_key
+                    .runtime()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain");
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
                     let tx = self.tx.clone();
@@ -776,7 +967,10 @@ impl App {
                 self.validators
                     .sub_chunk_from_stake_ledger(&validator_key, chunk);
                 // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
-                let runtime = validator_key.runtime().asset_hub_runtime();
+                let runtime = validator_key
+                    .runtime()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain");
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
                     let tx = self.tx.clone();
@@ -809,7 +1003,10 @@ impl App {
                 // 'Withdrawn' event. The witdrawn amount is expected to be available as free in balance
                 // and also unlocked from `staking.ledger`. Rather than unlocking manually is easier just
                 // to fetch storage for staking ledger.
-                let runtime = validator_key.runtime().asset_hub_runtime();
+                let runtime = validator_key
+                    .runtime()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain");
                 if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
                     let validator_keys = vec![validator_key];
                     let tx = self.tx.clone();
@@ -833,6 +1030,73 @@ impl App {
                         );
                     });
                 }
+            }
+        }
+    }
+
+    fn handle_collator_actions(&mut self, action: CollatorAction) {
+        match action {
+            CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
+                self.collators
+                    .update_aura_authorities(runtime, &authorities);
+                self.chains.update_aura_authorities(&runtime, authorities);
+            }
+            CollatorAction::UpdateInvulnerables(runtime, invulnerables) => {
+                self.collators.update_invulnerables(runtime, &invulnerables);
+                self.chains
+                    .update_aura_invulnerables(&runtime, invulnerables);
+            }
+            CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
+                if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
+                    if let Some(aura) = &chain.aura() {
+                        self.collators.update_authored_block(
+                            runtime,
+                            aura.authorities(),
+                            block_number,
+                            slot,
+                        );
+                    }
+                }
+            }
+            CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
+                // Calculate the expected Aura block time and update the chain. This is
+                // the minimum per-block cadence the relay chain can absorb, per the
+                // runtime source: `RELAY_CHAIN_SLOT_DURATION_MILLIS / BLOCK_PROCESSING_VELOCITY`.
+                if let Some(rc_chain) = self.chains.get_chain_by_runtime(runtime.relay_chain()) {
+                    let block_time_ms = rc_chain
+                        .epoch()
+                        .as_ref()
+                        .map(|e| e.block_time_ms())
+                        .unwrap_or(0);
+
+                    let expected_aura_block_time_ms =
+                        (block_time_ms / runtime.block_processing_velocity()) * 1000;
+
+                    self.chains
+                        .update_aura_block_time_ms(&runtime, expected_aura_block_time_ms);
+                }
+
+                if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
+                    if let Some(aura) = &chain.aura() {
+                        self.collators.update_last_authored_block(
+                            runtime,
+                            stash_bytes,
+                            block_number,
+                            chain.finalized_block(),
+                            aura.block_time_ms(),
+                        );
+                    }
+                }
+            }
+            CollatorAction::UpdateIdentity(stash_bytes, identity) => {
+                self.collators.update_identity(stash_bytes, identity);
+            }
+            CollatorAction::UpdateNextKeys(runtime, stash_bytes, keys) => {
+                self.collators.update_next_keys(runtime, stash_bytes, keys);
+            }
+            CollatorAction::UpdateQueuedKeys(runtime, stash_bytes, keys) => {
+                self.collators
+                    .update_queued_keys(runtime, stash_bytes, keys);
             }
         }
     }
@@ -1062,7 +1326,9 @@ impl App {
             Section::Validators => {
                 self.validators.move_up();
             }
-            // Section::Collators => self.collators.move_up(),
+            Section::Collators => {
+                self.collators.move_up();
+            }
             _ => {}
         };
     }
@@ -1082,7 +1348,9 @@ impl App {
             Section::Validators => {
                 self.validators.move_down();
             }
-            // Section::Collators => self.collators.move_down(),
+            Section::Collators => {
+                self.collators.move_down();
+            }
             _ => {}
         };
     }
@@ -1094,8 +1362,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        // self.collators
-        //     .set_active(self.section == Section::Collators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 
     /// Moves the active section down.
@@ -1105,8 +1373,8 @@ impl App {
         self.chains.set_active(self.section == Section::Chains);
         self.validators
             .set_active(self.section == Section::Validators);
-        // self.collators
-        //     .set_active(self.section == Section::Collators);
+        self.collators
+            .set_active(self.section == Section::Collators);
     }
 
     /// Selects the previous window.
@@ -1181,6 +1449,13 @@ impl App {
         self.popup.toggle_mask();
     }
 
+    /// Toggles between grouped and listed view.
+    fn toggle_view(&mut self) {
+        if self.section == Section::Collators && self.collators.is_active() {
+            self.collators.toggle_view();
+        }
+    }
+
     /// Open menu popup
     pub fn open_popup(&mut self) {
         if self.popup.is_visible() {
@@ -1196,10 +1471,12 @@ impl App {
                 return;
             };
 
-            let Some(chain) = self
-                .chains
-                .get_chain_by_runtime(validator.runtime().asset_hub_runtime())
-            else {
+            let Some(chain) = self.chains.get_chain_by_runtime(
+                validator
+                    .runtime()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain"),
+            ) else {
                 return;
             };
 
@@ -1453,7 +1730,10 @@ impl App {
     }
 
     pub fn handle_extrinsic_calls(&mut self, call: Call, validator: Validator) {
-        let runtime = validator.runtime().asset_hub_runtime();
+        let runtime = validator
+            .runtime()
+            .asset_hub_runtime()
+            .expect("every relay has an AssetHub chain");
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
@@ -1576,7 +1856,10 @@ impl App {
             }
             CommandKind::Uses(calls) => match calls {
                 CustomCalls::RotateAndSetKeys => {
-                    let runtime = validator.runtime().asset_hub_runtime();
+                    let runtime = validator
+                        .runtime()
+                        .asset_hub_runtime()
+                        .expect("every relay has an AssetHub chain");
 
                     let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                         return;
@@ -1748,7 +2031,10 @@ impl App {
             };
 
             if self.popup.is_confirmation_mode() {
-                let runtime = validator.runtime().asset_hub_runtime();
+                let runtime = validator
+                    .runtime()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain");
                 let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
                     return;
                 };
@@ -1775,7 +2061,10 @@ impl App {
     /// Handle enter when a validator is selected and popup is in confirmation mode
     /// showing the call details and input field as password
     pub fn on_validator_confirm_enter(&mut self, validator: Validator) {
-        let runtime = validator.runtime().asset_hub_runtime();
+        let runtime = validator
+            .runtime()
+            .asset_hub_runtime()
+            .expect("every relay has an AssetHub chain");
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
@@ -1875,7 +2164,7 @@ impl App {
     pub fn reset_selection(&mut self) {
         self.chains.set_active(false);
         self.validators.set_active(false);
-        // self.collators.set_active(false);
+        self.collators.set_active(false);
     }
 
     /// Copy to clipboard

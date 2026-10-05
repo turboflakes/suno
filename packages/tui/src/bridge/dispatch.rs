@@ -1,5 +1,5 @@
 use crate::bridge::sync::spawn_process_transaction_progress;
-use suno_actions::{Action, ChainAction, TxAction, ValidatorAction};
+use suno_actions::{Action, ChainAction, CollatorAction, TxAction, ValidatorAction};
 use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
@@ -241,6 +241,72 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdateBalance(
                 account_key,
                 data.value.balance,
+            )))
+            .boxed()?;
+        }
+        Response::AuraAuthorities(_data) => {
+            // Raw Aura session public keys, not stashes - not yet consumed by app state.
+            // See Response::SessionValidators for the stash-addressable authority set.
+        }
+        Response::SessionValidators(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateAuraAuthorities(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
+        Response::Invulnerables(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateInvulnerables(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
+        Response::LastAuthoredBlock(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateLastAuthoredBlock(
+                runtime,
+                data.value.account,
+                data.value.block,
+            )))
+            .boxed()?;
+        }
+        Response::CollatorIdentity(data) => {
+            if let Some(identity) = data.value.identity {
+                tx.send(Action::Collator(CollatorAction::UpdateIdentity(
+                    data.value.account,
+                    identity,
+                )))
+                .boxed()?;
+            } else {
+                warn!(
+                    "No identity data found for collator {:?}",
+                    data.value.account
+                );
+            }
+        }
+        Response::CollatorNextKeys(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateNextKeys(
+                runtime,
+                data.value.account,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
+        Response::CollatorQueuedKeys(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateQueuedKeys(
+                runtime,
+                data.value.account,
+                data.value.keys,
+            )))
+            .boxed()?;
+        }
+        Response::SessionIndex(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateSessionIndex(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
+        Response::SlotDuration(data) => {
+            tx.send(Action::Chain(ChainAction::UpdateSlotDuration(
+                runtime, data.value,
             )))
             .boxed()?;
         } // _ => {

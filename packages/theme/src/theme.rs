@@ -38,6 +38,7 @@ impl Theme {
             block: Block {
                 base: Style::new().bg(p.color_06).fg(p.color_01),
                 main: Style::new().bg(p.background).fg(p.foreground),
+                main_odd: Style::new().bg(p.color_08).fg(p.foreground),
                 pane_header: Style::new().bg(p.color_08).fg(p.color_01),
                 pane_body: Style::new().bg(p.color_07).fg(p.color_01),
                 popup_header: Style::new().bg(p.color_05).fg(p.color_01),
@@ -61,6 +62,7 @@ impl Theme {
                 header_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 label: Style::new().fg(p.color_04),
                 label_active: Style::new().fg(p.color_04).add_modifier(Modifier::BOLD),
+                label_italic: Style::new().fg(p.color_04).add_modifier(Modifier::ITALIC),
                 label_inverse: Style::new().fg(p.color_14),
                 cell: Style::default(),
                 cell_active: Style::new()
@@ -109,6 +111,7 @@ pub struct Block {
     pub footer_left: Style,
     pub footer_right: Style,
     pub main: Style,
+    pub main_odd: Style,
     pub active: Style,
 }
 
@@ -127,6 +130,14 @@ impl Block {
 
     pub fn main(&self, active: bool) -> Style {
         self.get_style(self.main, active)
+    }
+
+    pub fn alt(&self, is_odd: bool) -> Style {
+        if is_odd {
+            self.main_odd
+        } else {
+            self.main
+        }
     }
 }
 
@@ -180,6 +191,7 @@ pub struct Paragraph {
     pub label: Style,
     pub label_active: Style,
     pub label_inverse: Style,
+    pub label_italic: Style,
     pub cell: Style,
     pub cell_active: Style,
 }

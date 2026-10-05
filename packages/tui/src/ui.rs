@@ -1,4 +1,9 @@
 use crate::app::App;
+use crate::section::Section;
+use crate::widgets::collators::CollatorsView;
+use crate::widgets::collators_compact::CollatorsCompactWidget;
+use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
+use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
@@ -6,9 +11,8 @@ use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, 
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
-    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Padding, Paragraph},
+    widgets::{Block, Padding, Paragraph},
     Frame,
 };
 use suno_config::CONFIG;
@@ -32,24 +36,32 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
-    let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
-    if config.features.validators_enabled() {
-        constraints.push(Constraint::Fill(1));
-    } else {
-        constraints.push(Constraint::Length(0));
-    }
+    let validators_enabled = config.features.validators_enabled();
+    let collators_enabled = config.features.collators_enabled();
 
-    if config.features.collators_enabled() {
-        constraints.push(Constraint::Fill(1));
+    let validators_constraint = match (validators_enabled, collators_enabled) {
+        (true, true) => Constraint::Length(app.validators.total_compact_height()),
+        (true, false) => Constraint::Fill(1),
+        (false, _) => Constraint::Length(0),
+    };
+    let collators_constraint = if collators_enabled {
+        Constraint::Fill(1)
     } else {
-        constraints.push(Constraint::Length(0));
-    }
+        Constraint::Length(0)
+    };
 
-    if config.features.rpcs_enabled() {
-        constraints.push(Constraint::Fill(1));
-    } else {
-        constraints.push(Constraint::Length(0));
-    }
+    let constraints = vec![
+        Constraint::Length(3 + config.chains.len() as u16),
+        validators_constraint,
+        collators_constraint,
+    ];
+
+    // DEPRECATED
+    // if config.features.rpcs_enabled() {
+    //     constraints.push(Constraint::Fill(1));
+    // } else {
+    //     constraints.push(Constraint::Length(0));
+    // }
 
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -63,14 +75,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_validators_widget(app, frame, left_layout[1]);
     }
 
-    // TODO: Collators
-    // if config.features.collators_enabled() {
-    //     render_collators_widget(app, frame, left_layout[2]);
-    // }
-
-    if config.features.rpcs_enabled() {
-        render_rpcs_widget(app, frame, left_layout[3]);
+    if config.features.collators_enabled() {
+        render_collators_widget(app, frame, left_layout[2]);
     }
+
+    // DEPRECATED
+    // if config.features.rpcs_enabled() {
+    //     render_rpcs_widget(app, frame, left_layout[3]);
+    // }
 
     // Switch between main body window.
     match app.window {
@@ -138,24 +150,29 @@ fn render_validators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-// fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
-//     frame.render_widget(&app.collators, area);
-// }
-
-fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(
-        Paragraph::new(" >> RPCs List")
-            .block(
-                Block::new()
-                    .title(" RPCs ")
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .style(Style::default().fg(Color::Blue))
-            .left_aligned(),
+fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    frame.render_stateful_widget(
+        CollatorsCompactWidget::new(app.theme),
         area,
+        &mut app.collators,
     );
 }
+
+// DEPRECATED
+// fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
+//     frame.render_widget(
+//         Paragraph::new(" >> RPCs List")
+//             .block(
+//                 Block::new()
+//                     .title(" RPCs ")
+//                     .borders(Borders::ALL)
+//                     .border_type(BorderType::Plain),
+//             )
+//             .style(Style::default().fg(Color::Blue))
+//             .left_aligned(),
+//         area,
+//     );
+// }
 
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
@@ -164,8 +181,23 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         .padding(Padding::proportional(1));
     let block_area = block.inner(area);
     frame.render_widget(block, area);
-    let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
-    frame.render_stateful_widget(widget, block_area, &mut app.validators);
+
+    match app.section {
+        Section::Collators => match app.collators.view() {
+            CollatorsView::Group => {
+                let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
+                frame.render_stateful_widget(widget, block_area, &mut app.collators);
+            }
+            CollatorsView::List => {
+                let widget = CollatorsDetailedListWidget::new(&app.chains, theme);
+                frame.render_stateful_widget(widget, block_area, &mut app.collators);
+            }
+        },
+        _ => {
+            let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.validators);
+        }
+    }
 }
 
 fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -263,12 +295,21 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             }
             _ => {}
         }
-    } else if app.chains.is_active() || app.validators.is_active() {
+    } else if app.chains.is_active() || app.validators.is_active() || app.collators.is_active() {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("select".to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
+        if app.collators.is_active() {
+            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "change view".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
         legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));

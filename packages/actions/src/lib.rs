@@ -19,6 +19,7 @@ use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
+type AccountBytes = [u8; 32];
 type BlockNumber = u64;
 type BlockHash = H256;
 type Amount = u128;
@@ -41,8 +42,8 @@ pub enum Action {
     Validator(ValidatorAction),
     /// Transaction related actions
     Transaction(TxAction),
-    //TODO: Collator actions
-    // Collator(CollatorAction),
+    /// Collator actions
+    Collator(CollatorAction),
     ///
     /// QrScanner actions
     Scanner(ScannerAction),
@@ -63,6 +64,7 @@ pub enum NavigationAction {
     Reset,
     Copy,
     ToggleMask,
+    ToggleView,
 }
 
 type SpecVersion = u32;
@@ -136,8 +138,22 @@ pub enum ChainAction {
     UpdateTotalValidators(ChainKey, Counter),
     UpdateActiveNominators(ChainKey, Counter),
     UpdateTotalNominators(ChainKey, Counter),
+    UpdateCurrentSlot(ChainKey, BlockNumber, u64),
+    UpdateSlotDuration(ChainKey, u64),
+    UpdateSessionIndex(ChainKey, u32),
     FetchValidatorData(ValidatorKey),
     FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CollatorAction {
+    UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
+    UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
+    UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
+    UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
+    UpdateIdentity(AccountBytes, Identity),
+    UpdateNextKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
+    UpdateQueuedKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,7 +1,9 @@
+pub mod aura;
 pub mod babe;
 pub mod balance;
 pub mod call;
 pub mod chain;
+pub mod collator;
 pub mod display;
 pub mod entry;
 pub mod identity;
@@ -15,10 +17,12 @@ pub mod storage;
 pub mod tx;
 pub mod validator;
 
+pub use aura::Aura;
 pub use babe::Epoch;
-pub use chain::{BlockHash, BlockNumber, Chain};
+pub use chain::{BlockHash, BlockNumber, Chain, RecentBlocks};
+pub use collator::Collator;
 pub use key::AccountKey;
-pub use node_account::{AccountDisplay, Collator, NodeAccount};
+pub use node_account::{AccountDisplay, NodeAccount};
 pub use staking::Era;
 pub use storage::Response;
 pub use validator::Validator;

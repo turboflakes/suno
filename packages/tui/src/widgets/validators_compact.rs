@@ -33,19 +33,41 @@ impl StatefulWidget for ValidatorsCompactWidget {
 
         let proxies_available = state.proxies_available();
 
-        let rows = state.validators_iter().map(|v| {
-            let mut row = vec![
-                Text::from(""),
-                Text::from(format!("{}/{}", v.runtime(), v.display_name(4),)),
-            ];
+        // Interleave a non-selectable chain-name row before each chain's validators.
+        // The underlying `table_state` selection index refers to `state.validators_order`,
+        // so it's translated here to account for the extra header rows.
+        let selected = state.table_state.selected();
+        let mut display_selected = None;
+        let mut rows: Vec<Row> = Vec::new();
+        let mut last_runtime = None;
+
+        for (i, v) in state.validators_iter().enumerate() {
+            if last_runtime != Some(v.runtime()) {
+                let mut header_row = vec![
+                    Text::from(""),
+                    Text::from(v.runtime().to_string()).style(theme.paragraph.label_italic),
+                ];
+                if proxies_available {
+                    header_row.push(Text::from(""));
+                }
+                header_row.push(Text::from(""));
+                rows.push(Row::new(header_row));
+                last_runtime = Some(v.runtime());
+            }
+
+            if selected == Some(i) {
+                display_selected = Some(rows.len());
+            }
+
+            let mut row = vec![Text::from(""), Text::from(v.display_name(4))];
 
             if proxies_available {
                 row.push(Text::from(v.proxies_as_str()).alignment(Alignment::Right));
             }
 
             row.push(Text::from(""));
-            Row::new(row)
-        });
+            rows.push(Row::new(row));
+        }
 
         // Define widths
         let mut widths = vec![Constraint::Length(1), Constraint::Fill(1)];
@@ -66,6 +88,7 @@ impl StatefulWidget for ValidatorsCompactWidget {
         }
         header_cells.push(Cell::from(""));
 
+        let rows_len = rows.len();
         let table = Table::new(rows, widths)
             .block(block)
             .header(Row::new(header_cells).set_style(theme.table.header(state.is_active())))
@@ -73,24 +96,21 @@ impl StatefulWidget for ValidatorsCompactWidget {
             .row_highlight_style(theme.table.row_highlight(state.is_active()))
             .highlight_symbol(theme.table.highlight_symbol(state.is_active()));
 
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
+        let mut display_table_state = state.table_state;
+        display_table_state.select(display_selected);
+
+        StatefulWidget::render(table, area, buf, &mut display_table_state);
 
         // Render scrollbar when active
-        if state.is_active() && state.validators.len() >= area.height.saturating_sub(2) as usize {
+        if state.is_active() && rows_len >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,
                 width: 1,
                 height: area.height.saturating_sub(2),
             };
-            if let Some(row_index) = state.table_state.selected() {
-                render_scrollbar(
-                    theme,
-                    row_index,
-                    state.validators.len(),
-                    scrollbar_area,
-                    buf,
-                );
+            if let Some(row_index) = display_selected {
+                render_scrollbar(theme, row_index, rows_len, scrollbar_area, buf);
             }
         }
     }

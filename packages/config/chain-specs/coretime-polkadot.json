@@ -1,0 +1,25 @@
+{
+  "name": "Polkadot Coretime",
+  "id": "coretime-polkadot",
+  "chainType": "Live",
+  "bootNodes": [
+    "/dns/polkadot-coretime-connect-a-0.polkadot.io/tcp/30334/p2p/12D3KooWKjnixAHbKMsPTJwGx8SrBeGEJLHA8KmKcEDYMp3YmWgR",
+        "/dns/polkadot-coretime-connect-a-1.polkadot.io/tcp/30334/p2p/12D3KooWQ7B7p4DFv1jWqaKfhrZBcMmi5g8bWFnmskguLaGEmT6n",
+        "/dns/polkadot-coretime-connect-a-0.polkadot.io/tcp/443/wss/p2p/12D3KooWKjnixAHbKMsPTJwGx8SrBeGEJLHA8KmKcEDYMp3YmWgR",
+        "/dns/polkadot-coretime-connect-a-1.polkadot.io/tcp/443/wss/p2p/12D3KooWQ7B7p4DFv1jWqaKfhrZBcMmi5g8bWFnmskguLaGEmT6n",
+        "/dns/boot-coretime-polkadot.stakeworld.io/tcp/443/wss/p2p/12D3KooWF2uEx9xYFCJVe8ZdjKXSxsJgL47c5TyW8opEuicpxrnx"
+  ],
+  "telemetryEndpoints": null,
+  "protocolId": null,
+  "properties": {
+    "ss58Format": 0,
+    "tokenDecimals": 10,
+    "tokenSymbol": "DOT"
+  },
+  "relay_chain": "polkadot",
+  "para_id": 1005,
+  "codeSubstitutes": {},
+  "genesis": {
+    "stateRootHash": "0x6e2af5f681a0f432c7aaf564dbebe4ddade85822605d510ccb78f1d90710947a"
+  }
+}

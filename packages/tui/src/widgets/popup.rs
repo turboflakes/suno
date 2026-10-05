@@ -179,7 +179,11 @@ impl Popup {
             return;
         }
 
-        let runtime = ctx.validator.runtime().asset_hub_runtime();
+        let runtime = ctx
+            .validator
+            .runtime()
+            .asset_hub_runtime()
+            .expect("every relay has an AssetHub chain");
         let unit = runtime.token_symbol();
         let decimals = runtime.token_decimals();
         let metadata = InputFieldMetadata::new()

@@ -1,7 +1,6 @@
 use crate::balance::{Amount, Balance};
 use crate::display::{format_planks, to_compact_string};
 use crate::{identity::Identity, key::AccountKey};
-use ratatui::widgets::Row;
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
@@ -93,46 +92,6 @@ impl AccountDisplay for NodeAccount {
 
     fn account_format(&self) -> u16 {
         self.account_format()
-    }
-}
-
-/// Specific types using composition
-#[derive(Debug, Clone)]
-pub struct Collator {
-    account: NodeAccount,
-}
-
-impl Collator {
-    pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
-        Self {
-            account: NodeAccount::new(runtime, stash),
-        }
-    }
-
-    // Getter methods if needed
-    pub fn runtime(&self) -> SupportedRuntime {
-        self.account.runtime()
-    }
-
-    pub fn identity(&self) -> Option<&Identity> {
-        self.account.identity.as_ref()
-    }
-}
-
-impl AccountDisplay for Collator {
-    fn stash(&self) -> AccountId32 {
-        self.account.stash()
-    }
-
-    fn account_format(&self) -> u16 {
-        self.account.account_format()
-    }
-}
-
-impl From<&Collator> for Row<'_> {
-    fn from(c: &Collator) -> Self {
-        let c = c.clone();
-        Row::new(vec![c.runtime().to_string(), c.to_compact_string(5)])
     }
 }
 

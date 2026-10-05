@@ -169,6 +169,10 @@ pub fn render_help(theme: Theme, area: Rect, buf: &mut Buffer) {
             Span::raw("Show list of available themes."),
         ]),
         Line::from(vec![
+            Span::raw("ctrl+v ").style(theme.paragraph.label(true)),
+            Span::raw("Toggle between grouped and listed view."),
+        ]),
+        Line::from(vec![
             Span::raw("ctrl+h/ctrl+l/left/right ").style(theme.paragraph.label(true)),
             Span::raw("Navigate between pane sections."),
         ]),

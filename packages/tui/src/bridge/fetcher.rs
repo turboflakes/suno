@@ -117,6 +117,12 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_collator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -128,6 +134,49 @@ pub trait RuntimeFetcher {
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
         stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_aura_authorities(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_session_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_invulnerables(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_collator_last_authored_block(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_collators_queued_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        collator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_collator_next_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_slot_duration(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_session_index(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
     ) -> Result<Response, Error>;
 
     async fn fetch_metadata(
@@ -487,6 +536,31 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_collator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // Identity storage is keyed by stash regardless of whether the account is a
+        // validator or a collator, so reuse the same per-chain fetch and just relabel
+        // the response so dispatch routes it into collator state instead of validator state.
+        let response = match self {
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_identity(api, stash).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_identity(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, stash).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_identity(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }?;
+
+        match response {
+            Response::Identity(data) => Ok(Response::collator_identity(
+                data.value.account,
+                data.value.identity,
+            )),
+            other => Ok(other),
+        }
+    }
+
     async fn fetch_and_validate_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -525,6 +599,328 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_aura_authorities(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_aura_authorities(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_aura_authorities(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_aura_authorities(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_aura_authorities(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_aura_authorities(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_aura_authorities(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_aura_authorities(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_aura_authorities(api).await,
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_aura_authorities(api).await
+            }
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_aura_authorities(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_aura_authorities(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_aura_authorities(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_aura_authorities(api).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_aura_authorities(api).await
+            }
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_aura_authorities(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_aura_authorities(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_session_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_session_validators(api).await
+            }
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_session_validators(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_session_validators(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_session_validators(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_session_validators(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_session_validators(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_session_validators(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_session_validators(api).await,
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_session_validators(api).await
+            }
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_session_validators(api).await,
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::fetch_session_validators(api).await
+            }
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_validators(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_session_validators(api).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_session_validators(api).await
+            }
+            Runtime::BulletinPolkadot => {
+                suno_bulletin_polkadot::fetch_session_validators(api).await
+            }
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_session_validators(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_invulnerables(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_invulnerables(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_invulnerables(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_invulnerables(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_invulnerables(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_invulnerables(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_invulnerables(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_invulnerables(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_invulnerables(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_invulnerables(api).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_invulnerables(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_invulnerables(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_invulnerables(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_invulnerables(api).await
+            }
+            Runtime::CollectivesWestend => suno_collectives_westend::fetch_invulnerables(api).await,
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_invulnerables(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_invulnerables(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collator_last_authored_block(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::BulletinPolkadot => {
+                suno_bulletin_polkadot::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::BulletinPaseo => {
+                suno_bulletin_paseo::fetch_collator_last_authored_block(api, stash).await
+            }
+
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collators_queued_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        collator_keys: &[AccountKey],
+    ) -> Result<Vec<Response>, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::BulletinPolkadot => {
+                suno_bulletin_polkadot::fetch_collators_queued_keys(api, collator_keys).await
+            }
+            Runtime::BulletinPaseo => {
+                suno_bulletin_paseo::fetch_collators_queued_keys(api, collator_keys).await
+            }
+
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_collator_next_keys(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::AssetHubKusama => {
+                suno_asset_hub_kusama::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::AssetHubPaseo => {
+                suno_asset_hub_paseo::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::AssetHubWestend => {
+                suno_asset_hub_westend::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::PeopleKusama => suno_people_kusama::fetch_collator_next_keys(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_collator_next_keys(api, stash).await,
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::BulletinPolkadot => {
+                suno_bulletin_polkadot::fetch_collator_next_keys(api, stash).await
+            }
+            Runtime::BulletinPaseo => {
+                suno_bulletin_paseo::fetch_collator_next_keys(api, stash).await
+            }
+
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_slot_duration(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_slot_duration(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_slot_duration(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_slot_duration(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_slot_duration(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_slot_duration(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_slot_duration(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_slot_duration(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_slot_duration(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_slot_duration(api).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_slot_duration(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_slot_duration(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_slot_duration(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_slot_duration(api).await
+            }
+            Runtime::CollectivesWestend => suno_collectives_westend::fetch_slot_duration(api).await,
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_slot_duration(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_slot_duration(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_session_index(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_session_index(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_session_index(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_session_index(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_session_index(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_session_index(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_session_index(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_session_index(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_session_index(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_session_index(api).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_session_index(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_session_index(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_index(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_session_index(api).await
+            }
+            Runtime::CollectivesWestend => suno_collectives_westend::fetch_session_index(api).await,
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_session_index(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_session_index(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
     async fn fetch_metadata(
         &self,
         api: &ClientAtBlock<CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
@@ -542,6 +938,14 @@ impl RuntimeFetcher for Runtime {
             Runtime::PeopleKusama => suno_people_kusama::fetch_metadata(api).await,
             Runtime::PeoplePaseo => suno_people_paseo::fetch_metadata(api).await,
             Runtime::PeopleWestend => suno_people_westend::fetch_metadata(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_metadata(api).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_metadata(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_metadata(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_metadata(api).await,
+            Runtime::CollectivesPolkadot => suno_collectives_polkadot::fetch_metadata(api).await,
+            Runtime::CollectivesWestend => suno_collectives_westend::fetch_metadata(api).await,
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_metadata(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_metadata(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
