@@ -580,8 +580,50 @@ impl SupportedRuntime {
         }
     }
 
+    pub fn as_str_short(&self) -> &'static str {
+        match self {
+            Self::Local => "Local",
+            Self::Polkadot => "Polkadot",
+            Self::Kusama => "Kusama",
+            Self::Westend => "Westend",
+            Self::Paseo => "Paseo",
+            Self::AssetHubPolkadot => "AHP",
+            Self::BridgeHubPolkadot => "BHP",
+            Self::PeoplePolkadot => "PP",
+            Self::AssetHubKusama => "AHK",
+            Self::BridgeHubKusama => "BHK",
+            Self::PeopleKusama => "PK",
+            Self::AssetHubPaseo => "AHPa",
+            Self::BridgeHubPaseo => "BHPa",
+            Self::PeoplePaseo => "PPa",
+            Self::AssetHubWestend => "AHW",
+            Self::BridgeHubWestend => "BHW",
+            Self::PeopleWestend => "PW",
+            Self::CoretimePolkadot => "CRP",
+            Self::CollectivesPolkadot => "CLP",
+            Self::CoretimeKusama => "CRK",
+            Self::CoretimeWestend => "CRW",
+            Self::CollectivesWestend => "CLW",
+            Self::BulletinPolkadot => "BP",
+            Self::BulletinPaseo => "BPa",
+        }
+    }
+
     pub fn chain_name(&self) -> String {
         self.as_str_long().to_lowercase().replace(' ', "-")
+    }
+
+    pub fn system_name(&self) -> String {
+        let full = self.as_str_long();
+        if self.is_relay_chain() {
+            return full.to_string();
+        }
+
+        let relay_name = self.relay_chain().as_str();
+        full.strip_prefix(relay_name)
+            .or_else(|| full.strip_suffix(relay_name))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| full.to_string())
     }
 
     pub fn legacy_name(&self) -> String {

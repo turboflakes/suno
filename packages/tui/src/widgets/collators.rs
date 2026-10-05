@@ -68,6 +68,24 @@ impl CollatorsList {
         grouped
     }
 
+    /// Same as [`Self::get_collators_grouped_by_runtime`], but grouped by relay chain
+    /// instead of by parachain, so collators from every system chain of a relay (AssetHub,
+    /// BridgeHub, Coretime, Collectives, People, ...) are listed together.
+    pub fn get_collators_grouped_by_relay_chain(
+        &self,
+    ) -> BTreeMap<SupportedRuntime, Vec<&Collator>> {
+        let mut grouped: BTreeMap<SupportedRuntime, Vec<&Collator>> = BTreeMap::new();
+
+        for collator in &self.collators {
+            grouped
+                .entry(collator.runtime().relay_chain())
+                .or_default()
+                .push(collator);
+        }
+
+        grouped
+    }
+
     pub fn total_detailed_group_height(&self) -> u16 {
         let grouped = self.get_collators_grouped_by_runtime();
 
@@ -171,7 +189,7 @@ impl CollatorsList {
             if collator.runtime() == runtime && *collator.status() != CollatorStatus::Invulnerable {
                 let stash_bytes: [u8; 32] = *collator.stash().as_ref();
                 let status = if authorities.contains(&stash_bytes) {
-                    CollatorStatus::Authority
+                    CollatorStatus::Permissionless
                 } else {
                     CollatorStatus::Unknown
                 };

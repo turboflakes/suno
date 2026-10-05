@@ -9,8 +9,8 @@ use suno_config::SupportedRuntime;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorStatus {
-    /// Collator is an authority in the current Aura slot set, displayed as [A]
-    Authority,
+    /// Collator is an permissionless authority in the current Aura slot set, displayed as [P]
+    Permissionless,
     /// Collator is part of the fixed invulnerable set, displayed as [I]
     Invulnerable,
     /// Collator is a registered candidate waiting to become an authority, displayed as [W]
@@ -23,7 +23,7 @@ pub enum CollatorStatus {
 impl std::fmt::Display for CollatorStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Authority => write!(f, "[A]"),
+            Self::Permissionless => write!(f, "[P]"),
             Self::Invulnerable => write!(f, "[I]"),
             Self::Waiting => write!(f, "[W]"),
             Self::Unknown => write!(f, "[U]"),
@@ -103,8 +103,8 @@ impl Collator {
         self.status = status;
     }
 
-    pub fn is_authority(&self) -> bool {
-        self.status == CollatorStatus::Authority
+    pub fn is_permissionless(&self) -> bool {
+        self.status == CollatorStatus::Permissionless
     }
 
     pub fn is_invulnerable(&self) -> bool {

@@ -2,6 +2,7 @@ pub mod chains;
 pub mod collators;
 pub mod collators_compact;
 pub mod collators_detailed_group;
+pub mod collators_detailed_list;
 pub mod input_command;
 pub mod input_field;
 pub mod input_filter;
