@@ -13,8 +13,8 @@ use suno_primitives::{
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorsView {
-    #[default]
     Group,
+    #[default]
     List,
 }
 
