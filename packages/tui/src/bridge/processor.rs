@@ -72,6 +72,39 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_runtime_events(api, events).await
             }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::process_runtime_events(api, events).await
+            }
+            Runtime::PeopleKusama => suno_people_kusama::process_runtime_events(api, events).await,
+            Runtime::PeoplePaseo => suno_people_paseo::process_runtime_events(api, events).await,
+            Runtime::PeopleWestend => {
+                suno_people_westend::process_runtime_events(api, events).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::process_runtime_events(api, events).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::process_runtime_events(api, events).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::process_runtime_events(api, events).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::process_runtime_events(api, events).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::process_runtime_events(api, events).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::process_runtime_events(api, events).await
+            }
+            Runtime::BulletinPolkadot => {
+                suno_bulletin_polkadot::process_runtime_events(api, events).await
+            }
+            Runtime::BulletinPaseo => {
+                suno_bulletin_paseo::process_runtime_events(api, events).await
+            }
+
             _ => Ok(vec![]),
         }
     }
