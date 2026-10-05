@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Add collator monitoring support see PR [#66](https://github.com/turboflakes/suno/pull/66)
 
 ## [0.9.0] - 2026-09-26
 - Add dynamic theme switching with `ctrl+t` see PR [#64](https://github.com/turboflakes/suno/pull/64)
