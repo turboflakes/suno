@@ -288,6 +288,13 @@ impl ValidatorsList {
         grouped
     }
 
+    /// Height needed by [`ValidatorsCompactWidget`] to display every validator without scrolling.
+    /// One row per validator and one extra row per distinct runtime group.
+    pub fn total_compact_height(&self) -> u16 {
+        3 + self.validators_order.len() as u16
+            + self.get_validators_grouped_by_runtime().len() as u16
+    }
+
     pub fn get_selected_ref(&self) -> Option<&Validator> {
         self.table_state
             .selected()

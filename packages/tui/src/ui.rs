@@ -11,9 +11,8 @@ use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, 
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
-    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Padding, Paragraph},
+    widgets::{Block, Padding, Paragraph},
     Frame,
 };
 use suno_config::CONFIG;
@@ -37,24 +36,32 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
-    let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
-    if config.features.validators_enabled() {
-        constraints.push(Constraint::Fill(1));
-    } else {
-        constraints.push(Constraint::Length(0));
-    }
+    let validators_enabled = config.features.validators_enabled();
+    let collators_enabled = config.features.collators_enabled();
 
-    if config.features.collators_enabled() {
-        constraints.push(Constraint::Fill(1));
+    let validators_constraint = match (validators_enabled, collators_enabled) {
+        (true, true) => Constraint::Length(app.validators.total_compact_height()),
+        (true, false) => Constraint::Fill(1),
+        (false, _) => Constraint::Length(0),
+    };
+    let collators_constraint = if collators_enabled {
+        Constraint::Fill(1)
     } else {
-        constraints.push(Constraint::Length(0));
-    }
+        Constraint::Length(0)
+    };
 
-    if config.features.rpcs_enabled() {
-        constraints.push(Constraint::Fill(1));
-    } else {
-        constraints.push(Constraint::Length(0));
-    }
+    let constraints = vec![
+        Constraint::Length(3 + config.chains.len() as u16),
+        validators_constraint,
+        collators_constraint,
+    ];
+
+    // DEPRECATED
+    // if config.features.rpcs_enabled() {
+    //     constraints.push(Constraint::Fill(1));
+    // } else {
+    //     constraints.push(Constraint::Length(0));
+    // }
 
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -72,9 +79,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
-    if config.features.rpcs_enabled() {
-        render_rpcs_widget(app, frame, left_layout[3]);
-    }
+    // DEPRECATED
+    // if config.features.rpcs_enabled() {
+    //     render_rpcs_widget(app, frame, left_layout[3]);
+    // }
 
     // Switch between main body window.
     match app.window {
@@ -150,20 +158,21 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-    frame.render_widget(
-        Paragraph::new(" >> RPCs List")
-            .block(
-                Block::new()
-                    .title(" RPCs ")
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .style(Style::default().fg(Color::Blue))
-            .left_aligned(),
-        area,
-    );
-}
+// DEPRECATED
+// fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
+//     frame.render_widget(
+//         Paragraph::new(" >> RPCs List")
+//             .block(
+//                 Block::new()
+//                     .title(" RPCs ")
+//                     .borders(Borders::ALL)
+//                     .border_type(BorderType::Plain),
+//             )
+//             .style(Style::default().fg(Color::Blue))
+//             .left_aligned(),
+//         area,
+//     );
+// }
 
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
