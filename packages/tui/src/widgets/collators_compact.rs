@@ -31,32 +31,50 @@ impl StatefulWidget for CollatorsCompactWidget {
             .set_style(theme.block.pane_body(state.is_active()))
             .padding(Padding::symmetric(0, 1));
 
-        // Interleave a non-selectable chain-name row before each chain's collators.
+        // In group view, interleave a non-selectable chain-name row before each group's collators.
         // The underlying `table_state` selection index refers to `state.collators`,
         // so it's translated here to account for the extra header rows.
+        // In list view, collators are regrouped by relay chain.
+        let mut indexed: Vec<(usize, _)> = state.collators_iter().enumerate().collect();
+        if state.is_list_view() {
+            indexed.sort_by_key(|(_, c)| c.runtime().relay_chain());
+        }
+
         let selected = state.table_state.selected();
         let mut display_selected = None;
         let mut rows: Vec<Row> = Vec::new();
-        let mut last_runtime = None;
+        let mut last_group = None;
 
-        for (i, c) in state.collators_iter().enumerate() {
-            if last_runtime != Some(c.runtime()) {
+        for (i, c) in indexed {
+            let group_key = if state.is_list_view() {
+                c.runtime().relay_chain()
+            } else {
+                c.runtime()
+            };
+
+            if last_group != Some(group_key) {
                 rows.push(Row::new(vec![
                     Text::from(""),
-                    Text::from(c.runtime().to_string()).style(theme.paragraph.label_italic),
+                    Text::from(group_key.to_string()).style(theme.paragraph.label_italic),
                     Text::from(""),
                     Text::from(""),
                 ]));
-                last_runtime = Some(c.runtime());
+                last_group = Some(group_key);
             }
 
             if selected == Some(i) {
                 display_selected = Some(rows.len());
             }
 
+            let chain_label = if state.is_list_view() {
+                format!("{}/", c.runtime().as_str_short())
+            } else {
+                String::new()
+            };
+
             rows.push(Row::new(vec![
                 Text::from(""),
-                Text::from(c.display_name(4)),
+                Text::from(format!("{}{}", chain_label, c.display_name(4))),
                 Text::from(""),
                 Text::from(""),
             ]));

@@ -11,6 +11,13 @@ use suno_primitives::{
     AccountDisplay, AccountKey,
 };
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CollatorsView {
+    #[default]
+    Group,
+    List,
+}
+
 #[derive(Debug, Default)]
 pub struct CollatorsList {
     pub collators: Vec<Collator>,
@@ -18,6 +25,7 @@ pub struct CollatorsList {
     pub scroll_offset: u16,
     pub viewport_height: u16,
     active: bool,
+    view: CollatorsView,
 }
 
 impl CollatorsList {
@@ -137,6 +145,21 @@ impl CollatorsList {
 
     pub fn set_active(&mut self, active: bool) {
         self.active = active;
+    }
+
+    pub fn view(&self) -> CollatorsView {
+        self.view
+    }
+
+    pub fn toggle_view(&mut self) {
+        self.view = match self.view {
+            CollatorsView::Group => CollatorsView::List,
+            CollatorsView::List => CollatorsView::Group,
+        };
+    }
+
+    pub fn is_list_view(&self) -> bool {
+        self.view == CollatorsView::List
     }
 
     pub fn get_selected(&self) -> Option<Collator> {

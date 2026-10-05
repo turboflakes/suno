@@ -593,9 +593,9 @@ impl SupportedRuntime {
             Self::AssetHubKusama => "AHK",
             Self::BridgeHubKusama => "BHK",
             Self::PeopleKusama => "PK",
-            Self::AssetHubPaseo => "AHPa",
-            Self::BridgeHubPaseo => "BHPa",
-            Self::PeoplePaseo => "PPa",
+            Self::AssetHubPaseo => "AHP",
+            Self::BridgeHubPaseo => "BHP",
+            Self::PeoplePaseo => "PP",
             Self::AssetHubWestend => "AHW",
             Self::BridgeHubWestend => "BHW",
             Self::PeopleWestend => "PW",
@@ -605,7 +605,7 @@ impl SupportedRuntime {
             Self::CoretimeWestend => "CRW",
             Self::CollectivesWestend => "CLW",
             Self::BulletinPolkadot => "BP",
-            Self::BulletinPaseo => "BPa",
+            Self::BulletinPaseo => "BP",
         }
     }
 

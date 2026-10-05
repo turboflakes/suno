@@ -254,6 +254,7 @@ impl App {
             NavigationAction::Reset => self.reset_selection(),
             NavigationAction::Copy => self.copy_to_clipboard(),
             NavigationAction::ToggleMask => self.toggle_mask(),
+            NavigationAction::ToggleView => self.toggle_view(),
         }
     }
 
@@ -1446,6 +1447,13 @@ impl App {
         self.masked = !self.masked;
         self.validators.toggle_mask();
         self.popup.toggle_mask();
+    }
+
+    /// Toggles between grouped and listed view.
+    fn toggle_view(&mut self) {
+        if self.section == Section::Collators && self.collators.is_active() {
+            self.collators.toggle_view();
+        }
     }
 
     /// Open menu popup

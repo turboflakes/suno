@@ -1,5 +1,6 @@
 use crate::app::App;
 use crate::section::Section;
+use crate::widgets::collators::CollatorsView;
 use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
@@ -173,10 +174,16 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_widget(block, area);
 
     match app.section {
-        Section::Collators => {
-            let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
-            frame.render_stateful_widget(widget, block_area, &mut app.collators);
-        }
+        Section::Collators => match app.collators.view() {
+            CollatorsView::Group => {
+                let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
+                frame.render_stateful_widget(widget, block_area, &mut app.collators);
+            }
+            CollatorsView::List => {
+                let widget = CollatorsDetailedListWidget::new(&app.chains, theme);
+                frame.render_stateful_widget(widget, block_area, &mut app.collators);
+            }
+        },
         _ => {
             let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
             frame.render_stateful_widget(widget, block_area, &mut app.validators);
@@ -279,12 +286,21 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             }
             _ => {}
         }
-    } else if app.chains.is_active() || app.validators.is_active() {
+    } else if app.chains.is_active() || app.validators.is_active() || app.collators.is_active() {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("select".to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
+        if app.collators.is_active() {
+            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "change view".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
         legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));

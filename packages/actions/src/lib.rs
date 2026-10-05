@@ -64,6 +64,7 @@ pub enum NavigationAction {
     Reset,
     Copy,
     ToggleMask,
+    ToggleView,
 }
 
 type SpecVersion = u32;
