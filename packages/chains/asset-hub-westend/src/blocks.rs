@@ -7,6 +7,7 @@ use crate::{
             pallet_staking_async::pallet::pallet::Call as StakingCall,
             pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
         },
+        session::events::NewSession,
         staking::events::{Bonded, Chilled, EraPaid, Unbonded, ValidatorPrefsSet, Withdrawn},
     },
     storage::{fetch_active_era_info, fetch_era_data, map_payee_from_reward_destination},
@@ -69,9 +70,14 @@ pub async fn process_runtime_events(
                 ValidatorPrefs::new(Perbill::from_parts(ev.prefs.commission.0), ev.prefs.blocked);
             let response = Response::validator_prefs_next(account_bytes, Some(prefs));
             processed_events.push(response);
-        } // else if let Some(ev) = event.as_event::<PayeeSet>().boxed()? {}
-          // TODO: Event PayeeSet is currently not available in the runtime
-          // so we process the extrinsic directly
+        } else if let Some(ev) = event.decode_fields_as::<NewSession>() {
+            let ev = ev.boxed()?;
+            let response = Response::session_index(ev.session_index);
+            processed_events.push(response);
+        }
+        // else if let Some(ev) = event.as_event::<PayeeSet>().boxed()? {}
+        // TODO: Event PayeeSet is currently not available in the runtime
+        // so we process the extrinsic directly
     }
     Ok(processed_events)
 }
