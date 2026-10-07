@@ -4,7 +4,7 @@ use crate::staking::{Payee, PayeeError};
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::str::FromStr;
-use subxt::utils::to_hex;
+use subxt::utils::{to_hex, AccountId32};
 use suno_config::CustomCommand;
 
 type Amount = u128;
@@ -47,6 +47,15 @@ pub enum Call {
         proof: Proof,
     },
     PurgeKeys,
+    RegisterAsCandidate,
+    LeaveIntent,
+    UpdateBond {
+        new_deposit: u128,
+    },
+    TakeCandidateSlot {
+        deposit: u128,
+        target: AccountId32,
+    },
     Custom(CustomCommand),
     // Specific chain commands
     // TODO: These should live in their own enum
@@ -99,6 +108,8 @@ impl Call {
             None => match input {
                 "chill" => Ok(Self::Chill),
                 "purge_keys" => Ok(Self::PurgeKeys),
+                "register_as_candidate" => Ok(Self::RegisterAsCandidate),
+                "leave_intent" => Ok(Self::LeaveIntent),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
                 "chain_specs" => Ok(Self::ChainSpecs {
                     chain_name: "".to_string(),
@@ -211,6 +222,22 @@ impl Call {
                         }
                     }
                 },
+                "update_bond" => match args.split_once(' ') {
+                    None => {
+                        let new_deposit = parse_standard_unit(args, decimals)?;
+                        Ok(Self::UpdateBond { new_deposit })
+                    }
+                    _ => Err(CallError::InvalidArgument(input.to_string())),
+                },
+                "take_candidate_slot" => match args.split_once(' ') {
+                    None => Err(CallError::MissingArgumentSilent),
+                    Some((deposit, target)) => {
+                        let deposit = parse_standard_unit(deposit, decimals)?;
+                        let target = AccountId32::from_str(target)
+                            .map_err(|_| CallError::InvalidAddress(target.to_string()))?;
+                        Ok(Self::TakeCandidateSlot { deposit, target })
+                    }
+                },
                 _ => {
                     // Try matching custom commands that take arguments
                     // e.g. user typed "upgrade 1.2.3" -> matches cmd "/upgrade {version}"
@@ -241,6 +268,10 @@ impl std::fmt::Display for Call {
             Self::Chill => write!(f, "chill"),
             Self::SetKeys { .. } => write!(f, "set_keys"),
             Self::PurgeKeys => write!(f, "purge_keys"),
+            Self::RegisterAsCandidate => write!(f, "register_as_candidate"),
+            Self::LeaveIntent => write!(f, "leave_intent"),
+            Self::UpdateBond { .. } => write!(f, "update_bond"),
+            Self::TakeCandidateSlot { .. } => write!(f, "take_candidate_slot"),
             Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
             Self::ChainSpecs { .. } => write!(f, "chain_specs"),
             Self::Metadata { .. } => write!(f, "metadata"),
@@ -294,6 +325,12 @@ impl ToDescription for Call {
                     .to_string()
             }
             Self::PurgeKeys => "Remove all session keys".to_string(),
+            Self::RegisterAsCandidate => {
+                "Register as a collator candidate, using registered session keys".to_string()
+            }
+            Self::LeaveIntent => "Deregister as a collator candidate".to_string(),
+            Self::UpdateBond { .. } => "Update the candidacy bond deposit".to_string(),
+            Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
             Self::Custom(custom) => custom.to_string(),
             Self::ChainSpecs { chain_name } => {
                 format!("Show chain-specs QR code for the {} network", chain_name)
@@ -323,6 +360,12 @@ impl ToPlaceholder for Call {
             Self::Chill => "chill".to_string(),
             Self::SetKeys { .. } => "set_keys <hex-session-keys> <hex-proof>".to_string(),
             Self::PurgeKeys => "purge_keys".to_string(),
+            Self::RegisterAsCandidate => "register_as_candidate".to_string(),
+            Self::LeaveIntent => "leave_intent".to_string(),
+            Self::UpdateBond { .. } => "update_bond <value-in-standard-units>".to_string(),
+            Self::TakeCandidateSlot { .. } => {
+                "take_candidate_slot <value-in-standard-units> <target-address>".to_string()
+            }
             Self::Custom(custom) => custom.placeholder(),
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
@@ -351,6 +394,17 @@ impl ToMethod for Call {
                 format!("staking_rc_client.set_keys {keys} {proof}")
             }
             Self::PurgeKeys => "staking_rc_client.purge_keys".to_string(),
+            // TODO:
+            // session.set_keys
+            // session.purge_keys
+            Self::RegisterAsCandidate => "collator_selection.register_as_candidate".to_string(),
+            Self::LeaveIntent => "collator_selection.leave_intent".to_string(),
+            Self::UpdateBond { new_deposit } => {
+                format!("collator_selection.update_bond {new_deposit}")
+            }
+            Self::TakeCandidateSlot { deposit, target } => {
+                format!("collator_selection.take_candidate_slot {deposit} {target}")
+            }
             Self::Custom(custom) => format!("custom.{}", custom.cmd()),
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
