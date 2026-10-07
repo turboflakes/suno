@@ -6,7 +6,7 @@ use subxt::{
 };
 use suno_config::{CustomConfig, Runtime};
 use suno_error::Error;
-use suno_primitives::{AccountKey, Response};
+use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
 
 #[async_trait]
 pub trait RuntimeFetcher {
@@ -123,7 +123,21 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
-    async fn fetch_and_validate_proxy_account(
+    async fn fetch_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_and_validate_validators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_and_validate_collators_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
         stash: &AccountId32,
@@ -561,7 +575,7 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
-    async fn fetch_and_validate_proxy_account(
+    async fn fetch_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
         stash: &AccountId32,
@@ -580,9 +594,88 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::fetch_and_validate_proxy_account(api, stash, proxy).await
             }
-
+            Runtime::PeopleKusama => {
+                suno_people_kusama::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
+            // NOTE: The Bulletin chains (bulletin-polkadot,bulletin-paseo) have no Proxy pallet available on-chain
+            // if that changes in the future apply the same changes here
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
+    }
+
+    async fn fetch_and_validate_validators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error> {
+        let responses = self.fetch_proxy_account(api, stash, proxy).await?;
+
+        let runtime = *self;
+        Ok(responses
+            .into_iter()
+            .filter(|response| match response {
+                Response::SupportedProxy(data) => {
+                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    proxy_key.is_staking_valid()
+                        || proxy_key.is_staking_operator_valid()
+                        || proxy_key.is_non_transfer_valid()
+                        || !proxy_key.is_valid()
+                }
+                _ => true,
+            })
+            .collect())
+    }
+
+    async fn fetch_and_validate_collators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error> {
+        let responses = self.fetch_proxy_account(api, stash, proxy).await?;
+
+        let runtime = *self;
+        Ok(responses
+            .into_iter()
+            .filter_map(|response| match response {
+                Response::SupportedProxy(data) => {
+                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    (proxy_key.is_collator_valid()
+                        || proxy_key.is_non_transfer_valid()
+                        || !proxy_key.is_valid())
+                    .then(|| Response::CollatorSupportedProxy(data))
+                }
+                other => Some(other),
+            })
+            .collect())
     }
 
     async fn fetch_account_balance(

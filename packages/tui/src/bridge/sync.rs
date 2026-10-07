@@ -535,7 +535,25 @@ pub fn spawn_fetch_validators_proxy_status(
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
         move |api, stash| async move {
             runtime
-                .fetch_and_validate_proxy_account(&api, &stash, &proxy)
+                .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
+                .await
+        },
+        3,
+    );
+}
+
+pub fn spawn_fetch_collators_proxy_status(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    proxy: &AccountId32,
+    tx: &UnboundedSender<Action>,
+) {
+    let proxy = *proxy;
+    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
+        move |api, stash| async move {
+            runtime
+                .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
                 .await
         },
         3,

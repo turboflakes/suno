@@ -446,6 +446,14 @@ impl App {
                                                 &proxy,
                                                 &tx,
                                             );
+
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
                                         };
 
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
@@ -496,6 +504,16 @@ impl App {
                                             &validator_keys,
                                             &tx,
                                         );
+
+                                        if let Ok(proxy) = runtime.signer_account_id() {
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
+                                        };
 
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
@@ -588,6 +606,16 @@ impl App {
                                                     )));
                                                 return;
                                             }
+                                        };
+
+                                        if let Ok(proxy) = runtime.signer_account_id() {
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
                                         };
 
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
@@ -1058,7 +1086,8 @@ impl App {
                     }
                 }
             }
-            CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
+            CollatorAction::UpdateLastAuthoredBlock(collator_key, block_number) => {
+                let runtime = collator_key.runtime();
                 // Calculate the expected Aura block time and update the chain. This is
                 // the minimum per-block cadence the relay chain can absorb, per the
                 // runtime source: `RELAY_CHAIN_SLOT_DURATION_MILLIS / BLOCK_PROCESSING_VELOCITY`.
@@ -1079,8 +1108,7 @@ impl App {
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                     if let Some(aura) = &chain.aura() {
                         self.collators.update_last_authored_block(
-                            runtime,
-                            stash_bytes,
+                            &collator_key,
                             block_number,
                             chain.finalized_block(),
                             aura.block_time_ms(),
@@ -1091,12 +1119,14 @@ impl App {
             CollatorAction::UpdateIdentity(stash_bytes, identity) => {
                 self.collators.update_identity(stash_bytes, identity);
             }
-            CollatorAction::UpdateNextKeys(runtime, stash_bytes, keys) => {
-                self.collators.update_next_keys(runtime, stash_bytes, keys);
+            CollatorAction::UpdateNextKeys(collator_key, keys) => {
+                self.collators.update_next_keys(&collator_key, keys);
             }
-            CollatorAction::UpdateQueuedKeys(runtime, stash_bytes, keys) => {
-                self.collators
-                    .update_queued_keys(runtime, stash_bytes, keys);
+            CollatorAction::UpdateQueuedKeys(collator_key, keys) => {
+                self.collators.update_queued_keys(&collator_key, keys);
+            }
+            CollatorAction::AddProxy(collator_key, proxy) => {
+                self.collators.add_proxy(&collator_key, proxy);
             }
         }
     }

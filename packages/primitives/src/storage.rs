@@ -174,6 +174,7 @@ pub enum Response {
     CollatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
+    CollatorSupportedProxy(Data<SupportedProxyData>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
 }
@@ -273,6 +274,16 @@ impl Response {
 
     pub fn supported_proxy(account: AccountBytes, supported_proxy: SupportedProxy) -> Self {
         Response::SupportedProxy(Data::new(SupportedProxyData {
+            account,
+            supported_proxy,
+        }))
+    }
+
+    pub fn collator_supported_proxy(
+        account: AccountBytes,
+        supported_proxy: SupportedProxy,
+    ) -> Self {
+        Response::CollatorSupportedProxy(Data::new(SupportedProxyData {
             account,
             supported_proxy,
         }))

@@ -70,6 +70,18 @@ pub async fn fetch_and_validate_proxy_account(
                 SupportedProxy::StakingOperator,
             ));
         }
+        if def.delegate == *proxy && def.proxy_type == ProxyType::Collator {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::Collator,
+            ));
+        }
+        if def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::NonTransfer,
+            ));
+        }
     }
 
     if responses.is_empty() {

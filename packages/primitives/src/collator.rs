@@ -3,7 +3,9 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
+    proxy::{ProxyKey, SupportedProxy},
 };
+use std::collections::HashSet;
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
@@ -34,18 +36,20 @@ impl std::fmt::Display for CollatorStatus {
 /// Specific types using composition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
-    account: NodeAccount,
-    status: CollatorStatus,
-    last_block_authored: Option<u64>,
-    last_block_authored_ts: Option<u128>,
+    pub account: NodeAccount,
+    pub status: CollatorStatus,
+    pub last_block_authored: Option<u64>,
+    pub last_block_authored_ts: Option<u128>,
     // Aura slot the last few produced blocks were claimed for, and how many
     // consecutive blocks have been observed authored under that same slot.
-    last_slot: Option<u64>,
-    blocks_in_slot: u32,
+    pub last_slot: Option<u64>,
+    pub blocks_in_slot: u32,
     // Aura session public key currently active, from `Session::NextKeys`
-    next_keys: Option<[u8; 32]>,
+    pub next_keys: Option<[u8; 32]>,
     // Aura session public key queued for the next session, from `Session::QueuedKeys`
-    queued_keys: Option<[u8; 32]>,
+    pub queued_keys: Option<[u8; 32]>,
+    // Proxy accounts linked to the collator
+    pub proxies: HashSet<ProxyKey>,
 }
 
 impl Collator {
@@ -59,6 +63,7 @@ impl Collator {
             blocks_in_slot: 0,
             next_keys: None,
             queued_keys: None,
+            proxies: HashSet::new(),
         }
     }
 
@@ -235,6 +240,47 @@ impl Collator {
         let remaining_ms = total_ms.saturating_sub(get_elapsed_millis(current_slot_ts));
 
         Some(format_millis(remaining_ms, true, false))
+    }
+
+    pub fn is_proxy_valid(&self) -> bool {
+        self.proxies
+            .iter()
+            .any(|p| p.is_non_transfer_valid() || p.is_collator_valid())
+    }
+
+    pub fn has_proxies(&self) -> bool {
+        !self.proxies.is_empty()
+    }
+
+    pub fn proxies_as_str(&self) -> String {
+        let mut proxies = self
+            .proxies
+            .iter()
+            .filter(|p| p.is_valid())
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if proxies.is_empty() {
+            return String::new();
+        }
+
+        proxies.sort();
+        format!(
+            "[{}]",
+            proxies
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+
+    pub fn get_proxy(&self, runtime: SupportedRuntime) -> SupportedProxy {
+        self.proxies
+            .iter()
+            .find(|p| p.runtime == runtime)
+            .map(|p| p.proxy)
+            .unwrap_or(SupportedProxy::None)
     }
 }
 

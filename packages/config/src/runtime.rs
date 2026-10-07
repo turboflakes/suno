@@ -522,6 +522,29 @@ impl SupportedRuntime {
         )
     }
 
+    pub fn is_para_chain(&self) -> bool {
+        matches!(
+            self,
+            Self::AssetHubPolkadot
+                | Self::PeoplePolkadot
+                | Self::CoretimePolkadot
+                | Self::CollectivesPolkadot
+                | Self::BridgeHubPolkadot
+                | Self::BulletinPolkadot
+                | Self::AssetHubKusama
+                | Self::PeopleKusama
+                | Self::CoretimeKusama
+                | Self::BridgeHubKusama
+                | Self::AssetHubWestend
+                | Self::PeopleWestend
+                | Self::CoretimeWestend
+                | Self::CollectivesWestend
+                | Self::AssetHubPaseo
+                | Self::PeoplePaseo
+                | Self::BulletinPaseo
+        )
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Local => "Local",

@@ -235,6 +235,15 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::CollatorSupportedProxy(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
+            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            tx.send(Action::Collator(CollatorAction::AddProxy(
+                collator_key,
+                proxy_key,
+            )))
+            .boxed()?;
+        }
         Response::Balance(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
@@ -261,9 +270,9 @@ pub fn dispatch_response_action(
             .boxed()?;
         }
         Response::LastAuthoredBlock(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateLastAuthoredBlock(
-                runtime,
-                data.value.account,
+                collator_key,
                 data.value.block,
             )))
             .boxed()?;
@@ -283,17 +292,17 @@ pub fn dispatch_response_action(
             }
         }
         Response::CollatorNextKeys(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateNextKeys(
-                runtime,
-                data.value.account,
+                collator_key,
                 data.value.keys,
             )))
             .boxed()?;
         }
         Response::CollatorQueuedKeys(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateQueuedKeys(
-                runtime,
-                data.value.account,
+                collator_key,
                 data.value.keys,
             )))
             .boxed()?;

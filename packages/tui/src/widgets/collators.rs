@@ -8,6 +8,7 @@ use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
     collator::{Collator, CollatorStatus},
     identity::Identity,
+    proxy::ProxyKey,
     AccountDisplay, AccountKey,
 };
 
@@ -66,6 +67,13 @@ impl CollatorsList {
         self.collators_order
             .iter()
             .filter_map(move |key| self.collators.get(key))
+    }
+
+    // Returns true if any validator has proxies available
+    pub fn proxies_available(&self) -> bool {
+        self.collators_order
+            .iter()
+            .any(|key| self.collators.get(key).is_some_and(|c| c.has_proxies()))
     }
 
     // Helper method to get collator by table index
@@ -294,12 +302,11 @@ impl CollatorsList {
         }
     }
 
-    /// Seeds collators last produced block number, the `current_block`/`block_time_ms`
+    /// Seeds the collator's last produced block number, the `current_block`/`block_time_ms`
     /// are used to estimate how long ago that block was authored.
     pub fn update_last_authored_block(
         &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
+        collator_key: &CollatorKey,
         block_number: u64,
         current_block: u64,
         block_time_ms: Option<u64>,
@@ -316,19 +323,17 @@ impl CollatorsList {
             None => now,
         };
 
-        for collator in self.collators.values_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes
-                    && block_number > collator.last_block_authored().unwrap_or(0)
-                {
-                    collator.set_last_block_authored(block_number, ts);
-                }
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            if block_number > collator.last_block_authored().unwrap_or(0) {
+                collator.set_last_block_authored(block_number, ts);
             }
         }
     }
 
-    /// Sets the on-chain identity for whichever collator matches `stash_bytes`.
+    /// Sets the on-chain identity for the collator matching `collator_key`.
+    /// Sets the on-chain identity for every collator matching `stash_bytes`, regardless
+    /// of runtime: identity is fetched once per stash via the People chain and fans out
+    /// to every chain where that same stash runs as a collator.
     pub fn update_identity(&mut self, stash_bytes: [u8; 32], identity: Identity) {
         for collator in self.collators.values_mut() {
             let collator_stash: [u8; 32] = *collator.stash().as_ref();
@@ -338,35 +343,21 @@ impl CollatorsList {
         }
     }
 
-    pub fn update_next_keys(
-        &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
-        keys: Option<[u8; 32]>,
-    ) {
-        for collator in self.collators.values_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes {
-                    collator.set_next_keys(keys);
-                }
-            }
+    pub fn update_next_keys(&mut self, collator_key: &CollatorKey, keys: Option<[u8; 32]>) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_next_keys(keys);
         }
     }
 
-    pub fn update_queued_keys(
-        &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
-        keys: Option<[u8; 32]>,
-    ) {
-        for collator in self.collators.values_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes {
-                    collator.set_queued_keys(keys);
-                }
-            }
+    pub fn update_queued_keys(&mut self, collator_key: &CollatorKey, keys: Option<[u8; 32]>) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_queued_keys(keys);
+        }
+    }
+
+    pub fn add_proxy(&mut self, collator_key: &CollatorKey, proxy: ProxyKey) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.proxies.insert(proxy);
         }
     }
 }

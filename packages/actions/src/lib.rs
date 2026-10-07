@@ -18,6 +18,7 @@ use suno_primitives::{
 use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
+type CollatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
 type AccountBytes = [u8; 32];
 type BlockNumber = u64;
@@ -150,10 +151,11 @@ pub enum CollatorAction {
     UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
     UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
-    UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
+    UpdateLastAuthoredBlock(CollatorKey, BlockNumber),
     UpdateIdentity(AccountBytes, Identity),
-    UpdateNextKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
-    UpdateQueuedKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
+    UpdateNextKeys(CollatorKey, Option<[u8; 32]>),
+    UpdateQueuedKeys(CollatorKey, Option<[u8; 32]>),
+    AddProxy(CollatorKey, ProxyKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

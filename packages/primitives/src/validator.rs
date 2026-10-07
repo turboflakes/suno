@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
@@ -9,6 +7,7 @@ use crate::{
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
+use std::collections::HashSet;
 use subxt::utils::AccountId32;
 use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 

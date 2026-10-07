@@ -2,15 +2,78 @@ use super::node_runtime;
 use async_recursion::async_recursion;
 use node_runtime::runtime_types::pallet_identity::types::Data;
 use node_runtime::runtime_types::{
-    pallet_identity::types::Registration, people_kusama_runtime::people::IdentityInfo,
-    people_kusama_runtime::SessionKeys,
+    bounded_collections::bounded_vec::BoundedVec, pallet_identity::types::Registration,
+    pallet_proxy::ProxyDefinition, people_kusama_runtime::people::IdentityInfo,
+    people_kusama_runtime::ProxyType, people_kusama_runtime::SessionKeys,
 };
 use std::collections::HashMap;
 use std::result::Result;
 use subxt::{utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
-use suno_primitives::{identity::Identity, AccountKey, Response};
+use suno_primitives::{identity::Identity, proxy::SupportedProxy, AccountKey, Response};
+
+/// Fetch and validate a proxy account for a given stash at the specified block hash
+pub async fn fetch_and_validate_proxy_account(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+    proxy: &AccountId32,
+) -> Result<Vec<Response>, Error> {
+    let mut responses: Vec<Response> = Vec::new();
+    let account_bytes = *stash.as_ref();
+
+    let (BoundedVec(proxies), _) = fetch_account_proxies(api, stash).await?;
+
+    for def in proxies {
+        if def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::NonTransfer,
+            ));
+        }
+        if def.delegate == *proxy && def.proxy_type == ProxyType::Collator {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::Collator,
+            ));
+        }
+    }
+
+    if responses.is_empty() {
+        responses.push(Response::supported_proxy(
+            account_bytes,
+            SupportedProxy::None,
+        ));
+    }
+
+    Ok(responses)
+}
+
+/// Fetch proxies for a given account at the specified block hash
+async fn fetch_account_proxies(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<
+    (
+        BoundedVec<ProxyDefinition<AccountId32, ProxyType, u32>>,
+        u128,
+    ),
+    Error,
+> {
+    let addr = node_runtime::storage().proxy().proxies();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
 
 pub async fn fetch_identity(
     api: &OnlineClientAtBlock<CustomConfig>,
