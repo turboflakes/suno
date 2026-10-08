@@ -219,7 +219,9 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     // show how to open popup with available commands depending on the active section
     if ((app.validators.is_active()
-        && (app.validators.is_proxy_valid() || app.validators.is_commands_available()))
+        && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
+        || (app.collators.is_active()
+            && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
         || app.chains.is_active())
         && !app.popup.is_visible()
     {
@@ -328,7 +330,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         "switch window".to_string(),
         theme.paragraph.label,
     ));
-    if app.popup.get_mode() != PopupMode::ThemeMenu {
+    if app.popup.is_hidden() && app.popup.get_mode() != PopupMode::ThemeMenu {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("ctrl+t".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));

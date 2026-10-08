@@ -1,5 +1,5 @@
 use crate::entry::{AsBytes, ToDescription, ToHex, ToJson, ToMethod, ToPlaceholder};
-use crate::session::{Keys, KeysError, Proof, ProofError};
+use crate::session::{AuraKey, Keys, KeysError, Proof, ProofError};
 use crate::staking::{Payee, PayeeError};
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
@@ -10,6 +10,17 @@ use suno_config::CustomCommand;
 type Amount = u128;
 type Description = String;
 type Max = Option<(Amount, Description)>;
+
+/// Which menu/role `Call::parse` is being invoked for. `set_keys`/`purge_keys` are
+/// typed identically by the user either way; this is what lets `parse` resolve
+/// them to the right variant (`SetKeys`/`PurgeKeys` for a validator, `SetSessionKeys`/
+/// `PurgeSessionKeys` for a collator) without the caller having to type different text.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CallContext {
+    #[default]
+    Validator,
+    Collator,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +58,11 @@ pub enum Call {
         proof: Proof,
     },
     PurgeKeys,
+    SetSessionKeys {
+        aura_key: AuraKey,
+        proof: Proof,
+    },
+    PurgeSessionKeys,
     RegisterAsCandidate,
     LeaveIntent,
     UpdateBond {
@@ -98,16 +114,19 @@ pub enum CallError {
 }
 
 impl Call {
-    /// Parses a call from a string representation.
     pub fn parse(
         input: &str,
         decimals: u32,
         custom_commands: &[CustomCommand],
+        context: CallContext,
     ) -> Result<Self, CallError> {
         match input.split_once(' ') {
             None => match input {
                 "chill" => Ok(Self::Chill),
-                "purge_keys" => Ok(Self::PurgeKeys),
+                "purge_keys" => match context {
+                    CallContext::Validator => Ok(Self::PurgeKeys),
+                    CallContext::Collator => Ok(Self::PurgeSessionKeys),
+                },
                 "register_as_candidate" => Ok(Self::RegisterAsCandidate),
                 "leave_intent" => Ok(Self::LeaveIntent),
                 "withdraw_unbonded" => Ok(Self::WithdrawUnbonded { max: None }),
@@ -184,15 +203,26 @@ impl Call {
                 "set_keys" => match args.split_once(' ') {
                     None => Err(CallError::MissingArgumentSilent),
                     Some((keys, proof)) => {
-                        let keys = Keys::from_str(keys).map_err(|e| match e {
-                            KeysError::MissingHex => CallError::MissingArgumentSilent,
-                            e => CallError::InvalidKeys(e),
-                        })?;
                         let proof = Proof::from_str(proof).map_err(|e| match e {
                             ProofError::MissingHex => CallError::MissingArgumentSilent,
                             e => CallError::InvalidProof(e),
                         })?;
-                        Ok(Self::SetKeys { keys, proof })
+                        match context {
+                            CallContext::Validator => {
+                                let keys = Keys::from_str(keys).map_err(|e| match e {
+                                    KeysError::MissingHex => CallError::MissingArgumentSilent,
+                                    e => CallError::InvalidKeys(e),
+                                })?;
+                                Ok(Self::SetKeys { keys, proof })
+                            }
+                            CallContext::Collator => {
+                                let aura_key = AuraKey::from_str(keys).map_err(|e| match e {
+                                    KeysError::MissingHex => CallError::MissingArgumentSilent,
+                                    e => CallError::InvalidKeys(e),
+                                })?;
+                                Ok(Self::SetSessionKeys { aura_key, proof })
+                            }
+                        }
                     }
                 },
                 "validate" => match args.split_once(' ') {
@@ -268,6 +298,8 @@ impl std::fmt::Display for Call {
             Self::Chill => write!(f, "chill"),
             Self::SetKeys { .. } => write!(f, "set_keys"),
             Self::PurgeKeys => write!(f, "purge_keys"),
+            Self::SetSessionKeys { .. } => write!(f, "set_keys"),
+            Self::PurgeSessionKeys => write!(f, "purge_keys"),
             Self::RegisterAsCandidate => write!(f, "register_as_candidate"),
             Self::LeaveIntent => write!(f, "leave_intent"),
             Self::UpdateBond { .. } => write!(f, "update_bond"),
@@ -324,9 +356,11 @@ impl ToDescription for Call {
                 "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
             }
-            Self::PurgeKeys => "Remove all session keys".to_string(),
+            Self::PurgeKeys => "Remove the validator's session keys".to_string(),
+            Self::SetSessionKeys { .. } => "Set the Aura session key using the output of the `author_rotateKeysWithOwner` RPC call".to_string(),
+            Self::PurgeSessionKeys => "Remove the collator's session key".to_string(),
             Self::RegisterAsCandidate => {
-                "Register as a collator candidate, using registered session keys".to_string()
+                "Register as a collator candidate, using registered session key".to_string()
             }
             Self::LeaveIntent => "Deregister as a collator candidate".to_string(),
             Self::UpdateBond { .. } => "Update the candidacy bond deposit".to_string(),
@@ -360,6 +394,8 @@ impl ToPlaceholder for Call {
             Self::Chill => "chill".to_string(),
             Self::SetKeys { .. } => "set_keys <hex-session-keys> <hex-proof>".to_string(),
             Self::PurgeKeys => "purge_keys".to_string(),
+            Self::SetSessionKeys { .. } => "set_keys <hex-aura-key> <hex-proof>".to_string(),
+            Self::PurgeSessionKeys => "purge_keys".to_string(),
             Self::RegisterAsCandidate => "register_as_candidate".to_string(),
             Self::LeaveIntent => "leave_intent".to_string(),
             Self::UpdateBond { .. } => "update_bond <value-in-standard-units>".to_string(),
@@ -394,9 +430,10 @@ impl ToMethod for Call {
                 format!("staking_rc_client.set_keys {keys} {proof}")
             }
             Self::PurgeKeys => "staking_rc_client.purge_keys".to_string(),
-            // TODO:
-            // session.set_keys
-            // session.purge_keys
+            Self::SetSessionKeys { aura_key, proof } => {
+                format!("session.set_keys {aura_key} {proof}")
+            }
+            Self::PurgeSessionKeys => "session.purge_keys".to_string(),
             Self::RegisterAsCandidate => "collator_selection.register_as_candidate".to_string(),
             Self::LeaveIntent => "collator_selection.leave_intent".to_string(),
             Self::UpdateBond { new_deposit } => {

@@ -204,6 +204,20 @@ impl CollatorsList {
             .and_then(|i| self.get_collator_by_index_cloned(i))
     }
 
+    pub fn is_proxy_valid(&self) -> bool {
+        if let Some(c) = self.get_selected() {
+            return c.is_proxy_valid();
+        }
+        false
+    }
+
+    pub fn has_commands_available(&self) -> bool {
+        if let Some(c) = self.get_selected() {
+            return c.has_commands_available();
+        }
+        false
+    }
+
     pub fn move_down(&mut self) -> Option<Collator> {
         if let Some(selected) = self.table_state.selected() {
             if selected == self.collators_order.len() - 1 {
@@ -358,6 +372,12 @@ impl CollatorsList {
     pub fn add_proxy(&mut self, collator_key: &CollatorKey, proxy: ProxyKey) {
         if let Some(collator) = self.collators.get_mut(collator_key) {
             collator.proxies.insert(proxy);
+        }
+    }
+
+    pub fn update_status(&mut self, collator_key: &CollatorKey, status: CollatorStatus) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_status(status);
         }
     }
 }

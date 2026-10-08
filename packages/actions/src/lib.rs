@@ -7,6 +7,7 @@ use suno_primitives::{
     babe::Epoch,
     balance::Balance,
     call::Call,
+    collator::CollatorStatus,
     identity::Identity,
     network::ConnectionState,
     proxy::ProxyKey,
@@ -155,6 +156,7 @@ pub enum CollatorAction {
     UpdateIdentity(AccountBytes, Identity),
     UpdateNextKeys(CollatorKey, Option<[u8; 32]>),
     UpdateQueuedKeys(CollatorKey, Option<[u8; 32]>),
+    UpdateStatus(CollatorKey, CollatorStatus),
     AddProxy(CollatorKey, ProxyKey),
 }
 

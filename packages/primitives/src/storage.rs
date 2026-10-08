@@ -1,6 +1,7 @@
 use crate::{
     babe::Epoch,
     balance::Balance,
+    collator::CollatorStatus,
     identity::Identity,
     proxy::SupportedProxy,
     session::Keys,
@@ -132,6 +133,13 @@ pub struct CollatorKeysData {
     pub keys: Option<[u8; 32]>,
 }
 
+/// Collator status data combining account and its collator status
+#[derive(Debug)]
+pub struct CollatorStatusData {
+    pub account: AccountBytes,
+    pub status: CollatorStatus,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -175,6 +183,7 @@ pub enum Response {
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
     CollatorSupportedProxy(Data<SupportedProxyData>),
+    CollatorStatus(Data<CollatorStatusData>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
 }
@@ -319,6 +328,10 @@ impl Response {
 
     pub fn collator_queued_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
         Response::CollatorQueuedKeys(Data::new(CollatorKeysData { account, keys }))
+    }
+
+    pub fn collator_status(account: AccountBytes, status: CollatorStatus) -> Self {
+        Response::CollatorStatus(Data::new(CollatorStatusData { account, status }))
     }
 
     pub fn slot_duration(duration_ms: u64) -> Self {

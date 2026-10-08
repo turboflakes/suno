@@ -56,10 +56,10 @@ impl SupportedProxy {
             (Self::StakingOperator, Call::PurgeKeys) => true,
             // TODO: implement Kick
             // (Self::StakingOperator, Call::Kick) => true,
-            // NOTE: NonTransfer proxy is limited to session-key operations on system parachains
-            (Self::NonTransfer, Call::SetKeys { .. }) => true,
-            (Self::NonTransfer, Call::PurgeKeys) => true,
-            // NOTE: Collator proxy is limited to CollatorSelection operations on system parachains
+            // NOTE: NonTransfer proxy is limited to session_key operations on system parachains
+            (Self::NonTransfer, Call::SetSessionKeys { .. }) => true,
+            (Self::NonTransfer, Call::PurgeSessionKeys) => true,
+            // NOTE: Collator proxy is limited to collator_selection operations on system parachains
             (Self::Collator, Call::RegisterAsCandidate) => true,
             (Self::Collator, Call::LeaveIntent) => true,
             (Self::Collator, Call::UpdateBond { .. }) => true,

@@ -17,11 +17,11 @@ use sp_arithmetic::Perbill;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
 use suno_config::SupportedRuntime;
 use suno_primitives::{
-    call::Call,
+    call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
-    session::{Keys, Proof},
+    session::{AuraKey, Keys, Proof},
     staking::Payee,
-    Chain, Validator,
+    AccountDisplay, Chain, Collator, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use suno_theme::Theme;
@@ -34,6 +34,11 @@ type ActiveEra = u32;
 struct ValidatorContext {
     era: ActiveEra,
     validator: Validator,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct CollatorContext {
+    collator: Collator,
 }
 
 struct ChainContext {
@@ -61,6 +66,7 @@ enum Context {
     #[default]
     None,
     ValidatorMenu(Box<ValidatorContext>),
+    CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
     ThemeMenu(Box<ThemeMenuContext>),
     Confirmation(Box<ConfirmationContext>),
@@ -74,6 +80,7 @@ impl Context {
         match self {
             Context::None => Mode::Hidden,
             Context::ValidatorMenu(_) => Mode::Menu,
+            Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Confirmation(_) => Mode::Confirmation,
@@ -150,6 +157,7 @@ impl Popup {
 
         match &context {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
+            Context::CollatorMenu(ctx) => self.init_collator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
             Context::ThemeMenu(ctx) => {
                 self.input.reset_as_filter();
@@ -175,7 +183,7 @@ impl Popup {
     }
 
     fn init_validator_menu(&mut self, ctx: &ValidatorContext) {
-        if !ctx.validator.is_proxy_valid() && !ctx.validator.is_commands_available() {
+        if !ctx.validator.is_proxy_valid() && !ctx.validator.has_commands_available() {
             return;
         }
 
@@ -189,7 +197,8 @@ impl Popup {
         let metadata = InputFieldMetadata::new()
             .with_unit(unit)
             .with_decimals(decimals)
-            .with_custom_commands(ctx.validator.commands.clone());
+            .with_custom_commands(ctx.validator.commands.clone())
+            .with_call_context(CallContext::Validator);
         self.input.reset_as_command(Some(metadata));
 
         ctx.validator.proxies.iter().for_each(|p| {
@@ -293,7 +302,7 @@ impl Popup {
                 keys: Keys::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_keys) && ctx.validator.is_active_or_waiting() {
+            if p.proxy().can_call(&set_keys) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_keys,
                     bytes: None,
@@ -313,6 +322,93 @@ impl Popup {
         });
 
         ctx.validator.commands.iter().for_each(|c| {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::Custom(c.clone()),
+                bytes: None,
+            }));
+        });
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn init_collator_menu(&mut self, ctx: &CollatorContext) {
+        if !ctx.collator.is_proxy_valid() && !ctx.collator.has_commands_available() {
+            return;
+        }
+
+        let runtime = ctx.collator.runtime();
+        let unit = runtime.token_symbol();
+        let decimals = runtime.token_decimals();
+        let metadata = InputFieldMetadata::new()
+            .with_unit(unit)
+            .with_decimals(decimals)
+            .with_custom_commands(ctx.collator.commands.clone())
+            .with_call_context(CallContext::Collator);
+        self.input.reset_as_command(Some(metadata));
+
+        ctx.collator.proxies.iter().for_each(|p| {
+            let register_as_candidate = Call::RegisterAsCandidate;
+            if p.proxy().can_call(&register_as_candidate) && ctx.collator.is_registered_candidate()
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: register_as_candidate,
+                    bytes: None,
+                }));
+            }
+
+            let leave_intent = Call::LeaveIntent;
+            if p.proxy().can_call(&leave_intent) && ctx.collator.is_registered_candidate() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: leave_intent,
+                    bytes: None,
+                }));
+            }
+
+            let update_bond = Call::UpdateBond { new_deposit: 0 };
+            if p.proxy().can_call(&update_bond) && ctx.collator.is_registered_candidate() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: update_bond,
+                    bytes: None,
+                }));
+            }
+
+            let take_candidate_slot = Call::TakeCandidateSlot {
+                deposit: 0,
+                target: ctx.collator.stash(),
+            };
+            if p.proxy().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: take_candidate_slot,
+                    bytes: None,
+                }));
+            }
+
+            let set_session_keys = Call::SetSessionKeys {
+                aura_key: AuraKey::default(),
+                proof: Proof::default(),
+            };
+            if p.proxy().can_call(&set_session_keys) {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: set_session_keys,
+                    bytes: None,
+                }));
+            }
+
+            let purge_session_keys = Call::PurgeSessionKeys;
+            if p.proxy().can_call(&purge_session_keys)
+                && ctx.collator.is_active_or_waiting()
+                && ctx.collator.has_keys()
+            {
+                self.options.push(Entry::new(Command::Instruction {
+                    call: purge_session_keys,
+                    bytes: None,
+                }));
+            }
+        });
+
+        ctx.collator.commands.iter().for_each(|c| {
             self.options.push(Entry::new(Command::Instruction {
                 call: Call::Custom(c.clone()),
                 bytes: None,
@@ -352,6 +448,13 @@ impl Popup {
             validator: validator.clone(),
         };
         self.on_init(Context::ValidatorMenu(Box::new(ctx)));
+    }
+
+    pub fn show_collator_commands(&mut self, collator: &Collator) {
+        let ctx = CollatorContext {
+            collator: collator.clone(),
+        };
+        self.on_init(Context::CollatorMenu(Box::new(ctx)));
     }
 
     pub fn show_chain_commands(&mut self, chain: &Chain) {
@@ -584,6 +687,7 @@ impl Popup {
         matches!(
             self.context,
             Context::ValidatorMenu(_)
+                | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
                 | Context::ThemeMenu(_)
                 | Context::ChainSpecs(_)

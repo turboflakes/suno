@@ -250,6 +250,40 @@ impl RuntimeCaller for Runtime {
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
+            Runtime::CoretimeKusama => match call {
+                Call::RegisterAsCandidate => {
+                    let rc =
+                        suno_coretime_kusama::extrinsics::collator_selection_register_as_candidate(
+                        );
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::UpdateBond { new_deposit } => {
+                    let rc = suno_coretime_kusama::extrinsics::collator_selection_update_bond(
+                        new_deposit,
+                    );
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::LeaveIntent => {
+                    let rc = suno_coretime_kusama::extrinsics::collator_selection_leave_intent();
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::TakeCandidateSlot { deposit, target } => {
+                    let rc =
+                        suno_coretime_kusama::extrinsics::collator_selection_take_candidate_slot(
+                            deposit, target,
+                        );
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::SetSessionKeys { aura_key, proof } => {
+                    let rc = suno_coretime_kusama::extrinsics::session_set_keys(aura_key, proof);
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeSessionKeys => {
+                    let rc = suno_coretime_kusama::extrinsics::session_purge_keys();
+                    suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                _ => Err(Error::UnsupportedCall(call.to_string())),
+            },
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

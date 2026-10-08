@@ -325,7 +325,7 @@ impl Validator {
         self.commands.iter().any(|c| c.is_super())
     }
 
-    pub fn is_commands_available(&self) -> bool {
+    pub fn has_commands_available(&self) -> bool {
         !self.commands.is_empty()
     }
 }

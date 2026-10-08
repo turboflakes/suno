@@ -46,6 +46,7 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::process_transaction_events(events),
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::process_transaction_events(events),
             Runtime::AssetHubWestend => suno_asset_hub_westend::process_transaction_events(events),
+            Runtime::CoretimeKusama => suno_coretime_kusama::process_transaction_events(events),
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -130,6 +131,9 @@ impl RuntimeProcessor for Runtime {
             }
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::process_block_extrinsics(api, extrinsics).await
             }
             _ => Ok(vec![]),
         }

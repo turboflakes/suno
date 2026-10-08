@@ -7,7 +7,7 @@ use crate::{
 };
 use std::collections::HashSet;
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
+use suno_config::{CustomCommand, SupportedRuntime};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorStatus {
@@ -50,6 +50,7 @@ pub struct Collator {
     pub queued_keys: Option<[u8; 32]>,
     // Proxy accounts linked to the collator
     pub proxies: HashSet<ProxyKey>,
+    pub commands: Vec<CustomCommand>,
 }
 
 impl Collator {
@@ -64,6 +65,7 @@ impl Collator {
             next_keys: None,
             queued_keys: None,
             proxies: HashSet::new(),
+            commands: Vec::new(),
         }
     }
 
@@ -118,6 +120,22 @@ impl Collator {
 
     pub fn is_waiting(&self) -> bool {
         self.status == CollatorStatus::Waiting
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        self.status == CollatorStatus::Unknown
+    }
+
+    pub fn is_active_or_waiting(&self) -> bool {
+        self.status != CollatorStatus::Unknown
+    }
+
+    pub fn is_registered_candidate(&self) -> bool {
+        self.is_permissionless() || self.is_waiting()
+    }
+
+    pub fn has_keys(&self) -> bool {
+        self.next_keys.is_some()
     }
 
     pub fn last_block_authored(&self) -> Option<u64> {
@@ -281,6 +299,10 @@ impl Collator {
             .find(|p| p.runtime == runtime)
             .map(|p| p.proxy)
             .unwrap_or(SupportedProxy::None)
+    }
+
+    pub fn has_commands_available(&self) -> bool {
+        !self.commands.is_empty()
     }
 }
 

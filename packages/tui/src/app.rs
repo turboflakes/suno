@@ -28,7 +28,7 @@ use suno_config::{
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, AccountKey,
-    Chain, Validator,
+    Chain, Collator, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -1128,6 +1128,9 @@ impl App {
             CollatorAction::AddProxy(collator_key, proxy) => {
                 self.collators.add_proxy(&collator_key, proxy);
             }
+            CollatorAction::UpdateStatus(collator_key, status) => {
+                self.collators.update_status(&collator_key, status);
+            }
         }
     }
 
@@ -1493,7 +1496,7 @@ impl App {
         }
 
         if self.section == Section::Validators && self.validators.is_active() {
-            if !self.validators.is_proxy_valid() && !self.validators.is_commands_available() {
+            if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
                 return;
             }
 
@@ -1516,6 +1519,21 @@ impl App {
 
             self.popup
                 .show_validator_commands(&validator, active_era.index());
+
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        };
+
+        if self.section == Section::Collators && self.collators.is_active() {
+            if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
+                return;
+            }
+
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            self.popup.show_collator_commands(&collator);
 
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
@@ -1717,6 +1735,22 @@ impl App {
             }
         };
 
+        if self.section == Section::Collators {
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            match self.popup.get_mode() {
+                PopupMode::Menu => {
+                    self.on_collator_menu_enter(collator);
+                }
+                PopupMode::Confirmation => {
+                    self.on_collator_confirm_enter(collator);
+                }
+                _ => {}
+            }
+        };
+
         if self.section == Section::Chains {
             let Some(chain) = self.chains.get_selected() else {
                 return;
@@ -1781,6 +1815,101 @@ impl App {
         let supported_proxy = validator.get_proxy(runtime);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+        tokio::spawn(async move {
+            let at_block = match api.at_current_block().await.boxed() {
+                Ok(client) => client,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_current_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let call_data_bytes =
+                match runtime.build_call_data(&at_block, &stash, call.clone(), supported_proxy) {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to build call data: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                };
+
+            info!("method: {}", call.to_method());
+            info!("call_data: 0x{}", hex::encode(&call_data_bytes));
+
+            let qr_bytes = match build_transaction_qrcode(
+                &at_block,
+                &proxy_account_id,
+                &call_data_bytes,
+            )
+            .await
+            {
+                Ok(qr_bytes) => qr_bytes,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to build QR data: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+            info!("qr_bytes: 0x{}", hex::encode(&qr_bytes));
+
+            let spec_version = at_block.spec_version();
+            let ctx = Box::new(ConfirmationContext {
+                runtime,
+                spec_version,
+                proxy_identity,
+                stash_identity,
+                call,
+                call_data_bytes,
+                qr_bytes,
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowConfirmAndSign(ctx)));
+        });
+    }
+
+    /// Handle enter when a collator is selected and popup is in menu mode
+    /// showing available extrinsics/commands
+    pub fn on_collator_menu_enter(&mut self, collator: Collator) {
+        let Some(call) = self.popup.get_input_parsed_call() else {
+            return;
+        };
+
+        match call {
+            Call::Custom(_) => {}
+            _ => self.handle_collator_extrinsic_calls(call, collator),
+        }
+    }
+
+    pub fn handle_collator_extrinsic_calls(&mut self, call: Call, collator: Collator) {
+        let runtime = collator.runtime();
+
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
+        let stash = collator.key().stash();
+        let proxy_account_id = match runtime.signer_account_id().boxed() {
+            Ok(address) => address,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        };
+        let supported_proxy = collator.get_proxy(runtime);
+        let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
+        let stash_identity = collator.display_name(3);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -2086,6 +2215,35 @@ impl App {
                 }
             }
         };
+
+        if self.section == Section::Collators {
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            if self.popup.is_confirmation_mode() {
+                let runtime = collator.runtime();
+                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                    return;
+                };
+                let Some(bytes) = self.popup.get_call_data_bytes() else {
+                    return;
+                };
+                let api = chain.client().clone();
+                let tx = self.tx.clone();
+
+                if let Ok(signer) = runtime.signer_account_id() {
+                    sync::spawn_submit_call_data_with_signature(
+                        &api,
+                        runtime,
+                        &signer,
+                        &bytes,
+                        signature_bytes,
+                        &tx,
+                    );
+                }
+            }
+        };
     }
 
     /// Handle enter when a validator is selected and popup is in confirmation mode
@@ -2095,6 +2253,73 @@ impl App {
             .runtime()
             .asset_hub_runtime()
             .expect("every relay has an AssetHub chain");
+
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+
+        let Some(bytes) = self.popup.get_call_data_bytes() else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
+
+        let result = self
+            .popup
+            .execute_with_password(|password| -> AppResult<()> {
+                let password = Zeroizing::new(password.to_string());
+
+                tokio::spawn(async move {
+                    // Use spawn_blocking for CPU-intensive decrypt_json operation
+                    let signer_result =
+                        tokio::task::spawn_blocking(move || suno_signer::load_keypair(&password))
+                            .await;
+
+                    match signer_result {
+                        Ok(Ok(signer)) => {
+                            sync::spawn_sign_and_submit_call_data(
+                                &api, runtime, &signer, &bytes, &tx,
+                            );
+                        }
+                        Ok(Err(e)) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Failed to load keypair: {}",
+                                e
+                            ))));
+                            let _ = tx.send(Action::Input(InputAction::Error(
+                                "Invalid password".to_string(),
+                            )));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Task failed: {}",
+                                e
+                            ))));
+                            let _ = tx.send(Action::Input(InputAction::Error(
+                                "Something went wrong, check errors and try again".to_string(),
+                            )));
+                        }
+                    }
+                });
+
+                // Lock input so it can't be changed unless there's an error
+                // and remove focus from the input field and start verification password spinner
+                let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+                Ok(())
+            });
+        if let Err(e) = result {
+            let _ = self
+                .tx
+                .send(Action::System(SystemAction::Error(e.to_string())));
+            let _ = self.tx.send(Action::Input(InputAction::Error(
+                "Something went wrong, check errors and try again".to_string(),
+            )));
+        }
+    }
+
+    pub fn on_collator_confirm_enter(&mut self, collator: Collator) {
+        let runtime = collator.runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
