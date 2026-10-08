@@ -1,10 +1,52 @@
 use super::node_runtime;
-use node_runtime::runtime_types::bulletin_paseo_runtime::SessionKeys;
+use node_runtime::runtime_types::{
+    bulletin_paseo_runtime::SessionKeys, frame_system::AccountInfo,
+    pallet_balances::types::AccountData,
+};
 use std::collections::HashMap;
 use subxt::{utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
-use suno_primitives::{AccountKey, Response};
+use suno_primitives::{balance::Balance, AccountKey, Response};
+
+/// Fetch balance for a given stash at the specified block hash
+pub async fn fetch_balance(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+
+    let account_info = fetch_system_account(api, stash).await?;
+
+    Ok(Response::balance(
+        account_bytes,
+        Balance::new(
+            account_info.data.free,
+            account_info.data.frozen,
+            account_info.data.reserved,
+        ),
+    ))
+}
+
+/// Fetch balance for a given account at the specified block hash
+async fn fetch_system_account(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<AccountInfo<u32, AccountData<u128>>, Error> {
+    let addr = node_runtime::storage().system().account();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch((*stash,))
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
+}
 
 /// Fetch the current Aura authority set (session public keys) at the specified block hash
 pub async fn fetch_aura_authorities(

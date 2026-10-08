@@ -701,6 +701,21 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_balance(api, stash).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_balance(api, stash).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_balance(api, stash).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_balance(api, stash).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_balance(api, stash).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_balance(api, stash).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_balance(api, stash).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_balance(api, stash).await
+            }
+            Runtime::PeopleKusama => suno_people_kusama::fetch_balance(api, stash).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_balance(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_balance(api, stash).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_balance(api, stash).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_balance(api, stash).await,
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_balance(api, stash).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
