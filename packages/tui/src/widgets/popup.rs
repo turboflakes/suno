@@ -366,7 +366,10 @@ impl Popup {
                 }));
             }
 
-            let update_bond = Call::UpdateBond { new_deposit: 0 };
+            let update_bond = Call::UpdateBond {
+                new_deposit: 0,
+                max: Some(ctx.collator.free_balance_extended(4)),
+            };
             if p.proxy().can_call(&update_bond) && ctx.collator.is_registered_candidate() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: update_bond,

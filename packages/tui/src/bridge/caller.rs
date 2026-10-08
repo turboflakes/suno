@@ -257,7 +257,7 @@ impl RuntimeCaller for Runtime {
                         );
                     suno_coretime_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
-                Call::UpdateBond { new_deposit } => {
+                Call::UpdateBond { new_deposit, .. } => {
                     let rc = suno_coretime_kusama::extrinsics::collator_selection_update_bond(
                         new_deposit,
                     );

@@ -431,7 +431,7 @@ impl App {
                                             &tx,
                                         );
 
-                                        sync::spawn_fetch_account_balance(
+                                        sync::spawn_fetch_validators_account_balance(
                                             &api_at,
                                             runtime,
                                             &validator_keys,
@@ -468,6 +468,12 @@ impl App {
                                             &tx,
                                         );
                                         sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_account_balance(
                                             &api_at,
                                             runtime,
                                             &collator_keys,
@@ -527,6 +533,12 @@ impl App {
                                             &tx,
                                         );
                                         sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_account_balance(
                                             &api_at,
                                             runtime,
                                             &collator_keys,
@@ -630,6 +642,12 @@ impl App {
                                             &tx,
                                         );
                                         sync::spawn_fetch_collators_next_keys(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_collators_account_balance(
                                             &api_at,
                                             runtime,
                                             &collator_keys,
@@ -987,7 +1005,12 @@ impl App {
                             &validator_keys,
                             &tx,
                         );
-                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                        sync::spawn_fetch_validators_account_balance(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
                     });
                 }
             }
@@ -1014,7 +1037,12 @@ impl App {
                             }
                         };
 
-                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                        sync::spawn_fetch_validators_account_balance(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
                     });
                 }
             }
@@ -1130,6 +1158,9 @@ impl App {
             }
             CollatorAction::UpdateStatus(collator_key, status) => {
                 self.collators.update_status(&collator_key, status);
+            }
+            CollatorAction::UpdateBalance(collator_key, balance) => {
+                self.collators.update_balance(&collator_key, balance);
             }
         }
     }

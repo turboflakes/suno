@@ -6,6 +6,7 @@ use std::{
 };
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
+    balance::Balance,
     collator::{Collator, CollatorStatus},
     identity::Identity,
     proxy::ProxyKey,
@@ -379,5 +380,15 @@ impl CollatorsList {
         if let Some(collator) = self.collators.get_mut(collator_key) {
             collator.set_status(status);
         }
+    }
+
+    fn set_balance(&mut self, collator_key: &AccountKey, balance: Balance) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.account.set_balance(balance);
+        }
+    }
+
+    pub fn update_balance(&mut self, collator_key: &CollatorKey, balance: Balance) {
+        self.set_balance(collator_key, balance);
     }
 }

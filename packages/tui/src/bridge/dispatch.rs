@@ -253,6 +253,14 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::CollatorBalance(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Collator(CollatorAction::UpdateBalance(
+                collator_key,
+                data.value.balance,
+            )))
+            .boxed()?;
+        }
         Response::AuraAuthorities(_data) => {
             // Raw Aura session public keys, not stashes - not yet consumed by app state.
             // See Response::SessionValidators for the stash-addressable authority set.

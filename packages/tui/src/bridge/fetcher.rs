@@ -150,6 +150,18 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_validators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_collators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_aura_authorities(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -688,8 +700,32 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_balance(api, stash).await,
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_balance(api, stash).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_balance(api, stash).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_balance(api, stash).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
+    }
+
+    async fn fetch_validators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        let response = self.fetch_account_balance(api, stash).await?;
+
+        Ok(response)
+    }
+
+    async fn fetch_collators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        let response = self.fetch_account_balance(api, stash).await?;
+
+        Ok(match response {
+            Response::Balance(data) => Response::CollatorBalance(data),
+            other => other,
+        })
     }
 
     async fn fetch_aura_authorities(

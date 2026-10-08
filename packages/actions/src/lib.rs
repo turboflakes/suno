@@ -157,6 +157,7 @@ pub enum CollatorAction {
     UpdateNextKeys(CollatorKey, Option<[u8; 32]>),
     UpdateQueuedKeys(CollatorKey, Option<[u8; 32]>),
     UpdateStatus(CollatorKey, CollatorStatus),
+    UpdateBalance(CollatorKey, Balance),
     AddProxy(CollatorKey, ProxyKey),
 }
 

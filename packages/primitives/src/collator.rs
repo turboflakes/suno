@@ -82,6 +82,17 @@ impl Collator {
         self.account.identity().as_ref()
     }
 
+    pub fn free_balance(&self) -> u128 {
+        self.account.free_balance()
+    }
+
+    pub fn free_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.free_balance(),
+            self.account.free_balance_as_str(decimal_places),
+        )
+    }
+
     pub fn display_name(&self, size: usize) -> String {
         if let Some(identity) = self.identity() {
             format!("{} ({})", identity, self.to_compact_string(size))

@@ -560,14 +560,26 @@ pub fn spawn_fetch_collators_proxy_status(
     );
 }
 
-pub fn spawn_fetch_account_balance(
+pub fn spawn_fetch_validators_account_balance(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
-        move |api, stash| async move { runtime.fetch_account_balance(&api, &stash).await },
+        move |api, stash| async move { runtime.fetch_validators_account_balance(&api, &stash).await },
+        3,
+    );
+}
+
+pub fn spawn_fetch_collators_account_balance(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    validator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_collators_account_balance(&api, &stash).await },
         3,
     );
 }

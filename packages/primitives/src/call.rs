@@ -67,6 +67,7 @@ pub enum Call {
     LeaveIntent,
     UpdateBond {
         new_deposit: u128,
+        max: Max,
     },
     TakeCandidateSlot {
         deposit: u128,
@@ -255,7 +256,10 @@ impl Call {
                 "update_bond" => match args.split_once(' ') {
                     None => {
                         let new_deposit = parse_standard_unit(args, decimals)?;
-                        Ok(Self::UpdateBond { new_deposit })
+                        Ok(Self::UpdateBond {
+                            new_deposit,
+                            max: None,
+                        })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
@@ -363,7 +367,14 @@ impl ToDescription for Call {
                 "Register as a collator candidate, using registered session key".to_string()
             }
             Self::LeaveIntent => "Deregister as a collator candidate".to_string(),
-            Self::UpdateBond { .. } => "Update the candidacy bond deposit".to_string(),
+            Self::UpdateBond { max, .. } => {
+                format!(
+                    "Update the candidacy bond deposit, up to {} from your free balance",
+                    max.as_ref()
+                        .map(|(_, description)| description.to_string())
+                        .unwrap_or_default()
+                )
+            }
             Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
             Self::Custom(custom) => custom.to_string(),
             Self::ChainSpecs { chain_name } => {
@@ -436,7 +447,7 @@ impl ToMethod for Call {
             Self::PurgeSessionKeys => "session.purge_keys".to_string(),
             Self::RegisterAsCandidate => "collator_selection.register_as_candidate".to_string(),
             Self::LeaveIntent => "collator_selection.leave_intent".to_string(),
-            Self::UpdateBond { new_deposit } => {
+            Self::UpdateBond { new_deposit, .. } => {
                 format!("collator_selection.update_bond {new_deposit}")
             }
             Self::TakeCandidateSlot { deposit, target } => {

@@ -175,6 +175,7 @@ pub enum Response {
     EventWithdrawn(Data<AmountData>),
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
+    CollatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
@@ -300,6 +301,10 @@ impl Response {
 
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {
         Response::Balance(Data::new(BalanceData { account, balance }))
+    }
+
+    pub fn collator_balance(account: AccountBytes, balance: Balance) -> Self {
+        Response::CollatorBalance(Data::new(BalanceData { account, balance }))
     }
 
     pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
