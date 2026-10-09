@@ -456,12 +456,21 @@ impl App {
                                             );
                                         };
 
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
                                         sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -474,12 +483,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
+                                        // ---
                                     });
                                 }
                             }
@@ -522,12 +526,21 @@ impl App {
                                             );
                                         };
 
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
                                         sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -540,12 +553,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
+                                        // ---
                                     });
                                 }
 
@@ -632,12 +640,21 @@ impl App {
                                             );
                                         };
 
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
                                         sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -650,12 +667,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
+                                        // ---
                                     });
                                 }
                             }
@@ -928,7 +940,152 @@ impl App {
                     .update_current_slot(&chain_key, block_number, slot);
             }
             ChainAction::UpdateSessionIndex(chain_key, index) => {
-                self.chains.update_session_index(&chain_key, index);
+                let is_updated = self.chains.update_session_index(&chain_key, index);
+                if is_updated {
+                    let runtime = chain_key;
+                    match runtime {
+                        SupportedRuntime::AssetHubPolkadot
+                        | SupportedRuntime::AssetHubKusama
+                        | SupportedRuntime::AssetHubPaseo
+                        | SupportedRuntime::AssetHubWestend
+                        | SupportedRuntime::BridgeHubPolkadot
+                        | SupportedRuntime::BridgeHubKusama
+                        | SupportedRuntime::CoretimePolkadot
+                        | SupportedRuntime::CoretimeKusama
+                        | SupportedRuntime::CollectivesPolkadot
+                        | SupportedRuntime::CollectivesWestend
+                        | SupportedRuntime::BulletinPolkadot
+                        | SupportedRuntime::BulletinPaseo => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    // Fetched on connected and every new session
+                                    // ---
+                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_queued_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    sync::spawn_fetch_collators_next_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    // ---
+                                });
+                            }
+                        }
+                        SupportedRuntime::PeoplePolkadot
+                        | SupportedRuntime::PeopleKusama
+                        | SupportedRuntime::PeoplePaseo
+                        | SupportedRuntime::PeopleWestend => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_queued_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    sync::spawn_fetch_collators_next_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                });
+                            }
+
+                            // NOTE: On every session change, identity is currently re-fetched. Ideally these should be event-based
+                            // and there is no need for a re-fetch here.
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                // Fetch collators for each parachain, so we can sync their identity
+                                let collator_keys: Vec<Vec<AccountKey>> = [
+                                    Some(runtime), // the People chain's own collators
+                                    runtime.relay_chain().asset_hub_runtime(),
+                                    runtime.relay_chain().bridge_hub_runtime(),
+                                    runtime.relay_chain().coretime_runtime(),
+                                    runtime.relay_chain().collectives_runtime(),
+                                    runtime.relay_chain().bulletin_runtime(),
+                                ]
+                                .into_iter()
+                                .flatten()
+                                .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                .collect();
+
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    // Since collator_keys could be the same stash accross different
+                                    // chains, we need to dedupe the keys before fetching their identity
+                                    // so we dont end up fetching the same key multiple times
+                                    let mut seen = HashSet::new();
+                                    let keys: Vec<AccountKey> = collator_keys
+                                        .iter()
+                                        .flatten()
+                                        .filter(|k| seen.insert(k.bytes))
+                                        .cloned()
+                                        .collect();
+
+                                    sync::spawn_fetch_collators_identity(
+                                        &api_at, runtime, &keys, &tx,
+                                    );
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
             ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
                 self.chains

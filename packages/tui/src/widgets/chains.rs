@@ -157,8 +157,9 @@ impl ChainsList {
     pub fn set_session_index(&mut self, chain_key: &ChainKey, data: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if let Some(aura) = chain.get_mut_aura() {
+                let changed = aura.current_session_index() != Some(data);
                 aura.set_current_session_index(Some(data));
-                return true;
+                return changed;
             }
         }
         false
