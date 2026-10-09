@@ -1,4 +1,5 @@
 use crate::display::format_millis;
+use crate::key::AccountBytes;
 use subxt::{config::substrate::DigestItem, ext::codec::Decode};
 
 /// Consensus engine id used by `pallet_aura` to tag its slot-claim pre-runtime digest.
@@ -14,17 +15,19 @@ pub fn extract_aura_slot(digest_logs: &[DigestItem]) -> Option<u64> {
     })
 }
 
+pub type Deposit = u128;
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Aura {
     // Current session index
     current_session_index: Option<u32>,
     // Current Aura authority set, in on-chain rotation order
-    authorities: Vec<[u8; 32]>,
+    authorities: Vec<AccountBytes>,
     // Fixed invulnerable collator set, from `CollatorSelection::Invulnerables`
-    invulnerables: Vec<[u8; 32]>,
+    invulnerables: Vec<AccountBytes>,
     // Registered collator candidates, from `CollatorSelection::Permissionless`
     // or `CollatorSelection::Candidate`
-    candidates: Vec<[u8; 32]>,
+    candidates: Vec<(AccountBytes, Deposit)>,
     // Aura slot duration in milliseconds, constant for the runtime
     slot_duration_ms: Option<u64>,
     // Expected average block creation in milliseconds, constant
@@ -58,13 +61,13 @@ impl Aura {
         self.slot_duration_ms = slot_duration_ms;
     }
 
-    pub fn invulnerables(&self) -> &[[u8; 32]] {
+    pub fn invulnerables(&self) -> &[AccountBytes] {
         &self.invulnerables
     }
 
     /// Current authorities that are not part of the invulnerable set, i.e. the
     /// collators that got in through the candidacy (permissionless) route.
-    pub fn permissionless(&self) -> Vec<[u8; 32]> {
+    pub fn permissionless(&self) -> Vec<AccountBytes> {
         self.authorities
             .iter()
             .filter(|a| !self.invulnerables.contains(a))
@@ -72,15 +75,15 @@ impl Aura {
             .collect()
     }
 
-    pub fn set_invulnerables(&mut self, invulnerables: Vec<[u8; 32]>) {
+    pub fn set_invulnerables(&mut self, invulnerables: Vec<AccountBytes>) {
         self.invulnerables = invulnerables;
     }
 
-    pub fn set_authorities(&mut self, authorities: Vec<[u8; 32]>) {
+    pub fn set_authorities(&mut self, authorities: Vec<AccountBytes>) {
         self.authorities = authorities;
     }
 
-    pub fn set_candidates(&mut self, candidates: Vec<[u8; 32]>) {
+    pub fn set_candidates(&mut self, candidates: Vec<(AccountBytes, Deposit)>) {
         self.candidates = candidates;
     }
 

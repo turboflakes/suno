@@ -1,5 +1,5 @@
 use crate::{
-    display::{format_millis, get_elapsed_millis},
+    display::{format_millis, format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount},
@@ -17,6 +17,9 @@ pub enum CollatorStatus {
     Invulnerable,
     /// Collator is a registered candidate to become an authority, displayed as [C]
     Candidate,
+    /// Collator that has signalled its intent to leave and remains active until
+    /// the end of the current session, displayed as [E]
+    Exiting,
     /// Collator status is unknown or not yet determined, displayed as [U]
     #[default]
     Unknown,
@@ -28,16 +31,19 @@ impl std::fmt::Display for CollatorStatus {
             Self::Permissionless => write!(f, "[P]"),
             Self::Invulnerable => write!(f, "[I]"),
             Self::Candidate => write!(f, "[C]"),
+            Self::Exiting => write!(f, "[E]"),
             Self::Unknown => write!(f, "[U]"),
         }
     }
 }
 
+type Amount = u128;
+
 /// Specific types using composition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
     pub account: NodeAccount,
-    pub status: CollatorStatus,
+    pub deposit: Amount,
     pub last_block_authored: Option<u64>,
     pub last_block_authored_ts: Option<u128>,
     // Aura slot the last few produced blocks were claimed for, and how many
@@ -51,13 +57,14 @@ pub struct Collator {
     // Proxy accounts linked to the collator
     pub proxies: HashSet<ProxyKey>,
     pub commands: Vec<CustomCommand>,
+    pub status: CollatorStatus,
 }
 
 impl Collator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
-            status: CollatorStatus::default(),
+            deposit: 0,
             last_block_authored: None,
             last_block_authored_ts: None,
             last_slot: None,
@@ -66,6 +73,7 @@ impl Collator {
             queued_keys: None,
             proxies: HashSet::new(),
             commands: Vec::new(),
+            status: CollatorStatus::default(),
         }
     }
 
@@ -136,6 +144,23 @@ impl Collator {
         self.status = status;
     }
 
+    pub fn deposit(&self) -> Amount {
+        self.deposit
+    }
+
+    pub fn deposit_extended(&self, decimal_places: usize) -> (u128, String) {
+        (self.deposit, self.deposit_as_str(decimal_places))
+    }
+
+    fn deposit_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(self.deposit, self.account.token_decimals(), decimal_places);
+        format!("{}{}", value, self.account.token_symbol())
+    }
+
+    pub fn set_deposit(&mut self, value: Amount) {
+        self.deposit = value;
+    }
+
     pub fn is_permissionless(&self) -> bool {
         self.status == CollatorStatus::Permissionless
     }
@@ -148,6 +173,10 @@ impl Collator {
         self.status == CollatorStatus::Candidate
     }
 
+    pub fn is_exiting(&self) -> bool {
+        self.status == CollatorStatus::Exiting
+    }
+
     pub fn is_unknown(&self) -> bool {
         self.status == CollatorStatus::Unknown
     }
@@ -158,6 +187,10 @@ impl Collator {
 
     pub fn is_permissionless_or_candidate(&self) -> bool {
         self.is_permissionless() || self.is_candidate()
+    }
+
+    pub fn is_exiting_or_unknown(&self) -> bool {
+        self.is_exiting() || self.is_unknown()
     }
 
     pub fn is_authority(&self) -> bool {

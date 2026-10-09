@@ -10,7 +10,7 @@ use suno_config::CustomCommand;
 type Amount = u128;
 type Description = String;
 type Max = Option<(Amount, Description)>;
-type Free = Option<(Amount, Description)>;
+type CurrentDeposit = Option<(Amount, Description)>;
 
 /// Which menu/role `Call::parse` is being invoked for. `set_keys`/`purge_keys` are
 /// typed identically by the user either way; this is what lets `parse` resolve
@@ -68,8 +68,8 @@ pub enum Call {
     LeaveIntent,
     UpdateBond {
         new_deposit: u128,
+        current_deposit: CurrentDeposit,
         max: Max,
-        free: Free,
     },
     TakeCandidateSlot {
         deposit: u128,
@@ -260,8 +260,8 @@ impl Call {
                         let new_deposit = parse_standard_unit(args, decimals)?;
                         Ok(Self::UpdateBond {
                             new_deposit,
+                            current_deposit: None,
                             max: None,
-                            free: None,
                         })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
@@ -370,15 +370,15 @@ impl ToDescription for Call {
                 "Register as a collator candidate, using registered session key".to_string()
             }
             Self::LeaveIntent => "Deregister as a collator candidate".to_string(),
-            Self::UpdateBond { max, free,.. } => {
+            Self::UpdateBond { max, current_deposit,.. } => {
                 format!(
-                    "Update the candidacy bond deposit, up to {}, currently {} is on your free balance",
+                    "Update your current deposit of {} by up to {} from your free balance",
+                    current_deposit.as_ref()
+                        .map(|(_, description)| description.to_string())
+                        .unwrap_or_default(),
                     max.as_ref()
                         .map(|(_, description)| description.to_string())
                         .unwrap_or_default(),
-                    free.as_ref()
-                        .map(|(_, description)| description.to_string())
-                        .unwrap_or_default()
                 )
             }
             Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
@@ -415,7 +415,7 @@ impl ToPlaceholder for Call {
             Self::PurgeSessionKeys => "purge_keys".to_string(),
             Self::RegisterAsCandidate => "register_as_candidate".to_string(),
             Self::LeaveIntent => "leave_intent".to_string(),
-            Self::UpdateBond { .. } => "update_bond <value-in-standard-units>".to_string(),
+            Self::UpdateBond { .. } => "update_bond <new-deposit-in-standard-units>".to_string(),
             Self::TakeCandidateSlot { .. } => {
                 "take_candidate_slot <value-in-standard-units> <target-address>".to_string()
             }

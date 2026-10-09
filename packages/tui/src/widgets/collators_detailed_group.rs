@@ -11,7 +11,7 @@ use ratatui::{
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
-    display::{create_progress_bar_by_blocks, format_millis},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks},
     Aura,
 };
 use suno_theme::Theme;
@@ -358,6 +358,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
+            Cell::from(Text::from("deposit").alignment(Alignment::Right)),
             Cell::from(Text::from("last block").alignment(Alignment::Right)),
             Cell::from(Text::from("").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
@@ -372,6 +373,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let mut widths = vec![
             Constraint::Length(3),
             Constraint::Length(24),
+            Constraint::Fill(1),
             Constraint::Fill(2),
             Constraint::Fill(1),
             Constraint::Fill(2),
@@ -454,9 +456,30 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
-            Cell::from(Text::from(last_block_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Left)),
         ];
+
+        if collator.is_permissionless_or_candidate() {
+            cells.push(Cell::from(
+                Line::from(vec![
+                    Span::raw(format_planks(
+                        collator.deposit(),
+                        collator.account.token_decimals(),
+                        4,
+                    )),
+                    Span::raw(collator.account.token_symbol()).style(theme.paragraph.label(false)),
+                ])
+                .alignment(Alignment::Right),
+            ));
+        } else {
+            cells.push(Cell::from(Text::from("")));
+        }
+
+        cells.push(Cell::from(
+            Text::from(last_block_str).alignment(Alignment::Right),
+        ));
+        cells.push(Cell::from(
+            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+        ));
 
         if collator.is_current_slot_author(authorities, current_slot) {
             cells.push(Cell::from(

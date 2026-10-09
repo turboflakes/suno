@@ -4,6 +4,7 @@ use sp_arithmetic::Permill;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
+    aura::Deposit,
     babe::Epoch,
     balance::Balance,
     call::Call,
@@ -151,13 +152,14 @@ pub enum ChainAction {
 pub enum CollatorAction {
     UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
     UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
-    UpdateCandidates(SupportedRuntime, Vec<AccountBytes>),
+    UpdateCandidates(SupportedRuntime, Vec<(AccountBytes, Deposit)>),
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
     UpdateLastAuthoredBlock(CollatorKey, BlockNumber),
     UpdateIdentity(AccountBytes, Identity),
     UpdateNextKeys(CollatorKey, Option<[u8; 32]>),
     UpdateQueuedKeys(CollatorKey, Option<[u8; 32]>),
     UpdateStatus(CollatorKey, CollatorStatus),
+    UpdateDeposit(CollatorKey, Deposit),
     UpdateBalance(CollatorKey, Balance),
     AddProxy(CollatorKey, ProxyKey),
 }

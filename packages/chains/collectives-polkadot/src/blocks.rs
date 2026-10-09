@@ -7,6 +7,7 @@ use crate::node_runtime::{
     },
     session::events::NewSession,
 };
+use crate::storage::{fetch_balance, fetch_candidacy_bond};
 use subxt::{
     client::OnlineClientAtBlockImpl,
     events::Events,
@@ -36,7 +37,7 @@ pub async fn process_runtime_events(
 }
 
 pub async fn process_block_extrinsics(
-    _api: &OnlineClientAtBlock<CustomConfig>,
+    api: &OnlineClientAtBlock<CustomConfig>,
     extrinsics: Extrinsics<'_, CustomConfig, OnlineClientAtBlockImpl<CustomConfig>>,
 ) -> Result<Vec<Response>, Error> {
     let mut processed_extrinsics: Vec<Response> = Vec::new();
@@ -58,6 +59,35 @@ pub async fn process_block_extrinsics(
             {
                 let account_bytes = *stash.as_ref();
                 let res = Response::collator_status(account_bytes, CollatorStatus::Candidate);
+                processed_extrinsics.push(res);
+                // Fetch candidacy bond and update collator deposit
+                let deposit = fetch_candidacy_bond(api).await?;
+                let res = Response::collator_deposit(account_bytes, deposit);
+                processed_extrinsics.push(res);
+                // Fetch account balance and update collator balance
+                let res = fetch_balance(api, &stash).await?;
+                processed_extrinsics.push(res);
+            } else if let RuntimeCall::CollatorSelection(CollatorSelectionCall::leave_intent) =
+                call.as_ref()
+            {
+                let account_bytes = *stash.as_ref();
+                let res = Response::collator_status(account_bytes, CollatorStatus::Exiting);
+                processed_extrinsics.push(res);
+                // Set collator deposit to 0
+                let res = Response::collator_deposit(account_bytes, 0);
+                processed_extrinsics.push(res);
+                // Fetch account balance and update collator balance
+                let res = fetch_balance(api, &stash).await?;
+                processed_extrinsics.push(res);
+            } else if let RuntimeCall::CollatorSelection(CollatorSelectionCall::update_bond {
+                new_deposit,
+            }) = call.as_ref()
+            {
+                let account_bytes = *stash.as_ref();
+                let res = Response::collator_deposit(account_bytes, *new_deposit);
+                processed_extrinsics.push(res);
+                // Fetch account balance and update collator balance
+                let res = fetch_balance(api, &stash).await?;
                 processed_extrinsics.push(res);
             }
         }

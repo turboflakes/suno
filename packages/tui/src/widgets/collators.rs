@@ -1,5 +1,6 @@
 use crate::widgets::collators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use ratatui::widgets::TableState;
+use sp_arithmetic::traits::Zero;
 use std::{
     collections::{BTreeMap, HashMap},
     time::{SystemTime, UNIX_EPOCH},
@@ -14,6 +15,8 @@ use suno_primitives::{
 };
 
 type CollatorKey = AccountKey;
+type Amount = u128;
+type AccountBytes = [u8; 32];
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorsView {
@@ -258,12 +261,20 @@ impl CollatorsList {
     ///
     /// Leaves collators already marked `Invulnerable` untouched, since that status
     /// takes priority regardless of the order the two fetches resolve in.
-    pub fn update_aura_authorities(&mut self, runtime: SupportedRuntime, authorities: &[[u8; 32]]) {
+    pub fn update_aura_authorities(
+        &mut self,
+        runtime: SupportedRuntime,
+        authorities: &[AccountBytes],
+    ) {
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime && *collator.status() != CollatorStatus::Invulnerable {
-                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
                 if authorities.contains(&stash_bytes) {
-                    collator.set_status(CollatorStatus::Permissionless);
+                    if collator.deposit().is_zero() && collator.has_keys() {
+                        collator.set_status(CollatorStatus::Exiting);
+                    } else {
+                        collator.set_status(CollatorStatus::Permissionless);
+                    }
                 }
             }
         }
@@ -271,10 +282,14 @@ impl CollatorsList {
 
     /// Marks the collators of `runtime` found in the invulnerable set, overriding
     /// whatever status they currently have.
-    pub fn update_invulnerables(&mut self, runtime: SupportedRuntime, invulnerables: &[[u8; 32]]) {
+    pub fn update_invulnerables(
+        &mut self,
+        runtime: SupportedRuntime,
+        invulnerables: &[AccountBytes],
+    ) {
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime {
-                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
                 if invulnerables.contains(&stash_bytes) {
                     collator.set_status(CollatorStatus::Invulnerable);
                 }
@@ -286,12 +301,20 @@ impl CollatorsList {
     ///
     /// Leaves collators already marked `Invulnerable` or `Permissionless` untouched, since those status
     /// takes priority regardless of the order the fetches resolve in.
-    pub fn update_candidates(&mut self, runtime: SupportedRuntime, candidates: &[[u8; 32]]) {
+    pub fn update_candidates(
+        &mut self,
+        runtime: SupportedRuntime,
+        candidates: &[(AccountBytes, Amount)],
+    ) {
         for collator in self.collators.values_mut() {
-            if collator.runtime() == runtime && *collator.status() == CollatorStatus::Unknown {
-                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
-                if candidates.contains(&stash_bytes) {
-                    collator.set_status(CollatorStatus::Candidate);
+            if collator.runtime() == runtime {
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
+                if let Some((_, deposit)) = candidates.iter().find(|(who, _)| *who == stash_bytes) {
+                    if *collator.status() == CollatorStatus::Unknown {
+                        collator.set_status(CollatorStatus::Candidate);
+                    }
+
+                    collator.set_deposit(*deposit);
                 }
             }
         }
@@ -402,5 +425,15 @@ impl CollatorsList {
 
     pub fn update_balance(&mut self, collator_key: &CollatorKey, balance: Balance) {
         self.set_balance(collator_key, balance);
+    }
+
+    fn set_deposit(&mut self, collator_key: &AccountKey, amount: Amount) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_deposit(amount);
+        }
+    }
+
+    pub fn update_deposit(&mut self, collator_key: &CollatorKey, amount: Amount) {
+        self.set_deposit(collator_key, amount);
     }
 }

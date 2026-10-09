@@ -1323,6 +1323,9 @@ impl App {
             CollatorAction::UpdateStatus(collator_key, status) => {
                 self.collators.update_status(&collator_key, status);
             }
+            CollatorAction::UpdateDeposit(collator_key, amount) => {
+                self.collators.update_deposit(&collator_key, amount);
+            }
             CollatorAction::UpdateBalance(collator_key, balance) => {
                 self.collators.update_balance(&collator_key, balance);
             }

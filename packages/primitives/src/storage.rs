@@ -1,8 +1,10 @@
 use crate::{
+    aura::Deposit,
     babe::Epoch,
     balance::Balance,
     collator::CollatorStatus,
     identity::Identity,
+    key::AccountBytes,
     proxy::SupportedProxy,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -13,7 +15,6 @@ use std::fmt::Debug;
 use subxt::{client::OnlineClientAtBlockImpl, tx::TransactionProgress, utils::H256};
 use suno_config::CustomConfig;
 
-type AccountBytes = [u8; 32];
 type Points = u32;
 type Amount = u128;
 
@@ -140,6 +141,13 @@ pub struct CollatorStatusData {
     pub status: CollatorStatus,
 }
 
+/// Collator deposit data combining account and its collator deposit
+#[derive(Debug)]
+pub struct CollatorDepositData {
+    pub account: AccountBytes,
+    pub deposit: Deposit,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -179,13 +187,14 @@ pub enum Response {
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
-    Candidates(Data<Vec<AccountBytes>>),
+    Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
     CollatorSupportedProxy(Data<SupportedProxyData>),
     CollatorStatus(Data<CollatorStatusData>),
+    CollatorDeposit(Data<CollatorDepositData>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
 }
@@ -320,7 +329,7 @@ impl Response {
         Response::Invulnerables(Data::new(invulnerables))
     }
 
-    pub fn candidates(candidates: Vec<AccountBytes>) -> Self {
+    pub fn candidates(candidates: Vec<(AccountBytes, Deposit)>) -> Self {
         Response::Candidates(Data::new(candidates))
     }
 
@@ -342,6 +351,10 @@ impl Response {
 
     pub fn collator_status(account: AccountBytes, status: CollatorStatus) -> Self {
         Response::CollatorStatus(Data::new(CollatorStatusData { account, status }))
+    }
+
+    pub fn collator_deposit(account: AccountBytes, deposit: Deposit) -> Self {
+        Response::CollatorDeposit(Data::new(CollatorDepositData { account, deposit }))
     }
 
     pub fn slot_duration(duration_ms: u64) -> Self {

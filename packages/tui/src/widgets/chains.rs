@@ -15,7 +15,9 @@ use subxt::{lightclient::LightClient, utils::H256, OnlineClient};
 use suno_actions::{Action, SystemAction};
 use suno_config::{CustomConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
+    aura::Deposit,
     display::{create_progress_bar_by_millis, format_millis, get_elapsed_millis},
+    key::AccountBytes,
     network::ConnectionState,
     BlockHash, BlockNumber, Chain, Epoch, Era,
 };
@@ -124,7 +126,7 @@ impl ChainsList {
         false
     }
 
-    pub fn set_aura_authorities(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+    pub fn set_aura_authorities(&mut self, chain_key: &ChainKey, data: Vec<AccountBytes>) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if let Some(aura) = chain.get_mut_aura() {
                 aura.set_authorities(data.clone());
@@ -134,7 +136,11 @@ impl ChainsList {
         false
     }
 
-    pub fn set_aura_invulnerables(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+    pub fn set_aura_invulnerables(
+        &mut self,
+        chain_key: &ChainKey,
+        data: Vec<AccountBytes>,
+    ) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if let Some(aura) = chain.get_mut_aura() {
                 aura.set_invulnerables(data);
@@ -144,7 +150,11 @@ impl ChainsList {
         false
     }
 
-    pub fn set_aura_candidates(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+    pub fn set_aura_candidates(
+        &mut self,
+        chain_key: &ChainKey,
+        data: Vec<(AccountBytes, Deposit)>,
+    ) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if let Some(aura) = chain.get_mut_aura() {
                 aura.set_candidates(data.clone());
@@ -426,7 +436,7 @@ impl ChainsList {
     pub fn update_aura_invulnerables(
         &mut self,
         chain_key: &ChainKey,
-        invulnerables: Vec<[u8; 32]>,
+        invulnerables: Vec<AccountBytes>,
     ) -> bool {
         self.set_aura_invulnerables(chain_key, invulnerables)
     }
@@ -434,7 +444,7 @@ impl ChainsList {
     pub fn update_aura_authorities(
         &mut self,
         chain_key: &ChainKey,
-        authorities: Vec<[u8; 32]>,
+        authorities: Vec<AccountBytes>,
     ) -> bool {
         self.set_aura_authorities(chain_key, authorities)
     }
@@ -442,7 +452,7 @@ impl ChainsList {
     pub fn update_aura_candidates(
         &mut self,
         chain_key: &ChainKey,
-        candidates: Vec<[u8; 32]>,
+        candidates: Vec<(AccountBytes, Deposit)>,
     ) -> bool {
         self.set_aura_candidates(chain_key, candidates)
     }

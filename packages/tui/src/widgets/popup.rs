@@ -350,7 +350,7 @@ impl Popup {
 
         ctx.collator.proxies.iter().for_each(|p| {
             let register_as_candidate = Call::RegisterAsCandidate;
-            if p.proxy().can_call(&register_as_candidate) && !ctx.collator.is_invulnerable() {
+            if p.proxy().can_call(&register_as_candidate) && ctx.collator.is_exiting_or_unknown() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: register_as_candidate,
                     bytes: None,
@@ -367,8 +367,8 @@ impl Popup {
 
             let update_bond = Call::UpdateBond {
                 new_deposit: 0,
-                max: Some(ctx.collator.total_balance_extended(4)),
-                free: Some(ctx.collator.free_balance_extended(4)),
+                current_deposit: Some(ctx.collator.deposit_extended(4)),
+                max: Some(ctx.collator.free_balance_extended(4)),
             };
             if p.proxy().can_call(&update_bond) && ctx.collator.is_permissionless_or_candidate() {
                 self.options.push(Entry::new(Command::Instruction {
@@ -998,7 +998,7 @@ impl Popup {
         let runtime_version_value = format!("{}/{}", ctx.runtime.legacy_name(), ctx.spec_version);
         let stash = ctx.stash_identity.clone();
         let proxy = ctx.proxy_identity.clone();
-        let method = truncate_method(&ctx.call, 32);
+        let method = truncate_method(&ctx.call, 64);
         let call_data = truncate_hex(&ctx.call_data_bytes, 24);
         let qr_bytes = if ctx.runtime.is_qrcode_enabled() {
             Some(ctx.qr_bytes.clone())

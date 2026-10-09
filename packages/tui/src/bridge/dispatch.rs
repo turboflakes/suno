@@ -329,6 +329,14 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::CollatorDeposit(data) => {
+            let collator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Collator(CollatorAction::UpdateDeposit(
+                collator_key,
+                data.value.deposit,
+            )))
+            .boxed()?;
+        }
         Response::SessionIndex(data) => {
             tx.send(Action::Chain(ChainAction::UpdateSessionIndex(
                 runtime, data.value,

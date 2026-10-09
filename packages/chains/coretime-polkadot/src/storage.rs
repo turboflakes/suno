@@ -211,9 +211,32 @@ pub async fn fetch_candidate_list(
         .decode()
         .boxed()?;
 
-    let candidates = value.0.iter().map(|stash| *stash.who.as_ref()).collect();
+    let candidates = value
+        .0
+        .iter()
+        .map(|stash| (*stash.who.as_ref(), stash.deposit))
+        .collect();
 
     Ok(Response::candidates(candidates))
+}
+
+/// Fetch candidacy bond at the specified block hash
+pub async fn fetch_candidacy_bond(api: &OnlineClientAtBlock<CustomConfig>) -> Result<u128, Error> {
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .candidacy_bond();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
 }
 
 /// Fetch the last block authored by a given collator stash at the specified block hash
