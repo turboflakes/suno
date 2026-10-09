@@ -1,10 +1,14 @@
 use crate::node_runtime;
 use crate::node_runtime::runtime_types::{
-    asset_hub_polkadot_runtime::RuntimeCall, frame_system::pallet::Call as SystemCall,
+    asset_hub_polkadot_runtime::{RuntimeCall, SessionKeys},
+    frame_system::pallet::Call as SystemCall,
+    pallet_collator_selection::pallet::Call as CollatorSelectionCall,
+    pallet_session::pallet::Call as SessionCall,
     pallet_staking_async::pallet::pallet::Call as StakingCall,
     pallet_staking_async::ValidatorPrefs,
     pallet_staking_async_rc_client::pallet::Call as StakingRcClientCall,
     sp_arithmetic::per_things::Perbill,
+    sp_consensus_aura::ed25519::app_ed25519::Public as AuraPublic,
 };
 use crate::utils::{map_payee, map_supported_proxy};
 use subxt::{
@@ -15,7 +19,7 @@ use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     proxy::SupportedProxy,
-    session::{Keys, Proof},
+    session::{AuraKey, Keys, Proof},
     staking::Payee,
     tx::Bytes,
 };
@@ -98,4 +102,33 @@ pub fn staking_rc_client_purge_keys() -> RuntimeCall {
     RuntimeCall::StakingRcClient(StakingRcClientCall::purge_keys {
         max_delivery_and_remote_execution_fee: None,
     })
+}
+
+pub fn session_set_keys(aura_key: AuraKey, proof: Proof) -> RuntimeCall {
+    RuntimeCall::Session(SessionCall::set_keys {
+        keys: SessionKeys {
+            aura: AuraPublic(aura_key.into_bytes()),
+        },
+        proof: proof.into_bytes(),
+    })
+}
+
+pub fn session_purge_keys() -> RuntimeCall {
+    RuntimeCall::Session(SessionCall::purge_keys)
+}
+
+pub fn collator_selection_register_as_candidate() -> RuntimeCall {
+    RuntimeCall::CollatorSelection(CollatorSelectionCall::register_as_candidate {})
+}
+
+pub fn collator_selection_leave_intent() -> RuntimeCall {
+    RuntimeCall::CollatorSelection(CollatorSelectionCall::leave_intent {})
+}
+
+pub fn collator_selection_update_bond(new_deposit: u128) -> RuntimeCall {
+    RuntimeCall::CollatorSelection(CollatorSelectionCall::update_bond { new_deposit })
+}
+
+pub fn collator_selection_take_candidate_slot(deposit: u128, target: AccountId32) -> RuntimeCall {
+    RuntimeCall::CollatorSelection(CollatorSelectionCall::take_candidate_slot { deposit, target })
 }

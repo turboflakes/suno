@@ -50,6 +50,7 @@ impl RuntimeCaller for Runtime {
     ) -> Result<Bytes, Error> {
         match &self {
             Runtime::AssetHubPolkadot => match call {
+                // Validator staking
                 Call::Bond { amount, payee, .. } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_bond(amount, payee);
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
@@ -88,6 +89,7 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_chill();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
+                // Validator session keys
                 Call::SetKeys { keys, proof } => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_set_keys(
                         keys, proof,
@@ -96,6 +98,39 @@ impl RuntimeCaller for Runtime {
                 }
                 Call::PurgeKeys => {
                     let rc = suno_asset_hub_polkadot::extrinsics::staking_rc_client_purge_keys();
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator selection
+                Call::RegisterAsCandidate => {
+                    let rc =
+                        suno_asset_hub_polkadot::extrinsics::collator_selection_register_as_candidate(
+                        );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::UpdateBond { new_deposit, .. } => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::collator_selection_update_bond(
+                        new_deposit,
+                    );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::LeaveIntent => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::collator_selection_leave_intent();
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::TakeCandidateSlot { deposit, target } => {
+                    let rc =
+                        suno_asset_hub_polkadot::extrinsics::collator_selection_take_candidate_slot(
+                            deposit, target,
+                        );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator session keys
+                Call::SetSessionKeys { aura_key, proof } => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::session_set_keys(aura_key, proof);
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeSessionKeys => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::session_purge_keys();
                     suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
@@ -139,6 +174,7 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_chill();
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
+                // Validator session keys
                 Call::SetKeys { keys, proof } => {
                     let rc =
                         suno_asset_hub_kusama::extrinsics::staking_rc_client_set_keys(keys, proof);
@@ -146,6 +182,39 @@ impl RuntimeCaller for Runtime {
                 }
                 Call::PurgeKeys => {
                     let rc = suno_asset_hub_kusama::extrinsics::staking_rc_client_purge_keys();
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator selection
+                Call::RegisterAsCandidate => {
+                    let rc =
+                        suno_asset_hub_kusama::extrinsics::collator_selection_register_as_candidate(
+                        );
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::UpdateBond { new_deposit, .. } => {
+                    let rc = suno_asset_hub_kusama::extrinsics::collator_selection_update_bond(
+                        new_deposit,
+                    );
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::LeaveIntent => {
+                    let rc = suno_asset_hub_kusama::extrinsics::collator_selection_leave_intent();
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::TakeCandidateSlot { deposit, target } => {
+                    let rc =
+                        suno_asset_hub_kusama::extrinsics::collator_selection_take_candidate_slot(
+                            deposit, target,
+                        );
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator session keys
+                Call::SetSessionKeys { aura_key, proof } => {
+                    let rc = suno_asset_hub_kusama::extrinsics::session_set_keys(aura_key, proof);
+                    suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeSessionKeys => {
+                    let rc = suno_asset_hub_kusama::extrinsics::session_purge_keys();
                     suno_asset_hub_kusama::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
@@ -198,6 +267,39 @@ impl RuntimeCaller for Runtime {
                     let rc = suno_asset_hub_paseo::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
+                // Collator selection
+                Call::RegisterAsCandidate => {
+                    let rc =
+                        suno_asset_hub_paseo::extrinsics::collator_selection_register_as_candidate(
+                        );
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::UpdateBond { new_deposit, .. } => {
+                    let rc = suno_asset_hub_paseo::extrinsics::collator_selection_update_bond(
+                        new_deposit,
+                    );
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::LeaveIntent => {
+                    let rc = suno_asset_hub_paseo::extrinsics::collator_selection_leave_intent();
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::TakeCandidateSlot { deposit, target } => {
+                    let rc =
+                        suno_asset_hub_paseo::extrinsics::collator_selection_take_candidate_slot(
+                            deposit, target,
+                        );
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator session keys
+                Call::SetSessionKeys { aura_key, proof } => {
+                    let rc = suno_asset_hub_paseo::extrinsics::session_set_keys(aura_key, proof);
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeSessionKeys => {
+                    let rc = suno_asset_hub_paseo::extrinsics::session_purge_keys();
+                    suno_asset_hub_paseo::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
             Runtime::AssetHubWestend => match call {
@@ -247,6 +349,39 @@ impl RuntimeCaller for Runtime {
                 Call::PurgeKeys => {
                     let rc = suno_asset_hub_westend::extrinsics::staking_rc_client_purge_keys();
                     suno_asset_hub_westend::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator selection
+                Call::RegisterAsCandidate => {
+                    let rc =
+                        suno_asset_hub_polkadot::extrinsics::collator_selection_register_as_candidate(
+                        );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::UpdateBond { new_deposit, .. } => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::collator_selection_update_bond(
+                        new_deposit,
+                    );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::LeaveIntent => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::collator_selection_leave_intent();
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::TakeCandidateSlot { deposit, target } => {
+                    let rc =
+                        suno_asset_hub_polkadot::extrinsics::collator_selection_take_candidate_slot(
+                            deposit, target,
+                        );
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                // Collator session keys
+                Call::SetSessionKeys { aura_key, proof } => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::session_set_keys(aura_key, proof);
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
+                }
+                Call::PurgeSessionKeys => {
+                    let rc = suno_asset_hub_polkadot::extrinsics::session_purge_keys();
+                    suno_asset_hub_polkadot::wrap_call_into_proxy(api, rc, stash, supported_proxy)
                 }
                 _ => Err(Error::UnsupportedCall(call.to_string())),
             },
