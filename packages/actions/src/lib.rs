@@ -151,6 +151,7 @@ pub enum ChainAction {
 pub enum CollatorAction {
     UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
     UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
+    UpdateCandidates(SupportedRuntime, Vec<AccountBytes>),
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
     UpdateLastAuthoredBlock(CollatorKey, BlockNumber),
     UpdateIdentity(AccountBytes, Identity),

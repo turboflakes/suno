@@ -11,7 +11,6 @@ use subxt::{utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{balance::Balance, proxy::SupportedProxy, AccountKey, Response};
-use tracing::info;
 
 /// Fetch balance for a given stash at the specified block hash
 pub async fn fetch_balance(
@@ -21,8 +20,6 @@ pub async fn fetch_balance(
     let account_bytes = *stash.as_ref();
 
     let account_info = fetch_system_account(api, stash).await?;
-
-    info!("____account_info {:?}", account_info);
 
     Ok(Response::balance(
         account_bytes,
@@ -176,6 +173,29 @@ pub async fn fetch_invulnerables(
     let invulnerables = value.0.iter().map(|stash| *stash.as_ref()).collect();
 
     Ok(Response::invulnerables(invulnerables))
+}
+
+/// Fetch the collators in the candidate list at the specified block hash
+pub async fn fetch_candidate_list(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .candidate_list();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let candidates = value.0.iter().map(|stash| *stash.who.as_ref()).collect();
+
+    Ok(Response::candidates(candidates))
 }
 
 /// Fetch the last block authored by a given collator stash at the specified block hash

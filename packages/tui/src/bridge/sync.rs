@@ -302,6 +302,15 @@ pub fn spawn_fetch_invulnerables(
         .spawn(move |api| async move { runtime.fetch_invulnerables(&api).await });
 }
 
+pub fn spawn_fetch_candidate_list(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_candidate_list(&api).await });
+}
+
 pub fn spawn_fetch_collators_last_authored_block(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,

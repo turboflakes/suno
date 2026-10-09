@@ -218,12 +218,12 @@ impl<'a> CollatorsDetailedListWidget<'a> {
 
         let invulnerables_count = collators.iter().filter(|c| c.is_invulnerable()).count();
         let permissionless_count = collators.iter().filter(|c| c.is_permissionless()).count();
-        let registered_count = collators.iter().filter(|c| c.is_waiting()).count();
+        let registered_count = collators.iter().filter(|c| c.is_candidate()).count();
 
         let displayed = [
             (invulnerables_count, "inv"),
             (permissionless_count, "perm"),
-            (registered_count, "reg"),
+            (registered_count, "cand"),
         ]
         .into_iter()
         .filter(|(count, _)| *count > 0)

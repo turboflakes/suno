@@ -277,6 +277,12 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::Candidates(data) => {
+            tx.send(Action::Collator(CollatorAction::UpdateCandidates(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
         Response::LastAuthoredBlock(data) => {
             let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateLastAuthoredBlock(

@@ -262,12 +262,9 @@ impl CollatorsList {
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime && *collator.status() != CollatorStatus::Invulnerable {
                 let stash_bytes: [u8; 32] = *collator.stash().as_ref();
-                let status = if authorities.contains(&stash_bytes) {
-                    CollatorStatus::Permissionless
-                } else {
-                    CollatorStatus::Unknown
-                };
-                collator.set_status(status);
+                if authorities.contains(&stash_bytes) {
+                    collator.set_status(CollatorStatus::Permissionless);
+                }
             }
         }
     }
@@ -280,6 +277,21 @@ impl CollatorsList {
                 let stash_bytes: [u8; 32] = *collator.stash().as_ref();
                 if invulnerables.contains(&stash_bytes) {
                     collator.set_status(CollatorStatus::Invulnerable);
+                }
+            }
+        }
+    }
+
+    /// Marks the collators of `runtime` found in the candidate list.
+    ///
+    /// Leaves collators already marked `Invulnerable` or `Permissionless` untouched, since those status
+    /// takes priority regardless of the order the fetches resolve in.
+    pub fn update_candidates(&mut self, runtime: SupportedRuntime, candidates: &[[u8; 32]]) {
+        for collator in self.collators.values_mut() {
+            if collator.runtime() == runtime && *collator.status() == CollatorStatus::Unknown {
+                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
+                if candidates.contains(&stash_bytes) {
+                    collator.set_status(CollatorStatus::Candidate);
                 }
             }
         }

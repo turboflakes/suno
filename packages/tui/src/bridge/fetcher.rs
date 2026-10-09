@@ -177,6 +177,11 @@ pub trait RuntimeFetcher {
         api: &OnlineClientAtBlock<CustomConfig>,
     ) -> Result<Response, Error>;
 
+    async fn fetch_candidate_list(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
     async fn fetch_collator_last_authored_block(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -834,6 +839,35 @@ impl RuntimeFetcher for Runtime {
             Runtime::CollectivesWestend => suno_collectives_westend::fetch_invulnerables(api).await,
             Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_invulnerables(api).await,
             Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_invulnerables(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_candidate_list(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_candidate_list(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_candidate_list(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_candidate_list(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_candidate_list(api).await,
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_candidate_list(api).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_candidate_list(api).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_candidate_list(api).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_candidate_list(api).await,
+            Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_candidate_list(api).await,
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_candidate_list(api).await,
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_candidate_list(api).await,
+            Runtime::CoretimeKusama => suno_coretime_kusama::fetch_candidate_list(api).await,
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::fetch_candidate_list(api).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::fetch_candidate_list(api).await
+            }
+            Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_candidate_list(api).await,
+            Runtime::BulletinPaseo => suno_bulletin_paseo::fetch_candidate_list(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

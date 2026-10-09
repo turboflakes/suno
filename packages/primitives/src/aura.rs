@@ -22,6 +22,9 @@ pub struct Aura {
     authorities: Vec<[u8; 32]>,
     // Fixed invulnerable collator set, from `CollatorSelection::Invulnerables`
     invulnerables: Vec<[u8; 32]>,
+    // Registered collator candidates, from `CollatorSelection::Permissionless`
+    // or `CollatorSelection::Candidate`
+    candidates: Vec<[u8; 32]>,
     // Aura slot duration in milliseconds, constant for the runtime
     slot_duration_ms: Option<u64>,
     // Expected average block creation in milliseconds, constant
@@ -75,6 +78,10 @@ impl Aura {
 
     pub fn set_authorities(&mut self, authorities: Vec<[u8; 32]>) {
         self.authorities = authorities;
+    }
+
+    pub fn set_candidates(&mut self, candidates: Vec<[u8; 32]>) {
+        self.candidates = candidates;
     }
 
     pub fn set_block_time_ms(&mut self, block_time_ms: Option<u64>) {

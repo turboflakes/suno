@@ -83,6 +83,28 @@ impl NodeAccount {
         let value = format_planks(self.free_balance(), self.token_decimals(), decimal_places);
         format!("{}{}", value, self.token_symbol())
     }
+
+    pub fn reserved_balance(&self) -> u128 {
+        self.balance.reserved_balance()
+    }
+
+    pub fn reserved_balance_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(
+            self.reserved_balance(),
+            self.token_decimals(),
+            decimal_places,
+        );
+        format!("{}{}", value, self.token_symbol())
+    }
+
+    pub fn total_balance(&self) -> u128 {
+        self.balance.total_balance()
+    }
+
+    pub fn total_balance_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(self.total_balance(), self.token_decimals(), decimal_places);
+        format!("{}{}", value, self.token_symbol())
+    }
 }
 
 impl AccountDisplay for NodeAccount {

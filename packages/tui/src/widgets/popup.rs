@@ -350,8 +350,7 @@ impl Popup {
 
         ctx.collator.proxies.iter().for_each(|p| {
             let register_as_candidate = Call::RegisterAsCandidate;
-            if p.proxy().can_call(&register_as_candidate) && ctx.collator.is_registered_candidate()
-            {
+            if p.proxy().can_call(&register_as_candidate) && !ctx.collator.is_invulnerable() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: register_as_candidate,
                     bytes: None,
@@ -359,7 +358,7 @@ impl Popup {
             }
 
             let leave_intent = Call::LeaveIntent;
-            if p.proxy().can_call(&leave_intent) && ctx.collator.is_registered_candidate() {
+            if p.proxy().can_call(&leave_intent) && ctx.collator.is_permissionless_or_candidate() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: leave_intent,
                     bytes: None,
@@ -368,9 +367,10 @@ impl Popup {
 
             let update_bond = Call::UpdateBond {
                 new_deposit: 0,
-                max: Some(ctx.collator.free_balance_extended(4)),
+                max: Some(ctx.collator.total_balance_extended(4)),
+                free: Some(ctx.collator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&update_bond) && ctx.collator.is_registered_candidate() {
+            if p.proxy().can_call(&update_bond) && ctx.collator.is_permissionless_or_candidate() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: update_bond,
                     bytes: None,
@@ -400,10 +400,7 @@ impl Popup {
             }
 
             let purge_session_keys = Call::PurgeSessionKeys;
-            if p.proxy().can_call(&purge_session_keys)
-                && ctx.collator.is_active_or_waiting()
-                && ctx.collator.has_keys()
-            {
+            if p.proxy().can_call(&purge_session_keys) && ctx.collator.has_keys() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: purge_session_keys,
                     bytes: None,

@@ -57,7 +57,7 @@ pub async fn process_block_extrinsics(
             ) = call.as_ref()
             {
                 let account_bytes = *stash.as_ref();
-                let res = Response::collator_status(account_bytes, CollatorStatus::Waiting);
+                let res = Response::collator_status(account_bytes, CollatorStatus::Candidate);
                 processed_extrinsics.push(res);
             }
         }

@@ -15,8 +15,8 @@ pub enum CollatorStatus {
     Permissionless,
     /// Collator is part of the fixed invulnerable set, displayed as [I]
     Invulnerable,
-    /// Collator is a registered candidate waiting to become an authority, displayed as [W]
-    Waiting,
+    /// Collator is a registered candidate to become an authority, displayed as [C]
+    Candidate,
     /// Collator status is unknown or not yet determined, displayed as [U]
     #[default]
     Unknown,
@@ -27,7 +27,7 @@ impl std::fmt::Display for CollatorStatus {
         match self {
             Self::Permissionless => write!(f, "[P]"),
             Self::Invulnerable => write!(f, "[I]"),
-            Self::Waiting => write!(f, "[W]"),
+            Self::Candidate => write!(f, "[C]"),
             Self::Unknown => write!(f, "[U]"),
         }
     }
@@ -93,6 +93,17 @@ impl Collator {
         )
     }
 
+    pub fn total_balance(&self) -> u128 {
+        self.account.total_balance()
+    }
+
+    pub fn total_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.total_balance(),
+            self.account.total_balance_as_str(decimal_places),
+        )
+    }
+
     pub fn display_name(&self, size: usize) -> String {
         if let Some(identity) = self.identity() {
             format!("{} ({})", identity, self.to_compact_string(size))
@@ -129,20 +140,24 @@ impl Collator {
         self.status == CollatorStatus::Invulnerable
     }
 
-    pub fn is_waiting(&self) -> bool {
-        self.status == CollatorStatus::Waiting
+    pub fn is_candidate(&self) -> bool {
+        self.status == CollatorStatus::Candidate
     }
 
     pub fn is_unknown(&self) -> bool {
         self.status == CollatorStatus::Unknown
     }
 
-    pub fn is_active_or_waiting(&self) -> bool {
+    pub fn is_authority_or_candidate(&self) -> bool {
         self.status != CollatorStatus::Unknown
     }
 
-    pub fn is_registered_candidate(&self) -> bool {
-        self.is_permissionless() || self.is_waiting()
+    pub fn is_permissionless_or_candidate(&self) -> bool {
+        self.is_permissionless() || self.is_candidate()
+    }
+
+    pub fn is_authority(&self) -> bool {
+        self.is_permissionless() || self.is_invulnerable()
     }
 
     pub fn has_keys(&self) -> bool {

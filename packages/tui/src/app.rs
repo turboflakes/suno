@@ -459,6 +459,7 @@ impl App {
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
@@ -524,6 +525,7 @@ impl App {
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
@@ -633,6 +635,7 @@ impl App {
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
@@ -1101,6 +1104,10 @@ impl App {
                 self.collators.update_invulnerables(runtime, &invulnerables);
                 self.chains
                     .update_aura_invulnerables(&runtime, invulnerables);
+            }
+            CollatorAction::UpdateCandidates(runtime, candidates) => {
+                self.collators.update_candidates(runtime, &candidates);
+                self.chains.update_aura_candidates(&runtime, candidates);
             }
             CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {

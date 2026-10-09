@@ -144,6 +144,16 @@ impl ChainsList {
         false
     }
 
+    pub fn set_aura_candidates(&mut self, chain_key: &ChainKey, data: Vec<[u8; 32]>) -> bool {
+        if let Some(chain) = self.chains.get_mut(chain_key) {
+            if let Some(aura) = chain.get_mut_aura() {
+                aura.set_candidates(data.clone());
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn set_session_index(&mut self, chain_key: &ChainKey, data: u32) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
             if let Some(aura) = chain.get_mut_aura() {
@@ -426,6 +436,14 @@ impl ChainsList {
         authorities: Vec<[u8; 32]>,
     ) -> bool {
         self.set_aura_authorities(chain_key, authorities)
+    }
+
+    pub fn update_aura_candidates(
+        &mut self,
+        chain_key: &ChainKey,
+        candidates: Vec<[u8; 32]>,
+    ) -> bool {
+        self.set_aura_candidates(chain_key, candidates)
     }
 
     pub fn update_session_index(&mut self, chain_key: &ChainKey, index: u32) -> bool {

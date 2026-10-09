@@ -193,6 +193,29 @@ pub async fn fetch_invulnerables(
     Ok(Response::invulnerables(invulnerables))
 }
 
+/// Fetch the current collator candidate list at the specified block hash
+pub async fn fetch_candidate_list(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .candidate_list();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let candidates = value.0.iter().map(|stash| *stash.who.as_ref()).collect();
+
+    Ok(Response::candidates(candidates))
+}
+
 /// Fetch the last block authored by a given collator stash at the specified block hash
 pub async fn fetch_collator_last_authored_block(
     api: &OnlineClientAtBlock<CustomConfig>,

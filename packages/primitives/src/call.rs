@@ -10,6 +10,7 @@ use suno_config::CustomCommand;
 type Amount = u128;
 type Description = String;
 type Max = Option<(Amount, Description)>;
+type Free = Option<(Amount, Description)>;
 
 /// Which menu/role `Call::parse` is being invoked for. `set_keys`/`purge_keys` are
 /// typed identically by the user either way; this is what lets `parse` resolve
@@ -68,6 +69,7 @@ pub enum Call {
     UpdateBond {
         new_deposit: u128,
         max: Max,
+        free: Free,
     },
     TakeCandidateSlot {
         deposit: u128,
@@ -259,6 +261,7 @@ impl Call {
                         Ok(Self::UpdateBond {
                             new_deposit,
                             max: None,
+                            free: None,
                         })
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
@@ -367,10 +370,13 @@ impl ToDescription for Call {
                 "Register as a collator candidate, using registered session key".to_string()
             }
             Self::LeaveIntent => "Deregister as a collator candidate".to_string(),
-            Self::UpdateBond { max, .. } => {
+            Self::UpdateBond { max, free,.. } => {
                 format!(
-                    "Update the candidacy bond deposit, up to {} from your free balance",
+                    "Update the candidacy bond deposit, up to {}, currently {} is on your free balance",
                     max.as_ref()
+                        .map(|(_, description)| description.to_string())
+                        .unwrap_or_default(),
+                    free.as_ref()
                         .map(|(_, description)| description.to_string())
                         .unwrap_or_default()
                 )

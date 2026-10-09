@@ -179,6 +179,7 @@ pub enum Response {
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
+    Candidates(Data<Vec<AccountBytes>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
@@ -317,6 +318,10 @@ impl Response {
 
     pub fn invulnerables(invulnerables: Vec<AccountBytes>) -> Self {
         Response::Invulnerables(Data::new(invulnerables))
+    }
+
+    pub fn candidates(candidates: Vec<AccountBytes>) -> Self {
+        Response::Candidates(Data::new(candidates))
     }
 
     pub fn last_authored_block(account: AccountBytes, block: u64) -> Self {
