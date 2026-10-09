@@ -171,7 +171,11 @@ impl Validator {
 
     pub fn display_name(&self, size: usize) -> String {
         if let Some(identity) = self.identity() {
-            format!("{} ({})", identity, self.to_compact_string(size))
+            format!(
+                "{} ({})",
+                identity.truncate(6 * size),
+                self.to_compact_string(size)
+            )
         } else {
             self.to_compact_string(size)
         }
