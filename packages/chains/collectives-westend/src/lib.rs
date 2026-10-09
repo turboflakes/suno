@@ -1,10 +1,13 @@
 pub mod blocks;
 pub mod constants;
+pub mod extrinsics;
 pub mod runtime_apis;
 pub mod storage;
+pub mod utils;
 
-pub use blocks::process_runtime_events;
+pub use blocks::{process_block_extrinsics, process_runtime_events, process_transaction_events};
 pub use constants::fetch_slot_duration;
+pub use extrinsics::wrap_call_into_proxy;
 pub use runtime_apis::fetch_metadata;
 pub use storage::{
     fetch_and_validate_proxy_account, fetch_aura_authorities, fetch_balance, fetch_candidate_list,
