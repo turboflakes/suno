@@ -22,7 +22,7 @@ pub const PADDING: u16 = 3;
 
 /// Header height for a group: the fixed lines plus [`LINES_PER_CHAIN`] lines per
 /// distinct parachain the group's collators span.
-fn group_header_height(collators: &[&Collator]) -> u16 {
+pub fn group_header_height(collators: &[&Collator]) -> u16 {
     let distinct_chains = collators
         .iter()
         .map(|c| c.runtime())

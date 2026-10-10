@@ -1,4 +1,5 @@
 use crate::widgets::collators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
+use crate::widgets::collators_detailed_list::group_header_height;
 use ratatui::widgets::TableState;
 use sp_arithmetic::traits::Zero;
 use std::{
@@ -166,17 +167,36 @@ impl CollatorsList {
 
     // Determine the Y position of the current collator selection
     fn get_selected_y_position(&self) -> u16 {
-        let mut selected_y_position = 0;
         let selected_ref = self.get_selected_ref();
 
-        for (_, collators) in self.get_collators_grouped_by_runtime() {
-            if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
-                // Header + index + table header
-                return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
+        match self.view {
+            CollatorsView::Group => {
+                let mut selected_y_position = 0;
+                for (_, collators) in self.get_collators_grouped_by_runtime() {
+                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
+                        // Header + index + table header
+                        return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
+                    }
+                    selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
+                }
+                0
             }
-            selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
+            CollatorsView::List => {
+                let grouped = self.get_collators_grouped_by_relay_chain();
+                // Groups get a one row top padding when more than one is displayed
+                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
+                let mut selected_y_position = 0;
+                for (_, collators) in grouped {
+                    let header_height = group_header_height(&collators);
+                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
+                        // Top padding + header + index + table header
+                        return selected_y_position + top_padding + header_height + idx as u16 + 1;
+                    }
+                    selected_y_position += header_height + collators.len() as u16 + PADDING;
+                }
+                0
+            }
         }
-        0
     }
 
     pub fn is_active(&self) -> bool {
