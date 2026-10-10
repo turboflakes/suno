@@ -28,7 +28,7 @@ use suno_config::{
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, AccountKey,
-    Chain, Validator,
+    Chain, Collator, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -431,7 +431,7 @@ impl App {
                                             &tx,
                                         );
 
-                                        sync::spawn_fetch_account_balance(
+                                        sync::spawn_fetch_validators_account_balance(
                                             &api_at,
                                             runtime,
                                             &validator_keys,
@@ -446,13 +446,31 @@ impl App {
                                                 &proxy,
                                                 &tx,
                                             );
+
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
                                         };
 
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -465,6 +483,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
+                                        // ---
                                     });
                                 }
                             }
@@ -497,11 +516,31 @@ impl App {
                                             &tx,
                                         );
 
+                                        if let Ok(proxy) = runtime.signer_account_id() {
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
+                                        };
+
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -514,6 +553,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
+                                        // ---
                                     });
                                 }
 
@@ -590,11 +630,31 @@ impl App {
                                             }
                                         };
 
+                                        if let Ok(proxy) = runtime.signer_account_id() {
+                                            sync::spawn_fetch_collators_proxy_status(
+                                                &api_at,
+                                                runtime,
+                                                &collator_keys,
+                                                &proxy,
+                                                &tx,
+                                            );
+                                        };
+
+                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_collators_account_balance(
+                                            &api_at,
+                                            runtime,
+                                            &collator_keys,
+                                            &tx,
+                                        );
+
+                                        // Fetched on connected and every new session
+                                        // ---
                                         sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
                                         sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_index(&api_at, runtime, &tx);
+                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
                                         sync::spawn_fetch_collators_queued_keys(
                                             &api_at,
                                             runtime,
@@ -607,6 +667,7 @@ impl App {
                                             &collator_keys,
                                             &tx,
                                         );
+                                        // ---
                                     });
                                 }
                             }
@@ -879,7 +940,152 @@ impl App {
                     .update_current_slot(&chain_key, block_number, slot);
             }
             ChainAction::UpdateSessionIndex(chain_key, index) => {
-                self.chains.update_session_index(&chain_key, index);
+                let is_updated = self.chains.update_session_index(&chain_key, index);
+                if is_updated {
+                    let runtime = chain_key;
+                    match runtime {
+                        SupportedRuntime::AssetHubPolkadot
+                        | SupportedRuntime::AssetHubKusama
+                        | SupportedRuntime::AssetHubPaseo
+                        | SupportedRuntime::AssetHubWestend
+                        | SupportedRuntime::BridgeHubPolkadot
+                        | SupportedRuntime::BridgeHubKusama
+                        | SupportedRuntime::CoretimePolkadot
+                        | SupportedRuntime::CoretimeKusama
+                        | SupportedRuntime::CollectivesPolkadot
+                        | SupportedRuntime::CollectivesWestend
+                        | SupportedRuntime::BulletinPolkadot
+                        | SupportedRuntime::BulletinPaseo => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    // Fetched on connected and every new session
+                                    // ---
+                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_queued_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    sync::spawn_fetch_collators_next_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    // ---
+                                });
+                            }
+                        }
+                        SupportedRuntime::PeoplePolkadot
+                        | SupportedRuntime::PeopleKusama
+                        | SupportedRuntime::PeoplePaseo
+                        | SupportedRuntime::PeopleWestend => {
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                let collator_keys =
+                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_queued_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                    sync::spawn_fetch_collators_next_keys(
+                                        &api_at,
+                                        runtime,
+                                        &collator_keys,
+                                        &tx,
+                                    );
+                                });
+                            }
+
+                            // NOTE: On every session change, identity is currently re-fetched. Ideally these should be event-based
+                            // and there is no need for a re-fetch here.
+                            if let Some((api, block_hash)) =
+                                self.chains.get_api_and_block_hash(runtime)
+                            {
+                                // Fetch collators for each parachain, so we can sync their identity
+                                let collator_keys: Vec<Vec<AccountKey>> = [
+                                    Some(runtime), // the People chain's own collators
+                                    runtime.relay_chain().asset_hub_runtime(),
+                                    runtime.relay_chain().bridge_hub_runtime(),
+                                    runtime.relay_chain().coretime_runtime(),
+                                    runtime.relay_chain().collectives_runtime(),
+                                    runtime.relay_chain().bulletin_runtime(),
+                                ]
+                                .into_iter()
+                                .flatten()
+                                .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                .collect();
+
+                                let tx = self.tx.clone();
+                                tokio::spawn(async move {
+                                    let api_at = match api.at_block(block_hash).await.boxed() {
+                                        Ok(api_at) => api_at,
+                                        Err(e) => {
+                                            let _ = tx.send(Action::System(SystemAction::Error(
+                                                format!("Failed to client at_block: {}", e),
+                                            )));
+                                            return;
+                                        }
+                                    };
+
+                                    // Since collator_keys could be the same stash accross different
+                                    // chains, we need to dedupe the keys before fetching their identity
+                                    // so we dont end up fetching the same key multiple times
+                                    let mut seen = HashSet::new();
+                                    let keys: Vec<AccountKey> = collator_keys
+                                        .iter()
+                                        .flatten()
+                                        .filter(|k| seen.insert(k.bytes))
+                                        .cloned()
+                                        .collect();
+
+                                    sync::spawn_fetch_collators_identity(
+                                        &api_at, runtime, &keys, &tx,
+                                    );
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
             ChainAction::UpdateSlotDuration(chain_key, duration_ms) => {
                 self.chains
@@ -959,7 +1165,12 @@ impl App {
                             &validator_keys,
                             &tx,
                         );
-                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                        sync::spawn_fetch_validators_account_balance(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
                     });
                 }
             }
@@ -986,7 +1197,12 @@ impl App {
                             }
                         };
 
-                        sync::spawn_fetch_account_balance(&api_at, runtime, &validator_keys, &tx);
+                        sync::spawn_fetch_validators_account_balance(
+                            &api_at,
+                            runtime,
+                            &validator_keys,
+                            &tx,
+                        );
                     });
                 }
             }
@@ -1046,6 +1262,10 @@ impl App {
                 self.chains
                     .update_aura_invulnerables(&runtime, invulnerables);
             }
+            CollatorAction::UpdateCandidates(runtime, candidates) => {
+                self.collators.update_candidates(runtime, &candidates);
+                self.chains.update_aura_candidates(&runtime, candidates);
+            }
             CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                     if let Some(aura) = &chain.aura() {
@@ -1058,7 +1278,8 @@ impl App {
                     }
                 }
             }
-            CollatorAction::UpdateLastAuthoredBlock(runtime, stash_bytes, block_number) => {
+            CollatorAction::UpdateLastAuthoredBlock(collator_key, block_number) => {
+                let runtime = collator_key.runtime();
                 // Calculate the expected Aura block time and update the chain. This is
                 // the minimum per-block cadence the relay chain can absorb, per the
                 // runtime source: `RELAY_CHAIN_SLOT_DURATION_MILLIS / BLOCK_PROCESSING_VELOCITY`.
@@ -1079,8 +1300,7 @@ impl App {
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                     if let Some(aura) = &chain.aura() {
                         self.collators.update_last_authored_block(
-                            runtime,
-                            stash_bytes,
+                            &collator_key,
                             block_number,
                             chain.finalized_block(),
                             aura.block_time_ms(),
@@ -1091,12 +1311,23 @@ impl App {
             CollatorAction::UpdateIdentity(stash_bytes, identity) => {
                 self.collators.update_identity(stash_bytes, identity);
             }
-            CollatorAction::UpdateNextKeys(runtime, stash_bytes, keys) => {
-                self.collators.update_next_keys(runtime, stash_bytes, keys);
+            CollatorAction::UpdateNextKeys(collator_key, keys) => {
+                self.collators.update_next_keys(&collator_key, keys);
             }
-            CollatorAction::UpdateQueuedKeys(runtime, stash_bytes, keys) => {
-                self.collators
-                    .update_queued_keys(runtime, stash_bytes, keys);
+            CollatorAction::UpdateQueuedKeys(collator_key, keys) => {
+                self.collators.update_queued_keys(&collator_key, keys);
+            }
+            CollatorAction::AddProxy(collator_key, proxy) => {
+                self.collators.add_proxy(&collator_key, proxy);
+            }
+            CollatorAction::UpdateStatus(collator_key, status) => {
+                self.collators.update_status(&collator_key, status);
+            }
+            CollatorAction::UpdateDeposit(collator_key, amount) => {
+                self.collators.update_deposit(&collator_key, amount);
+            }
+            CollatorAction::UpdateBalance(collator_key, balance) => {
+                self.collators.update_balance(&collator_key, balance);
             }
         }
     }
@@ -1463,7 +1694,7 @@ impl App {
         }
 
         if self.section == Section::Validators && self.validators.is_active() {
-            if !self.validators.is_proxy_valid() && !self.validators.is_commands_available() {
+            if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
                 return;
             }
 
@@ -1486,6 +1717,21 @@ impl App {
 
             self.popup
                 .show_validator_commands(&validator, active_era.index());
+
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        };
+
+        if self.section == Section::Collators && self.collators.is_active() {
+            if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
+                return;
+            }
+
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            self.popup.show_collator_commands(&collator);
 
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
@@ -1687,6 +1933,22 @@ impl App {
             }
         };
 
+        if self.section == Section::Collators {
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            match self.popup.get_mode() {
+                PopupMode::Menu => {
+                    self.on_collator_menu_enter(collator);
+                }
+                PopupMode::Confirmation => {
+                    self.on_collator_confirm_enter(collator);
+                }
+                _ => {}
+            }
+        };
+
         if self.section == Section::Chains {
             let Some(chain) = self.chains.get_selected() else {
                 return;
@@ -1751,6 +2013,101 @@ impl App {
         let supported_proxy = validator.get_proxy(runtime);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
+
+        // Lock the input focus to prevent user interaction while the QR code is being built.
+        let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+        tokio::spawn(async move {
+            let at_block = match api.at_current_block().await.boxed() {
+                Ok(client) => client,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_current_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            let call_data_bytes =
+                match runtime.build_call_data(&at_block, &stash, call.clone(), supported_proxy) {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to build call data: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                };
+
+            info!("method: {}", call.to_method());
+            info!("call_data: 0x{}", hex::encode(&call_data_bytes));
+
+            let qr_bytes = match build_transaction_qrcode(
+                &at_block,
+                &proxy_account_id,
+                &call_data_bytes,
+            )
+            .await
+            {
+                Ok(qr_bytes) => qr_bytes,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to build QR data: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+            info!("qr_bytes: 0x{}", hex::encode(&qr_bytes));
+
+            let spec_version = at_block.spec_version();
+            let ctx = Box::new(ConfirmationContext {
+                runtime,
+                spec_version,
+                proxy_identity,
+                stash_identity,
+                call,
+                call_data_bytes,
+                qr_bytes,
+            });
+            let _ = tx.send(Action::Popup(PopupAction::ShowConfirmAndSign(ctx)));
+        });
+    }
+
+    /// Handle enter when a collator is selected and popup is in menu mode
+    /// showing available extrinsics/commands
+    pub fn on_collator_menu_enter(&mut self, collator: Collator) {
+        let Some(call) = self.popup.get_input_parsed_call() else {
+            return;
+        };
+
+        match call {
+            Call::Custom(_) => {}
+            _ => self.handle_collator_extrinsic_calls(call, collator),
+        }
+    }
+
+    pub fn handle_collator_extrinsic_calls(&mut self, call: Call, collator: Collator) {
+        let runtime = collator.runtime();
+
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
+        let stash = collator.key().stash();
+        let proxy_account_id = match runtime.signer_account_id().boxed() {
+            Ok(address) => address,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        };
+        let supported_proxy = collator.get_proxy(runtime);
+        let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
+        let stash_identity = collator.display_name(3);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -2056,6 +2413,35 @@ impl App {
                 }
             }
         };
+
+        if self.section == Section::Collators {
+            let Some(collator) = self.collators.get_selected() else {
+                return;
+            };
+
+            if self.popup.is_confirmation_mode() {
+                let runtime = collator.runtime();
+                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                    return;
+                };
+                let Some(bytes) = self.popup.get_call_data_bytes() else {
+                    return;
+                };
+                let api = chain.client().clone();
+                let tx = self.tx.clone();
+
+                if let Ok(signer) = runtime.signer_account_id() {
+                    sync::spawn_submit_call_data_with_signature(
+                        &api,
+                        runtime,
+                        &signer,
+                        &bytes,
+                        signature_bytes,
+                        &tx,
+                    );
+                }
+            }
+        };
     }
 
     /// Handle enter when a validator is selected and popup is in confirmation mode
@@ -2065,6 +2451,73 @@ impl App {
             .runtime()
             .asset_hub_runtime()
             .expect("every relay has an AssetHub chain");
+
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+
+        let Some(bytes) = self.popup.get_call_data_bytes() else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
+
+        let result = self
+            .popup
+            .execute_with_password(|password| -> AppResult<()> {
+                let password = Zeroizing::new(password.to_string());
+
+                tokio::spawn(async move {
+                    // Use spawn_blocking for CPU-intensive decrypt_json operation
+                    let signer_result =
+                        tokio::task::spawn_blocking(move || suno_signer::load_keypair(&password))
+                            .await;
+
+                    match signer_result {
+                        Ok(Ok(signer)) => {
+                            sync::spawn_sign_and_submit_call_data(
+                                &api, runtime, &signer, &bytes, &tx,
+                            );
+                        }
+                        Ok(Err(e)) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Failed to load keypair: {}",
+                                e
+                            ))));
+                            let _ = tx.send(Action::Input(InputAction::Error(
+                                "Invalid password".to_string(),
+                            )));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Task failed: {}",
+                                e
+                            ))));
+                            let _ = tx.send(Action::Input(InputAction::Error(
+                                "Something went wrong, check errors and try again".to_string(),
+                            )));
+                        }
+                    }
+                });
+
+                // Lock input so it can't be changed unless there's an error
+                // and remove focus from the input field and start verification password spinner
+                let _ = self.tx.send(Action::Input(InputAction::Lock));
+
+                Ok(())
+            });
+        if let Err(e) = result {
+            let _ = self
+                .tx
+                .send(Action::System(SystemAction::Error(e.to_string())));
+            let _ = self.tx.send(Action::Input(InputAction::Error(
+                "Something went wrong, check errors and try again".to_string(),
+            )));
+        }
+    }
+
+    pub fn on_collator_confirm_enter(&mut self, collator: Collator) {
+        let runtime = collator.runtime();
 
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;

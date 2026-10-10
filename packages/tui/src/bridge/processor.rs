@@ -46,6 +46,22 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubKusama => suno_asset_hub_kusama::process_transaction_events(events),
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::process_transaction_events(events),
             Runtime::AssetHubWestend => suno_asset_hub_westend::process_transaction_events(events),
+            Runtime::CoretimeKusama => suno_coretime_kusama::process_transaction_events(events),
+            Runtime::CoretimePolkadot => suno_coretime_polkadot::process_transaction_events(events),
+            Runtime::BridgeHubKusama => suno_bridge_hub_kusama::process_transaction_events(events),
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::process_transaction_events(events)
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::process_transaction_events(events)
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::process_transaction_events(events)
+            }
+            Runtime::PeopleKusama => suno_people_kusama::process_transaction_events(events),
+            Runtime::PeoplePolkadot => suno_people_polkadot::process_transaction_events(events),
+            Runtime::PeoplePaseo => suno_people_paseo::process_transaction_events(events),
+            Runtime::PeopleWestend => suno_people_westend::process_transaction_events(events),
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }
@@ -130,6 +146,36 @@ impl RuntimeProcessor for Runtime {
             }
             Runtime::AssetHubWestend => {
                 suno_asset_hub_westend::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CoretimeKusama => {
+                suno_coretime_kusama::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CoretimePolkadot => {
+                suno_coretime_polkadot::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::BridgeHubKusama => {
+                suno_bridge_hub_kusama::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::BridgeHubPolkadot => {
+                suno_bridge_hub_polkadot::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CollectivesPolkadot => {
+                suno_collectives_polkadot::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CollectivesWestend => {
+                suno_collectives_westend::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::PeopleKusama => {
+                suno_people_kusama::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::PeoplePolkadot => {
+                suno_people_polkadot::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::PeoplePaseo => {
+                suno_people_paseo::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::PeopleWestend => {
+                suno_people_westend::process_block_extrinsics(api, extrinsics).await
             }
             _ => Ok(vec![]),
         }

@@ -302,6 +302,15 @@ pub fn spawn_fetch_invulnerables(
         .spawn(move |api| async move { runtime.fetch_invulnerables(&api).await });
 }
 
+pub fn spawn_fetch_candidate_list(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_candidate_list(&api).await });
+}
+
 pub fn spawn_fetch_collators_last_authored_block(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -535,21 +544,51 @@ pub fn spawn_fetch_validators_proxy_status(
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
         move |api, stash| async move {
             runtime
-                .fetch_and_validate_proxy_account(&api, &stash, &proxy)
+                .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
                 .await
         },
         3,
     );
 }
 
-pub fn spawn_fetch_account_balance(
+pub fn spawn_fetch_collators_proxy_status(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    proxy: &AccountId32,
+    tx: &UnboundedSender<Action>,
+) {
+    let proxy = *proxy;
+    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
+        move |api, stash| async move {
+            runtime
+                .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
+                .await
+        },
+        3,
+    );
+}
+
+pub fn spawn_fetch_validators_account_balance(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
-        move |api, stash| async move { runtime.fetch_account_balance(&api, &stash).await },
+        move |api, stash| async move { runtime.fetch_validators_account_balance(&api, &stash).await },
+        3,
+    );
+}
+
+pub fn spawn_fetch_collators_account_balance(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    validator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_collators_account_balance(&api, &stash).await },
         3,
     );
 }

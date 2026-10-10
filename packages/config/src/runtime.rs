@@ -34,6 +34,10 @@ pub const COLLECTIVES_WESTEND_SPEC: &str = include_str!("../chain-specs/collecti
 
 pub type Runtime = SupportedRuntime;
 
+/// Supported chains. Each variant represents a supported chain, with a unique identifier.
+///
+/// The order of variants is important, as it determines the order in which chains are displayed.
+///
 #[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {
@@ -519,6 +523,29 @@ impl SupportedRuntime {
         matches!(
             self,
             Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend
+        )
+    }
+
+    pub fn is_para_chain(&self) -> bool {
+        matches!(
+            self,
+            Self::AssetHubPolkadot
+                | Self::PeoplePolkadot
+                | Self::CoretimePolkadot
+                | Self::CollectivesPolkadot
+                | Self::BridgeHubPolkadot
+                | Self::BulletinPolkadot
+                | Self::AssetHubKusama
+                | Self::PeopleKusama
+                | Self::CoretimeKusama
+                | Self::BridgeHubKusama
+                | Self::AssetHubWestend
+                | Self::PeopleWestend
+                | Self::CoretimeWestend
+                | Self::CollectivesWestend
+                | Self::AssetHubPaseo
+                | Self::PeoplePaseo
+                | Self::BulletinPaseo
         )
     }
 

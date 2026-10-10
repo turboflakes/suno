@@ -459,9 +459,9 @@ impl ValidatorsList {
         false
     }
 
-    pub fn is_commands_available(&self) -> bool {
+    pub fn has_commands_available(&self) -> bool {
         if let Some(v) = self.get_selected() {
-            return v.is_commands_available();
+            return v.has_commands_available();
         }
         false
     }

@@ -31,6 +31,8 @@ impl StatefulWidget for CollatorsCompactWidget {
             .set_style(theme.block.pane_body(state.is_active()))
             .padding(Padding::symmetric(0, 1));
 
+        let proxies_available = state.proxies_available();
+
         // In group view, interleave a non-selectable chain-name row before each group's collators.
         // The underlying `table_state` selection index refers to `state.collators`,
         // so it's translated here to account for the extra header rows.
@@ -53,12 +55,18 @@ impl StatefulWidget for CollatorsCompactWidget {
             };
 
             if last_group != Some(group_key) {
-                rows.push(Row::new(vec![
+                let mut row = vec![
                     Text::from(""),
                     Text::from(group_key.to_string()).style(theme.paragraph.label_italic),
-                    Text::from(""),
-                    Text::from(""),
-                ]));
+                ];
+
+                if proxies_available {
+                    row.push(Text::from(""));
+                }
+
+                row.push(Text::from(""));
+                rows.push(Row::new(row));
+
                 last_group = Some(group_key);
             }
 
@@ -72,27 +80,40 @@ impl StatefulWidget for CollatorsCompactWidget {
                 String::new()
             };
 
-            rows.push(Row::new(vec![
+            let mut row = vec![
                 Text::from(""),
                 Text::from(format!("{}{}", chain_label, c.display_name(4))),
-                Text::from(""),
-                Text::from(""),
-            ]));
+            ];
+
+            if proxies_available {
+                row.push(Text::from(c.proxies_as_str()).alignment(Alignment::Right));
+            }
+
+            row.push(Text::from(""));
+            rows.push(Row::new(row));
         }
 
-        let widths = [
-            Constraint::Length(1),
-            Constraint::Fill(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-        ];
+        // Define widths
+        let mut widths = vec![Constraint::Length(1), Constraint::Fill(1)];
 
-        let header_cells = vec![
+        if proxies_available {
+            widths.push(Constraint::Length(7));
+        }
+        widths.push(Constraint::Length(1));
+
+        // Define header cells
+        let mut header_cells = vec![
             Cell::from(""),
             Cell::from(Text::from("collators").alignment(Alignment::Left)),
-            Cell::from(""),
-            Cell::from(""),
         ];
+
+        if proxies_available {
+            header_cells.push(Cell::from(
+                Text::from("proxies").alignment(Alignment::Right),
+            ));
+        }
+
+        header_cells.push(Cell::from(""));
 
         let rows_len = rows.len();
         let table = Table::new(rows, widths)

@@ -4,9 +4,11 @@ use sp_arithmetic::Permill;
 use subxt::utils::H256;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
+    aura::Deposit,
     babe::Epoch,
     balance::Balance,
     call::Call,
+    collator::CollatorStatus,
     identity::Identity,
     network::ConnectionState,
     proxy::ProxyKey,
@@ -18,6 +20,7 @@ use suno_primitives::{
 use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
+type CollatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
 type AccountBytes = [u8; 32];
 type BlockNumber = u64;
@@ -149,11 +152,16 @@ pub enum ChainAction {
 pub enum CollatorAction {
     UpdateAuraAuthorities(SupportedRuntime, Vec<AccountBytes>),
     UpdateInvulnerables(SupportedRuntime, Vec<AccountBytes>),
+    UpdateCandidates(SupportedRuntime, Vec<(AccountBytes, Deposit)>),
     UpdateAuthoredBlock(SupportedRuntime, BlockNumber, u64),
-    UpdateLastAuthoredBlock(SupportedRuntime, AccountBytes, BlockNumber),
+    UpdateLastAuthoredBlock(CollatorKey, BlockNumber),
     UpdateIdentity(AccountBytes, Identity),
-    UpdateNextKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
-    UpdateQueuedKeys(SupportedRuntime, AccountBytes, Option<[u8; 32]>),
+    UpdateNextKeys(CollatorKey, Option<[u8; 32]>),
+    UpdateQueuedKeys(CollatorKey, Option<[u8; 32]>),
+    UpdateStatus(CollatorKey, CollatorStatus),
+    UpdateDeposit(CollatorKey, Deposit),
+    UpdateBalance(CollatorKey, Balance),
+    AddProxy(CollatorKey, ProxyKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

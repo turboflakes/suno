@@ -1,7 +1,10 @@
 use crate::{
+    aura::Deposit,
     babe::Epoch,
     balance::Balance,
+    collator::CollatorStatus,
     identity::Identity,
+    key::AccountBytes,
     proxy::SupportedProxy,
     session::Keys,
     staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -12,7 +15,6 @@ use std::fmt::Debug;
 use subxt::{client::OnlineClientAtBlockImpl, tx::TransactionProgress, utils::H256};
 use suno_config::CustomConfig;
 
-type AccountBytes = [u8; 32];
 type Points = u32;
 type Amount = u128;
 
@@ -132,6 +134,20 @@ pub struct CollatorKeysData {
     pub keys: Option<[u8; 32]>,
 }
 
+/// Collator status data combining account and its collator status
+#[derive(Debug)]
+pub struct CollatorStatusData {
+    pub account: AccountBytes,
+    pub status: CollatorStatus,
+}
+
+/// Collator deposit data combining account and its collator deposit
+#[derive(Debug)]
+pub struct CollatorDepositData {
+    pub account: AccountBytes,
+    pub deposit: Deposit,
+}
+
 /// Response types from chain storage queries
 /// This enum allows heterogeneous collection of different data types
 #[derive(Debug)]
@@ -167,13 +183,18 @@ pub enum Response {
     EventWithdrawn(Data<AmountData>),
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
+    CollatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
+    Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
+    CollatorSupportedProxy(Data<SupportedProxyData>),
+    CollatorStatus(Data<CollatorStatusData>),
+    CollatorDeposit(Data<CollatorDepositData>),
     SlotDuration(Data<u64>),
     SessionIndex(Data<u32>),
 }
@@ -278,8 +299,22 @@ impl Response {
         }))
     }
 
+    pub fn collator_supported_proxy(
+        account: AccountBytes,
+        supported_proxy: SupportedProxy,
+    ) -> Self {
+        Response::CollatorSupportedProxy(Data::new(SupportedProxyData {
+            account,
+            supported_proxy,
+        }))
+    }
+
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {
         Response::Balance(Data::new(BalanceData { account, balance }))
+    }
+
+    pub fn collator_balance(account: AccountBytes, balance: Balance) -> Self {
+        Response::CollatorBalance(Data::new(BalanceData { account, balance }))
     }
 
     pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
@@ -292,6 +327,10 @@ impl Response {
 
     pub fn invulnerables(invulnerables: Vec<AccountBytes>) -> Self {
         Response::Invulnerables(Data::new(invulnerables))
+    }
+
+    pub fn candidates(candidates: Vec<(AccountBytes, Deposit)>) -> Self {
+        Response::Candidates(Data::new(candidates))
     }
 
     pub fn last_authored_block(account: AccountBytes, block: u64) -> Self {
@@ -308,6 +347,14 @@ impl Response {
 
     pub fn collator_queued_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {
         Response::CollatorQueuedKeys(Data::new(CollatorKeysData { account, keys }))
+    }
+
+    pub fn collator_status(account: AccountBytes, status: CollatorStatus) -> Self {
+        Response::CollatorStatus(Data::new(CollatorStatusData { account, status }))
+    }
+
+    pub fn collator_deposit(account: AccountBytes, deposit: Deposit) -> Self {
+        Response::CollatorDeposit(Data::new(CollatorDepositData { account, deposit }))
     }
 
     pub fn slot_duration(duration_ms: u64) -> Self {

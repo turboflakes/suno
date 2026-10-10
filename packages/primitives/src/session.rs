@@ -71,6 +71,8 @@ pub enum KeysError {
     InvalidHex(#[from] hex::FromHexError),
     #[error("Invalid hex length: expected 193 bytes, got {0}")]
     InvalidHexLength(usize),
+    #[error("Invalid hex length: expected 32 bytes, got {0}")]
+    InvalidAuraHexLength(usize),
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -134,6 +136,45 @@ impl Keys {
         let keys = parse_keys_from_bytes(bytes)?;
 
         Ok(keys)
+    }
+}
+
+/// A collator's single 32-byte Aura session key, as opposed to a validator's
+/// 193-byte relay-chain bundle in [`Keys`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuraKey(pub [u8; 32]);
+
+impl AuraKey {
+    pub fn into_bytes(self) -> [u8; 32] {
+        self.0
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeysError> {
+        let bytes: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| KeysError::InvalidAuraHexLength(bytes.len()))?;
+
+        Ok(Self(bytes))
+    }
+}
+
+impl std::fmt::Display for AuraKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{}", hex::encode(self.0))
+    }
+}
+
+impl FromStr for AuraKey {
+    type Err = KeysError;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if input.is_empty() {
+            return Err(KeysError::MissingHex);
+        }
+
+        let hex_str = input.trim_start_matches("0x");
+        let bytes = hex::decode(hex_str).map_err(KeysError::InvalidHex)?;
+
+        Self::from_bytes(&bytes)
     }
 }
 

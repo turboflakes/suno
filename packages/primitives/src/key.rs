@@ -1,10 +1,12 @@
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
+pub type AccountBytes = [u8; 32];
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct AccountKey {
     pub runtime: SupportedRuntime,
-    pub bytes: [u8; 32],
+    pub bytes: AccountBytes,
 }
 
 impl AccountKey {
@@ -15,7 +17,7 @@ impl AccountKey {
         }
     }
 
-    pub fn from_bytes(runtime: SupportedRuntime, bytes: [u8; 32]) -> Self {
+    pub fn from_bytes(runtime: SupportedRuntime, bytes: AccountBytes) -> Self {
         Self { runtime, bytes }
     }
 
@@ -23,7 +25,7 @@ impl AccountKey {
         self.runtime
     }
 
-    pub fn bytes(&self) -> [u8; 32] {
+    pub fn bytes(&self) -> AccountBytes {
         self.bytes
     }
 

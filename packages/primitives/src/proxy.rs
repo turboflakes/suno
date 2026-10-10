@@ -9,26 +9,28 @@ pub type Proxy = SupportedProxy;
 /// https://docs.polkadot.com/node-infrastructure/run-a-validator/operational-tasks/staking-operator-proxy/#staking-operator-vs-staking-proxy
 pub enum SupportedProxy {
     None,
-    /// TODO: DEPRECATE NonTransfer proxy, all default staking operations are now fully supported on AH
-    ///
-    /// NonTransfer proxy must be configured on the Relay chain and is limited to SetKeys/PurgeKeys
-    /// extrinsics on the Relay chain
-    NonTransfer,
     /// Staking proxy must be configured on Asset Hub and is limited to call extrinsics for
     /// staking operations on Asset Hub
     Staking,
     /// StakingOperator proxy must be configured on Asset Hub and is limited to a strict subset of
     /// the Staking proxy.
     StakingOperator,
+    /// Collator proxy must be configured on the system chains where restricted colator operations
+    /// are desired, such as `register_as_candidate`, `leave_intent`, `update_bond` or `take_candidate_slot`
+    Collator,
+    /// NonTransfer proxy must be configured on the system chains to execute `set_keys` or `purge_keys`
+    /// extrinsics.
+    NonTransfer,
 }
 
 impl SupportedProxy {
     pub fn as_short(&self) -> &'static str {
         match self {
             Self::None => "",
-            Self::NonTransfer => "NT",
             Self::Staking => "S",
             Self::StakingOperator => "SO",
+            Self::NonTransfer => "NT",
+            Self::Collator => "C",
         }
     }
 
@@ -54,6 +56,14 @@ impl SupportedProxy {
             (Self::StakingOperator, Call::PurgeKeys) => true,
             // TODO: implement Kick
             // (Self::StakingOperator, Call::Kick) => true,
+            // NOTE: NonTransfer proxy is limited to session_key operations on system parachains
+            (Self::NonTransfer, Call::SetSessionKeys { .. }) => true,
+            (Self::NonTransfer, Call::PurgeSessionKeys) => true,
+            // NOTE: Collator proxy is limited to collator_selection operations on system parachains
+            (Self::Collator, Call::RegisterAsCandidate) => true,
+            (Self::Collator, Call::LeaveIntent) => true,
+            (Self::Collator, Call::UpdateBond { .. }) => true,
+            (Self::Collator, Call::TakeCandidateSlot { .. }) => true,
             _ => false,
         }
     }
@@ -105,11 +115,11 @@ impl ProxyKey {
     }
 
     pub fn is_non_transfer_valid(&self) -> bool {
-        (self.runtime == SupportedRuntime::Polkadot
-            || self.runtime == SupportedRuntime::Kusama
-            || self.runtime == SupportedRuntime::Paseo
-            || self.runtime == SupportedRuntime::Westend)
-            && self.proxy == SupportedProxy::NonTransfer
+        self.runtime.is_para_chain() && self.proxy == SupportedProxy::NonTransfer
+    }
+
+    pub fn is_collator_valid(&self) -> bool {
+        self.runtime.is_para_chain() && self.proxy == SupportedProxy::Collator
     }
 }
 

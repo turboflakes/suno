@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
@@ -9,6 +7,7 @@ use crate::{
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
+use std::collections::HashSet;
 use subxt::utils::AccountId32;
 use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 
@@ -172,7 +171,11 @@ impl Validator {
 
     pub fn display_name(&self, size: usize) -> String {
         if let Some(identity) = self.identity() {
-            format!("{} ({})", identity, self.to_compact_string(size))
+            format!(
+                "{} ({})",
+                identity.truncate(6 * size),
+                self.to_compact_string(size)
+            )
         } else {
             self.to_compact_string(size)
         }
@@ -326,7 +329,7 @@ impl Validator {
         self.commands.iter().any(|c| c.is_super())
     }
 
-    pub fn is_commands_available(&self) -> bool {
+    pub fn has_commands_available(&self) -> bool {
         !self.commands.is_empty()
     }
 }

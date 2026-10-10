@@ -13,11 +13,16 @@ impl Identity {
     pub fn with_name(name: String) -> Self {
         Self { name, sub: None }
     }
+
     pub fn with_name_and_sub(name: String, sub: String) -> Self {
         Self {
             name,
             sub: Some(sub),
         }
+    }
+
+    pub fn truncate(&self, size: usize) -> String {
+        self.to_string().chars().take(size).collect()
     }
 }
 

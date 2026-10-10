@@ -1,15 +1,23 @@
 use crate::widgets::collators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
+use crate::widgets::collators_detailed_list::group_header_height;
 use ratatui::widgets::TableState;
+use sp_arithmetic::traits::Zero;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     time::{SystemTime, UNIX_EPOCH},
 };
 use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
+    balance::Balance,
     collator::{Collator, CollatorStatus},
     identity::Identity,
+    proxy::ProxyKey,
     AccountDisplay, AccountKey,
 };
+
+type CollatorKey = AccountKey;
+type Amount = u128;
+type AccountBytes = [u8; 32];
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorsView {
@@ -20,7 +28,8 @@ pub enum CollatorsView {
 
 #[derive(Debug, Default)]
 pub struct CollatorsList {
-    pub collators: Vec<Collator>,
+    pub collators: HashMap<CollatorKey, Collator>,
+    pub collators_order: Vec<CollatorKey>,
     pub table_state: TableState,
     pub scroll_offset: u16,
     pub viewport_height: u16,
@@ -29,6 +38,19 @@ pub struct CollatorsList {
 }
 
 impl CollatorsList {
+    pub fn add_collator(&mut self, collator: Collator) {
+        let key = collator.key().clone();
+        if !self.collators.contains_key(&key) {
+            // Keep the order sorted by runtime (config order within a runtime) so the
+            // selection order matches the order of the groups displayed in both views.
+            let position = self
+                .collators_order
+                .partition_point(|k| k.runtime <= key.runtime);
+            self.collators_order.insert(position, key.clone());
+        }
+        self.collators.insert(key, collator);
+    }
+
     pub fn on_init(&mut self) {
         let chains = CONFIG.chains();
         for chain in chains.iter() {
@@ -36,10 +58,10 @@ impl CollatorsList {
                 for collator in &chain_config.collators {
                     match collator {
                         NodeConfig::Address(stash) => {
-                            self.collators.push(Collator::new(*chain_name, *stash));
+                            self.add_collator(Collator::new(*chain_name, *stash));
                         }
                         NodeConfig::Detailed { stash, .. } => {
-                            self.collators.push(Collator::new(*chain_name, *stash));
+                            self.add_collator(Collator::new(*chain_name, *stash));
                         }
                     }
                 }
@@ -52,25 +74,47 @@ impl CollatorsList {
 
     /// Returns an iterator of collators in display order
     pub fn collators_iter(&self) -> impl Iterator<Item = &Collator> {
-        self.collators.iter()
+        self.collators_order
+            .iter()
+            .filter_map(move |key| self.collators.get(key))
+    }
+
+    // Returns true if any validator has proxies available
+    pub fn proxies_available(&self) -> bool {
+        self.collators_order
+            .iter()
+            .any(|key| self.collators.get(key).is_some_and(|c| c.has_proxies()))
+    }
+
+    // Helper method to get collator by table index
+    pub fn get_collator_by_index(&self, index: usize) -> Option<&Collator> {
+        self.collators_order
+            .get(index)
+            .and_then(|key| self.collators.get(key))
+    }
+
+    pub fn get_collator_by_index_cloned(&self, index: usize) -> Option<Collator> {
+        self.get_collator_by_index(index).cloned()
     }
 
     pub fn get_collator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
-        self.collators
+        self.collators_order
             .iter()
-            .filter(|c| c.runtime() == runtime)
-            .map(|c| c.key().clone())
+            .filter(|key| key.runtime == runtime)
+            .cloned()
             .collect()
     }
 
     pub fn get_collators_grouped_by_runtime(&self) -> BTreeMap<SupportedRuntime, Vec<&Collator>> {
         let mut grouped: BTreeMap<SupportedRuntime, Vec<&Collator>> = BTreeMap::new();
 
-        for collator in &self.collators {
-            grouped
-                .entry(collator.runtime())
-                .or_default()
-                .push(collator);
+        for key in &self.collators_order {
+            if let Some(collator) = self.collators.get(key) {
+                grouped
+                    .entry(collator.runtime())
+                    .or_default()
+                    .push(collator);
+            }
         }
 
         grouped
@@ -84,11 +128,13 @@ impl CollatorsList {
     ) -> BTreeMap<SupportedRuntime, Vec<&Collator>> {
         let mut grouped: BTreeMap<SupportedRuntime, Vec<&Collator>> = BTreeMap::new();
 
-        for collator in &self.collators {
-            grouped
-                .entry(collator.runtime().relay_chain())
-                .or_default()
-                .push(collator);
+        for key in &self.collators_order {
+            if let Some(collator) = self.collators.get(key) {
+                grouped
+                    .entry(collator.runtime().relay_chain())
+                    .or_default()
+                    .push(collator);
+            }
         }
 
         grouped
@@ -110,7 +156,7 @@ impl CollatorsList {
     pub fn get_selected_ref(&self) -> Option<&Collator> {
         self.table_state
             .selected()
-            .and_then(|i| self.collators.get(i))
+            .and_then(|i| self.get_collator_by_index(i))
     }
 
     // Scroll to the selected collator if it's not in view
@@ -126,17 +172,43 @@ impl CollatorsList {
 
     // Determine the Y position of the current collator selection
     fn get_selected_y_position(&self) -> u16 {
-        let mut selected_y_position = 0;
         let selected_ref = self.get_selected_ref();
 
-        for (_, collators) in self.get_collators_grouped_by_runtime() {
-            if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
-                // Header + index + table header
-                return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
+        match self.view {
+            CollatorsView::Group => {
+                let grouped = self.get_collators_grouped_by_runtime();
+                // Groups get a one row top padding when more than one is displayed
+                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
+                let mut selected_y_position = 0;
+                for (_, collators) in grouped {
+                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
+                        // Top padding + header + index + table header
+                        return selected_y_position
+                            + top_padding
+                            + GROUP_HEADER_HEIGHT
+                            + idx as u16
+                            + 1;
+                    }
+                    selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
+                }
+                0
             }
-            selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
+            CollatorsView::List => {
+                let grouped = self.get_collators_grouped_by_relay_chain();
+                // Groups get a one row top padding when more than one is displayed
+                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
+                let mut selected_y_position = 0;
+                for (_, collators) in grouped {
+                    let header_height = group_header_height(&collators);
+                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
+                        // Top padding + header + index + table header
+                        return selected_y_position + top_padding + header_height + idx as u16 + 1;
+                    }
+                    selected_y_position += header_height + collators.len() as u16 + PADDING;
+                }
+                0
+            }
         }
-        0
     }
 
     pub fn is_active(&self) -> bool {
@@ -165,12 +237,26 @@ impl CollatorsList {
     pub fn get_selected(&self) -> Option<Collator> {
         self.table_state
             .selected()
-            .and_then(|i| self.collators.get(i).cloned())
+            .and_then(|i| self.get_collator_by_index_cloned(i))
+    }
+
+    pub fn is_proxy_valid(&self) -> bool {
+        if let Some(c) = self.get_selected() {
+            return c.is_proxy_valid();
+        }
+        false
+    }
+
+    pub fn has_commands_available(&self) -> bool {
+        if let Some(c) = self.get_selected() {
+            return c.has_commands_available();
+        }
+        false
     }
 
     pub fn move_down(&mut self) -> Option<Collator> {
         if let Some(selected) = self.table_state.selected() {
-            if selected == self.collators.len() - 1 {
+            if selected == self.collators_order.len() - 1 {
                 self.table_state.select_first();
                 self.scroll_offset = 0;
             } else {
@@ -179,7 +265,7 @@ impl CollatorsList {
             self.ensure_selection_in_view();
             self.table_state
                 .selected()
-                .and_then(|i| self.collators.get(i).cloned())
+                .and_then(|i| self.get_collator_by_index_cloned(i))
         } else {
             None
         }
@@ -188,7 +274,7 @@ impl CollatorsList {
     pub fn move_up(&mut self) -> Option<Collator> {
         if let Some(selected) = self.table_state.selected() {
             if selected == 0 {
-                let i = self.collators.len() - 1;
+                let i = self.collators_order.len() - 1;
                 self.table_state.select(Some(i));
             } else {
                 self.table_state.scroll_up_by(1);
@@ -197,7 +283,7 @@ impl CollatorsList {
             self.ensure_selection_in_view();
             self.table_state
                 .selected()
-                .and_then(|i| self.collators.get(i).cloned())
+                .and_then(|i| self.get_collator_by_index_cloned(i))
         } else {
             None
         }
@@ -207,28 +293,60 @@ impl CollatorsList {
     ///
     /// Leaves collators already marked `Invulnerable` untouched, since that status
     /// takes priority regardless of the order the two fetches resolve in.
-    pub fn update_aura_authorities(&mut self, runtime: SupportedRuntime, authorities: &[[u8; 32]]) {
-        for collator in self.collators.iter_mut() {
+    pub fn update_aura_authorities(
+        &mut self,
+        runtime: SupportedRuntime,
+        authorities: &[AccountBytes],
+    ) {
+        for collator in self.collators.values_mut() {
             if collator.runtime() == runtime && *collator.status() != CollatorStatus::Invulnerable {
-                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
-                let status = if authorities.contains(&stash_bytes) {
-                    CollatorStatus::Permissionless
-                } else {
-                    CollatorStatus::Unknown
-                };
-                collator.set_status(status);
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
+                if authorities.contains(&stash_bytes) {
+                    if collator.deposit().is_zero() && collator.has_keys() {
+                        collator.set_status(CollatorStatus::Exiting);
+                    } else {
+                        collator.set_status(CollatorStatus::Permissionless);
+                    }
+                }
             }
         }
     }
 
     /// Marks the collators of `runtime` found in the invulnerable set, overriding
     /// whatever status they currently have.
-    pub fn update_invulnerables(&mut self, runtime: SupportedRuntime, invulnerables: &[[u8; 32]]) {
-        for collator in self.collators.iter_mut() {
+    pub fn update_invulnerables(
+        &mut self,
+        runtime: SupportedRuntime,
+        invulnerables: &[AccountBytes],
+    ) {
+        for collator in self.collators.values_mut() {
             if collator.runtime() == runtime {
-                let stash_bytes: [u8; 32] = *collator.stash().as_ref();
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
                 if invulnerables.contains(&stash_bytes) {
                     collator.set_status(CollatorStatus::Invulnerable);
+                }
+            }
+        }
+    }
+
+    /// Marks the collators of `runtime` found in the candidate list.
+    ///
+    /// Leaves collators already marked `Invulnerable` or `Permissionless` untouched, since those status
+    /// takes priority regardless of the order the fetches resolve in.
+    pub fn update_candidates(
+        &mut self,
+        runtime: SupportedRuntime,
+        candidates: &[(AccountBytes, Amount)],
+    ) {
+        for collator in self.collators.values_mut() {
+            if collator.runtime() == runtime {
+                let stash_bytes: AccountBytes = *collator.stash().as_ref();
+                if let Some((_, deposit)) = candidates.iter().find(|(who, _)| *who == stash_bytes) {
+                    if *collator.status() == CollatorStatus::Unknown {
+                        collator.set_status(CollatorStatus::Candidate);
+                    }
+
+                    collator.set_deposit(*deposit);
                 }
             }
         }
@@ -255,7 +373,7 @@ impl CollatorsList {
             .unwrap()
             .as_millis();
 
-        for collator in self.collators.iter_mut() {
+        for collator in self.collators.values_mut() {
             if collator.runtime() == runtime {
                 let stash_bytes: [u8; 32] = *collator.stash().as_ref();
                 if stash_bytes == *author_bytes {
@@ -266,12 +384,11 @@ impl CollatorsList {
         }
     }
 
-    /// Seeds collators last produced block number, the `current_block`/`block_time_ms`
+    /// Seeds the collator's last produced block number, the `current_block`/`block_time_ms`
     /// are used to estimate how long ago that block was authored.
     pub fn update_last_authored_block(
         &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
+        collator_key: &CollatorKey,
         block_number: u64,
         current_block: u64,
         block_time_ms: Option<u64>,
@@ -288,21 +405,19 @@ impl CollatorsList {
             None => now,
         };
 
-        for collator in self.collators.iter_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes
-                    && block_number > collator.last_block_authored().unwrap_or(0)
-                {
-                    collator.set_last_block_authored(block_number, ts);
-                }
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            if block_number > collator.last_block_authored().unwrap_or(0) {
+                collator.set_last_block_authored(block_number, ts);
             }
         }
     }
 
-    /// Sets the on-chain identity for whichever collator matches `stash_bytes`.
+    /// Sets the on-chain identity for the collator matching `collator_key`.
+    /// Sets the on-chain identity for every collator matching `stash_bytes`, regardless
+    /// of runtime: identity is fetched once per stash via the People chain and fans out
+    /// to every chain where that same stash runs as a collator.
     pub fn update_identity(&mut self, stash_bytes: [u8; 32], identity: Identity) {
-        for collator in self.collators.iter_mut() {
+        for collator in self.collators.values_mut() {
             let collator_stash: [u8; 32] = *collator.stash().as_ref();
             if collator_stash == stash_bytes {
                 collator.set_identity(Some(identity.clone()));
@@ -310,35 +425,47 @@ impl CollatorsList {
         }
     }
 
-    pub fn update_next_keys(
-        &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
-        keys: Option<[u8; 32]>,
-    ) {
-        for collator in self.collators.iter_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes {
-                    collator.set_next_keys(keys);
-                }
-            }
+    pub fn update_next_keys(&mut self, collator_key: &CollatorKey, keys: Option<[u8; 32]>) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_next_keys(keys);
         }
     }
 
-    pub fn update_queued_keys(
-        &mut self,
-        runtime: SupportedRuntime,
-        stash_bytes: [u8; 32],
-        keys: Option<[u8; 32]>,
-    ) {
-        for collator in self.collators.iter_mut() {
-            if collator.runtime() == runtime {
-                let collator_stash: [u8; 32] = *collator.stash().as_ref();
-                if collator_stash == stash_bytes {
-                    collator.set_queued_keys(keys);
-                }
-            }
+    pub fn update_queued_keys(&mut self, collator_key: &CollatorKey, keys: Option<[u8; 32]>) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_queued_keys(keys);
         }
+    }
+
+    pub fn add_proxy(&mut self, collator_key: &CollatorKey, proxy: ProxyKey) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.proxies.insert(proxy);
+        }
+    }
+
+    pub fn update_status(&mut self, collator_key: &CollatorKey, status: CollatorStatus) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_status(status);
+        }
+    }
+
+    fn set_balance(&mut self, collator_key: &AccountKey, balance: Balance) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.account.set_balance(balance);
+        }
+    }
+
+    pub fn update_balance(&mut self, collator_key: &CollatorKey, balance: Balance) {
+        self.set_balance(collator_key, balance);
+    }
+
+    fn set_deposit(&mut self, collator_key: &AccountKey, amount: Amount) {
+        if let Some(collator) = self.collators.get_mut(collator_key) {
+            collator.set_deposit(amount);
+        }
+    }
+
+    pub fn update_deposit(&mut self, collator_key: &CollatorKey, amount: Amount) {
+        self.set_deposit(collator_key, amount);
     }
 }

@@ -70,6 +70,18 @@ pub async fn fetch_and_validate_proxy_account(
                 SupportedProxy::StakingOperator,
             ));
         }
+        if def.delegate == *proxy && def.proxy_type == ProxyType::NonTransfer {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::NonTransfer,
+            ));
+        }
+        if def.delegate == *proxy && def.proxy_type == ProxyType::Collator {
+            responses.push(Response::supported_proxy(
+                account_bytes,
+                SupportedProxy::Collator,
+            ));
+        }
     }
 
     if responses.is_empty() {
@@ -364,6 +376,52 @@ pub async fn fetch_invulnerables(
     let invulnerables = value.0.iter().map(|stash| *stash.as_ref()).collect();
 
     Ok(Response::invulnerables(invulnerables))
+}
+
+/// Fetch the current collator candidate list at the specified block hash
+pub async fn fetch_candidate_list(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .candidate_list();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    let candidates = value
+        .0
+        .iter()
+        .map(|stash| (*stash.who.as_ref(), stash.deposit))
+        .collect();
+
+    Ok(Response::candidates(candidates))
+}
+
+/// Fetch candidacy bond at the specified block hash
+pub async fn fetch_candidacy_bond(api: &OnlineClientAtBlock<CustomConfig>) -> Result<u128, Error> {
+    let addr = node_runtime::storage()
+        .collator_selection()
+        .candidacy_bond();
+
+    let value = api
+        .storage()
+        .entry(addr)
+        .boxed()?
+        .fetch(())
+        .await
+        .boxed()?
+        .decode()
+        .boxed()?;
+
+    Ok(value)
 }
 
 /// Fetch the last block authored by a given collator stash at the specified block hash
