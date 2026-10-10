@@ -22,7 +22,7 @@ pub use babe::Epoch;
 pub use chain::{BlockHash, BlockNumber, Chain, RecentBlocks};
 pub use collator::Collator;
 pub use key::AccountKey;
-pub use node_account::{AccountDisplay, NodeAccount};
+pub use node_account::{AccountDisplay, NodeAccount, NodeHost};
 pub use staking::Era;
 pub use storage::Response;
 pub use validator::Validator;

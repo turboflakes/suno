@@ -60,8 +60,19 @@ impl CollatorsList {
                         NodeConfig::Address(stash) => {
                             self.add_collator(Collator::new(*chain_name, *stash));
                         }
-                        NodeConfig::Detailed { stash, .. } => {
-                            self.add_collator(Collator::new(*chain_name, *stash));
+                        NodeConfig::Detailed {
+                            stash,
+                            host_rpc,
+                            ssh,
+                            commands,
+                        } => {
+                            let mut collator = Collator::new(*chain_name, *stash);
+                            collator.host_rpc = host_rpc.clone();
+                            collator.ssh = ssh.clone();
+                            if let Some(cmds) = commands {
+                                collator.commands = cmds.clone();
+                            }
+                            self.add_collator(collator);
                         }
                     }
                 }

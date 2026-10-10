@@ -28,7 +28,7 @@ use suno_config::{
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, AccountKey,
-    Chain, Collator, Validator,
+    Chain, Collator, NodeHost, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -2010,7 +2010,7 @@ impl App {
                 return;
             }
         };
-        let supported_proxy = validator.get_proxy(runtime);
+        let supported_proxy = validator.get_proxy_for(runtime, &call);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
 
@@ -2084,7 +2084,7 @@ impl App {
         };
 
         match call {
-            Call::Custom(_) => {}
+            Call::Custom(custom) => self.handle_collator_custom_command(custom, collator),
             _ => self.handle_collator_extrinsic_calls(call, collator),
         }
     }
@@ -2105,7 +2105,7 @@ impl App {
                 return;
             }
         };
-        let supported_proxy = collator.get_proxy(runtime);
+        let supported_proxy = collator.get_proxy_for(runtime, &call);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = collator.display_name(3);
 
@@ -2171,6 +2171,205 @@ impl App {
         });
     }
 
+    pub fn handle_collator_custom_command(&mut self, custom: CustomCommand, collator: Collator) {
+        let tx = self.tx.clone();
+        let masked = self.is_masked();
+
+        match custom.kind {
+            CommandKind::Shell { run, .. } => {
+                tokio::spawn(async move {
+                    let run = run.replace("{stash}", &collator.key().stash().to_string());
+                    let access = NodeAccess::from_ssh_config(collator.ssh.as_ref());
+                    let result = access.execute_shell(&run).await;
+                    match result {
+                        Ok(_) => {
+                            let msg = format!(
+                                "Command '{}' succeeded for {} on host {}.",
+                                run,
+                                collator.display_name(4),
+                                collator.host(masked),
+                            );
+                            let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                        }
+                        Err(e) => {
+                            let msg = format!(
+                                "Command '{}' failed for {} on host {}.",
+                                run,
+                                collator.display_name(4),
+                                collator.host(masked),
+                            );
+                            let _ = tx.send(Action::Input(InputAction::Error(msg.clone())));
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "{}: {}",
+                                msg, e
+                            ))));
+                        }
+                    }
+                });
+
+                // Lock input so it can't be changed unless there's an error
+                // and remove focus from the input field and start loading spinner
+                let _ = self.tx.send(Action::Input(InputAction::Lock));
+            }
+            CommandKind::Uses(calls) => match calls {
+                CustomCalls::RotateAndSetKeys => {
+                    let runtime = collator.runtime();
+                    let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+                        return;
+                    };
+                    let api = chain.client().clone();
+                    let stash = collator.key().stash();
+                    let proxy_account_id = match runtime.signer_account_id().boxed() {
+                        Ok(address) => address,
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
+                    };
+                    let stash_identity = collator.display_name(3);
+                    let proxy_identity =
+                        to_compact_string(&proxy_account_id, runtime.account_format(), 6);
+
+                    tokio::spawn(async move {
+                        let (aura_key, proof) = match custom::rotate_keys(&collator).await {
+                            Ok(result) => result,
+                            Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to call rotate_keys: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+                        let call = Call::SetSessionKeys { aura_key, proof };
+                        let supported_proxy = collator.get_proxy_for(runtime, &call);
+
+                        let at_block = match api.at_current_block().await.boxed() {
+                            Ok(client) => client,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to client at_current_block: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+
+                        let call_data_bytes = match runtime.build_call_data(
+                            &at_block,
+                            &stash,
+                            call.clone(),
+                            supported_proxy,
+                        ) {
+                            Ok(bytes) => bytes,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to build call data: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+
+                        let qr_bytes = match build_transaction_qrcode(
+                            &at_block,
+                            &proxy_account_id,
+                            &call_data_bytes,
+                        )
+                        .await
+                        {
+                            Ok(qr_bytes) => qr_bytes,
+                            Err(e) => {
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to build QR data: {}",
+                                    e
+                                ))));
+                                return;
+                            }
+                        };
+                        info!("qr_bytes: 0x{}", hex::encode(&qr_bytes));
+
+                        let spec_version = at_block.spec_version();
+                        let ctx = Box::new(ConfirmationContext {
+                            runtime,
+                            spec_version,
+                            proxy_identity,
+                            stash_identity,
+                            call,
+                            call_data_bytes,
+                            qr_bytes,
+                        });
+                        let _ = tx.send(Action::Popup(PopupAction::ShowConfirmAndSign(ctx)));
+                    });
+                    // Lock input so it can't be changed unless there's an error
+                    // and remove focus from the input field and start loading spinner
+                    let _ = self.tx.send(Action::Input(InputAction::Lock));
+                }
+                CustomCalls::HasKeys => {
+                    tokio::spawn(async move {
+                        match custom::has_keys(&collator).await {
+                            Ok(true) => {
+                                let msg = format!(
+                                    "Yes. Host {} contains the next session keys for {}.",
+                                    collator.host(masked),
+                                    collator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                            }
+                            Ok(false) => {
+                                let msg = format!(
+                                    "No. Host {} does NOT have the next session keys for {}.",
+                                    collator.host(masked),
+                                    collator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Error(msg)));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to call has_keys: {}",
+                                    e
+                                ))));
+                            }
+                        }
+                    });
+                    let _ = self.tx.send(Action::Input(InputAction::Lock));
+                }
+                CustomCalls::HasQueuedKeys => {
+                    tokio::spawn(async move {
+                        match custom::has_queued_keys(&collator).await {
+                            Ok(true) => {
+                                let msg = format!(
+                                    "Yes. Host {} contains the queued session keys for {}",
+                                    collator.host(masked),
+                                    collator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Success(msg)));
+                            }
+                            Ok(false) => {
+                                let msg = format!(
+                                    "No. Host {} does NOT have the queued session keys for {}.",
+                                    collator.host(masked),
+                                    collator.display_name(4),
+                                );
+                                let _ = tx.send(Action::Input(InputAction::Error(msg)));
+                            }
+                            Err(e) => {
+                                let _ = tx.send(Action::Input(InputAction::Error(e.to_string())));
+                                let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                    "Failed to call has_queued_keys: {}",
+                                    e
+                                ))));
+                            }
+                        }
+                    });
+                    let _ = self.tx.send(Action::Input(InputAction::Lock));
+                }
+            },
+        }
+    }
+
     pub fn handle_custom_command(&mut self, custom: CustomCommand, validator: Validator) {
         let tx = self.tx.clone();
         let masked = self.is_masked();
@@ -2233,13 +2432,13 @@ impl App {
                     let stash_identity = validator.display_name(3);
                     let proxy_identity =
                         to_compact_string(&proxy_account_id, runtime.account_format(), 6);
-                    let supported_proxy = validator.get_proxy(runtime);
 
                     tokio::spawn(async move {
                         let result = custom::rotate_keys(&validator).await;
                         match result {
                             Ok((keys, proof)) => {
                                 let call = Call::SetKeys { keys, proof };
+                                let supported_proxy = validator.get_proxy_for(runtime, &call);
 
                                 let at_block = match api.at_current_block().await.boxed() {
                                     Ok(client) => client,

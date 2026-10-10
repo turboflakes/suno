@@ -1,13 +1,15 @@
 use crate::{
+    call::Call,
     display::{format_millis, format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount},
+    node_account::{AccountDisplay, NodeAccount, NodeHost},
     proxy::{ProxyKey, SupportedProxy},
+    session::AuraKey,
 };
 use std::collections::HashSet;
 use subxt::utils::AccountId32;
-use suno_config::{CustomCommand, SupportedRuntime};
+use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorStatus {
@@ -56,6 +58,8 @@ pub struct Collator {
     pub queued_keys: Option<[u8; 32]>,
     // Proxy accounts linked to the collator
     pub proxies: HashSet<ProxyKey>,
+    pub host_rpc: Host,
+    pub ssh: Option<SshConfig>,
     pub commands: Vec<CustomCommand>,
     pub status: CollatorStatus,
 }
@@ -72,6 +76,8 @@ impl Collator {
             next_keys: None,
             queued_keys: None,
             proxies: HashSet::new(),
+            host_rpc: Host::default(),
+            ssh: None,
             commands: Vec::new(),
             status: CollatorStatus::default(),
         }
@@ -356,10 +362,11 @@ impl Collator {
         )
     }
 
-    pub fn get_proxy(&self, runtime: SupportedRuntime) -> SupportedProxy {
+    /// Proxy type configured for `runtime` that is allowed to execute the given `call`.
+    pub fn get_proxy_for(&self, runtime: SupportedRuntime, call: &Call) -> SupportedProxy {
         self.proxies
             .iter()
-            .find(|p| p.runtime == runtime)
+            .find(|p| p.runtime == runtime && p.proxy.can_call(call))
             .map(|p| p.proxy)
             .unwrap_or(SupportedProxy::None)
     }
@@ -376,5 +383,29 @@ impl AccountDisplay for Collator {
 
     fn account_format(&self) -> u16 {
         self.account.account_format()
+    }
+}
+
+impl NodeHost for Collator {
+    type SessionKeys = AuraKey;
+
+    fn node_account(&self) -> &NodeAccount {
+        &self.account
+    }
+
+    fn ssh(&self) -> Option<&SshConfig> {
+        self.ssh.as_ref()
+    }
+
+    fn host_rpc(&self) -> &Host {
+        &self.host_rpc
+    }
+
+    fn next_session_keys(&self) -> Option<AuraKey> {
+        self.next_keys.map(AuraKey)
+    }
+
+    fn queued_session_keys(&self) -> Option<AuraKey> {
+        self.queued_keys.map(AuraKey)
     }
 }

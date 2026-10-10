@@ -1,8 +1,9 @@
 use crate::{
+    call::Call,
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount},
+    node_account::{AccountDisplay, NodeAccount, NodeHost},
     proxy::{ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -305,18 +306,11 @@ impl Validator {
         )
     }
 
-    pub fn host(&self, masked: bool) -> String {
-        if let Some(config) = self.ssh.as_ref() {
-            return config.host(masked).to_string();
-        }
-
-        self.host_rpc.host(masked)
-    }
-
-    pub fn get_proxy(&self, runtime: SupportedRuntime) -> SupportedProxy {
+    /// Proxy type configured for `runtime` that is allowed to execute the given `call`.
+    pub fn get_proxy_for(&self, runtime: SupportedRuntime, call: &Call) -> SupportedProxy {
         self.proxies
             .iter()
-            .find(|p| p.runtime == runtime)
+            .find(|p| p.runtime == runtime && p.proxy.can_call(call))
             .map(|p| p.proxy)
             .unwrap_or(SupportedProxy::None)
     }
@@ -341,5 +335,29 @@ impl AccountDisplay for Validator {
 
     fn account_format(&self) -> u16 {
         self.account.account_format()
+    }
+}
+
+impl NodeHost for Validator {
+    type SessionKeys = Keys;
+
+    fn node_account(&self) -> &NodeAccount {
+        &self.account
+    }
+
+    fn ssh(&self) -> Option<&SshConfig> {
+        self.ssh.as_ref()
+    }
+
+    fn host_rpc(&self) -> &Host {
+        &self.host_rpc
+    }
+
+    fn next_session_keys(&self) -> Option<Keys> {
+        self.next_keys.clone()
+    }
+
+    fn queued_session_keys(&self) -> Option<Keys> {
+        self.queued_keys.clone()
     }
 }

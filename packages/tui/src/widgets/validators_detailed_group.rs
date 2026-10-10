@@ -12,6 +12,7 @@ use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_blocks, format_millis, format_planks},
     validator::Validator,
+    NodeHost,
 };
 use suno_theme::Theme;
 

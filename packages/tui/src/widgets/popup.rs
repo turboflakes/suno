@@ -21,7 +21,7 @@ use suno_primitives::{
     entry::{Command, Entry, ToDescription, ToMethod},
     session::{AuraKey, Keys, Proof},
     staking::Payee,
-    AccountDisplay, Chain, Collator, Validator,
+    AccountDisplay, Chain, Collator, NodeHost, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use suno_theme::Theme;
@@ -854,6 +854,14 @@ impl Popup {
                     "Commands".to_string()
                 };
                 (Some(ctx.validator.display_identity()), Some(label))
+            }
+            Context::CollatorMenu(ctx) => {
+                let label = if !ctx.collator.commands.is_empty() {
+                    format!("Commands ({})", ctx.collator.host(self.masked))
+                } else {
+                    "Commands".to_string()
+                };
+                (Some(ctx.collator.display_identity()), Some(label))
             }
             Context::ChainMenu(ctx) => (
                 Some(ctx.runtime.as_str_long().to_uppercase()),
