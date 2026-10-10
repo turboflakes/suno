@@ -176,11 +176,18 @@ impl CollatorsList {
 
         match self.view {
             CollatorsView::Group => {
+                let grouped = self.get_collators_grouped_by_runtime();
+                // Groups get a one row top padding when more than one is displayed
+                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
                 let mut selected_y_position = 0;
-                for (_, collators) in self.get_collators_grouped_by_runtime() {
+                for (_, collators) in grouped {
                     if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
-                        // Header + index + table header
-                        return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
+                        // Top padding + header + index + table header
+                        return selected_y_position
+                            + top_padding
+                            + GROUP_HEADER_HEIGHT
+                            + idx as u16
+                            + 1;
                     }
                     selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
                 }
