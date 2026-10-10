@@ -34,6 +34,10 @@ pub const COLLECTIVES_WESTEND_SPEC: &str = include_str!("../chain-specs/collecti
 
 pub type Runtime = SupportedRuntime;
 
+/// Supported chains. Each variant represents a supported chain, with a unique identifier.
+///
+/// The order of variants is important, as it determines the order in which chains are displayed.
+///
 #[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {

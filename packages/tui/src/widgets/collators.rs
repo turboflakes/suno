@@ -41,7 +41,12 @@ impl CollatorsList {
     pub fn add_collator(&mut self, collator: Collator) {
         let key = collator.key().clone();
         if !self.collators.contains_key(&key) {
-            self.collators_order.push(key.clone());
+            // Keep the order sorted by runtime (config order within a runtime) so the
+            // selection order matches the order of the groups displayed in both views.
+            let position = self
+                .collators_order
+                .partition_point(|k| k.runtime <= key.runtime);
+            self.collators_order.insert(position, key.clone());
         }
         self.collators.insert(key, collator);
     }
