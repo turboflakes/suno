@@ -411,7 +411,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
-            Constraint::Fill(2),
+            Constraint::Fill(1),
         ];
         if show_host {
             widths.insert(3, Constraint::Fill(2));
