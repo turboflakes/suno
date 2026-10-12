@@ -31,5 +31,6 @@ pub fn map_supported_proxy(proxy: SupportedProxy) -> Option<ProxyType> {
         SupportedProxy::NonTransfer => Some(ProxyType::NonTransfer),
         SupportedProxy::Staking => Some(ProxyType::Staking),
         SupportedProxy::StakingOperator => Some(ProxyType::StakingOperator),
+        SupportedProxy::Collator => Some(ProxyType::Collator),
     }
 }

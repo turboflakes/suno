@@ -1,6 +1,7 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::collators::CollatorsList;
 use crate::widgets::scrollbar::render_scrollbar;
+use crate::widgets::spinner::current_frame;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -12,17 +13,18 @@ use std::collections::BTreeSet;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
-    display::{create_progress_bar_by_blocks, format_millis},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
+    NodeHost,
 };
 use suno_theme::Theme;
 
-pub const LIST_HEADER_HEIGHT: u16 = 4;
+pub const LIST_HEADER_HEIGHT: u16 = 5;
 pub const LINES_PER_CHAIN: u16 = 1;
 pub const PADDING: u16 = 3;
 
 /// Header height for a group: the fixed lines plus [`LINES_PER_CHAIN`] lines per
 /// distinct parachain the group's collators span.
-fn group_header_height(collators: &[&Collator]) -> u16 {
+pub fn group_header_height(collators: &[&Collator]) -> u16 {
     let distinct_chains = collators
         .iter()
         .map(|c| c.runtime())
@@ -35,11 +37,21 @@ fn group_header_height(collators: &[&Collator]) -> u16 {
 pub struct CollatorsDetailedListWidget<'a> {
     pub chains: &'a ChainsList,
     theme: Theme,
+    masked: bool,
 }
 
 impl<'a> CollatorsDetailedListWidget<'a> {
     pub fn new(chains: &'a ChainsList, theme: Theme) -> Self {
-        Self { chains, theme }
+        Self {
+            chains,
+            theme,
+            masked: true,
+        }
+    }
+
+    pub fn with_masked(mut self, masked: bool) -> Self {
+        self.masked = masked;
+        self
     }
 }
 
@@ -218,12 +230,12 @@ impl<'a> CollatorsDetailedListWidget<'a> {
 
         let invulnerables_count = collators.iter().filter(|c| c.is_invulnerable()).count();
         let permissionless_count = collators.iter().filter(|c| c.is_permissionless()).count();
-        let registered_count = collators.iter().filter(|c| c.is_waiting()).count();
+        let registered_count = collators.iter().filter(|c| c.is_candidate()).count();
 
         let displayed = [
             (invulnerables_count, "inv"),
             (permissionless_count, "perm"),
-            (registered_count, "reg"),
+            (registered_count, "cand"),
         ]
         .into_iter()
         .filter(|(count, _)| *count > 0)
@@ -292,7 +304,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                         Constraint::Fill(1),    // Avg. block time
                         Constraint::Length(26), // Session info
                         Constraint::Length(24), // Session progress bar
-                        Constraint::Length(16), // Countdown
+                        Constraint::Length(20), // Countdown
                     ])
                     .areas(*row_area);
 
@@ -303,8 +315,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 .unwrap_or_else(|| "-".to_string());
 
             Paragraph::new(Line::from(vec![
-                Span::raw(format!("{} avg. block time ", runtime.system_name()))
-                    .style(theme.paragraph.label),
+                Span::raw(format!("{} ", runtime.system_name())).style(theme.paragraph.label),
                 Span::raw(avg_block_time),
             ]))
             .block(Block::new().set_style(block_style))
@@ -315,13 +326,8 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 aura.session_progress(chain.finalized_block(), runtime.duration_bn());
 
             Paragraph::new(
-                Line::from(format!(
-                    "{} session {} {:.0}% ",
-                    runtime.as_str_short().to_lowercase(),
-                    aura.current_session_index().unwrap_or_default(),
-                    session_progress * 100_f64
-                ))
-                .alignment(Alignment::Right),
+                Line::from(format!("{:.0}% ", session_progress * 100_f64))
+                    .alignment(Alignment::Right),
             )
             .block(Block::new().set_style(block_style))
             .style(theme.paragraph.base)
@@ -338,7 +344,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 aura.session_countdown_time(chain.finalized_block(), runtime.duration_bn());
 
             Paragraph::new(
-                Line::from(format!(" {}", session_countdown)).alignment(Alignment::Left),
+                Line::from(format!(" {} left", session_countdown)).alignment(Alignment::Left),
             )
             .block(Block::new().set_style(block_style))
             .style(theme.paragraph.base)
@@ -346,6 +352,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         }
 
         let bottom_lines = vec![
+            Line::from(""),
             Line::from(vec![
                 Span::raw("Total collators ").style(theme.paragraph.label),
                 Span::raw(total_count),
@@ -374,17 +381,22 @@ impl<'a> CollatorsDetailedListWidget<'a> {
     ) {
         let theme = self.theme;
         let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
+        let show_host = collators.iter().any(|c| c.has_commands_available());
 
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("chain").alignment(Alignment::Left)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
+            Cell::from(Text::from("deposit").alignment(Alignment::Right)),
             Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("").alignment(Alignment::Left)),
+            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("in").alignment(Alignment::Left)),
+            Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
+        if show_host {
+            header_cells.insert(3, Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
         if show_next_keys {
             header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
         }
@@ -394,19 +406,23 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Constraint::Length(3),
             Constraint::Length(12),
             Constraint::Length(24),
-            Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Fill(2),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
         ];
+        if show_host {
+            widths.insert(3, Constraint::Fill(2));
+        }
         if show_next_keys {
             widths.push(Constraint::Length(10));
         }
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, theme, show_next_keys))
+            .map(|c| self.collator_row(c, selected_collator, theme, show_next_keys, show_host))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -427,6 +443,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         selected: Option<&Collator>,
         theme: Theme,
         show_next_keys: bool,
+        show_host: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -455,12 +472,21 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             None => format!("{blocks:2}"),
         };
 
+        // Blocks in slot is only meaningful while the collator is the current author
+        let blocks_in_slot_str = if is_current_author {
+            blocks_in_slot_str
+        } else {
+            String::new()
+        };
+
         let last_block_str = collator
             .last_block_authored()
-            .map(|b| {
-                let prefix = if is_current_author { "> " } else { "" };
-                format!("{prefix}#{b}")
-            })
+            .map(|b| format!("#{b}"))
+            .unwrap_or_default();
+
+        let last_block_ago_str = collator
+            .last_block_authored_ts
+            .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
             .unwrap_or_default();
 
         let mut cells = vec![
@@ -468,21 +494,45 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Cell::from(Text::from(collator.runtime().system_name()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
-            Cell::from(Text::from(last_block_str).alignment(Alignment::Right)),
-            Cell::from(Text::from(blocks_in_slot_str).alignment(Alignment::Left)),
         ];
+
+        if show_host {
+            cells.push(Cell::from(
+                Text::from(collator.host(self.masked)).alignment(Alignment::Left),
+            ));
+        }
+
+        if collator.is_permissionless_or_candidate() {
+            cells.push(Cell::from(
+                Line::from(vec![
+                    Span::raw(format_planks(
+                        collator.deposit(),
+                        collator.account.token_decimals(),
+                        4,
+                    )),
+                    Span::raw(collator.account.token_symbol()).style(theme.paragraph.label(false)),
+                ])
+                .alignment(Alignment::Right),
+            ));
+        } else {
+            cells.push(Cell::from(Text::from("")));
+        }
+
+        cells.push(Cell::from(
+            Text::from(last_block_str).alignment(Alignment::Right),
+        ));
+
+        cells.push(Cell::from(
+            Text::from(last_block_ago_str).alignment(Alignment::Left),
+        ));
 
         if is_current_author {
             cells.push(Cell::from(
-                Text::from(format!("#{}", current_slot)).alignment(Alignment::Right),
+                Text::from(current_frame())
+                    .style(theme.paragraph.label(false))
+                    .alignment(Alignment::Right),
             ));
-            cells.push(Cell::from(Text::from("").alignment(Alignment::Left)));
         } else {
-            let next_slot_str = aura
-                .and_then(|a| collator.next_slot(a.authorities(), current_slot))
-                .map(|s| format!("#{}", s))
-                .unwrap_or_default();
-
             let next_slot_countdown_str = aura
                 .and_then(|a| {
                     let slot_duration_ms = a.slot_duration_ms()?;
@@ -496,12 +546,13 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 .unwrap_or_default();
 
             cells.push(Cell::from(
-                Text::from(next_slot_str).alignment(Alignment::Right),
-            ));
-            cells.push(Cell::from(
-                Text::from(next_slot_countdown_str).alignment(Alignment::Left),
+                Text::from(next_slot_countdown_str).alignment(Alignment::Right),
             ));
         }
+
+        cells.push(Cell::from(
+            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+        ));
 
         cells.push(Cell::from(
             Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),

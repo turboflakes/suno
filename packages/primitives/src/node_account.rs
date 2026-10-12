@@ -1,8 +1,13 @@
 use crate::balance::{Amount, Balance};
 use crate::display::{format_planks, to_compact_string};
+use crate::session::KeysError;
 use crate::{identity::Identity, key::AccountKey};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
+use suno_config::{Host, SshConfig, SupportedRuntime};
 
 /// Common trait for account-related functionality
 pub trait AccountDisplay {
@@ -11,6 +16,31 @@ pub trait AccountDisplay {
 
     fn to_compact_string(&self, size: usize) -> String {
         to_compact_string(&self.stash(), self.account_format(), size)
+    }
+}
+
+/// A node (validator or collator) reachable through its own RPC host and, optionally, SSH.
+/// The only differences between the two roles are the session keys type each one rotates
+/// and tracks, so anything built on top of this trait can be written once.
+pub trait NodeHost {
+    type SessionKeys: FromStr<Err = KeysError> + Display + Debug;
+
+    fn node_account(&self) -> &NodeAccount;
+    fn ssh(&self) -> Option<&SshConfig>;
+    fn host_rpc(&self) -> &Host;
+    fn next_session_keys(&self) -> Option<Self::SessionKeys>;
+    fn queued_session_keys(&self) -> Option<Self::SessionKeys>;
+
+    fn public_key(&self) -> String {
+        self.node_account().public_key()
+    }
+
+    fn host(&self, masked: bool) -> String {
+        if let Some(config) = self.ssh() {
+            return config.host(masked).to_string();
+        }
+
+        self.host_rpc().host(masked)
     }
 }
 
@@ -81,6 +111,28 @@ impl NodeAccount {
 
     pub fn free_balance_as_str(&self, decimal_places: usize) -> String {
         let value = format_planks(self.free_balance(), self.token_decimals(), decimal_places);
+        format!("{}{}", value, self.token_symbol())
+    }
+
+    pub fn reserved_balance(&self) -> u128 {
+        self.balance.reserved_balance()
+    }
+
+    pub fn reserved_balance_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(
+            self.reserved_balance(),
+            self.token_decimals(),
+            decimal_places,
+        );
+        format!("{}{}", value, self.token_symbol())
+    }
+
+    pub fn total_balance(&self) -> u128 {
+        self.balance.total_balance()
+    }
+
+    pub fn total_balance_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(self.total_balance(), self.token_decimals(), decimal_places);
         format!("{}{}", value, self.token_symbol())
     }
 }

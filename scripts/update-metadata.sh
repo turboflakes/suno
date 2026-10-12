@@ -12,11 +12,11 @@
 BASE="packages/chains"
 RC_PALLETS="System,Session,StakingAhClient,Proxy,Babe,ParasShared"
 AH_PALLETS="System,Aura,Session,CollatorSelection,Balances,Proxy,Staking,StakingRcClient,Utility,NominationPools"
-PEOPLE_PALLETS="System,Aura,Session,CollatorSelection,Identity"
-BH_PALLETS="System,Aura,Session,CollatorSelection"
-CORETIME_PALLETS="System,Aura,Session,CollatorSelection"
-COLLECTIVES_PALLETS="System,Aura,Session,CollatorSelection"
-BULLETIN_PALLETS="System,Aura,Session,CollatorSelection"
+PEOPLE_PALLETS="System,Aura,Session,CollatorSelection,Proxy,Identity"
+BH_PALLETS="System,Aura,Session,CollatorSelection,Proxy"
+CORETIME_PALLETS="System,Aura,Session,CollatorSelection,Proxy"
+COLLECTIVES_PALLETS="System,Aura,Session,CollatorSelection,Proxy"
+BULLETIN_PALLETS="System,Aura,Session,CollatorSelection,Proxy"
 NETWORK="$1"
 
 # Where to write the spec versions fetched in this run.
@@ -93,8 +93,6 @@ fetch_metadata "collectives-polkadot" "polkadot-collectives-rpc.polkadot.io"   "
 # Bulletin Chains
 fetch_metadata "bulletin-paseo"    "bullet.tunastaking.eu"      "$BULLETIN_PALLETS"
 fetch_metadata "bulletin-polkadot" "bulletin-rpc.polkadot.io"   "$BULLETIN_PALLETS"
-
-wss://bulletin-paseo.tservices.es:8443
 
 # Report all spec versions, flagging the chains whose metadata actually changed.
 changed_chains=$(git status --porcelain -- "$BASE" \

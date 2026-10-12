@@ -1,11 +1,15 @@
 use crate::{
-    display::{format_millis, get_elapsed_millis},
+    call::Call,
+    display::{format_millis, format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount},
+    node_account::{AccountDisplay, NodeAccount, NodeHost},
+    proxy::{ProxyKey, SupportedProxy},
+    session::AuraKey,
 };
+use std::collections::HashSet;
 use subxt::utils::AccountId32;
-use suno_config::SupportedRuntime;
+use suno_config::{CustomCommand, Host, SshConfig, SupportedRuntime};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CollatorStatus {
@@ -13,8 +17,11 @@ pub enum CollatorStatus {
     Permissionless,
     /// Collator is part of the fixed invulnerable set, displayed as [I]
     Invulnerable,
-    /// Collator is a registered candidate waiting to become an authority, displayed as [W]
-    Waiting,
+    /// Collator is a registered candidate to become an authority, displayed as [C]
+    Candidate,
+    /// Collator that has signalled its intent to leave and remains active until
+    /// the end of the current session, displayed as [E]
+    Exiting,
     /// Collator status is unknown or not yet determined, displayed as [U]
     #[default]
     Unknown,
@@ -25,40 +32,54 @@ impl std::fmt::Display for CollatorStatus {
         match self {
             Self::Permissionless => write!(f, "[P]"),
             Self::Invulnerable => write!(f, "[I]"),
-            Self::Waiting => write!(f, "[W]"),
+            Self::Candidate => write!(f, "[C]"),
+            Self::Exiting => write!(f, "[E]"),
             Self::Unknown => write!(f, "[U]"),
         }
     }
 }
 
+type Amount = u128;
+
 /// Specific types using composition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
-    account: NodeAccount,
-    status: CollatorStatus,
-    last_block_authored: Option<u64>,
-    last_block_authored_ts: Option<u128>,
+    pub account: NodeAccount,
+    pub deposit: Amount,
+    pub last_block_authored: Option<u64>,
+    pub last_block_authored_ts: Option<u128>,
     // Aura slot the last few produced blocks were claimed for, and how many
     // consecutive blocks have been observed authored under that same slot.
-    last_slot: Option<u64>,
-    blocks_in_slot: u32,
+    pub last_slot: Option<u64>,
+    pub blocks_in_slot: u32,
     // Aura session public key currently active, from `Session::NextKeys`
-    next_keys: Option<[u8; 32]>,
+    pub next_keys: Option<[u8; 32]>,
     // Aura session public key queued for the next session, from `Session::QueuedKeys`
-    queued_keys: Option<[u8; 32]>,
+    pub queued_keys: Option<[u8; 32]>,
+    // Proxy accounts linked to the collator
+    pub proxies: HashSet<ProxyKey>,
+    pub host_rpc: Host,
+    pub ssh: Option<SshConfig>,
+    pub commands: Vec<CustomCommand>,
+    pub status: CollatorStatus,
 }
 
 impl Collator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
-            status: CollatorStatus::default(),
+            deposit: 0,
             last_block_authored: None,
             last_block_authored_ts: None,
             last_slot: None,
             blocks_in_slot: 0,
             next_keys: None,
             queued_keys: None,
+            proxies: HashSet::new(),
+            host_rpc: Host::default(),
+            ssh: None,
+            commands: Vec::new(),
+            status: CollatorStatus::default(),
         }
     }
 
@@ -75,9 +96,35 @@ impl Collator {
         self.account.identity().as_ref()
     }
 
+    pub fn free_balance(&self) -> u128 {
+        self.account.free_balance()
+    }
+
+    pub fn free_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.free_balance(),
+            self.account.free_balance_as_str(decimal_places),
+        )
+    }
+
+    pub fn total_balance(&self) -> u128 {
+        self.account.total_balance()
+    }
+
+    pub fn total_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.total_balance(),
+            self.account.total_balance_as_str(decimal_places),
+        )
+    }
+
     pub fn display_name(&self, size: usize) -> String {
         if let Some(identity) = self.identity() {
-            format!("{} ({})", identity, self.to_compact_string(size))
+            format!(
+                "{} ({})",
+                identity.truncate(6 * size),
+                self.to_compact_string(size)
+            )
         } else {
             self.to_compact_string(size)
         }
@@ -103,6 +150,23 @@ impl Collator {
         self.status = status;
     }
 
+    pub fn deposit(&self) -> Amount {
+        self.deposit
+    }
+
+    pub fn deposit_extended(&self, decimal_places: usize) -> (u128, String) {
+        (self.deposit, self.deposit_as_str(decimal_places))
+    }
+
+    fn deposit_as_str(&self, decimal_places: usize) -> String {
+        let value = format_planks(self.deposit, self.account.token_decimals(), decimal_places);
+        format!("{}{}", value, self.account.token_symbol())
+    }
+
+    pub fn set_deposit(&mut self, value: Amount) {
+        self.deposit = value;
+    }
+
     pub fn is_permissionless(&self) -> bool {
         self.status == CollatorStatus::Permissionless
     }
@@ -111,8 +175,36 @@ impl Collator {
         self.status == CollatorStatus::Invulnerable
     }
 
-    pub fn is_waiting(&self) -> bool {
-        self.status == CollatorStatus::Waiting
+    pub fn is_candidate(&self) -> bool {
+        self.status == CollatorStatus::Candidate
+    }
+
+    pub fn is_exiting(&self) -> bool {
+        self.status == CollatorStatus::Exiting
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        self.status == CollatorStatus::Unknown
+    }
+
+    pub fn is_authority_or_candidate(&self) -> bool {
+        self.status != CollatorStatus::Unknown
+    }
+
+    pub fn is_permissionless_or_candidate(&self) -> bool {
+        self.is_permissionless() || self.is_candidate()
+    }
+
+    pub fn is_exiting_or_unknown(&self) -> bool {
+        self.is_exiting() || self.is_unknown()
+    }
+
+    pub fn is_authority(&self) -> bool {
+        self.is_permissionless() || self.is_invulnerable()
+    }
+
+    pub fn has_keys(&self) -> bool {
+        self.next_keys.is_some()
     }
 
     pub fn last_block_authored(&self) -> Option<u64> {
@@ -236,6 +328,52 @@ impl Collator {
 
         Some(format_millis(remaining_ms, true, false))
     }
+
+    pub fn is_proxy_valid(&self) -> bool {
+        self.proxies
+            .iter()
+            .any(|p| p.is_non_transfer_valid() || p.is_collator_valid())
+    }
+
+    pub fn has_proxies(&self) -> bool {
+        !self.proxies.is_empty()
+    }
+
+    pub fn proxies_as_str(&self) -> String {
+        let mut proxies = self
+            .proxies
+            .iter()
+            .filter(|p| p.is_valid())
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if proxies.is_empty() {
+            return String::new();
+        }
+
+        proxies.sort();
+        format!(
+            "[{}]",
+            proxies
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+
+    /// Proxy type configured for `runtime` that is allowed to execute the given `call`.
+    pub fn get_proxy_for(&self, runtime: SupportedRuntime, call: &Call) -> SupportedProxy {
+        self.proxies
+            .iter()
+            .find(|p| p.runtime == runtime && p.proxy.can_call(call))
+            .map(|p| p.proxy)
+            .unwrap_or(SupportedProxy::None)
+    }
+
+    pub fn has_commands_available(&self) -> bool {
+        !self.commands.is_empty()
+    }
 }
 
 impl AccountDisplay for Collator {
@@ -245,5 +383,29 @@ impl AccountDisplay for Collator {
 
     fn account_format(&self) -> u16 {
         self.account.account_format()
+    }
+}
+
+impl NodeHost for Collator {
+    type SessionKeys = AuraKey;
+
+    fn node_account(&self) -> &NodeAccount {
+        &self.account
+    }
+
+    fn ssh(&self) -> Option<&SshConfig> {
+        self.ssh.as_ref()
+    }
+
+    fn host_rpc(&self) -> &Host {
+        &self.host_rpc
+    }
+
+    fn next_session_keys(&self) -> Option<AuraKey> {
+        self.next_keys.map(AuraKey)
+    }
+
+    fn queued_session_keys(&self) -> Option<AuraKey> {
+        self.queued_keys.map(AuraKey)
     }
 }

@@ -12,6 +12,7 @@ use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
     display::{create_progress_bar_by_blocks, format_millis, format_planks},
     validator::Validator,
+    NodeHost,
 };
 use suno_theme::Theme;
 
@@ -210,7 +211,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
                 Constraint::Fill(1),    // Network info
                 Constraint::Length(16), // Era / Session info bar
                 Constraint::Length(24), // Era / Session progress bar
-                Constraint::Length(16), // Countdown
+                Constraint::Length(20), // Countdown
             ])
             .areas(area);
 
@@ -337,8 +338,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let countdown_lines = vec![
             Line::from(""),
-            Line::from(format!(" {}", era_countdown_time,)).alignment(Alignment::Left),
-            Line::from(format!(" {}", epoch_countdown_time,)).alignment(Alignment::Left),
+            Line::from(format!(" {} left", era_countdown_time,)).alignment(Alignment::Left),
+            Line::from(format!(" {} left", epoch_countdown_time,)).alignment(Alignment::Left),
         ];
 
         let block = Block::new().set_style(theme.block.alt(is_odd));

@@ -7,7 +7,7 @@ use ratatui::layout::Position;
 use std::sync::{Arc, RwLock};
 use suno_config::CustomCommand;
 use suno_primitives::{
-    call::{Call, CallError},
+    call::{Call, CallContext, CallError},
     display::pasted_string_info,
 };
 use suno_theme::Theme;
@@ -91,6 +91,7 @@ pub struct Metadata {
     unit: &'static str,
     decimals: u32,
     custom_commands: Vec<CustomCommand>,
+    call_context: CallContext,
 }
 
 impl Metadata {
@@ -110,6 +111,11 @@ impl Metadata {
 
     pub fn with_custom_commands(mut self, commands: Vec<CustomCommand>) -> Self {
         self.custom_commands = commands;
+        self
+    }
+
+    pub fn with_call_context(mut self, call_context: CallContext) -> Self {
+        self.call_context = call_context;
         self
     }
 }
@@ -202,7 +208,12 @@ impl InputField {
                     .as_ref()
                     .map(|m| m.custom_commands.as_slice())
                     .unwrap_or(&[]);
-                match Call::parse(&value, decimals, custom_commands) {
+                let call_context = self
+                    .metadata
+                    .as_ref()
+                    .map(|m| m.call_context)
+                    .unwrap_or_default();
+                match Call::parse(&value, decimals, custom_commands, call_context) {
                     Ok(_) => self.status = Status::Valid,
                     Err(e) => match e {
                         CallError::InvalidAddress(_)
@@ -253,7 +264,12 @@ impl InputField {
                 .as_ref()
                 .map(|m| m.custom_commands.as_slice())
                 .unwrap_or(&[]);
-            Call::parse(&value, decimals, custom_commands).ok()
+            let call_context = self
+                .metadata
+                .as_ref()
+                .map(|m| m.call_context)
+                .unwrap_or_default();
+            Call::parse(&value, decimals, custom_commands, call_context).ok()
         } else {
             None
         }
