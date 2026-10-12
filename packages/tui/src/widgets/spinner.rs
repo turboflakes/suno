@@ -3,8 +3,21 @@ use ratatui::{
     layout::Rect,
     widgets::{Block, Padding, Paragraph, Widget},
 };
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use suno_theme::Theme;
+
+const FRAMES: [&str; 11] = ["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"];
+const FRAME_MILLIS: u64 = 250;
+
+/// Current spinner frame based on the wall clock, for stateless widgets (e.g. table rows)
+/// that have no [`Spinner`] instance of their own but should animate in sync.
+pub fn current_frame() -> &'static str {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or_default();
+    FRAMES[(millis / FRAME_MILLIS) as usize % FRAMES.len()]
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Status {
@@ -24,7 +37,7 @@ pub struct Spinner {
 impl Default for Spinner {
     fn default() -> Self {
         Self {
-            frames: vec!["⠋", "⠙", "⠹", "⠸", "⢸", "⣸", "⣠", "⣄", "⣇", "⠇", "⠏"],
+            frames: FRAMES.to_vec(),
             start_time: Instant::now(),
             counter: 0,
             status: Status::Running,
@@ -39,7 +52,7 @@ impl Spinner {
 
     pub fn frame(&self) -> &str {
         let elapsed = self.start_time.elapsed().as_millis() as u64;
-        let frame_index = (elapsed / 250) as usize % self.frames.len();
+        let frame_index = (elapsed / FRAME_MILLIS) as usize % self.frames.len();
         self.frames[frame_index]
     }
 

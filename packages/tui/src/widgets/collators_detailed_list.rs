@@ -1,6 +1,7 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::collators::CollatorsList;
 use crate::widgets::scrollbar::render_scrollbar;
+use crate::widgets::spinner::current_frame;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -12,11 +13,11 @@ use std::collections::BTreeSet;
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
-    display::{create_progress_bar_by_blocks, format_millis, format_planks},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
 };
 use suno_theme::Theme;
 
-pub const LIST_HEADER_HEIGHT: u16 = 4;
+pub const LIST_HEADER_HEIGHT: u16 = 5;
 pub const LINES_PER_CHAIN: u16 = 1;
 pub const PADDING: u16 = 3;
 
@@ -292,7 +293,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                         Constraint::Fill(1),    // Avg. block time
                         Constraint::Length(26), // Session info
                         Constraint::Length(24), // Session progress bar
-                        Constraint::Length(16), // Countdown
+                        Constraint::Length(20), // Countdown
                     ])
                     .areas(*row_area);
 
@@ -303,8 +304,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 .unwrap_or_else(|| "-".to_string());
 
             Paragraph::new(Line::from(vec![
-                Span::raw(format!("{} avg. block time ", runtime.system_name()))
-                    .style(theme.paragraph.label),
+                Span::raw(format!("{} ", runtime.system_name())).style(theme.paragraph.label),
                 Span::raw(avg_block_time),
             ]))
             .block(Block::new().set_style(block_style))
@@ -315,13 +315,8 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 aura.session_progress(chain.finalized_block(), runtime.duration_bn());
 
             Paragraph::new(
-                Line::from(format!(
-                    "{} session {} {:.0}% ",
-                    runtime.as_str_short().to_lowercase(),
-                    aura.current_session_index().unwrap_or_default(),
-                    session_progress * 100_f64
-                ))
-                .alignment(Alignment::Right),
+                Line::from(format!("{:.0}% ", session_progress * 100_f64))
+                    .alignment(Alignment::Right),
             )
             .block(Block::new().set_style(block_style))
             .style(theme.paragraph.base)
@@ -338,7 +333,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 aura.session_countdown_time(chain.finalized_block(), runtime.duration_bn());
 
             Paragraph::new(
-                Line::from(format!(" {}", session_countdown)).alignment(Alignment::Left),
+                Line::from(format!(" {} left", session_countdown)).alignment(Alignment::Left),
             )
             .block(Block::new().set_style(block_style))
             .style(theme.paragraph.base)
@@ -346,6 +341,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         }
 
         let bottom_lines = vec![
+            Line::from(""),
             Line::from(vec![
                 Span::raw("Total collators ").style(theme.paragraph.label),
                 Span::raw(total_count),
@@ -381,9 +377,9 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("deposit").alignment(Alignment::Right)),
             Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("").alignment(Alignment::Left)),
+            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("in").alignment(Alignment::Left)),
+            Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
         if show_next_keys {
@@ -398,7 +394,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
-            Constraint::Fill(2),
+            Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
         ];
@@ -457,12 +453,21 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             None => format!("{blocks:2}"),
         };
 
+        // Blocks in slot is only meaningful while the collator is the current author
+        let blocks_in_slot_str = if is_current_author {
+            blocks_in_slot_str
+        } else {
+            String::new()
+        };
+
         let last_block_str = collator
             .last_block_authored()
-            .map(|b| {
-                let prefix = if is_current_author { "> " } else { "" };
-                format!("{prefix}#{b}")
-            })
+            .map(|b| format!("#{b}"))
+            .unwrap_or_default();
+
+        let last_block_ago_str = collator
+            .last_block_authored_ts
+            .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
             .unwrap_or_default();
 
         let mut cells = vec![
@@ -491,21 +496,18 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         cells.push(Cell::from(
             Text::from(last_block_str).alignment(Alignment::Right),
         ));
+
         cells.push(Cell::from(
-            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+            Text::from(last_block_ago_str).alignment(Alignment::Left),
         ));
 
         if is_current_author {
             cells.push(Cell::from(
-                Text::from(format!("#{}", current_slot)).alignment(Alignment::Right),
+                Text::from(current_frame())
+                    .style(theme.paragraph.label(false))
+                    .alignment(Alignment::Right),
             ));
-            cells.push(Cell::from(Text::from("").alignment(Alignment::Left)));
         } else {
-            let next_slot_str = aura
-                .and_then(|a| collator.next_slot(a.authorities(), current_slot))
-                .map(|s| format!("#{}", s))
-                .unwrap_or_default();
-
             let next_slot_countdown_str = aura
                 .and_then(|a| {
                     let slot_duration_ms = a.slot_duration_ms()?;
@@ -519,12 +521,13 @@ impl<'a> CollatorsDetailedListWidget<'a> {
                 .unwrap_or_default();
 
             cells.push(Cell::from(
-                Text::from(next_slot_str).alignment(Alignment::Right),
-            ));
-            cells.push(Cell::from(
-                Text::from(next_slot_countdown_str).alignment(Alignment::Left),
+                Text::from(next_slot_countdown_str).alignment(Alignment::Right),
             ));
         }
+
+        cells.push(Cell::from(
+            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+        ));
 
         cells.push(Cell::from(
             Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),

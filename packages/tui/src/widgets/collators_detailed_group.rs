@@ -1,6 +1,7 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::collators::CollatorsList;
 use crate::widgets::scrollbar::render_scrollbar;
+use crate::widgets::spinner::current_frame;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -11,7 +12,7 @@ use ratatui::{
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
-    display::{create_progress_bar_by_blocks, format_millis, format_planks},
+    display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
     Aura,
 };
 use suno_theme::Theme;
@@ -187,7 +188,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 Constraint::Fill(1),    // Network info
                 Constraint::Length(20), // Slot info
                 Constraint::Length(24), // Slot progress bar
-                Constraint::Length(16), // Countdown
+                Constraint::Length(20), // Countdown
             ])
             .areas(area);
 
@@ -312,7 +313,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let countdown_lines = vec![
             Line::from(""),
             Line::from(format!(
-                " {}",
+                " {} left",
                 aura.session_countdown_time(chain.finalized_block(), chain.runtime().duration_bn()),
             ))
             .alignment(Alignment::Left),
@@ -360,9 +361,9 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
             Cell::from(Text::from("deposit").alignment(Alignment::Right)),
             Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("").alignment(Alignment::Left)),
+            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
             Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("").alignment(Alignment::Left)),
+            Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
         if show_next_keys {
@@ -432,24 +433,28 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let authorities = aura.authorities();
 
+        let is_current_author = collator.is_current_slot_author(authorities, current_slot);
+
         let blocks = collator.blocks_in_slot(current_slot);
 
-        let blocks_in_slot_str = match aura.number_blocks_expected() {
-            Some(expected) => format!("{blocks:2}/{expected}"),
-            None => format!("{blocks:2}"),
+        // Blocks in slot is only meaningful while the collator is the current author
+        let blocks_in_slot_str = if is_current_author {
+            match aura.number_blocks_expected() {
+                Some(expected) => format!("{blocks:2}/{expected}"),
+                None => format!("{blocks:2}"),
+            }
+        } else {
+            String::new()
         };
 
         let last_block_str = collator
             .last_block_authored()
-            .map(|b| {
-                let prefix = if collator.is_current_slot_author(authorities, current_slot) {
-                    "> "
-                } else {
-                    ""
-                };
+            .map(|b| format!("#{b}"))
+            .unwrap_or_default();
 
-                format!("{prefix}#{b}")
-            })
+        let last_block_ago_str = collator
+            .last_block_authored_ts
+            .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
             .unwrap_or_default();
 
         let mut cells = vec![
@@ -478,20 +483,16 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Text::from(last_block_str).alignment(Alignment::Right),
         ));
         cells.push(Cell::from(
-            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+            Text::from(last_block_ago_str).alignment(Alignment::Left),
         ));
 
-        if collator.is_current_slot_author(authorities, current_slot) {
+        if is_current_author {
             cells.push(Cell::from(
-                Text::from(format!("#{}", current_slot)).alignment(Alignment::Right),
+                Text::from(current_frame())
+                    .style(theme.paragraph.label(false))
+                    .alignment(Alignment::Right),
             ));
-            cells.push(Cell::from(Text::from("").alignment(Alignment::Left)));
         } else {
-            let next_slot_str = collator
-                .next_slot(authorities, current_slot)
-                .map(|s| format!("#{}", s))
-                .unwrap_or_default();
-
             let next_slot_countdown_str = match aura.slot_duration_ms() {
                 Some(slot_duration_ms) => collator
                     .next_slot_countdown(
@@ -504,12 +505,13 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 None => "".to_string(),
             };
             cells.push(Cell::from(
-                Text::from(next_slot_str).alignment(Alignment::Right),
+                Text::from(next_slot_countdown_str).alignment(Alignment::Right),
             ));
-            cells.push(Cell::from(
-                Text::from(next_slot_countdown_str).alignment(Alignment::Left),
-            ));
-        };
+        }
+
+        cells.push(Cell::from(
+            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+        ));
 
         cells.push(Cell::from(
             Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
