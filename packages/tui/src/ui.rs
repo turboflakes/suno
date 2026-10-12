@@ -111,7 +111,7 @@ fn render_window_tabs(app: &App, frame: &mut Frame, area: Rect) {
     let is_selected = app.section.is_none();
 
     let mut spans = Vec::new();
-    for window in Window::iter().filter(|w| w.is_enabled(&CONFIG.features())) {
+    for window in Window::iter().filter(|w| w.is_enabled(CONFIG.features())) {
         let style = if window == app.window {
             let style = theme.paragraph.header(is_selected);
             if is_selected {

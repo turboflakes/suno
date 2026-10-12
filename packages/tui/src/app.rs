@@ -129,7 +129,7 @@ impl App {
         Self {
             running: true,
             focus: Focus::default(),
-            window: Window::first(&CONFIG.features()),
+            window: Window::first(CONFIG.features()),
             section: Section::default(),
             main_section: Section::default(),
             chains,
@@ -1711,13 +1711,13 @@ impl App {
 
     /// Selects the previous window.
     fn prev_window(&mut self) {
-        self.window = self.window.prev(&CONFIG.features());
+        self.window = self.window.prev(CONFIG.features());
         self.sync_section_with_window();
     }
 
     /// Selects the next window.
     fn next_window(&mut self) {
-        self.window = self.window.next(&CONFIG.features());
+        self.window = self.window.next(CONFIG.features());
         self.sync_section_with_window();
     }
 
