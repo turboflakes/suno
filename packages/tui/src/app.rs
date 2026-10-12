@@ -76,6 +76,9 @@ pub struct App {
     pub window: Window,
     /// The current selected section.
     pub section: Section,
+    /// The section whose rows are shown and selected on the main window, while the main
+    /// window itself is the selected section.
+    main_section: Section,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
     /// Holds the validators list for the selected relay-chain.
@@ -125,8 +128,9 @@ impl App {
         Self {
             running: true,
             focus: Focus::default(),
-            window: Window::default(),
+            window: Window::first(&CONFIG.features()),
             section: Section::default(),
+            main_section: Section::default(),
             chains,
             validators: ValidatorsList::default(),
             collators: CollatorsList::default(),
@@ -247,6 +251,8 @@ impl App {
         match action {
             NavigationAction::SectionUp => self.section_up(),
             NavigationAction::SectionDown => self.section_down(),
+            NavigationAction::MoveLeft => self.move_left(),
+            NavigationAction::MoveRight => self.move_right(),
             NavigationAction::MoveUp => self.move_up(),
             NavigationAction::MoveDown => self.move_down(),
             NavigationAction::NextWindow => self.next_window(),
@@ -1550,7 +1556,7 @@ impl App {
             return;
         }
 
-        match self.section {
+        match self.data_section() {
             Section::Chains => {
                 self.chains.move_up();
             }
@@ -1572,7 +1578,7 @@ impl App {
             return;
         }
 
-        match self.section {
+        match self.data_section() {
             Section::Chains => {
                 self.chains.move_down();
             }
@@ -1586,36 +1592,105 @@ impl App {
         };
     }
 
+    /// Moves to the previous section, or to the previous window while the main window is
+    /// the selected section.
+    fn move_left(&mut self) {
+        if self.section == Section::Main {
+            self.prev_window();
+        } else {
+            self.section_up();
+        }
+    }
+
+    /// Moves to the next section, or to the next window while the main window is
+    /// the selected section.
+    fn move_right(&mut self) {
+        if self.section == Section::Main {
+            self.next_window();
+        } else {
+            self.section_down();
+        }
+    }
+
     /// Moves the active section up.
     pub fn section_up(&mut self) {
         let config = CONFIG.clone();
-        self.section = self.section.up(&config.features);
-        self.chains.set_active(self.section == Section::Chains);
-        self.validators
-            .set_active(self.section == Section::Validators);
-        self.collators
-            .set_active(self.section == Section::Collators);
+        let section = self.section.up(&config.features);
+        self.set_section(section);
     }
 
     /// Moves the active section down.
     pub fn section_down(&mut self) {
         let config = CONFIG.clone();
-        self.section = self.section.down(&config.features);
+        let section = self.section.down(&config.features);
+        self.set_section(section);
+    }
+
+    /// The section whose rows are displayed on the main window. It is the selected section,
+    /// unless the main window itself is selected, then it is the section it was reached from.
+    pub fn data_section(&self) -> Section {
+        match (&self.section, self.window) {
+            (Section::Main, Window::Validators) => Section::Validators,
+            (Section::Main, Window::Collators) => Section::Collators,
+            (Section::Main, _) => self.main_section.clone(),
+            (section, _) => section.clone(),
+        }
+    }
+
+    fn set_section(&mut self, section: Section) {
+        if section == Section::Main {
+            // Keep showing the rows of the section the main window was reached from, falling
+            // back to the first enabled one when coming from the chains.
+            let features = CONFIG.features();
+            self.main_section = match self.section {
+                Section::Validators => Section::Validators,
+                Section::Collators => Section::Collators,
+                _ if features.validators_enabled() => Section::Validators,
+                _ if features.collators_enabled() => Section::Collators,
+                _ => Section::Chains,
+            };
+        }
+        // Selecting a section brings up its window
+        match section {
+            Section::Validators => self.window = Window::Validators,
+            Section::Collators => self.window = Window::Collators,
+            _ => {}
+        }
+        self.section = section;
+        self.update_active_section();
+    }
+
+    fn update_active_section(&mut self) {
+        let data_section = self.data_section();
         self.chains.set_active(self.section == Section::Chains);
         self.validators
-            .set_active(self.section == Section::Validators);
+            .set_active(data_section == Section::Validators);
         self.collators
-            .set_active(self.section == Section::Collators);
+            .set_active(data_section == Section::Collators);
     }
 
     /// Selects the previous window.
     fn prev_window(&mut self) {
-        self.window = self.window.prev();
+        self.window = self.window.prev(&CONFIG.features());
+        self.sync_section_with_window();
     }
 
     /// Selects the next window.
     fn next_window(&mut self) {
-        self.window = self.window.next();
+        self.window = self.window.next(&CONFIG.features());
+        self.sync_section_with_window();
+    }
+
+    /// Keeps the selected section in line with the window displayed: the validators and
+    /// collators windows select their own section, unless the main window is the selected
+    /// section, then the rows selected are the ones of the window displayed.
+    fn sync_section_with_window(&mut self) {
+        match (&self.section, self.window) {
+            (Section::Main, _) => self.update_active_section(),
+            (_, Window::Validators) => self.set_section(Section::Validators),
+            (_, Window::Collators) => self.set_section(Section::Collators),
+            _ => {}
+        }
     }
 
     /// Opens the theme selection popup.
@@ -1683,7 +1758,7 @@ impl App {
 
     /// Toggles between grouped and listed view.
     fn toggle_view(&mut self) {
-        if self.section == Section::Collators && self.collators.is_active() {
+        if self.data_section() == Section::Collators && self.collators.is_active() {
             self.collators.toggle_view();
         }
     }
@@ -1694,7 +1769,7 @@ impl App {
             return;
         }
 
-        if self.section == Section::Validators && self.validators.is_active() {
+        if self.data_section() == Section::Validators && self.validators.is_active() {
             if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
                 return;
             }
@@ -1723,7 +1798,7 @@ impl App {
             let _ = self.tx.send(Action::Input(InputAction::Editing));
         };
 
-        if self.section == Section::Collators && self.collators.is_active() {
+        if self.data_section() == Section::Collators && self.collators.is_active() {
             if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
                 return;
             }
@@ -1918,7 +1993,7 @@ impl App {
             return;
         }
 
-        if self.section == Section::Validators {
+        if self.data_section() == Section::Validators {
             let Some(validator) = self.validators.get_selected() else {
                 return;
             };
@@ -1934,7 +2009,7 @@ impl App {
             }
         };
 
-        if self.section == Section::Collators {
+        if self.data_section() == Section::Collators {
             let Some(collator) = self.collators.get_selected() else {
                 return;
             };
@@ -2582,7 +2657,7 @@ impl App {
             return;
         }
 
-        if self.section == Section::Validators {
+        if self.data_section() == Section::Validators {
             let Some(validator) = self.validators.get_selected() else {
                 return;
             };
@@ -2614,7 +2689,7 @@ impl App {
             }
         };
 
-        if self.section == Section::Collators {
+        if self.data_section() == Section::Collators {
             let Some(collator) = self.collators.get_selected() else {
                 return;
             };
@@ -2789,7 +2864,7 @@ impl App {
             return;
         }
 
-        if self.section == Section::Validators && self.popup.get_mode() == PopupMode::Menu {
+        if self.data_section() == Section::Validators && self.popup.get_mode() == PopupMode::Menu {
             self.popup.insert_input_paste_data(data);
         };
     }

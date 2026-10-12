@@ -5,34 +5,53 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Padding, Paragraph, Widget, Wrap},
 };
-use strum::{Display, EnumIter, FromRepr};
+use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use suno_config::Features;
 use suno_theme::Theme;
 
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
+#[strum(serialize_all = "lowercase")]
 pub enum Window {
     #[default]
-    Main,
+    Validators,
+    Collators,
     Logs,
     Help,
 }
 
 impl Window {
-    pub fn next(self) -> Self {
-        let current_index = self as usize;
-        if Self::from_repr(current_index) == Some(Window::Help) {
-            return Window::Main;
+    /// Windows backed by a feature can be switched off in the config.
+    pub fn is_enabled(self, features: &Features) -> bool {
+        match self {
+            Self::Validators => features.validators_enabled(),
+            Self::Collators => features.collators_enabled(),
+            Self::Logs | Self::Help => true,
         }
-        let next_index = current_index.saturating_add(1);
-        Self::from_repr(next_index).unwrap_or(self)
     }
 
-    pub fn prev(self) -> Self {
-        let current_index = self as usize;
-        if Self::from_repr(current_index) == Some(Window::Main) {
-            return Window::Help;
-        }
-        let prev_index = current_index.saturating_sub(1);
-        Self::from_repr(prev_index).unwrap_or(self)
+    /// First window enabled, the one displayed on start.
+    pub fn first(features: &Features) -> Self {
+        Self::iter()
+            .find(|w| w.is_enabled(features))
+            .unwrap_or_default()
+    }
+
+    /// Next enabled window, wrapping around.
+    pub fn next(self, features: &Features) -> Self {
+        let count = Self::iter().count();
+        (1..=count)
+            .filter_map(|step| Self::from_repr((self as usize + step) % count))
+            .find(|w| w.is_enabled(features))
+            .unwrap_or(self)
+    }
+
+    /// Previous enabled window, wrapping around.
+    pub fn prev(self, features: &Features) -> Self {
+        let count = Self::iter().count();
+        (1..=count)
+            .filter_map(|step| Self::from_repr((self as usize + count - step) % count))
+            .find(|w| w.is_enabled(features))
+            .unwrap_or(self)
     }
 }
 
@@ -146,7 +165,9 @@ pub fn render_help(theme: Theme, area: Rect, buf: &mut Buffer) {
         Line::from(Span::raw("KEYBINDINGS").style(theme.paragraph.header(true))),
         Line::from(vec![
             Span::raw("tab ").style(theme.paragraph.label(true)),
-            Span::raw("Input focus, Autocomplete or Navigate between pane sections."),
+            Span::raw(
+                "Input focus, Autocomplete or Navigate between pane sections and the main window.",
+            ),
         ]),
         Line::from(vec![
             Span::raw("esc ").style(theme.paragraph.label(true)),
@@ -174,7 +195,7 @@ pub fn render_help(theme: Theme, area: Rect, buf: &mut Buffer) {
         ]),
         Line::from(vec![
             Span::raw("ctrl+h/ctrl+l/left/right ").style(theme.paragraph.label(true)),
-            Span::raw("Navigate between pane sections."),
+            Span::raw("Navigate between pane sections. On the main window, switch window."),
         ]),
         Line::from(vec![
             Span::raw("ctrl+j/ctrl+k/up/down ").style(theme.paragraph.label(true)),

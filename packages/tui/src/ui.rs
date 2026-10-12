@@ -11,10 +11,12 @@ use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, 
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
+    style::Modifier,
     text::{Line, Span},
     widgets::{Block, Padding, Paragraph},
     Frame,
 };
+use strum::IntoEnumIterator;
 use suno_config::CONFIG;
 
 /// Renders the user interface widgets.
@@ -56,13 +58,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         collators_constraint,
     ];
 
-    // DEPRECATED
-    // if config.features.rpcs_enabled() {
-    //     constraints.push(Constraint::Fill(1));
-    // } else {
-    //     constraints.push(Constraint::Length(0));
-    // }
-
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
@@ -79,19 +74,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
-    // DEPRECATED
-    // if config.features.rpcs_enabled() {
-    //     render_rpcs_widget(app, frame, left_layout[3]);
-    // }
-
-    // Switch between main body window.
-    match app.window {
-        Window::Main => render_body_widget(app, frame, outer_layout[1]),
-        Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
-        Window::Help => {
-            render_help(app.theme, outer_layout[1], frame.buffer_mut());
-        }
-    }
+    render_window(app, frame, outer_layout[1]);
 
     let footer = Layout::default()
         .direction(Direction::Horizontal)
@@ -108,6 +91,46 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if app.popup.is_visible() {
         render_popup(app, frame, container[0]);
     }
+}
+
+fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
+    let [tabs_area, body_area] =
+        Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+    render_window_tabs(app, frame, tabs_area);
+    // Switch between main body window.
+    match app.window {
+        Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
+        Window::Logs => render_logs_widget(app, frame, body_area),
+        Window::Help => {
+            render_help(app.theme, body_area, frame.buffer_mut());
+        }
+    }
+}
+
+fn render_window_tabs(app: &App, frame: &mut Frame, area: Rect) {
+    let theme = app.theme;
+    let is_selected = app.section == Section::Main;
+
+    let mut spans = Vec::new();
+    for window in Window::iter().filter(|w| w.is_enabled(&CONFIG.features())) {
+        let style = if window == app.window {
+            let style = theme.paragraph.header(is_selected);
+            if is_selected {
+                style.add_modifier(Modifier::REVERSED)
+            } else {
+                style
+            }
+        } else {
+            theme.paragraph.label.add_modifier(Modifier::DIM)
+        };
+        spans.push(Span::raw(format!(" {} ", window)).style(style));
+        spans.push(Span::raw(" "));
+    }
+
+    let block = Block::default()
+        .style(theme.block.main)
+        .padding(Padding::new(2, 2, 1, 0));
+    frame.render_widget(Paragraph::new(Line::from(spans)).block(block), area);
 }
 
 fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -158,22 +181,6 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-// DEPRECATED
-// fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-//     frame.render_widget(
-//         Paragraph::new(" >> RPCs List")
-//             .block(
-//                 Block::new()
-//                     .title(" RPCs ")
-//                     .borders(Borders::ALL)
-//                     .border_type(BorderType::Plain),
-//             )
-//             .style(Style::default().fg(Color::Blue))
-//             .left_aligned(),
-//         area,
-//     );
-// }
-
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
     let block = Block::default()
@@ -182,8 +189,8 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block_area = block.inner(area);
     frame.render_widget(block, area);
 
-    match app.section {
-        Section::Collators => match app.collators.view() {
+    match app.window {
+        Window::Collators => match app.collators.view() {
             CollatorsView::Group => {
                 let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme)
                     .with_masked(app.collators.is_masked());

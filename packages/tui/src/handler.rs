@@ -36,10 +36,10 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('v') => Action::Navigation(NavigationAction::ToggleView),
                 _ => match app_focus {
                     Focus::Main => match key_event.code {
-                        KeyCode::Char('h') => Action::Navigation(NavigationAction::SectionUp),
+                        KeyCode::Char('h') => Action::Navigation(NavigationAction::MoveLeft),
                         KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
                         KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
-                        KeyCode::Char('l') => Action::Navigation(NavigationAction::SectionDown),
+                        KeyCode::Char('l') => Action::Navigation(NavigationAction::MoveRight),
                         _ => Action::System(SystemAction::Noop),
                     },
                     Focus::Input => match key_event.code {
@@ -66,10 +66,14 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
 
 fn handle_main_key_events(key_event: KeyEvent) -> Action {
     match key_event.code {
-        // Section Down on `Right`
-        KeyCode::Right | KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
-        // Section Up on `Left`
-        KeyCode::Left | KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
+        // Section Down on `Tab`
+        KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
+        // Section Up on `BackTab`
+        KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
+        // Next section, or next window when the main window is selected, on `Right`
+        KeyCode::Right => Action::Navigation(NavigationAction::MoveRight),
+        // Previous section, or previous window when the main window is selected, on `Left`
+        KeyCode::Left => Action::Navigation(NavigationAction::MoveLeft),
         // Move Up on `Up` inside the active section or list
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list

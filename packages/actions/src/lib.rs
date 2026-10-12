@@ -62,6 +62,8 @@ pub enum NavigationAction {
     MoveDown,
     SectionUp,
     SectionDown,
+    MoveLeft,
+    MoveRight,
     NextWindow,
     PrevWindow,
     Reset,
