@@ -27,8 +27,11 @@ impl StatefulWidget for ValidatorsCompactWidget {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = self.theme;
 
+        // The compact list looks inactive while the selection is driven from the main window
+        let is_active = state.focus().is_compact();
+
         let block = Block::new()
-            .set_style(theme.block.pane_body(state.is_active()))
+            .set_style(theme.block.pane_body(is_active))
             .padding(Padding::symmetric(0, 1));
 
         let proxies_available = state.proxies_available();
@@ -91,10 +94,10 @@ impl StatefulWidget for ValidatorsCompactWidget {
         let rows_len = rows.len();
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(header_cells).set_style(theme.table.header(state.is_active())))
+            .header(Row::new(header_cells).set_style(theme.table.header(is_active)))
             .style(theme.table.base)
-            .row_highlight_style(theme.table.row_highlight(state.is_active()))
-            .highlight_symbol(theme.table.highlight_symbol(state.is_active()));
+            .row_highlight_style(theme.table.row_highlight(is_active))
+            .highlight_symbol(theme.table.highlight_symbol(is_active));
 
         let mut display_table_state = state.table_state;
         display_table_state.select(display_selected);
@@ -102,7 +105,7 @@ impl StatefulWidget for ValidatorsCompactWidget {
         StatefulWidget::render(table, area, buf, &mut display_table_state);
 
         // Render scrollbar when active
-        if state.is_active() && rows_len >= area.height.saturating_sub(2) as usize {
+        if is_active && rows_len >= area.height.saturating_sub(2) as usize {
             let scrollbar_area = Rect {
                 x: area.x + area.width.saturating_sub(1),
                 y: area.y + 1,

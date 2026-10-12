@@ -6,8 +6,8 @@ pub enum Section {
     Chains,
     Validators,
     Collators,
-    /// The main window. Selection moves over every row.
-    Main,
+    /// No section is selected.
+    None,
 }
 
 impl Section {
@@ -15,14 +15,14 @@ impl Section {
         use Section::*;
 
         match self {
-            Chains => Main,
-            Main => Self::up_from_main(features),
+            Chains => None,
+            None => Self::up_from_none(features),
             Validators => Chains,
             Collators => Self::up_from_collators(features),
         }
     }
 
-    fn up_from_main(features: &Features) -> Self {
+    fn up_from_none(features: &Features) -> Self {
         if features.collators_enabled() {
             Self::Collators
         } else if features.validators_enabled() {
@@ -47,7 +47,7 @@ impl Section {
             Chains => Self::down_from_chains(features),
             Validators => Self::down_from_validators(features),
             Collators => Self::down_from_collators(),
-            Main => Chains,
+            None => Chains,
         }
     }
 
@@ -68,6 +68,10 @@ impl Section {
     }
 
     fn down_from_collators() -> Self {
-        Self::Main
+        Self::None
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, Section::None)
     }
 }

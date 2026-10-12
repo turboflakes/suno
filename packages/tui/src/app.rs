@@ -3,6 +3,7 @@ use crate::section::Section;
 use crate::widgets::{
     chains::ChainsList,
     collators::CollatorsList,
+    list_focus::ListFocus,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
     validators::ValidatorsList,
@@ -1559,7 +1560,7 @@ impl App {
         }
 
         // The logs have no section of their own, they scroll while the main window is selected
-        if self.section == Section::Main && self.window == Window::Logs {
+        if self.section.is_none() && self.window == Window::Logs {
             self.logs.move_up();
             return;
         }
@@ -1587,7 +1588,7 @@ impl App {
         }
 
         // The logs have no section of their own, they scroll while the main window is selected
-        if self.section == Section::Main && self.window == Window::Logs {
+        if self.section.is_none() && self.window == Window::Logs {
             self.logs.move_down();
             return;
         }
@@ -1609,7 +1610,7 @@ impl App {
     /// Moves to the previous section, or to the previous window while the main window is
     /// the selected section.
     fn move_left(&mut self) {
-        if self.section == Section::Main {
+        if self.section.is_none() {
             self.prev_window();
         } else {
             self.section_up();
@@ -1619,7 +1620,7 @@ impl App {
     /// Moves to the next section, or to the next window while the main window is
     /// the selected section.
     fn move_right(&mut self) {
-        if self.section == Section::Main {
+        if self.section.is_none() {
             self.next_window();
         } else {
             self.section_down();
@@ -1628,8 +1629,7 @@ impl App {
 
     /// Extends the selection up, on the logs. Anywhere else it moves the selection up.
     fn extend_up(&mut self) {
-        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
-        {
+        if self.section.is_none() && self.window == Window::Logs && !self.popup.is_visible() {
             self.logs.extend_up();
         } else {
             self.move_up();
@@ -1638,8 +1638,7 @@ impl App {
 
     /// Extends the selection down, on the logs. Anywhere else it moves the selection down.
     fn extend_down(&mut self) {
-        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
-        {
+        if self.section.is_none() && self.window == Window::Logs && !self.popup.is_visible() {
             self.logs.extend_down();
         } else {
             self.move_down();
@@ -1664,15 +1663,15 @@ impl App {
     /// unless the main window itself is selected, then it is the section it was reached from.
     pub fn data_section(&self) -> Section {
         match (&self.section, self.window) {
-            (Section::Main, Window::Validators) => Section::Validators,
-            (Section::Main, Window::Collators) => Section::Collators,
-            (Section::Main, _) => self.main_section.clone(),
+            (Section::None, Window::Validators) => Section::Validators,
+            (Section::None, Window::Collators) => Section::Collators,
+            (Section::None, _) => self.main_section.clone(),
             (section, _) => section.clone(),
         }
     }
 
     fn set_section(&mut self, section: Section) {
-        if section == Section::Main {
+        if section.is_none() {
             // Keep showing the rows of the section the main window was reached from, falling
             // back to the first enabled one when coming from the chains.
             let features = CONFIG.features();
@@ -1696,11 +1695,18 @@ impl App {
 
     fn update_active_section(&mut self) {
         let data_section = self.data_section();
+        // The left panes lose the focus while the main window is selected
+        let focus_of = |is_data_section: bool| match (is_data_section, &self.section) {
+            (false, _) => ListFocus::None,
+            (true, Section::None) => ListFocus::Main,
+            (true, _) => ListFocus::Compact,
+        };
+        let validators_focus = focus_of(data_section == Section::Validators);
+        let collators_focus = focus_of(data_section == Section::Collators);
+
         self.chains.set_active(self.section == Section::Chains);
-        self.validators
-            .set_active(data_section == Section::Validators);
-        self.collators
-            .set_active(data_section == Section::Collators);
+        self.validators.set_focus(validators_focus);
+        self.collators.set_focus(collators_focus);
     }
 
     /// Selects the previous window.
@@ -1720,7 +1726,7 @@ impl App {
     /// section, then the rows selected are the ones of the window displayed.
     fn sync_section_with_window(&mut self) {
         match (&self.section, self.window) {
-            (Section::Main, _) => self.update_active_section(),
+            (Section::None, _) => self.update_active_section(),
             (_, Window::Validators) => self.set_section(Section::Validators),
             (_, Window::Collators) => self.set_section(Section::Collators),
             _ => {}
@@ -2925,15 +2931,14 @@ impl App {
     /// Reset active selection
     pub fn reset_selection(&mut self) {
         self.chains.set_active(false);
-        self.validators.set_active(false);
-        self.collators.set_active(false);
+        self.validators.set_focus(ListFocus::None);
+        self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();
     }
 
     /// Copy to clipboard
     pub fn copy_to_clipboard(&self) {
-        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
-        {
+        if self.section.is_none() && self.window.is_logs_selected() && !self.popup.is_visible() {
             if let Some(text) = self.logs.selected_text() {
                 self.set_clipboard_text(text);
             }

@@ -1,5 +1,4 @@
 use crate::app::App;
-use crate::section::Section;
 use crate::widgets::collators::CollatorsView;
 use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
@@ -109,7 +108,7 @@ fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_window_tabs(app: &App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
-    let is_selected = app.section == Section::Main;
+    let is_selected = app.section.is_none();
 
     let mut spans = Vec::new();
     for window in Window::iter().filter(|w| w.is_enabled(&CONFIG.features())) {
@@ -226,6 +225,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let mut legend = vec![];
 
+    // Esc clears the selection without changing the section, so ask the lists, not the section
+    let has_selection = app.chains.is_active()
+        || app.validators.is_active()
+        || app.collators.is_active()
+        || (app.section.is_none() && app.window.is_logs_selected());
+
     // show how to open popup with available commands depending on the active section
     if ((app.validators.is_active()
         && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
@@ -233,6 +238,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
         || app.chains.is_active())
         && !app.popup.is_visible()
+        && !app.window.is_logs_selected()
     {
         legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
@@ -306,13 +312,32 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             }
             _ => {}
         }
-    } else if app.chains.is_active() || app.validators.is_active() || app.collators.is_active() {
+    } else if has_selection {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("select".to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
-        if app.collators.is_active() {
+        if app.section.is_none() && app.window.is_logs_selected() {
+            legend.push(Span::styled("shift+↑/↓".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "select multiple".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+            legend.push(Span::styled(
+                "shift+ctrl+c".to_string(),
+                theme.paragraph.base,
+            ));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "copy to clipboard".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
+        if app.collators.is_active() && app.window.is_collators_selected() {
             legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
             legend.push(Span::styled(
@@ -321,19 +346,22 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
+        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     } else {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
+        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     }
 
     // Always visible
     legend.push(Span::raw("   "));
-    legend.push(Span::styled("ctrl+w".to_string(), theme.paragraph.base));
+    legend.push(Span::styled(
+        "ctrl+w or ← →".to_string(),
+        theme.paragraph.base,
+    ));
     legend.push(Span::raw(" "));
     legend.push(Span::styled(
         "switch window".to_string(),

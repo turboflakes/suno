@@ -29,6 +29,22 @@ impl Window {
         }
     }
 
+    pub fn is_collators_selected(self) -> bool {
+        matches!(self, Self::Collators)
+    }
+
+    pub fn is_validators_selected(self) -> bool {
+        matches!(self, Self::Validators)
+    }
+
+    pub fn is_logs_selected(self) -> bool {
+        matches!(self, Self::Logs)
+    }
+
+    pub fn is_help_selected(self) -> bool {
+        matches!(self, Self::Help)
+    }
+
     /// First window enabled, the one displayed on start.
     pub fn first(features: &Features) -> Self {
         Self::iter()
@@ -200,6 +216,10 @@ pub fn render_help(theme: Theme, area: Rect, buf: &mut Buffer) {
         Line::from(vec![
             Span::raw("ctrl+j/ctrl+k/up/down ").style(theme.paragraph.label(true)),
             Span::raw("Select a chain, validator, or extrinsic depending on the highlighted area."),
+        ]),
+        Line::from(vec![
+            Span::raw("shift+ctrl+c ").style(theme.paragraph.label(true)),
+            Span::raw("Copy to clipboard."),
         ]),
         Line::from(vec![
             Span::raw("ctrl+c ").style(theme.paragraph.label(true)),

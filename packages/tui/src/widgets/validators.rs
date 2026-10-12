@@ -1,3 +1,4 @@
+use crate::widgets::list_focus::ListFocus;
 use crate::widgets::validators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -25,7 +26,7 @@ pub struct ValidatorsList {
     pub table_state: TableState,
     pub scroll_offset: u16,
     pub viewport_height: u16,
-    active: bool,
+    focus: ListFocus,
     masked: bool,
 }
 
@@ -37,7 +38,7 @@ impl Default for ValidatorsList {
             table_state: TableState::default(),
             scroll_offset: 0,
             viewport_height: 0,
-            active: false,
+            focus: ListFocus::default(),
             masked: true,
         }
     }
@@ -217,7 +218,11 @@ impl ValidatorsList {
     }
 
     pub fn is_active(&self) -> bool {
-        self.active
+        self.focus.is_active()
+    }
+
+    pub fn focus(&self) -> ListFocus {
+        self.focus
     }
 
     pub fn is_masked(&self) -> bool {
@@ -444,8 +449,8 @@ impl ValidatorsList {
         }
     }
 
-    pub fn set_active(&mut self, active: bool) {
-        self.active = active;
+    pub fn set_focus(&mut self, focus: ListFocus) {
+        self.focus = focus;
     }
 
     pub fn toggle_mask(&mut self) {

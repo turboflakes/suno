@@ -1,5 +1,6 @@
 use crate::widgets::collators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use crate::widgets::collators_detailed_list::group_header_height;
+use crate::widgets::list_focus::ListFocus;
 use ratatui::widgets::TableState;
 use sp_arithmetic::traits::Zero;
 use std::{
@@ -33,7 +34,7 @@ pub struct CollatorsList {
     pub table_state: TableState,
     pub scroll_offset: u16,
     pub viewport_height: u16,
-    active: bool,
+    focus: ListFocus,
     view: CollatorsView,
     masked: bool,
 }
@@ -46,7 +47,7 @@ impl Default for CollatorsList {
             table_state: TableState::default(),
             scroll_offset: 0,
             viewport_height: 0,
-            active: false,
+            focus: ListFocus::default(),
             view: CollatorsView::default(),
             masked: true,
         }
@@ -239,11 +240,15 @@ impl CollatorsList {
     }
 
     pub fn is_active(&self) -> bool {
-        self.active
+        self.focus.is_active()
     }
 
-    pub fn set_active(&mut self, active: bool) {
-        self.active = active;
+    pub fn focus(&self) -> ListFocus {
+        self.focus
+    }
+
+    pub fn set_focus(&mut self, focus: ListFocus) {
+        self.focus = focus;
     }
 
     pub fn view(&self) -> CollatorsView {
