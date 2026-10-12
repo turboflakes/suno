@@ -14,6 +14,7 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
     display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
+    NodeHost,
 };
 use suno_theme::Theme;
 
@@ -36,11 +37,21 @@ pub fn group_header_height(collators: &[&Collator]) -> u16 {
 pub struct CollatorsDetailedListWidget<'a> {
     pub chains: &'a ChainsList,
     theme: Theme,
+    masked: bool,
 }
 
 impl<'a> CollatorsDetailedListWidget<'a> {
     pub fn new(chains: &'a ChainsList, theme: Theme) -> Self {
-        Self { chains, theme }
+        Self {
+            chains,
+            theme,
+            masked: true,
+        }
+    }
+
+    pub fn with_masked(mut self, masked: bool) -> Self {
+        self.masked = masked;
+        self
     }
 }
 
@@ -370,6 +381,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
     ) {
         let theme = self.theme;
         let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
+        let show_host = collators.iter().any(|c| c.has_commands_available());
 
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
@@ -382,6 +394,9 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
+        if show_host {
+            header_cells.insert(3, Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
         if show_next_keys {
             header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
         }
@@ -398,13 +413,16 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Constraint::Fill(1),
             Constraint::Fill(2),
         ];
+        if show_host {
+            widths.insert(3, Constraint::Fill(2));
+        }
         if show_next_keys {
             widths.push(Constraint::Length(10));
         }
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, theme, show_next_keys))
+            .map(|c| self.collator_row(c, selected_collator, theme, show_next_keys, show_host))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -425,6 +443,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         selected: Option<&Collator>,
         theme: Theme,
         show_next_keys: bool,
+        show_host: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -476,6 +495,12 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
         ];
+
+        if show_host {
+            cells.push(Cell::from(
+                Text::from(collator.host(self.masked)).alignment(Alignment::Left),
+            ));
+        }
 
         if collator.is_permissionless_or_candidate() {
             cells.push(Cell::from(

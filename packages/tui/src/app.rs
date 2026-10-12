@@ -1677,6 +1677,7 @@ impl App {
     fn toggle_mask(&mut self) {
         self.masked = !self.masked;
         self.validators.toggle_mask();
+        self.collators.toggle_mask();
         self.popup.toggle_mask();
     }
 

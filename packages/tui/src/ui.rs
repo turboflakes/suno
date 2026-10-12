@@ -185,11 +185,13 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     match app.section {
         Section::Collators => match app.collators.view() {
             CollatorsView::Group => {
-                let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme);
+                let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme)
+                    .with_masked(app.collators.is_masked());
                 frame.render_stateful_widget(widget, block_area, &mut app.collators);
             }
             CollatorsView::List => {
-                let widget = CollatorsDetailedListWidget::new(&app.chains, theme);
+                let widget = CollatorsDetailedListWidget::new(&app.chains, theme)
+                    .with_masked(app.collators.is_masked());
                 frame.render_stateful_widget(widget, block_area, &mut app.collators);
             }
         },

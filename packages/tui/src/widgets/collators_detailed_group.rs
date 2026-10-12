@@ -13,7 +13,7 @@ use suno_config::SupportedRuntime;
 use suno_primitives::{
     collator::Collator,
     display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
-    Aura,
+    Aura, NodeHost,
 };
 use suno_theme::Theme;
 
@@ -24,11 +24,21 @@ pub const PADDING: u16 = 3;
 pub struct CollatorsDetailedGroupWidget<'a> {
     pub chains: &'a ChainsList,
     theme: Theme,
+    masked: bool,
 }
 
 impl<'a> CollatorsDetailedGroupWidget<'a> {
     pub fn new(chains: &'a ChainsList, theme: Theme) -> Self {
-        Self { chains, theme }
+        Self {
+            chains,
+            theme,
+            masked: true,
+        }
+    }
+
+    pub fn with_masked(mut self, masked: bool) -> Self {
+        self.masked = masked;
+        self
     }
 }
 
@@ -355,6 +365,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         };
 
         let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
+        let show_host = collators.iter().any(|c| c.has_commands_available());
 
         let mut header_cells = vec![
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
@@ -366,6 +377,9 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
             Cell::from(Text::from("keys").alignment(Alignment::Right)),
         ];
+        if show_host {
+            header_cells.insert(2, Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
         if show_next_keys {
             header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
         }
@@ -381,6 +395,9 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Constraint::Fill(1),
             Constraint::Fill(2),
         ];
+        if show_host {
+            widths.insert(2, Constraint::Fill(2));
+        }
         if show_next_keys {
             widths.push(Constraint::Length(10));
         }
@@ -399,6 +416,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                     current_slot_ts,
                     theme,
                     show_next_keys,
+                    show_host,
                 )
             })
             .collect::<Vec<_>>();
@@ -425,6 +443,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         current_slot_ts: u128,
         theme: Theme,
         show_next_keys: bool,
+        show_host: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -462,6 +481,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
         ];
+
+        if show_host {
+            cells.push(Cell::from(
+                Text::from(collator.host(self.masked)).alignment(Alignment::Left),
+            ));
+        }
 
         if collator.is_permissionless_or_candidate() {
             cells.push(Cell::from(

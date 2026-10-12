@@ -26,7 +26,7 @@ pub enum CollatorsView {
     List,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CollatorsList {
     pub collators: HashMap<CollatorKey, Collator>,
     pub collators_order: Vec<CollatorKey>,
@@ -35,6 +35,22 @@ pub struct CollatorsList {
     pub viewport_height: u16,
     active: bool,
     view: CollatorsView,
+    masked: bool,
+}
+
+impl Default for CollatorsList {
+    fn default() -> Self {
+        Self {
+            collators: HashMap::new(),
+            collators_order: Vec::new(),
+            table_state: TableState::default(),
+            scroll_offset: 0,
+            viewport_height: 0,
+            active: false,
+            view: CollatorsView::default(),
+            masked: true,
+        }
+    }
 }
 
 impl CollatorsList {
@@ -239,6 +255,14 @@ impl CollatorsList {
             CollatorsView::Group => CollatorsView::List,
             CollatorsView::List => CollatorsView::Group,
         };
+    }
+
+    pub fn is_masked(&self) -> bool {
+        self.masked
+    }
+
+    pub fn toggle_mask(&mut self) {
+        self.masked = !self.masked;
     }
 
     pub fn is_list_view(&self) -> bool {
