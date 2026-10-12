@@ -251,6 +251,8 @@ impl App {
         match action {
             NavigationAction::SectionUp => self.section_up(),
             NavigationAction::SectionDown => self.section_down(),
+            NavigationAction::ExtendUp => self.extend_up(),
+            NavigationAction::ExtendDown => self.extend_down(),
             NavigationAction::MoveLeft => self.move_left(),
             NavigationAction::MoveRight => self.move_right(),
             NavigationAction::MoveUp => self.move_up(),
@@ -1556,6 +1558,12 @@ impl App {
             return;
         }
 
+        // The logs have no section of their own, they scroll while the main window is selected
+        if self.section == Section::Main && self.window == Window::Logs {
+            self.logs.move_up();
+            return;
+        }
+
         match self.data_section() {
             Section::Chains => {
                 self.chains.move_up();
@@ -1575,6 +1583,12 @@ impl App {
         if self.popup.is_visible() {
             self.popup.move_down();
             self.preview_theme_selection();
+            return;
+        }
+
+        // The logs have no section of their own, they scroll while the main window is selected
+        if self.section == Section::Main && self.window == Window::Logs {
+            self.logs.move_down();
             return;
         }
 
@@ -1609,6 +1623,26 @@ impl App {
             self.next_window();
         } else {
             self.section_down();
+        }
+    }
+
+    /// Extends the selection up, on the logs. Anywhere else it moves the selection up.
+    fn extend_up(&mut self) {
+        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
+        {
+            self.logs.extend_up();
+        } else {
+            self.move_up();
+        }
+    }
+
+    /// Extends the selection down, on the logs. Anywhere else it moves the selection down.
+    fn extend_down(&mut self) {
+        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
+        {
+            self.logs.extend_down();
+        } else {
+            self.move_down();
         }
     }
 
@@ -2893,10 +2927,19 @@ impl App {
         self.chains.set_active(false);
         self.validators.set_active(false);
         self.collators.set_active(false);
+        self.logs.clear_selection();
     }
 
     /// Copy to clipboard
     pub fn copy_to_clipboard(&self) {
+        if self.section == Section::Main && self.window == Window::Logs && !self.popup.is_visible()
+        {
+            if let Some(text) = self.logs.selected_text() {
+                self.set_clipboard_text(text);
+            }
+            return;
+        }
+
         if !self.popup.is_visible() {
             return;
         }
@@ -2905,19 +2948,21 @@ impl App {
             let Some(bytes) = self.popup.get_call_data_bytes() else {
                 return;
             };
-            let hex_bytes = hex::encode(&bytes);
+            self.set_clipboard_text(hex::encode(&bytes));
+        }
+    }
 
-            let mut clipboard = match Clipboard::new() {
-                Ok(cb) => cb,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
-            if let Err(e) = clipboard.set_text(hex_bytes) {
+    fn set_clipboard_text(&self, text: String) {
+        let mut clipboard = match Clipboard::new() {
+            Ok(cb) => cb,
+            Err(e) => {
                 error!("{}", e);
+                return;
             }
+        };
+
+        if let Err(e) = clipboard.set_text(text) {
+            error!("{}", e);
         }
     }
 }

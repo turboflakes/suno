@@ -74,6 +74,14 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Right => Action::Navigation(NavigationAction::MoveRight),
         // Previous section, or previous window when the main window is selected, on `Left`
         KeyCode::Left => Action::Navigation(NavigationAction::MoveLeft),
+        // Extend the selection on `Shift+Up`
+        KeyCode::Up if key_event.modifiers.contains(KeyModifiers::SHIFT) => {
+            Action::Navigation(NavigationAction::ExtendUp)
+        }
+        // Extend the selection on `Shift+Down`
+        KeyCode::Down if key_event.modifiers.contains(KeyModifiers::SHIFT) => {
+            Action::Navigation(NavigationAction::ExtendDown)
+        }
         // Move Up on `Up` inside the active section or list
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
