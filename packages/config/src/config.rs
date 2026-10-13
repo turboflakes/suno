@@ -101,6 +101,10 @@ pub struct Config {
     /// file that persists runtime preferences (e.g. the active theme).
     #[serde(skip)]
     config_path: PathBuf,
+    /// Network launched from the CLI (e.g. `suno polkadot`), added as a suffix to the prefs
+    /// file name so each network keeps its own runtime preferences.
+    #[serde(skip)]
+    network: Option<SupportedRuntime>,
 }
 
 impl Default for Config {
@@ -115,6 +119,7 @@ impl Default for Config {
             themes: default_themes(),
             logs: default_logs(),
             config_path: PathBuf::new(),
+            network: None,
         }
     }
 }
@@ -402,6 +407,16 @@ pub struct Explorer {
 
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        Self::from_file_for(path, None)
+    }
+
+    /// Loads the config as `from_file` does, for the `network` launched from the CLI, if any.
+    /// The network is part of the prefs file name, so the preferences restored are the ones
+    /// persisted by the same network.
+    pub fn from_file_for<P: AsRef<Path>>(
+        path: P,
+        network: Option<SupportedRuntime>,
+    ) -> Result<Self, Error> {
         let path = path.as_ref();
 
         let mut config = if !path.exists() {
@@ -420,6 +435,7 @@ impl Config {
         };
 
         config.config_path = path.to_path_buf();
+        config.network = network;
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
@@ -444,10 +460,15 @@ impl Config {
     }
 
     /// Path of the small sibling file used to persist runtime preferences
-    /// across restarts, without touching the user's own config file.
+    /// across restarts, without touching the user's own config file. When launched for a
+    /// network, e.g. `suno polkadot`, the network is the suffix: `.config.local.polkadot.yaml`.
     fn prefs_path(&self) -> PathBuf {
         let dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
-        dir.join(".config.local.yaml")
+        let file_name = match self.network {
+            Some(network) => format!(".config.local.{}.yaml", network.to_string().to_lowercase()),
+            None => ".config.local.yaml".to_string(),
+        };
+        dir.join(file_name)
     }
 
     /// Reads the prefs file, if it exists and is well-formed. Defaults to
@@ -477,7 +498,13 @@ impl Config {
     fn write_prefs(&self, prefs: &Prefs) -> Result<(), Error> {
         let path = self.prefs_path();
         let content = serde_yaml::to_string(prefs)?;
-        let tmp_path = path.with_file_name(".config.local.yaml.tmp");
+        let tmp_name = format!(
+            "{}.tmp",
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(".config.local.yaml")
+        );
+        let tmp_path = path.with_file_name(tmp_name);
         fs::write(&tmp_path, content)?;
         fs::rename(&tmp_path, &path)?;
         Ok(())
@@ -719,8 +746,14 @@ fn get_config() -> Result<Config, Error> {
         .map(|s| s.as_str())
         .unwrap_or(default_config_path);
 
+    // The network launched, if any, so the prefs persisted are the ones of that network
+    let network = match matches.subcommand() {
+        Some(("update", _)) | None => None,
+        Some((relay_chain, _)) => SupportedRuntime::from_str(relay_chain).ok(),
+    };
+
     // Read and parse the config file
-    let mut config = Config::from_file(config_path)?;
+    let mut config = Config::from_file_for(config_path, network)?;
 
     // If not specified in the config file, load the signer proxy path
     // from the CLI, otherwise try to load the default
@@ -942,6 +975,7 @@ mod tests {
             themes: Themes::default(),
             logs: Logs::default(),
             config_path: PathBuf::new(),
+            network: None,
         };
         assert!(config.validate().is_err());
     }
@@ -1137,6 +1171,22 @@ explorer:
 
         let reloaded = Config::from_file(&config_path).unwrap();
         assert_eq!(reloaded.themes.active, other);
+    }
+
+    #[test]
+    fn test_prefs_file_has_the_network_as_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file_for(&config_path, Some(SupportedRuntime::Polkadot)).unwrap();
+        let mut prefs = config.read_prefs();
+        prefs.active_theme = Some(config.themes.active.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        assert!(dir.path().join(".config.local.polkadot.yaml").exists());
+        assert!(!dir.path().join(".config.local.yaml").exists());
+        assert!(!dir.path().join(".config.local.polkadot.yaml.tmp").exists());
     }
 
     #[test]
