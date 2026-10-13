@@ -284,6 +284,20 @@ pub fn spawn_fetch_aura_authorities(
         .spawn(move |api| async move { runtime.fetch_aura_authorities(&api).await });
 }
 
+/// Fetches the on-chain sets that make up a system chain's collators: the Aura authorities, the
+/// session validators, the invulnerables and the candidates. They change with the session, so
+/// they are fetched when the chain connects and on every new session.
+pub fn spawn_fetch_collator_sets(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_aura_authorities(api, runtime, tx);
+    spawn_fetch_session_validators(api, runtime, tx);
+    spawn_fetch_invulnerables(api, runtime, tx);
+    spawn_fetch_candidate_list(api, runtime, tx);
+}
+
 pub fn spawn_fetch_session_validators(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -337,6 +351,19 @@ pub fn spawn_fetch_collators_identity(
         move |api, stash| async move { runtime.fetch_collator_identity(&api, &stash).await },
         3,
     );
+}
+
+/// Fetches the session keys of the collators: the ones queued for the next session and the
+/// next ones. Both change with the session, so they are fetched when the chain connects and
+/// on every new session.
+pub fn spawn_fetch_collators_session_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_collators_queued_keys(api, runtime, collator_keys, tx);
+    spawn_fetch_collators_next_keys(api, runtime, collator_keys, tx);
 }
 
 pub fn spawn_fetch_collators_queued_keys(

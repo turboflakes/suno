@@ -40,7 +40,12 @@ impl StatefulWidget for CollatorsCompactWidget {
         // The underlying `table_state` selection index refers to `state.collators`,
         // so it's translated here to account for the extra header rows.
         // In list view, collators are regrouped by relay chain.
-        let mut indexed: Vec<(usize, _)> = state.collators_iter().enumerate().collect();
+        // Only the tracked collators, the ones listed in the config, are shown here.
+        let mut indexed: Vec<(usize, _)> = state
+            .collators_iter()
+            .enumerate()
+            .filter(|(_, c)| c.is_tracked())
+            .collect();
         if state.is_list_view() {
             indexed.sort_by_key(|(_, c)| c.runtime().relay_chain());
         }

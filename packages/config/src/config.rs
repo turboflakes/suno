@@ -317,10 +317,12 @@ fn default_enable() -> bool {
 pub struct Features {
     #[serde(default = "default_enable")]
     enable_validators: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     enable_collators: bool,
     #[serde(default)]
     enable_rpcs: bool,
+    #[serde(default = "default_enable")]
+    show_all_collators: bool,
     #[serde(default = "default_enable")]
     enable_check_update: bool,
     #[serde(default = "default_enable")]
@@ -341,8 +343,9 @@ impl Default for Features {
     fn default() -> Self {
         Self {
             enable_validators: true,
-            enable_collators: false,
+            enable_collators: true,
             enable_rpcs: false,
+            show_all_collators: true,
             enable_check_update: true,
             show_nominators_counter: true,
             show_nominators_stake: true,
@@ -373,6 +376,10 @@ impl Features {
 
     pub fn check_update_enabled(&self) -> bool {
         self.enable_check_update
+    }
+
+    pub fn all_collators_visible(&self) -> bool {
+        self.show_all_collators
     }
 
     pub fn nominators_counter_visible(&self) -> bool {

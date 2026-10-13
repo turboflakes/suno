@@ -142,8 +142,6 @@ impl<'a> StatefulWidget for CollatorsDetailedListWidget<'a> {
 
         // Render scrollbar when active
         if state.is_active() && area.height < total_height {
-            let selected_pos = state.table_state.selected().unwrap_or_default();
-
             let scrollbar_area = Rect {
                 x: area.right().saturating_sub(1),
                 y: area.y + 1,
@@ -151,10 +149,12 @@ impl<'a> StatefulWidget for CollatorsDetailedListWidget<'a> {
                 height: area.height.saturating_sub(2),
             };
 
+            // The thumb follows what is displayed, the scrolled rows out of the ones that don't fit
+            let scrollable = total_height.saturating_sub(area.height) as usize;
             render_scrollbar(
                 self.theme,
-                state.scroll_offset as usize + selected_pos,
-                total_height as usize,
+                (state.scroll_offset as usize).min(scrollable),
+                scrollable + 1,
                 scrollbar_area,
                 buf,
             );
@@ -259,7 +259,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         let title_block = Block::new().set_style(block_style);
         Paragraph::new(Line::from(
             Span::raw(format!(
-                "{} CHAINS",
+                "{} SYSTEM CHAINS",
                 relay_runtime.to_string().to_uppercase()
             ))
             .style(theme.paragraph.header_active),

@@ -397,6 +397,7 @@ impl App {
                                 {
                                     let collator_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
+                                    self.fetch_collators_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -466,33 +467,8 @@ impl App {
                                         };
 
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
-
-                                        // Fetched on connected and every new session
-                                        // ---
-                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_queued_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        sync::spawn_fetch_collators_next_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        // ---
+                                        sync::spawn_fetch_collator_sets(&api_at, runtime, &tx);
                                     });
                                 }
                             }
@@ -505,6 +481,8 @@ impl App {
                                 {
                                     let collator_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
+                                    // The identities of every chain's collators are fetched below, once People is connected
+                                    self.fetch_collators_chain_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -537,32 +515,7 @@ impl App {
 
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-
-                                        // Fetched on connected and every new session
-                                        // ---
-                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_queued_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        sync::spawn_fetch_collators_next_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        // ---
+                                        sync::spawn_fetch_collator_sets(&api_at, runtime, &tx);
                                     });
                                 }
 
@@ -626,6 +579,7 @@ impl App {
                                 {
                                     let collator_keys =
                                         self.collators.get_collator_keys_by_runtime(runtime);
+                                    self.fetch_collators_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
                                         let api_at = match api.at_block(block_hash).await.boxed() {
@@ -651,32 +605,7 @@ impl App {
 
                                         sync::spawn_fetch_slot_duration(&api_at, runtime, &tx);
                                         sync::spawn_fetch_session_index(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_account_balance(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-
-                                        // Fetched on connected and every new session
-                                        // ---
-                                        sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                        sync::spawn_fetch_collators_queued_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        sync::spawn_fetch_collators_next_keys(
-                                            &api_at,
-                                            runtime,
-                                            &collator_keys,
-                                            &tx,
-                                        );
-                                        // ---
+                                        sync::spawn_fetch_collator_sets(&api_at, runtime, &tx);
                                     });
                                 }
                             }
@@ -983,24 +912,13 @@ impl App {
                                     };
 
                                     // Fetched on connected and every new session
-                                    // ---
-                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_collators_queued_keys(
+                                    sync::spawn_fetch_collator_sets(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_session_keys(
                                         &api_at,
                                         runtime,
                                         &collator_keys,
                                         &tx,
                                     );
-                                    sync::spawn_fetch_collators_next_keys(
-                                        &api_at,
-                                        runtime,
-                                        &collator_keys,
-                                        &tx,
-                                    );
-                                    // ---
                                 });
                             }
                         }
@@ -1025,17 +943,8 @@ impl App {
                                         }
                                     };
 
-                                    sync::spawn_fetch_aura_authorities(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_session_validators(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_invulnerables(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_candidate_list(&api_at, runtime, &tx);
-                                    sync::spawn_fetch_collators_queued_keys(
-                                        &api_at,
-                                        runtime,
-                                        &collator_keys,
-                                        &tx,
-                                    );
-                                    sync::spawn_fetch_collators_next_keys(
+                                    sync::spawn_fetch_collator_sets(&api_at, runtime, &tx);
+                                    sync::spawn_fetch_collators_session_keys(
                                         &api_at,
                                         runtime,
                                         &collator_keys,
@@ -1259,21 +1168,160 @@ impl App {
         }
     }
 
+    /// Applies an update of the on-chain collator sets of `runtime`, e.g. the authorities, to the
+    /// collators and to the chain, and then syncs the on-chain only collators.
+    ///
+    /// The order matters:
+    /// 1. The collators are updated first. On-chain only ones are added there before their
+    ///    status is set, so the new ones get a status in the same step.
+    /// 2. The chain's aura state is updated before syncing, since the collators to keep are
+    ///    taken from it. Otherwise the ones just added would not be in it and get pruned.
+    fn update_collator_set(
+        &mut self,
+        runtime: SupportedRuntime,
+        update_collators: impl FnOnce(&mut CollatorsList, bool) -> Vec<AccountKey>,
+        update_chains: impl FnOnce(&mut ChainsList),
+    ) {
+        let add_missing = CONFIG.features().all_collators_visible();
+        let added = update_collators(&mut self.collators, add_missing);
+        update_chains(&mut self.chains);
+        self.sync_onchain_collators(runtime, added);
+    }
+
+    /// Once the on-chain sets of `runtime` were updated, drops the untracked collators that left
+    /// them and fetches the data of the ones just `added`.
+    fn sync_onchain_collators(&mut self, runtime: SupportedRuntime, added: Vec<AccountKey>) {
+        if !CONFIG.features().all_collators_visible() {
+            return;
+        }
+
+        let chain = self.chains.get_chain_by_runtime(runtime);
+        if let Some(aura) = chain.as_ref().and_then(|chain| chain.aura().as_ref()) {
+            let keep: HashSet<[u8; 32]> = aura
+                .authorities()
+                .iter()
+                .copied()
+                .chain(aura.invulnerables().iter().copied())
+                .chain(aura.candidates().iter().map(|(who, _)| *who))
+                .collect();
+            self.collators.prune_untracked(runtime, &keep);
+        }
+
+        self.fetch_collators_data(runtime, added);
+    }
+
+    /// Fetches the data of the `keys` collators of `runtime`: the data held on the collator's own
+    /// chain, and the identity held on the People chain.
+    ///
+    /// The fetches issued when a chain connects, and on every session change, only cover the
+    /// collators known at that time, so it is also used for the ones discovered on-chain after.
+    fn fetch_collators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        self.fetch_collators_chain_data(runtime, keys.clone());
+        self.fetch_collators_identity(runtime, keys);
+    }
+
+    /// Fetches the balance, the session keys and the last authored block of the `keys` collators,
+    /// all of them held on the collator's own chain.
+    fn fetch_collators_chain_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+
+        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) else {
+            return;
+        };
+
+        // Aura's expected block time is derived from the relay chain epoch data
+        let is_epoch_known = self
+            .chains
+            .get_chain_by_runtime(runtime.relay_chain())
+            .is_some_and(|chain| chain.epoch().is_some());
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let api_at = match api.at_block(block_hash).await.boxed() {
+                Ok(api_at) => api_at,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            sync::spawn_fetch_collators_account_balance(&api_at, runtime, &keys, &tx);
+            sync::spawn_fetch_collators_session_keys(&api_at, runtime, &keys, &tx);
+            if is_epoch_known {
+                sync::spawn_fetch_collators_last_authored_block(&api_at, runtime, &keys, &tx);
+            }
+        });
+    }
+
+    /// Fetches the identity of the `keys` collators of `runtime`, held on the People chain of the
+    /// relay chain, when it is connected. Otherwise the identities are fetched once it connects.
+    fn fetch_collators_identity(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+
+        let Some(people_runtime) = runtime.relay_chain().people_runtime() else {
+            return;
+        };
+        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
+            return;
+        };
+
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let api_at = match api.at_block(block_hash).await.boxed() {
+                Ok(api_at) => api_at,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            sync::spawn_fetch_collators_identity(&api_at, people_runtime, &keys, &tx);
+        });
+    }
+
     fn handle_collator_actions(&mut self, action: CollatorAction) {
         match action {
             CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
-                self.collators
-                    .update_aura_authorities(runtime, &authorities);
-                self.chains.update_aura_authorities(&runtime, authorities);
+                self.update_collator_set(
+                    runtime,
+                    |collators, add_missing| {
+                        collators.update_authorities(runtime, &authorities, add_missing)
+                    },
+                    |chains| {
+                        chains.update_aura_authorities(&runtime, authorities.clone());
+                    },
+                );
             }
             CollatorAction::UpdateInvulnerables(runtime, invulnerables) => {
-                self.collators.update_invulnerables(runtime, &invulnerables);
-                self.chains
-                    .update_aura_invulnerables(&runtime, invulnerables);
+                self.update_collator_set(
+                    runtime,
+                    |collators, add_missing| {
+                        collators.update_invulnerables(runtime, &invulnerables, add_missing)
+                    },
+                    |chains| {
+                        chains.update_aura_invulnerables(&runtime, invulnerables.clone());
+                    },
+                );
             }
             CollatorAction::UpdateCandidates(runtime, candidates) => {
-                self.collators.update_candidates(runtime, &candidates);
-                self.chains.update_aura_candidates(&runtime, candidates);
+                self.update_collator_set(
+                    runtime,
+                    |collators, add_missing| {
+                        collators.update_candidates(runtime, &candidates, add_missing)
+                    },
+                    |chains| {
+                        chains.update_aura_candidates(&runtime, candidates.clone());
+                    },
+                );
             }
             CollatorAction::UpdateAuthoredBlock(runtime, block_number, slot) => {
                 if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {

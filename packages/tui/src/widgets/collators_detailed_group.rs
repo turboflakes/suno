@@ -124,8 +124,6 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
 
         // Render scrollbar when active
         if state.is_active() && area.height < total_height {
-            let selected_pos = state.table_state.selected().unwrap_or_default();
-
             let scrollbar_area = Rect {
                 x: area.right().saturating_sub(1),
                 y: area.y + 1,
@@ -133,10 +131,12 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 height: area.height.saturating_sub(2),
             };
 
+            // The thumb follows what is displayed, the scrolled rows out of the ones that don't fit
+            let scrollable = total_height.saturating_sub(area.height) as usize;
             render_scrollbar(
                 self.theme,
-                state.scroll_offset as usize + selected_pos,
-                total_height as usize,
+                (state.scroll_offset as usize).min(scrollable),
+                scrollable + 1,
                 scrollbar_area,
                 buf,
             );
