@@ -12,7 +12,7 @@
   ],
   "telemetryEndpoints": null,
   "protocolId": null,
-  "relay_chain": "westend",
+  "relay_chain": "westend2",
   "properties": {
     "ss58Format": 42,
     "tokenDecimals": 12,
