@@ -29,8 +29,8 @@ use suno_config::{
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
-    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState, AccountKey,
-    Chain, Collator, NodeHost, Validator,
+    call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState,
+    AccountDisplay, AccountKey, Chain, Collator, NodeHost, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -3231,7 +3231,22 @@ impl App {
             return;
         }
 
+        // The stash of the selected validator or collator
         if !self.popup.is_visible() {
+            let address = match self.window {
+                Window::Validators => self
+                    .validators
+                    .get_selected_ref()
+                    .map(|v| v.to_address_string()),
+                Window::Collators => self
+                    .collators
+                    .get_selected_ref()
+                    .map(|c| c.to_address_string()),
+                _ => None,
+            };
+            if let Some(address) = address {
+                self.set_clipboard_text(address);
+            }
             return;
         }
 

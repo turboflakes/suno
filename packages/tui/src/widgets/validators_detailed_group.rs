@@ -47,6 +47,11 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
             area.width
         };
 
+        // Values needed further down to render the table
+        let is_active = state.is_active();
+        let is_masked = state.is_masked();
+        let table_state = state.table_state;
+
         // Create a new area to fit all the content as total_height, but as wide as the screen.
         let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
@@ -80,12 +85,13 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 runtime,
                 &validators,
                 selected_validator,
-                group_area,
-                &mut full_content_buf,
-                &mut state.table_state.clone(),
-                state.is_masked(),
+                is_active,
+                is_masked,
                 is_odd,
                 block,
+                group_area,
+                &mut full_content_buf,
+                &mut table_state.clone(),
             );
 
             current_y_group += group_height;
@@ -145,12 +151,13 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        area: Rect,
-        buf: &mut Buffer,
-        table_state: &mut TableState,
+        is_active: bool,
         is_masked: bool,
         is_odd: bool,
         block: Block,
+        area: Rect,
+        buf: &mut Buffer,
+        table_state: &mut TableState,
     ) {
         let content_area = block.inner(area);
         block.render(area, buf);
@@ -172,11 +179,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             runtime,
             validators,
             selected_validator,
+            is_active,
+            is_masked,
+            is_odd,
             body_area,
             buf,
             table_state,
-            is_masked,
-            is_odd,
         );
     }
 
@@ -356,13 +364,15 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
+        is_active: bool,
+        is_masked: bool,
+        is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_masked: bool,
-        is_odd: bool,
     ) {
         let theme = self.theme;
+
         let features = CONFIG.features();
         let Some(ah_chain) = self.chains.get_chain_by_runtime(
             runtime
@@ -412,7 +422,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
-            .header(header.set_style(theme.table.header));
+            .header(header.set_style(theme.table.header))
+            .row_highlight_style(theme.table.row_highlight(is_active));
 
         StatefulWidget::render(table, area, buf, table_state);
     }

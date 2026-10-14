@@ -74,6 +74,10 @@ impl<'a> StatefulWidget for CollatorsDetailedListWidget<'a> {
             area.width
         };
 
+        // Values needed further down to render the table
+        let is_active = state.is_active();
+        let table_state = state.table_state;
+
         // Create a new area to fit all the content as total_height, but as wide as the screen.
         let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
@@ -88,9 +92,7 @@ impl<'a> StatefulWidget for CollatorsDetailedListWidget<'a> {
 
             // Get selected collator if one of the collators in the current section
             let selected_collator = match state.get_selected_ref() {
-                Some(selected) if collators.contains(&selected) && state.is_active() => {
-                    Some(selected)
-                }
+                Some(selected) if collators.contains(&selected) && is_active => Some(selected),
                 _ => None,
             };
 
@@ -108,12 +110,13 @@ impl<'a> StatefulWidget for CollatorsDetailedListWidget<'a> {
                 relay_runtime,
                 &collators,
                 selected_collator,
-                group_area,
-                &mut full_content_buf,
-                &mut state.table_state.clone(),
+                is_active,
                 is_odd,
                 block,
                 header_height,
+                group_area,
+                &mut full_content_buf,
+                &mut table_state.clone(),
             );
 
             current_y_group += group_height;
@@ -169,12 +172,13 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         relay_runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
-        area: Rect,
-        buf: &mut Buffer,
-        table_state: &mut TableState,
+        is_active: bool,
         is_odd: bool,
         block: Block,
         header_height: u16,
+        area: Rect,
+        buf: &mut Buffer,
+        table_state: &mut TableState,
     ) {
         let content_area = block.inner(area);
         block.render(area, buf);
@@ -188,10 +192,11 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         self.render_list_body(
             collators,
             selected_collator,
+            is_active,
+            is_odd,
             body_area,
             buf,
             table_state,
-            is_odd,
         );
     }
 
@@ -370,14 +375,16 @@ impl<'a> CollatorsDetailedListWidget<'a> {
             .render(bottom_area, buf);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_list_body(
         &self,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
+        is_active: bool,
+        is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_odd: bool,
     ) {
         let theme = self.theme;
         let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
@@ -432,6 +439,7 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
+            .row_highlight_style(theme.table.row_highlight(is_active))
             .header(header.set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);

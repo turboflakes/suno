@@ -58,6 +58,10 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
             area.width
         };
 
+        // Values needed further down to render the table
+        let is_active = state.is_active();
+        let table_state = state.table_state;
+
         // Create a new area to fit all the content as total_height, but as wide as the screen.
         let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
@@ -71,9 +75,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
 
             // Get selected collator if one of the collators in the current section
             let selected_collator = match state.get_selected_ref() {
-                Some(selected) if collators.contains(&selected) && state.is_active() => {
-                    Some(selected)
-                }
+                Some(selected) if collators.contains(&selected) && is_active => Some(selected),
                 _ => None,
             };
 
@@ -91,11 +93,12 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 runtime,
                 &collators,
                 selected_collator,
-                group_area,
-                &mut full_content_buf,
-                &mut state.table_state.clone(),
+                is_active,
                 is_odd,
                 block,
+                group_area,
+                &mut full_content_buf,
+                &mut table_state.clone(),
             );
 
             current_y_group += group_height;
@@ -151,11 +154,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
+        is_active: bool,
+        is_odd: bool,
+        block: Block,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_odd: bool,
-        block: Block,
     ) {
         let content_area = block.inner(area);
         block.render(area, buf);
@@ -170,10 +174,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             runtime,
             collators,
             selected_collator,
+            is_active,
+            is_odd,
             body_area,
             buf,
             table_state,
-            is_odd,
         );
     }
 
@@ -345,10 +350,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
+        is_active: bool,
+        is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_odd: bool,
     ) {
         let theme = self.theme;
 
@@ -428,6 +434,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
+            .row_highlight_style(theme.table.row_highlight(is_active))
             .header(header.set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);

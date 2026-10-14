@@ -28,7 +28,7 @@ struct RowGroup<'a> {
     validators: Vec<&'a Validator>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidatorsList {
     pub validators: HashMap<ValidatorKey, Validator>,
     pub validators_order: Vec<ValidatorKey>,
