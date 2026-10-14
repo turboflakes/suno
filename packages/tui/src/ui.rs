@@ -6,7 +6,7 @@ use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
-use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, window::Window};
+use crate::widgets::{help::HelpWidget, logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
@@ -100,9 +100,7 @@ fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
     match app.window {
         Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
         Window::Logs => render_logs_widget(app, frame, body_area),
-        Window::Help => {
-            render_help(app.theme, body_area, frame.buffer_mut());
-        }
+        Window::Help => render_help_widget(app, frame, body_area),
     }
 }
 
@@ -217,6 +215,15 @@ fn render_logs_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_stateful_widget(logs, area, &mut app.logs);
 }
 
+fn render_help_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    let theme = app.theme;
+    let block = Block::default()
+        .style(theme.block.main)
+        .padding(Padding::proportional(1));
+    let help = HelpWidget::new().block(block);
+    frame.render_stateful_widget(help, area, &mut app.help);
+}
+
 fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
     let block = Block::default()
@@ -229,7 +236,8 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let has_selection = app.chains.is_active()
         || app.validators.is_active()
         || app.collators.is_active()
-        || (app.section.is_none() && app.window.is_logs_selected());
+        || (app.section.is_none()
+            && (app.window.is_logs_selected() || app.window.is_help_selected()));
 
     // show how to open popup with available commands depending on the active section
     if ((app.validators.is_active()
@@ -239,6 +247,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         || app.chains.is_active())
         && !app.popup.is_visible()
         && !app.window.is_logs_selected()
+        && !app.window.is_help_selected()
     {
         legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
@@ -316,7 +325,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled("select".to_string(), theme.paragraph.label));
+        let up_down = if app.window.is_help_selected() {
+            "scroll"
+        } else {
+            "select"
+        };
+        legend.push(Span::styled(up_down.to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
         if app.section.is_none() && app.window.is_logs_selected() {
             legend.push(Span::styled("shift+↑/↓".to_string(), theme.paragraph.base));
