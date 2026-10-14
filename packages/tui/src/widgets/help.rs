@@ -155,13 +155,13 @@ const KEYBINDINGS: &[HelpEntry] = &[
     ),
     ("esc ", "Close popup or Go back."),
     ("ctrl+e ", "Show commands."),
-    ("ctrl+w ", "Switch window."),
+    ("ctrl+w ", "Switch to the next window."),
     ("ctrl+m ", "Toggle mask on hosts."),
     ("ctrl+t ", "Show list of available themes."),
     ("ctrl+v ", "Toggle between grouped and listed view."),
     (
         "ctrl+h/ctrl+l/left/right ",
-        "Navigate between pane sections. On the main window, switch window.",
+        "Focus the window tabs, and then switch window.",
     ),
     (
         "ctrl+j/ctrl+k/up/down ",

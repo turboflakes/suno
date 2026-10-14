@@ -259,10 +259,10 @@ impl App {
         match action {
             NavigationAction::SectionUp => self.section_up(),
             NavigationAction::SectionDown => self.section_down(),
+            NavigationAction::PrevTab => self.prev_tab(),
+            NavigationAction::NextTab => self.next_tab(),
             NavigationAction::ExtendUp => self.extend_up(),
             NavigationAction::ExtendDown => self.extend_down(),
-            NavigationAction::MoveLeft => self.move_left(),
-            NavigationAction::MoveRight => self.move_right(),
             NavigationAction::MoveUp => self.move_up(),
             NavigationAction::MoveDown => self.move_down(),
             NavigationAction::NextWindow => self.next_window(),
@@ -1882,23 +1882,21 @@ impl App {
         };
     }
 
-    /// Moves to the previous section, or to the previous window while the main window is
-    /// the selected section.
-    fn move_left(&mut self) {
+    /// Focuses the window tabs, and when they already are, selects the previous window.
+    fn prev_tab(&mut self) {
         if self.section.is_none() {
             self.prev_window();
         } else {
-            self.section_up();
+            self.set_section(Section::None);
         }
     }
 
-    /// Moves to the next section, or to the next window while the main window is
-    /// the selected section.
-    fn move_right(&mut self) {
+    /// Focuses the window tabs, and when they already are, selects the next window.
+    fn next_tab(&mut self) {
         if self.section.is_none() {
             self.next_window();
         } else {
-            self.section_down();
+            self.set_section(Section::None);
         }
     }
 
