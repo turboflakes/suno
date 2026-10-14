@@ -322,6 +322,8 @@ pub struct Features {
     #[serde(default)]
     enable_rpcs: bool,
     #[serde(default = "default_enable")]
+    show_all_validators: bool,
+    #[serde(default = "default_enable")]
     show_all_collators: bool,
     #[serde(default = "default_enable")]
     enable_check_update: bool,
@@ -345,6 +347,7 @@ impl Default for Features {
             enable_validators: true,
             enable_collators: true,
             enable_rpcs: false,
+            show_all_validators: true,
             show_all_collators: true,
             enable_check_update: true,
             show_nominators_counter: true,
@@ -380,6 +383,10 @@ impl Features {
 
     pub fn all_collators_visible(&self) -> bool {
         self.show_all_collators
+    }
+
+    pub fn all_validators_visible(&self) -> bool {
+        self.show_all_validators
     }
 
     pub fn nominators_counter_visible(&self) -> bool {

@@ -4,6 +4,8 @@ pub enum Origin {
     /// Listed in the config file, it can carry hosts, commands and proxies.
     #[default]
     Config,
+    /// Listed in the remote source the config points to, e.g. a validators URL.
+    Remote,
     /// Picked from the UI and persisted in the prefs file, only monitored.
     Picked,
     /// Only found on-chain, listed when all of them are shown.
@@ -16,8 +18,9 @@ impl Origin {
         *self != Self::OnChain
     }
 
-    /// Nodes listed in the config file, which can't be untracked from the UI.
+    /// Nodes listed by the config, in the file or in its remote source, which can't be
+    /// untracked from the UI.
     pub fn is_config(&self) -> bool {
-        *self == Self::Config
+        matches!(self, Self::Config | Self::Remote)
     }
 }

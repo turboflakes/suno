@@ -4,6 +4,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount, NodeHost},
+    origin::Origin,
     proxy::{ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -48,6 +49,7 @@ pub struct Nominator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     pub account: NodeAccount,
+    pub origin: Origin,
     pub host_rpc: Host,
     pub ssh: Option<SshConfig>,
     pub prefs: ValidatorPrefs,
@@ -76,6 +78,7 @@ impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
+            origin: Origin::Config,
             host_rpc: Host::default(),
             ssh: None,
             prefs: ValidatorPrefs::default(),
@@ -95,6 +98,18 @@ impl Validator {
             commands: Vec::new(),
             status: ValidatorStatus::default(),
         }
+    }
+
+    /// Validator listed from the given `origin`, e.g. the remote source of the config.
+    pub fn with_origin(runtime: SupportedRuntime, stash: AccountId32, origin: Origin) -> Self {
+        Self {
+            origin,
+            ..Self::new(runtime, stash)
+        }
+    }
+
+    pub fn is_tracked(&self) -> bool {
+        self.origin.is_tracked()
     }
 
     pub fn key(&self) -> &AccountKey {

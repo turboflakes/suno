@@ -3,6 +3,7 @@ use crate::section::Section;
 use crate::widgets::{
     chains::ChainsList,
     collators::CollatorsList,
+    help::HelpState,
     list_focus::ListFocus,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
@@ -90,6 +91,8 @@ pub struct App {
     pub popup: Popup,
     /// Logs state.
     pub logs: LogsState,
+    /// Help state.
+    pub help: HelpState,
     /// Is any sensitive data masked?
     pub masked: bool,
     /// The currently active theme, picked from the `ctrl+t` menu.
@@ -125,6 +128,8 @@ impl App {
         popup.set_theme(theme);
         let mut logs = LogsState::new(rx_logs);
         logs.set_theme(theme);
+        let mut help = HelpState::default();
+        help.set_theme(theme);
 
         Self {
             running: true,
@@ -137,6 +142,7 @@ impl App {
             collators: CollatorsList::default(),
             popup,
             logs,
+            help,
             masked: true,
             theme,
             theme_index,
@@ -148,6 +154,7 @@ impl App {
     }
 
     async fn init(&mut self) {
+        self.update_visible_lists();
         self.validators.on_init().await;
         self.collators.on_init();
         self.chains.on_init(self.tx.clone()).await;
@@ -341,7 +348,18 @@ impl App {
                 match (is_updated, connection_state) {
                     (true, ConnectionState::Connected) => {
                         let runtime = chain_key;
-                        let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
+                        // The data that takes a fetch per validator is only fetched for the tracked
+                        // ones, and the visible ones for the tracked and visible keys. The status takes no extra
+                        // fetch per validator, so it is fetched for all of them.
+                        let tracked_validator_keys = self
+                            .validators
+                            .get_tracked_validator_keys_by_runtime(runtime);
+                        let all_validator_keys =
+                            self.validators.get_validator_keys_by_runtime(runtime);
+                        let tracked_and_visible_validator_keys = self
+                            .validators
+                            .get_tracked_and_visible_keys_by_runtime(runtime);
+                        let is_all_validators_visible = CONFIG.features().all_validators_visible();
                         match runtime {
                             SupportedRuntime::Polkadot
                             | SupportedRuntime::Kusama
@@ -368,21 +386,14 @@ impl App {
                                         sync::spawn_fetch_validators_authority_status(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &all_validator_keys,
                                             &tx,
                                         );
 
-                                        sync::spawn_fetch_validators_queued_keys(
+                                        sync::spawn_fetch_validators_session_keys(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
-                                            &tx,
-                                        );
-
-                                        sync::spawn_fetch_validators_next_keys(
-                                            &api_at,
-                                            runtime,
-                                            &validator_keys,
+                                            &tracked_and_visible_validator_keys,
                                             &tx,
                                         );
                                     });
@@ -395,8 +406,9 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    let collator_keys =
-                                        self.collators.get_collator_keys_by_runtime(runtime);
+                                    let collator_keys = self
+                                        .collators
+                                        .get_tracked_and_visible_keys_by_runtime(runtime);
                                     self.fetch_collators_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
@@ -411,6 +423,10 @@ impl App {
                                             }
                                         };
 
+                                        if is_all_validators_visible {
+                                            sync::spawn_fetch_all_validators(&api_at, runtime, &tx);
+                                        }
+
                                         sync::spawn_fetch_era_data(&api_at, runtime, &tx);
 
                                         sync::spawn_fetch_total_validators_count(
@@ -423,28 +439,28 @@ impl App {
                                         sync::spawn_fetch_validators_prefs_next(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &tracked_validator_keys,
                                             &tx,
                                         );
 
                                         sync::spawn_fetch_validators_staking_ledger(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &tracked_validator_keys,
                                             &tx,
                                         );
 
                                         sync::spawn_fetch_validators_payee(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &tracked_validator_keys,
                                             &tx,
                                         );
 
                                         sync::spawn_fetch_validators_account_balance(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &tracked_validator_keys,
                                             &tx,
                                         );
 
@@ -452,7 +468,7 @@ impl App {
                                             sync::spawn_fetch_validators_proxy_status(
                                                 &api_at,
                                                 runtime,
-                                                &validator_keys,
+                                                &tracked_validator_keys,
                                                 &proxy,
                                                 &tx,
                                             );
@@ -479,8 +495,9 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    let collator_keys =
-                                        self.collators.get_collator_keys_by_runtime(runtime);
+                                    let collator_keys = self
+                                        .collators
+                                        .get_tracked_and_visible_keys_by_runtime(runtime);
                                     // The identities of every chain's collators are fetched below, once People is connected
                                     self.fetch_collators_chain_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
@@ -499,7 +516,7 @@ impl App {
                                         sync::spawn_fetch_validators_identity(
                                             &api_at,
                                             runtime,
-                                            &validator_keys,
+                                            &all_validator_keys,
                                             &tx,
                                         );
 
@@ -533,7 +550,9 @@ impl App {
                                     ]
                                     .into_iter()
                                     .flatten()
-                                    .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                    .map(|rt| {
+                                        self.collators.get_tracked_and_visible_keys_by_runtime(rt)
+                                    })
                                     .collect();
 
                                     let tx = self.tx.clone();
@@ -577,8 +596,9 @@ impl App {
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
-                                    let collator_keys =
-                                        self.collators.get_collator_keys_by_runtime(runtime);
+                                    let collator_keys = self
+                                        .collators
+                                        .get_tracked_and_visible_keys_by_runtime(runtime);
                                     self.fetch_collators_data(runtime, collator_keys.clone());
                                     let tx = self.tx.clone();
                                     tokio::spawn(async move {
@@ -649,8 +669,9 @@ impl App {
                     | SupportedRuntime::Westend => {
                         if let Some(chain) = self.chains.get_chain_by_runtime(runtime) {
                             let api = chain.client().clone();
-                            let validator_keys =
-                                self.validators.get_validator_keys_by_runtime(runtime);
+                            let validator_keys = self
+                                .validators
+                                .get_tracked_and_visible_keys_by_runtime(runtime);
                             let tx = self.tx.clone();
 
                             tokio::spawn(async move {
@@ -688,8 +709,14 @@ impl App {
                     | SupportedRuntime::AssetHubWestend => {
                         if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
-                            let validator_keys =
-                                self.validators.get_validator_keys_by_runtime(runtime);
+                            let tracked_validator_keys = self
+                                .validators
+                                .get_tracked_validator_keys_by_runtime(runtime);
+                            let tracked_and_visible_validator_keys = self
+                                .validators
+                                .get_tracked_and_visible_keys_by_runtime(runtime);
+                            let is_all_validators_visible =
+                                CONFIG.features().all_validators_visible();
                             let era_index = era.index();
                             let tx = self.tx.clone();
 
@@ -703,6 +730,10 @@ impl App {
                                         return;
                                     }
                                 };
+
+                                if is_all_validators_visible {
+                                    sync::spawn_fetch_all_validators(&api_at, runtime, &tx);
+                                }
 
                                 sync::spawn_fetch_active_validators_count(
                                     &api_at, runtime, era_index, &tx,
@@ -718,15 +749,7 @@ impl App {
                                     &api_at,
                                     runtime,
                                     era_index,
-                                    &validator_keys,
-                                    &tx,
-                                );
-
-                                sync::spawn_fetch_validators_era_points(
-                                    &api_at,
-                                    runtime,
-                                    era_index,
-                                    &validator_keys,
+                                    &tracked_validator_keys,
                                     &tx,
                                 );
 
@@ -734,7 +757,15 @@ impl App {
                                     &api_at,
                                     runtime,
                                     era_index,
-                                    &validator_keys,
+                                    &tracked_and_visible_validator_keys,
+                                    &tx,
+                                );
+
+                                sync::spawn_fetch_validators_era_points(
+                                    &api_at,
+                                    runtime,
+                                    era_index,
+                                    &tracked_and_visible_validator_keys,
                                     &tx,
                                 );
                             });
@@ -748,7 +779,10 @@ impl App {
                 // Fetch data relevant to be synced whenever session changes
                 //
                 let runtime = chain_key;
-                let validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
+                let all_validator_keys = self.validators.get_validator_keys_by_runtime(runtime);
+                let tracked_and_visible_validator_keys = self
+                    .validators
+                    .get_tracked_and_visible_keys_by_runtime(runtime);
                 match runtime {
                     SupportedRuntime::Polkadot
                     | SupportedRuntime::Kusama
@@ -771,21 +805,14 @@ impl App {
                                 sync::spawn_fetch_validators_authority_status(
                                     &api_at,
                                     runtime,
-                                    &validator_keys,
+                                    &all_validator_keys,
                                     &tx,
                                 );
 
-                                sync::spawn_fetch_validators_queued_keys(
+                                sync::spawn_fetch_validators_session_keys(
                                     &api_at,
                                     runtime,
-                                    &validator_keys,
-                                    &tx,
-                                );
-
-                                sync::spawn_fetch_validators_next_keys(
-                                    &api_at,
-                                    runtime,
-                                    &validator_keys,
+                                    &tracked_and_visible_validator_keys,
                                     &tx,
                                 );
                             });
@@ -808,8 +835,9 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(para_runtime)
                             {
-                                let collator_keys =
-                                    self.collators.get_collator_keys_by_runtime(para_runtime);
+                                let collator_keys = self
+                                    .collators
+                                    .get_tracked_and_visible_keys_by_runtime(para_runtime);
                                 let tx = self.tx.clone();
                                 tokio::spawn(async move {
                                     let api_at = match api.at_block(block_hash).await.boxed() {
@@ -897,8 +925,9 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(runtime)
                             {
-                                let collator_keys =
-                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let collator_keys = self
+                                    .collators
+                                    .get_tracked_and_visible_keys_by_runtime(runtime);
                                 let tx = self.tx.clone();
                                 tokio::spawn(async move {
                                     let api_at = match api.at_block(block_hash).await.boxed() {
@@ -929,8 +958,9 @@ impl App {
                             if let Some((api, block_hash)) =
                                 self.chains.get_api_and_block_hash(runtime)
                             {
-                                let collator_keys =
-                                    self.collators.get_collator_keys_by_runtime(runtime);
+                                let collator_keys = self
+                                    .collators
+                                    .get_tracked_and_visible_keys_by_runtime(runtime);
                                 let tx = self.tx.clone();
                                 tokio::spawn(async move {
                                     let api_at = match api.at_block(block_hash).await.boxed() {
@@ -969,7 +999,9 @@ impl App {
                                 ]
                                 .into_iter()
                                 .flatten()
-                                .map(|rt| self.collators.get_collator_keys_by_runtime(rt))
+                                .map(|rt| {
+                                    self.collators.get_tracked_and_visible_keys_by_runtime(rt)
+                                })
                                 .collect();
 
                                 let tx = self.tx.clone();
@@ -1014,8 +1046,169 @@ impl App {
         }
     }
 
+    /// Fetches the data of the validators only found on-chain that became visible. It runs on
+    /// every tick, an event the app already handles, since what is visible changes with the
+    /// selection, the scroll, the size of the terminal or the window displayed.
+    fn fetch_visible_validators_data(&mut self) {
+        if !CONFIG.features().all_validators_visible() {
+            return;
+        }
+
+        for (runtime, keys) in self.validators.take_unrequested_visible() {
+            self.fetch_validators_data(runtime, keys);
+        }
+    }
+
+    /// Fetches the authority status of the `keys` validators of the relay chain `runtime`. It is
+    /// held on the relay chain, and takes no extra fetch per validator.
+    fn fetch_validators_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+
+        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+            let tx = self.tx.clone();
+            tokio::spawn(async move {
+                let api_at = match api.at_block(block_hash).await.boxed() {
+                    Ok(api_at) => api_at,
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to client at_block: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                };
+
+                sync::spawn_fetch_validators_authority_status(&api_at, runtime, &keys, &tx);
+            });
+        }
+    }
+
+    /// Fetches the identity of the `keys` validators of the relay chain `runtime`, held on the
+    /// People chain, when it is connected. Otherwise the identities are fetched once it connects.
+    /// It is fetched for every validator, visible or not.
+    fn fetch_validators_identity(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+
+        let Some(people_runtime) = runtime.people_runtime() else {
+            return;
+        };
+        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
+            return;
+        };
+
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let api_at = match api.at_block(block_hash).await.boxed() {
+                Ok(api_at) => api_at,
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_block: {}",
+                        e
+                    ))));
+                    return;
+                }
+            };
+
+            sync::spawn_fetch_validators_identity(&api_at, people_runtime, &keys, &tx);
+        });
+    }
+
+    /// Fetches the data of the `keys` validators of the relay chain `runtime` that takes a fetch
+    /// per validator, for the ones only found on-chain that are visible: the session keys, the
+    /// bonded stake (the ledger), the payee, the stake overview and the era points.
+    /// The rest, e.g. the prefs or the balance, is only fetched for the tracked ones.
+    fn fetch_validators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+
+        // The session keys are held on the relay chain
+        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+            let keys = keys.clone();
+            let tx = self.tx.clone();
+            tokio::spawn(async move {
+                let api_at = match api.at_block(block_hash).await.boxed() {
+                    Ok(api_at) => api_at,
+                    Err(e) => {
+                        let _ = tx.send(Action::System(SystemAction::Error(format!(
+                            "Failed to client at_block: {}",
+                            e
+                        ))));
+                        return;
+                    }
+                };
+
+                sync::spawn_fetch_validators_session_keys(&api_at, runtime, &keys, &tx);
+            });
+        }
+
+        // The staking data is held on the Asset Hub chain: the bonded stake (the ledger) and the
+        // payee, and, for the active era, the stake overview and the era points. If the era is
+        // not known yet, the last two are fetched for every validator once it is.
+        if let Some(asset_hub_runtime) = runtime.asset_hub_runtime() {
+            let chain = self.chains.get_chain_by_runtime(asset_hub_runtime);
+            let era_index = chain
+                .as_ref()
+                .and_then(|c| c.era().as_ref())
+                .map(|e| e.index());
+            if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(asset_hub_runtime) {
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let api_at = match api.at_block(block_hash).await.boxed() {
+                        Ok(api_at) => api_at,
+                        Err(e) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Failed to client at_block: {}",
+                                e
+                            ))));
+                            return;
+                        }
+                    };
+
+                    sync::spawn_fetch_validators_staking_ledger(
+                        &api_at,
+                        asset_hub_runtime,
+                        &keys,
+                        &tx,
+                    );
+                    sync::spawn_fetch_validators_payee(&api_at, asset_hub_runtime, &keys, &tx);
+
+                    if let Some(era_index) = era_index {
+                        sync::spawn_fetch_validators_stake_overview(
+                            &api_at,
+                            asset_hub_runtime,
+                            era_index,
+                            &keys,
+                            &tx,
+                        );
+                        sync::spawn_fetch_validators_era_points(
+                            &api_at,
+                            asset_hub_runtime,
+                            era_index,
+                            &keys,
+                            &tx,
+                        );
+                    }
+                });
+            }
+        }
+    }
+
     fn handle_validator_actions(&mut self, action: ValidatorAction) {
         match action {
+            ValidatorAction::UpdateAllValidators(runtime, stashes) => {
+                if !CONFIG.features().all_validators_visible() {
+                    return;
+                }
+                let runtime = runtime.relay_chain();
+                let added = self.validators.update_all_validators(runtime, &stashes);
+                self.fetch_validators_status(runtime, added.clone());
+                self.fetch_validators_identity(runtime, added);
+            }
             ValidatorAction::UpdateValidatorPrefs(validator_key, prefs) => {
                 self.validators.update_prefs(&validator_key, prefs);
             }
@@ -1179,18 +1372,18 @@ impl App {
     fn update_collator_set(
         &mut self,
         runtime: SupportedRuntime,
-        update_collators: impl FnOnce(&mut CollatorsList, bool) -> Vec<AccountKey>,
+        update_collators: impl FnOnce(&mut CollatorsList, bool),
         update_chains: impl FnOnce(&mut ChainsList),
     ) {
-        let add_missing = CONFIG.features().all_collators_visible();
-        let added = update_collators(&mut self.collators, add_missing);
+        let is_all_collators_visible = CONFIG.features().all_collators_visible();
+        update_collators(&mut self.collators, is_all_collators_visible);
         update_chains(&mut self.chains);
-        self.sync_onchain_collators(runtime, added);
+        self.sync_onchain_collators(runtime);
     }
 
     /// Once the on-chain sets of `runtime` were updated, drops the untracked collators that left
-    /// them and fetches the data of the ones just `added`.
-    fn sync_onchain_collators(&mut self, runtime: SupportedRuntime, added: Vec<AccountKey>) {
+    /// them. The data of the ones added is fetched once they are visible.
+    fn sync_onchain_collators(&mut self, runtime: SupportedRuntime) {
         if !CONFIG.features().all_collators_visible() {
             return;
         }
@@ -1206,8 +1399,19 @@ impl App {
                 .collect();
             self.collators.prune_untracked(runtime, &keep);
         }
+    }
 
-        self.fetch_collators_data(runtime, added);
+    /// Fetches the data of the collators only found on-chain that became visible. It runs on
+    /// every tick, an event the app already handles, since what is visible changes with the
+    /// selection, the scroll, the size of the terminal or the window displayed.
+    fn fetch_visible_collators_data(&mut self) {
+        if !CONFIG.features().all_collators_visible() {
+            return;
+        }
+
+        for (runtime, keys) in self.collators.take_unrequested_visible() {
+            self.fetch_collators_data(runtime, keys);
+        }
     }
 
     /// Fetches the data of the `keys` collators of `runtime`: the data held on the collator's own
@@ -1293,8 +1497,12 @@ impl App {
             CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
                 self.update_collator_set(
                     runtime,
-                    |collators, add_missing| {
-                        collators.update_authorities(runtime, &authorities, add_missing)
+                    |collators, is_all_collators_visible| {
+                        collators.update_authorities(
+                            runtime,
+                            &authorities,
+                            is_all_collators_visible,
+                        )
                     },
                     |chains| {
                         chains.update_aura_authorities(&runtime, authorities.clone());
@@ -1304,8 +1512,12 @@ impl App {
             CollatorAction::UpdateInvulnerables(runtime, invulnerables) => {
                 self.update_collator_set(
                     runtime,
-                    |collators, add_missing| {
-                        collators.update_invulnerables(runtime, &invulnerables, add_missing)
+                    |collators, is_all_collators_visible| {
+                        collators.update_invulnerables(
+                            runtime,
+                            &invulnerables,
+                            is_all_collators_visible,
+                        )
                     },
                     |chains| {
                         chains.update_aura_invulnerables(&runtime, invulnerables.clone());
@@ -1315,8 +1527,8 @@ impl App {
             CollatorAction::UpdateCandidates(runtime, candidates) => {
                 self.update_collator_set(
                     runtime,
-                    |collators, add_missing| {
-                        collators.update_candidates(runtime, &candidates, add_missing)
+                    |collators, is_all_collators_visible| {
+                        collators.update_candidates(runtime, &candidates, is_all_collators_visible)
                     },
                     |chains| {
                         chains.update_aura_candidates(&runtime, candidates.clone());
@@ -1592,6 +1804,9 @@ impl App {
         if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
             self.popup.advance_metadata_frame();
         }
+
+        self.fetch_visible_validators_data();
+        self.fetch_visible_collators_data();
     }
 
     /// Set running to false to quit the application.
@@ -1608,8 +1823,14 @@ impl App {
         }
 
         // The logs have no section of their own, they scroll while the main window is selected
-        if self.section.is_none() && self.window == Window::Logs {
+        if self.section.is_none() && self.window.is_logs_selected() {
             self.logs.move_up();
+            return;
+        }
+
+        // The same for the help, whose text can be taller than the window
+        if self.section.is_none() && self.window.is_help_selected() {
+            self.help.scroll_up();
             return;
         }
 
@@ -1638,6 +1859,12 @@ impl App {
         // The logs have no section of their own, they scroll while the main window is selected
         if self.section.is_none() && self.window == Window::Logs {
             self.logs.move_down();
+            return;
+        }
+
+        // The same for the help, whose text can be taller than the window
+        if self.section.is_none() && self.window == Window::Help {
+            self.help.scroll_down();
             return;
         }
 
@@ -1738,7 +1965,17 @@ impl App {
             _ => {}
         }
         self.section = section;
+        self.update_visible_lists();
         self.update_active_section();
+    }
+
+    /// Tells the lists whether their window is the one displayed, since the data of the
+    /// validators and collators only found on-chain is only fetched while they are visible.
+    fn update_visible_lists(&mut self) {
+        self.validators
+            .set_visible(self.window.is_validators_selected());
+        self.collators
+            .set_visible(self.window.is_collators_selected());
     }
 
     fn update_active_section(&mut self) {
@@ -1760,12 +1997,14 @@ impl App {
     /// Selects the previous window.
     fn prev_window(&mut self) {
         self.window = self.window.prev(CONFIG.features());
+        self.update_visible_lists();
         self.sync_section_with_window();
     }
 
     /// Selects the next window.
     fn next_window(&mut self) {
         self.window = self.window.next(CONFIG.features());
+        self.update_visible_lists();
         self.sync_section_with_window();
     }
 
@@ -1813,6 +2052,7 @@ impl App {
         self.chains.set_theme(self.theme);
         self.popup.set_theme(self.theme);
         self.logs.set_theme(self.theme);
+        self.help.set_theme(self.theme);
         info!("Theme changed to: {}", name);
     }
 

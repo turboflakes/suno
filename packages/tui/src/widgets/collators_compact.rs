@@ -7,6 +7,7 @@ use ratatui::{
     text::Text,
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
+use sp_arithmetic::traits::Zero;
 use suno_theme::Theme;
 
 #[derive(Debug, Default)]
@@ -99,6 +100,13 @@ impl StatefulWidget for CollatorsCompactWidget {
 
             row.push(Text::from(""));
             rows.push(Row::new(row));
+        }
+
+        if rows.len().is_zero() {
+            rows.push(Row::new(vec![
+                Text::from(""),
+                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+            ]));
         }
 
         // Define widths

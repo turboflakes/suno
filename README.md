@@ -244,6 +244,7 @@ chains:
 features:
   enable_validators: true
   enable_check_update: true
+  show_all_validators: true
   show_all_collators: true
   show_nominators_counter: true
   show_nominators_stake: true

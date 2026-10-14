@@ -7,6 +7,7 @@ use ratatui::{
     text::Text,
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
+use sp_arithmetic::traits::Zero;
 use suno_theme::Theme;
 
 #[derive(Debug, Default)]
@@ -44,7 +45,12 @@ impl StatefulWidget for ValidatorsCompactWidget {
         let mut rows: Vec<Row> = Vec::new();
         let mut last_runtime = None;
 
-        for (i, v) in state.validators_iter().enumerate() {
+        // Only the tracked validators, the ones listed by the config, are shown here.
+        for (i, v) in state
+            .validators_iter()
+            .enumerate()
+            .filter(|(_, v)| v.is_tracked())
+        {
             if last_runtime != Some(v.runtime()) {
                 let mut header_row = vec![
                     Text::from(""),
@@ -70,6 +76,13 @@ impl StatefulWidget for ValidatorsCompactWidget {
 
             row.push(Text::from(""));
             rows.push(Row::new(row));
+        }
+
+        if rows.len().is_zero() {
+            rows.push(Row::new(vec![
+                Text::from(""),
+                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+            ]));
         }
 
         // Define widths

@@ -271,6 +271,12 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::AllValidators(data) => {
+            tx.send(Action::Validator(ValidatorAction::UpdateAllValidators(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
         Response::Invulnerables(data) => {
             tx.send(Action::Collator(CollatorAction::UpdateInvulnerables(
                 runtime, data.value,

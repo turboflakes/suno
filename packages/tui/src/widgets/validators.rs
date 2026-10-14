@@ -1,12 +1,14 @@
-use crate::widgets::list_focus::ListFocus;
+use crate::widgets::list_focus::{ListFocus, VISIBLE_ROWS_MARGIN};
 use crate::widgets::validators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
+use subxt::utils::AccountId32;
 use suno_config::{fetch_validators_from_source, NodeConfig, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
+    origin::Origin,
     proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -18,6 +20,13 @@ use tracing::error;
 type Points = u32;
 type Amount = u128;
 type ValidatorKey = AccountKey;
+type AccountBytes = [u8; 32];
+
+/// A group of validators in the detailed group view, and the row of its first validator.
+struct RowGroup<'a> {
+    first_row: u16,
+    validators: Vec<&'a Validator>,
+}
 
 #[derive(Debug)]
 pub struct ValidatorsList {
@@ -28,6 +37,14 @@ pub struct ValidatorsList {
     pub viewport_height: u16,
     focus: ListFocus,
     masked: bool,
+    /// Whether the selection was moved by the user already. Until then, the selected row is
+    /// whatever the list started with.
+    navigated: bool,
+    /// Validators only found on-chain whose data was requested already, since it is only
+    /// fetched for the ones displayed.
+    requested: HashSet<ValidatorKey>,
+    /// Whether the window with this list is the one displayed.
+    visible: bool,
 }
 
 impl Default for ValidatorsList {
@@ -40,6 +57,9 @@ impl Default for ValidatorsList {
             viewport_height: 0,
             focus: ListFocus::default(),
             masked: true,
+            navigated: false,
+            requested: HashSet::new(),
+            visible: false,
         }
     }
 }
@@ -48,9 +68,66 @@ impl ValidatorsList {
     pub fn add_validator(&mut self, validator: Validator) {
         let key = validator.key();
         if !self.validators.contains_key(key) {
-            self.validators_order.push(key.clone());
+            // Keep the order sorted by runtime (insertion order within a runtime), so the
+            // validators of a runtime are listed together and the selection order matches the
+            // order of the groups displayed.
+            let position = self
+                .validators_order
+                .partition_point(|k| k.runtime <= key.runtime);
+            self.validators_order.insert(position, key.clone());
         }
         self.validators.insert(key.clone(), validator);
+    }
+
+    /// Updates every validator of `runtime`, the relay chain, active or waiting. The validators
+    /// not known yet are added as on-chain only ones, and the on-chain only ones that are no
+    /// longer in the set are removed. Returns the keys of the validators added.
+    pub fn update_all_validators(
+        &mut self,
+        runtime: SupportedRuntime,
+        stashes: &[AccountBytes],
+    ) -> Vec<ValidatorKey> {
+        // An empty set is not a valid set of validators, so nothing changes
+        if stashes.is_empty() {
+            return Vec::new();
+        }
+
+        let selected = self.selected_key();
+        let mut added = Vec::new();
+        for bytes in stashes {
+            let key = ValidatorKey::from_bytes(runtime, *bytes);
+            if self.validators.contains_key(&key) {
+                continue;
+            }
+            self.add_validator(Validator::with_origin(
+                runtime,
+                AccountId32::from(*bytes),
+                Origin::OnChain,
+            ));
+            added.push(key);
+        }
+
+        let keep: HashSet<&AccountBytes> = stashes.iter().collect();
+        let stale: Vec<ValidatorKey> = self
+            .validators
+            .iter()
+            .filter(|(key, v)| {
+                !v.is_tracked() && key.runtime == runtime && !keep.contains(&key.bytes)
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in &stale {
+            self.validators.remove(key);
+            self.requested.remove(key);
+        }
+        self.validators_order.retain(|key| !stale.contains(key));
+
+        // New validators are inserted in order and others removed, which shifts the selected index
+        let selected = selected.filter(|key| !stale.contains(key));
+        if !added.is_empty() || !stale.is_empty() {
+            self.restore_selection(selected);
+        }
+        added
     }
 
     pub fn set_prefs(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {
@@ -217,6 +294,14 @@ impl ValidatorsList {
         self.viewport_height = height;
     }
 
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+
     pub fn is_active(&self) -> bool {
         self.focus.is_active()
     }
@@ -294,10 +379,13 @@ impl ValidatorsList {
     }
 
     /// Height needed by [`ValidatorsCompactWidget`] to display every validator without scrolling.
-    /// One row per validator and one extra row per distinct runtime group.
+    /// One row per validator and one extra row per distinct runtime group, and at least one row
+    /// for the empty set message.
     pub fn total_compact_height(&self) -> u16 {
-        3 + self.validators_order.len() as u16
-            + self.get_validators_grouped_by_runtime().len() as u16
+        let tracked: Vec<&Validator> = self.validators_iter().filter(|v| v.is_tracked()).collect();
+        let runtimes: HashSet<SupportedRuntime> = tracked.iter().map(|v| v.runtime()).collect();
+        let rows = (tracked.len() + runtimes.len()).max(1);
+        3 + rows as u16
     }
 
     pub fn get_selected_ref(&self) -> Option<&Validator> {
@@ -325,6 +413,11 @@ impl ValidatorsList {
 
     // Scroll to the selected validator if it's not in view
     pub fn ensure_selection_in_view(&mut self) {
+        // Nothing was rendered yet, so there is no viewport to scroll within
+        if self.viewport_height == 0 {
+            return;
+        }
+
         let selected_y_position = self.get_selected_y_position();
 
         if selected_y_position < self.scroll_offset {
@@ -336,17 +429,39 @@ impl ValidatorsList {
 
     // Determine the Y position of the current validator selection
     fn get_selected_y_position(&self) -> u16 {
-        let mut selected_y_position = 0;
         let selected_ref = self.get_selected_ref();
 
-        for (_, validators) in self.get_validators_grouped_by_runtime() {
-            if let Some(idx) = validators.iter().position(|v| Some(*v) == selected_ref) {
-                // Header + index + table header
-                return selected_y_position + GROUP_HEADER_HEIGHT + idx as u16 + 1;
-            }
-            selected_y_position += GROUP_HEADER_HEIGHT + validators.len() as u16 + PADDING;
-        }
-        0
+        self.get_row_groups()
+            .iter()
+            .find_map(|group| {
+                let idx = group
+                    .validators
+                    .iter()
+                    .position(|v| Some(*v) == selected_ref)?;
+                Some(group.first_row + idx as u16)
+            })
+            .unwrap_or(0)
+    }
+
+    /// The groups of validators as laid out in the detailed group view, by relay chain.
+    fn get_row_groups(&self) -> Vec<RowGroup<'_>> {
+        let grouped = self.get_validators_grouped_by_runtime();
+        // Groups get a one row top padding when more than one is displayed
+        let top_padding = if grouped.len() > 1 { 1 } else { 0 };
+        let mut group_y = 0u16;
+        grouped
+            .into_values()
+            .map(|validators| {
+                // Top padding + header + table header
+                let first_row = group_y + top_padding + GROUP_HEADER_HEIGHT + 1;
+                group_y =
+                    group_y.saturating_add(GROUP_HEADER_HEIGHT + validators.len() as u16 + PADDING);
+                RowGroup {
+                    first_row,
+                    validators,
+                }
+            })
+            .collect()
     }
 
     // Scroll down if content is taller than the screen
@@ -366,13 +481,13 @@ impl ValidatorsList {
         for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
                 // Process validators from the chain config.
-                self.process_validators(chain_name, &chain_config.validators);
+                self.process_validators(chain_name, &chain_config.validators, Origin::Config);
                 // Fetch validators from the external source, if defined.
                 if let Some(source) = &chain_config.validators_source {
                     let res = fetch_validators_from_source(source).await;
                     match res {
                         Ok(validators) => {
-                            self.process_validators(chain_name, &validators);
+                            self.process_validators(chain_name, &validators, Origin::Remote);
                         }
                         Err(e) => error!("{:?}", e),
                     }
@@ -382,11 +497,16 @@ impl ValidatorsList {
         self.init_table();
     }
 
-    fn process_validators(&mut self, chain_name: &SupportedRuntime, validators: &[NodeConfig]) {
+    fn process_validators(
+        &mut self,
+        chain_name: &SupportedRuntime,
+        validators: &[NodeConfig],
+        origin: Origin,
+    ) {
         for validator in validators {
             match validator {
                 NodeConfig::Address(stash) => {
-                    let validator = Validator::new(*chain_name, *stash);
+                    let validator = Validator::with_origin(*chain_name, *stash, origin);
                     self.add_validator(validator);
                 }
                 NodeConfig::Detailed {
@@ -396,7 +516,7 @@ impl ValidatorsList {
                     commands,
                     ..
                 } => {
-                    let mut validator = Validator::new(*chain_name, *stash);
+                    let mut validator = Validator::with_origin(*chain_name, *stash, origin);
                     validator.host_rpc = host_rpc.clone();
                     validator.ssh = ssh.clone();
                     if let Some(cmds) = commands {
@@ -409,37 +529,90 @@ impl ValidatorsList {
     }
 
     pub fn move_down(&mut self) -> Option<Validator> {
-        if let Some(selected) = self.table_state.selected() {
-            if selected == self.validators_order.len() - 1 {
-                self.table_state.select_first();
-                self.scroll_offset = 0;
-            } else {
-                self.table_state.scroll_down_by(1);
-            }
-            self.ensure_selection_in_view();
-            self.table_state
-                .selected()
-                .and_then(|i| self.get_validator_by_index_cloned(i))
-        } else {
-            None
-        }
+        self.move_selection(true)
     }
 
     pub fn move_up(&mut self) -> Option<Validator> {
-        if let Some(selected) = self.table_state.selected() {
-            if selected == 0 {
-                let i = self.validators_order.len() - 1;
-                self.table_state.select(Some(i));
-            } else {
-                self.table_state.scroll_up_by(1);
-                self.scroll_offset = self.scroll_offset.saturating_sub(1);
+        self.move_selection(false)
+    }
+
+    /// Moves the selection to the next (or previous) validator, wrapping around. Unless the
+    /// main window is focused, untracked validators, the ones only found on-chain, are skipped
+    /// since they are not listed in the compact view the selection is driven from.
+    fn move_selection(&mut self, forward: bool) -> Option<Validator> {
+        let len = self.validators_order.len();
+        let can_select =
+            |list: &Self, i: usize| list.focus == ListFocus::Main || list.is_tracked_at(i);
+
+        // Nothing selected yet, e.g. no validator is tracked: start from the first one the
+        // focus allows
+        let first = (0..len).find(|i| can_select(self, *i))?;
+        let selected = match self.table_state.selected() {
+            Some(selected) => selected,
+            None => {
+                self.navigated = true;
+                self.table_state.select(Some(first));
+                self.ensure_selection_in_view();
+                return self.get_validator_by_index_cloned(first);
             }
+        };
+
+        // The first time the selection is moved, start from the top instead of from wherever
+        // the selection happens to be
+        if !self.navigated {
+            self.navigated = true;
+            if selected != first {
+                self.scroll_offset = 0;
+                self.table_state.select(Some(first));
+                self.ensure_selection_in_view();
+                return self.get_validator_by_index_cloned(first);
+            }
+        }
+
+        let next = (1..=len)
+            .map(|step| {
+                if forward {
+                    (selected + step) % len
+                } else {
+                    (selected + len - step) % len
+                }
+            })
+            .find(|i| can_select(self, *i))?;
+
+        // Wrapped around to the beginning, start again from the top
+        if forward && next <= selected {
+            self.scroll_offset = 0;
+        }
+        self.table_state.select(Some(next));
+        self.ensure_selection_in_view();
+        self.get_validator_by_index_cloned(next)
+    }
+
+    fn is_tracked_at(&self, index: usize) -> bool {
+        self.get_validator_by_index(index)
+            .is_some_and(|v| v.is_tracked())
+    }
+
+    fn selected_key(&self) -> Option<ValidatorKey> {
+        self.table_state
+            .selected()
+            .and_then(|i| self.validators_order.get(i))
+            .cloned()
+    }
+
+    /// Selects `key` again after the order changed, or the first tracked validator (the first
+    /// one when none is tracked) when there is no `key` or it is gone.
+    fn restore_selection(&mut self, key: Option<ValidatorKey>) {
+        let index = key
+            .and_then(|key| self.validators_order.iter().position(|k| *k == key))
+            .or_else(|| (0..self.validators_order.len()).find(|i| self.is_tracked_at(*i)))
+            .or_else(|| (!self.validators_order.is_empty()).then_some(0));
+        self.table_state.select(index);
+        // Only follow the selection while it is being used, otherwise keep showing the top
+        if self.focus.is_active() {
             self.ensure_selection_in_view();
-            self.table_state
-                .selected()
-                .and_then(|i| self.get_validator_by_index_cloned(i))
         } else {
-            None
+            self.scroll_offset = 0;
         }
     }
 
@@ -449,8 +622,22 @@ impl ValidatorsList {
         }
     }
 
+    /// Sets where the focus is. Back from the main window, where every validator can be selected,
+    /// the selection moves to the nearest tracked one, the only ones the compact list has.
     pub fn set_focus(&mut self, focus: ListFocus) {
+        let was_main = self.focus == ListFocus::Main;
         self.focus = focus;
+        let is_selected_tracked = self.get_selected_ref().is_some_and(|v| v.is_tracked());
+        if was_main && focus != ListFocus::Main && !is_selected_tracked {
+            let len = self.validators_order.len();
+            let nearest_tracked = self.table_state.selected().and_then(|sel| {
+                (0..len)
+                    .map(|step| (sel + step) % len)
+                    .find(|i| self.is_tracked_at(*i))
+            });
+            self.table_state.select(nearest_tracked);
+            self.ensure_selection_in_view();
+        }
     }
 
     pub fn toggle_mask(&mut self) {
@@ -473,6 +660,73 @@ impl ValidatorsList {
 
     pub fn get_validator_keys_by_runtime(&self, runtime: SupportedRuntime) -> Vec<AccountKey> {
         self.get_keys_by_runtime(runtime.relay_chain())
+    }
+
+    /// Keys of the validators with a row in the viewport of the detailed group view, plus a page
+    /// of margin above and below, so the data is there before the row is scrolled to.
+    fn get_visible_keys(&self) -> Vec<ValidatorKey> {
+        // Not displayed, or nothing was rendered yet
+        if !self.visible || self.viewport_height == 0 {
+            return Vec::new();
+        }
+
+        let margin = VISIBLE_ROWS_MARGIN;
+        let top = self.scroll_offset.saturating_sub(margin);
+        let bottom = self
+            .scroll_offset
+            .saturating_add(self.viewport_height)
+            .saturating_add(margin);
+
+        let mut keys = Vec::new();
+        for group in self.get_row_groups() {
+            for (i, validator) in group.validators.iter().enumerate() {
+                let row = group.first_row.saturating_add(i as u16);
+                if row >= top && row < bottom {
+                    keys.push(validator.key().clone());
+                }
+            }
+        }
+        keys
+    }
+
+    /// The validators only found on-chain that are visible and whose data wasn't requested
+    /// yet, by runtime. They are marked as requested, so they are returned once.
+    pub fn take_unrequested_visible(&mut self) -> HashMap<SupportedRuntime, Vec<ValidatorKey>> {
+        let mut by_runtime: HashMap<SupportedRuntime, Vec<ValidatorKey>> = HashMap::new();
+        for key in self.get_visible_keys() {
+            let is_on_chain = self.validators.get(&key).is_some_and(|v| !v.is_tracked());
+            if is_on_chain && self.requested.insert(key.clone()) {
+                by_runtime.entry(key.runtime).or_default().push(key);
+            }
+        }
+        by_runtime
+    }
+
+    /// Keys to sync periodically: the tracked validators and the on-chain only ones visible.
+    pub fn get_tracked_and_visible_keys_by_runtime(
+        &self,
+        runtime: SupportedRuntime,
+    ) -> Vec<ValidatorKey> {
+        let visible = self.get_visible_keys();
+        self.get_validator_keys_by_runtime(runtime)
+            .into_iter()
+            .filter(|key| {
+                self.validators.get(key).is_some_and(|v| v.is_tracked()) || visible.contains(key)
+            })
+            .collect()
+    }
+
+    /// Same as [`Self::get_validator_keys_by_runtime`], only for the tracked validators. The
+    /// data that takes a fetch per validator is only fetched for these, not for the ones only
+    /// found on-chain.
+    pub fn get_tracked_validator_keys_by_runtime(
+        &self,
+        runtime: SupportedRuntime,
+    ) -> Vec<AccountKey> {
+        self.get_validator_keys_by_runtime(runtime)
+            .into_iter()
+            .filter(|key| self.validators.get(key).is_some_and(|v| v.is_tracked()))
+            .collect()
     }
 
     pub fn update_prefs(&mut self, validator_key: &AccountKey, prefs: ValidatorPrefs) -> bool {

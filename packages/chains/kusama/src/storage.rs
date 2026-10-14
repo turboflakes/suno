@@ -85,7 +85,7 @@ pub async fn fetch_epoch_data(api: &OnlineClientAtBlock<CustomConfig>) -> Result
     )))
 }
 
-/// Fetch validators authority status
+/// Fetch validators authority status: authority, para authority or waiting
 pub async fn fetch_validators_authority_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     validator_keys: &[AccountKey],
@@ -95,9 +95,11 @@ pub async fn fetch_validators_authority_status(
     let validator_indices = fetch_active_validator_indices(api).await?;
     let validator_bytes: HashSet<[u8; 32]> = validator_keys.iter().map(|key| key.bytes()).collect();
 
+    let mut authorities = HashSet::<[u8; 32]>::new();
     for (i, stash) in validators.iter().enumerate() {
         let bytes = *stash.as_ref();
         if validator_bytes.contains(&bytes) {
+            authorities.insert(bytes);
             if validator_indices.contains(&ValidatorIndex(i as u32)) {
                 responses.push(Response::authority_status(
                     bytes,
@@ -110,6 +112,12 @@ pub async fn fetch_validators_authority_status(
                 ValidatorStatus::Authority,
             ));
         }
+    }
+
+    // The validators that are not in the session set are waiting, including the ones that
+    // just left it
+    for bytes in validator_bytes.difference(&authorities) {
+        responses.push(Response::authority_status(*bytes, ValidatorStatus::Waiting));
     }
 
     Ok(responses)

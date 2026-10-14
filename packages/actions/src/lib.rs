@@ -170,6 +170,7 @@ pub enum CollatorAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
+    UpdateAllValidators(SupportedRuntime, Vec<AccountBytes>),
     UpdateValidatorPrefs(ValidatorKey, ValidatorPrefs),
     UpdateValidatorPrefsNext(ValidatorKey, ValidatorPrefs),
     UpdatePoints(ValidatorKey, Points),

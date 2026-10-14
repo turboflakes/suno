@@ -1,3 +1,7 @@
+/// Rows above and below the viewport of a list whose data is also fetched, so it is there
+/// before the row is scrolled to.
+pub const VISIBLE_ROWS_MARGIN: u16 = 8;
+
 /// Where the focus is, for a list displayed on the left pane (compact) and on the main window.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ListFocus {

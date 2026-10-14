@@ -298,6 +298,15 @@ pub fn spawn_fetch_collator_sets(
     spawn_fetch_candidate_list(api, runtime, tx);
 }
 
+pub fn spawn_fetch_all_validators(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_all_validators(&api).await });
+}
+
 pub fn spawn_fetch_session_validators(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -445,6 +454,19 @@ pub fn spawn_fetch_validators_authority_status(
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_batch(
         move |api, vk| async move { runtime.fetch_validators_authority_status(&api, &vk).await },
     );
+}
+
+/// Fetches the session keys of the validators: the ones queued for the next session and the
+/// next ones. Both change with the session, so they are fetched when the chain connects and
+/// on every new session.
+pub fn spawn_fetch_validators_session_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    validator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_validators_queued_keys(api, runtime, validator_keys, tx);
+    spawn_fetch_validators_next_keys(api, runtime, validator_keys, tx);
 }
 
 pub fn spawn_fetch_validators_queued_keys(
