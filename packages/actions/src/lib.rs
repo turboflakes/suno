@@ -60,8 +60,12 @@ pub enum Action {
 pub enum NavigationAction {
     MoveUp,
     MoveDown,
+    ExtendUp,
+    ExtendDown,
     SectionUp,
     SectionDown,
+    MoveLeft,
+    MoveRight,
     NextWindow,
     PrevWindow,
     Reset,

@@ -7,6 +7,7 @@ pub mod input_command;
 pub mod input_field;
 pub mod input_filter;
 pub mod input_password;
+pub mod list_focus;
 pub mod logo;
 pub mod logs;
 pub mod popup;

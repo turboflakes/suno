@@ -1,5 +1,4 @@
 use crate::app::App;
-use crate::section::Section;
 use crate::widgets::collators::CollatorsView;
 use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
@@ -11,10 +10,12 @@ use crate::widgets::{logo::Logo, popup::Mode as PopupMode, window::render_help, 
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     prelude::Margin,
+    style::Modifier,
     text::{Line, Span},
     widgets::{Block, Padding, Paragraph},
     Frame,
 };
+use strum::IntoEnumIterator;
 use suno_config::CONFIG;
 
 /// Renders the user interface widgets.
@@ -56,13 +57,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         collators_constraint,
     ];
 
-    // DEPRECATED
-    // if config.features.rpcs_enabled() {
-    //     constraints.push(Constraint::Fill(1));
-    // } else {
-    //     constraints.push(Constraint::Length(0));
-    // }
-
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
@@ -79,19 +73,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
-    // DEPRECATED
-    // if config.features.rpcs_enabled() {
-    //     render_rpcs_widget(app, frame, left_layout[3]);
-    // }
-
-    // Switch between main body window.
-    match app.window {
-        Window::Main => render_body_widget(app, frame, outer_layout[1]),
-        Window::Logs => render_logs_widget(app, frame, outer_layout[1]),
-        Window::Help => {
-            render_help(app.theme, outer_layout[1], frame.buffer_mut());
-        }
-    }
+    render_window(app, frame, outer_layout[1]);
 
     let footer = Layout::default()
         .direction(Direction::Horizontal)
@@ -108,6 +90,46 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if app.popup.is_visible() {
         render_popup(app, frame, container[0]);
     }
+}
+
+fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
+    let [tabs_area, body_area] =
+        Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+    render_window_tabs(app, frame, tabs_area);
+    // Switch between main body window.
+    match app.window {
+        Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
+        Window::Logs => render_logs_widget(app, frame, body_area),
+        Window::Help => {
+            render_help(app.theme, body_area, frame.buffer_mut());
+        }
+    }
+}
+
+fn render_window_tabs(app: &App, frame: &mut Frame, area: Rect) {
+    let theme = app.theme;
+    let is_selected = app.section.is_none();
+
+    let mut spans = Vec::new();
+    for window in Window::iter().filter(|w| w.is_enabled(CONFIG.features())) {
+        let style = if window == app.window {
+            let style = theme.paragraph.header(is_selected);
+            if is_selected {
+                style.add_modifier(Modifier::REVERSED)
+            } else {
+                style
+            }
+        } else {
+            theme.paragraph.label.add_modifier(Modifier::DIM)
+        };
+        spans.push(Span::raw(format!(" {} ", window)).style(style));
+        spans.push(Span::raw(" "));
+    }
+
+    let block = Block::default()
+        .style(theme.block.main)
+        .padding(Padding::new(2, 2, 1, 0));
+    frame.render_widget(Paragraph::new(Line::from(spans)).block(block), area);
 }
 
 fn render_popup(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -158,22 +180,6 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
-// DEPRECATED
-// fn render_rpcs_widget(_app: &mut App, frame: &mut Frame, area: Rect) {
-//     frame.render_widget(
-//         Paragraph::new(" >> RPCs List")
-//             .block(
-//                 Block::new()
-//                     .title(" RPCs ")
-//                     .borders(Borders::ALL)
-//                     .border_type(BorderType::Plain),
-//             )
-//             .style(Style::default().fg(Color::Blue))
-//             .left_aligned(),
-//         area,
-//     );
-// }
-
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
     let block = Block::default()
@@ -182,8 +188,8 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let block_area = block.inner(area);
     frame.render_widget(block, area);
 
-    match app.section {
-        Section::Collators => match app.collators.view() {
+    match app.window {
+        Window::Collators => match app.collators.view() {
             CollatorsView::Group => {
                 let widget = CollatorsDetailedGroupWidget::new(&app.chains, theme)
                     .with_masked(app.collators.is_masked());
@@ -219,6 +225,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let mut legend = vec![];
 
+    // Esc clears the selection without changing the section, so ask the lists, not the section
+    let has_selection = app.chains.is_active()
+        || app.validators.is_active()
+        || app.collators.is_active()
+        || (app.section.is_none() && app.window.is_logs_selected());
+
     // show how to open popup with available commands depending on the active section
     if ((app.validators.is_active()
         && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
@@ -226,6 +238,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
         || app.chains.is_active())
         && !app.popup.is_visible()
+        && !app.window.is_logs_selected()
     {
         legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
@@ -299,13 +312,32 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             }
             _ => {}
         }
-    } else if app.chains.is_active() || app.validators.is_active() || app.collators.is_active() {
+    } else if has_selection {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("select".to_string(), theme.paragraph.label));
         legend.push(Span::raw("   "));
-        if app.collators.is_active() {
+        if app.section.is_none() && app.window.is_logs_selected() {
+            legend.push(Span::styled("shift+↑/↓".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "select multiple".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+            legend.push(Span::styled(
+                "shift+ctrl+c".to_string(),
+                theme.paragraph.base,
+            ));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "copy to clipboard".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
+        if app.collators.is_active() && app.window.is_collators_selected() {
             legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
             legend.push(Span::styled(
@@ -314,19 +346,22 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
+        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     } else {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab or ← →".to_string(), theme.paragraph.base));
+        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     }
 
     // Always visible
     legend.push(Span::raw("   "));
-    legend.push(Span::styled("ctrl+w".to_string(), theme.paragraph.base));
+    legend.push(Span::styled(
+        "ctrl+w or ← →".to_string(),
+        theme.paragraph.base,
+    ));
     legend.push(Span::raw(" "));
     legend.push(Span::styled(
         "switch window".to_string(),

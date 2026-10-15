@@ -6,7 +6,8 @@ pub enum Section {
     Chains,
     Validators,
     Collators,
-    Rpcs,
+    /// No section is selected.
+    None,
 }
 
 impl Section {
@@ -14,35 +15,25 @@ impl Section {
         use Section::*;
 
         match self {
-            Chains => Self::up_from_chains(features),
+            Chains => None,
+            None => Self::up_from_none(features),
             Validators => Chains,
             Collators => Self::up_from_collators(features),
-            Rpcs => Self::up_from_rpcs(features),
         }
     }
 
-    fn up_from_chains(features: &Features) -> Self {
-        if features.rpcs_enabled() {
-            Self::Rpcs
-        } else if features.collators_enabled() {
+    fn up_from_none(features: &Features) -> Self {
+        if features.collators_enabled() {
             Self::Collators
-        } else {
-            Self::Validators
-        }
-    }
-
-    fn up_from_collators(features: &Features) -> Self {
-        if features.validators_enabled() {
+        } else if features.validators_enabled() {
             Self::Validators
         } else {
             Self::Chains
         }
     }
 
-    fn up_from_rpcs(features: &Features) -> Self {
-        if features.collators_enabled() {
-            Self::Collators
-        } else if features.validators_enabled() {
+    fn up_from_collators(features: &Features) -> Self {
+        if features.validators_enabled() {
             Self::Validators
         } else {
             Self::Chains
@@ -55,36 +46,32 @@ impl Section {
         match self {
             Chains => Self::down_from_chains(features),
             Validators => Self::down_from_validators(features),
-            Collators => Self::down_from_collators(features),
-            Rpcs => Chains,
+            Collators => Self::down_from_collators(),
+            None => Chains,
         }
     }
 
     fn down_from_chains(features: &Features) -> Self {
         if features.validators_enabled() {
             Self::Validators
-        } else if features.collators_enabled() {
-            Self::Collators
         } else {
-            Self::Rpcs
+            Self::down_from_validators(features)
         }
     }
 
     fn down_from_validators(features: &Features) -> Self {
         if features.collators_enabled() {
             Self::Collators
-        } else if features.rpcs_enabled() {
-            Self::Rpcs
         } else {
-            Self::Chains
+            Self::down_from_collators()
         }
     }
 
-    fn down_from_collators(features: &Features) -> Self {
-        if features.rpcs_enabled() {
-            Self::Rpcs
-        } else {
-            Self::Chains
-        }
+    fn down_from_collators() -> Self {
+        Self::None
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, Section::None)
     }
 }
