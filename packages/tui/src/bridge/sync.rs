@@ -181,6 +181,10 @@ impl ValidatorSpawner {
         F: Fn(OnlineClientAtBlock<CustomConfig>, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
+        if self.validator_keys.is_empty() {
+            return;
+        }
+
         let Self {
             api,
             runtime,

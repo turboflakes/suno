@@ -390,12 +390,14 @@ impl Features {
         self.enable_check_update
     }
 
+    /// Every on-chain collator is listed, only if the collators are enabled.
     pub fn all_collators_visible(&self) -> bool {
-        self.show_all_collators
+        self.enable_collators && self.show_all_collators
     }
 
+    /// Every on-chain validator is listed, only if the validators are enabled.
     pub fn all_validators_visible(&self) -> bool {
-        self.show_all_validators
+        self.enable_validators && self.show_all_validators
     }
 
     pub fn nominators_counter_visible(&self) -> bool {

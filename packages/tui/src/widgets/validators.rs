@@ -477,6 +477,10 @@ impl ValidatorsList {
     }
 
     pub async fn on_init(&mut self) {
+        if !CONFIG.features().validators_enabled() {
+            return;
+        }
+
         let chains = CONFIG.chains();
         for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
