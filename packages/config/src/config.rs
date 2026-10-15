@@ -339,6 +339,12 @@ pub struct Features {
     show_payee: bool,
     #[serde(default = "default_enable")]
     show_keys: bool,
+    #[serde(default = "default_enable")]
+    show_deposit: bool,
+    #[serde(default = "default_enable")]
+    show_last_block: bool,
+    #[serde(default = "default_enable")]
+    show_next_slot: bool,
 }
 
 impl Default for Features {
@@ -356,6 +362,9 @@ impl Default for Features {
             show_commission: false,
             show_payee: true,
             show_keys: true,
+            show_deposit: true,
+            show_last_block: true,
+            show_next_slot: true,
         }
     }
 }
@@ -411,6 +420,18 @@ impl Features {
 
     pub fn keys_visible(&self) -> bool {
         self.show_keys
+    }
+
+    pub fn deposit_visible(&self) -> bool {
+        self.show_deposit
+    }
+
+    pub fn last_block_visible(&self) -> bool {
+        self.show_last_block
+    }
+
+    pub fn next_slot_visible(&self) -> bool {
+        self.show_next_slot
     }
 }
 

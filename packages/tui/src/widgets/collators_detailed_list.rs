@@ -1,5 +1,6 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::collators::CollatorsList;
+use crate::widgets::collators_detailed_group::Columns;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::spinner::current_frame;
 use ratatui::{
@@ -10,7 +11,7 @@ use ratatui::{
     widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::collections::BTreeSet;
-use suno_config::SupportedRuntime;
+use suno_config::{SupportedRuntime, CONFIG};
 use suno_primitives::{
     collator::Collator,
     display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
@@ -387,49 +388,15 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         table_state: &mut TableState,
     ) {
         let theme = self.theme;
-        let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
-        let show_host = collators.iter().any(|c| c.has_commands_available());
+        let columns = Columns::new(collators, CONFIG.features(), true);
 
-        let mut header_cells = vec![
-            Cell::from(Text::from("◈").alignment(Alignment::Center)),
-            Cell::from(Text::from("chain").alignment(Alignment::Left)),
-            Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("deposit").alignment(Alignment::Right)),
-            Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
-            Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
-            Cell::from(Text::from("keys").alignment(Alignment::Right)),
-        ];
-        if show_host {
-            header_cells.insert(3, Cell::from(Text::from("host").alignment(Alignment::Left)));
-        }
-        if show_next_keys {
-            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
-        }
-        let header = Row::new(header_cells);
+        let widths = columns.widths();
 
-        let mut widths = vec![
-            Constraint::Length(3),
-            Constraint::Length(12),
-            Constraint::Length(24),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-        ];
-        if show_host {
-            widths.insert(3, Constraint::Fill(2));
-        }
-        if show_next_keys {
-            widths.push(Constraint::Length(10));
-        }
+        let header = columns.header();
 
         let rows = collators
             .iter()
-            .map(|c| self.collator_row(c, selected_collator, theme, show_next_keys, show_host))
+            .map(|c| self.collator_row(c, selected_collator, &columns, theme))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -449,9 +416,8 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         &self,
         collator: &Collator,
         selected: Option<&Collator>,
+        columns: &Columns,
         theme: Theme,
-        show_next_keys: bool,
-        show_host: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -474,99 +440,112 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         let is_current_author =
             aura.is_some_and(|a| collator.is_current_slot_author(a.authorities(), current_slot));
 
-        let blocks = collator.blocks_in_slot(current_slot);
-        let blocks_in_slot_str = match aura.and_then(|a| a.number_blocks_expected()) {
-            Some(expected) => format!("{blocks:2}/{expected}"),
-            None => format!("{blocks:2}"),
-        };
+        let mut cells = vec![Cell::from(
+            Text::from(collator.status().to_string()).alignment(Alignment::Left),
+        )];
 
-        // Blocks in slot is only meaningful while the collator is the current author
-        let blocks_in_slot_str = if is_current_author {
-            blocks_in_slot_str
-        } else {
-            String::new()
-        };
+        if columns.chain {
+            cells.push(Cell::from(
+                Text::from(collator.runtime().system_name()).alignment(Alignment::Left),
+            ));
+        }
 
-        let last_block_str = collator
-            .last_block_authored()
-            .map(|b| format!("#{b}"))
-            .unwrap_or_default();
-
-        let last_block_ago_str = collator
-            .last_block_authored_ts
-            .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
-            .unwrap_or_default();
-
-        let mut cells = vec![
-            Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
-            Cell::from(Text::from(collator.runtime().system_name()).alignment(Alignment::Left)),
+        cells.push(
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
-        ];
+        );
 
-        if show_host {
+        if columns.host {
             cells.push(Cell::from(
                 Text::from(collator.host(self.masked)).alignment(Alignment::Left),
             ));
         }
 
-        if collator.is_permissionless_or_candidate() {
-            cells.push(Cell::from(
-                Line::from(vec![
-                    Span::raw(format_planks(
-                        collator.deposit(),
-                        collator.account.token_decimals(),
-                        4,
-                    )),
-                    Span::raw(collator.account.token_symbol()).style(theme.paragraph.label(false)),
-                ])
-                .alignment(Alignment::Right),
-            ));
-        } else {
-            cells.push(Cell::from(Text::from("")));
+        if columns.deposit {
+            if collator.is_permissionless_or_candidate() {
+                cells.push(Cell::from(
+                    Line::from(vec![
+                        Span::raw(format_planks(
+                            collator.deposit(),
+                            collator.account.token_decimals(),
+                            4,
+                        )),
+                        Span::raw(collator.account.token_symbol())
+                            .style(theme.paragraph.label(false)),
+                    ])
+                    .alignment(Alignment::Right),
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
         }
 
-        cells.push(Cell::from(
-            Text::from(last_block_str).alignment(Alignment::Right),
-        ));
+        if columns.last_block {
+            let last_block_str = collator
+                .last_block_authored()
+                .map(|b| format!("#{b}"))
+                .unwrap_or_default();
 
-        cells.push(Cell::from(
-            Text::from(last_block_ago_str).alignment(Alignment::Left),
-        ));
-
-        if is_current_author {
-            cells.push(Cell::from(
-                Text::from(current_frame())
-                    .style(theme.paragraph.label(false))
-                    .alignment(Alignment::Right),
-            ));
-        } else {
-            let next_slot_countdown_str = aura
-                .and_then(|a| {
-                    let slot_duration_ms = a.slot_duration_ms()?;
-                    collator.next_slot_countdown(
-                        a.authorities(),
-                        current_slot,
-                        slot_duration_ms,
-                        current_slot_ts,
-                    )
-                })
+            let last_block_ago_str = collator
+                .last_block_authored_ts
+                .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
                 .unwrap_or_default();
 
             cells.push(Cell::from(
-                Text::from(next_slot_countdown_str).alignment(Alignment::Right),
+                Text::from(last_block_str).alignment(Alignment::Right),
+            ));
+            cells.push(Cell::from(
+                Text::from(last_block_ago_str).alignment(Alignment::Left),
             ));
         }
 
-        cells.push(Cell::from(
-            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
-        ));
+        if columns.next_slot {
+            if is_current_author {
+                cells.push(Cell::from(
+                    Text::from(current_frame())
+                        .style(theme.paragraph.label(false))
+                        .alignment(Alignment::Right),
+                ));
+            } else {
+                let next_slot_countdown_str = aura
+                    .and_then(|a| {
+                        let slot_duration_ms = a.slot_duration_ms()?;
+                        collator.next_slot_countdown(
+                            a.authorities(),
+                            current_slot,
+                            slot_duration_ms,
+                            current_slot_ts,
+                        )
+                    })
+                    .unwrap_or_default();
 
-        cells.push(Cell::from(
-            Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
-        ));
+                cells.push(Cell::from(
+                    Text::from(next_slot_countdown_str).alignment(Alignment::Right),
+                ));
+            }
 
-        if show_next_keys {
+            // Blocks in slot is only meaningful while the collator is the current author
+            let blocks_in_slot_str = if is_current_author {
+                let blocks = collator.blocks_in_slot(current_slot);
+                match aura.and_then(|a| a.number_blocks_expected()) {
+                    Some(expected) => format!("{blocks:2}/{expected}"),
+                    None => format!("{blocks:2}"),
+                }
+            } else {
+                String::new()
+            };
+            cells.push(Cell::from(
+                Text::from(blocks_in_slot_str).alignment(Alignment::Left),
+            ));
+        }
+
+        if columns.keys {
+            cells.push(Cell::from(
+                Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
+            ));
+        }
+
+        if columns.next_keys {
             if collator.is_next_keys_changed() {
                 cells.push(Cell::from(
                     Text::from(collator.display_next_keys(6)).alignment(Alignment::Left),
