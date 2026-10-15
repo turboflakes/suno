@@ -1,3 +1,4 @@
+use crate::display::to_address_string;
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
@@ -36,6 +37,11 @@ impl AccountKey {
 
 impl std::fmt::Display for AccountKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "account {} at {}", self.stash(), self.runtime())
+        // The SS58 address of the stash, in the format of the network
+        write!(
+            f,
+            "{}",
+            to_address_string(&self.stash(), self.runtime().account_format()),
+        )
     }
 }
