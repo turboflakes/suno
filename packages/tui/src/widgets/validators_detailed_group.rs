@@ -478,6 +478,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         };
 
         let mut cells = vec![
+            Cell::from(Text::from(validator.origin.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
@@ -649,6 +650,9 @@ impl Columns {
 
     fn header(&self) -> Row<'static> {
         let mut cells = vec![
+            // The origin of the validator
+            Cell::from(""),
+            // The status of the validator
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
         ];
@@ -719,7 +723,11 @@ impl Columns {
     }
 
     fn widths(&self) -> Vec<Constraint> {
-        let mut widths = vec![Constraint::Length(3), Constraint::Length(24)];
+        let mut widths = vec![
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(24),
+        ];
 
         if self.host {
             widths.push(Constraint::Fill(2));

@@ -428,6 +428,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let is_current_author = collator.is_current_slot_author(authorities, current_slot);
 
         let mut cells = vec![
+            Cell::from(Text::from(collator.origin.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
@@ -562,7 +563,12 @@ impl Columns {
     }
 
     pub(crate) fn header(&self) -> Row<'static> {
-        let mut cells = vec![Cell::from(Text::from("◈").alignment(Alignment::Center))];
+        let mut cells = vec![
+            // The origin of the collator
+            Cell::from(""),
+            // The status of the collator
+            Cell::from(Text::from("◈").alignment(Alignment::Center)),
+        ];
 
         if self.chain {
             cells.push(Cell::from(Text::from("chain").alignment(Alignment::Left)));
@@ -610,7 +616,7 @@ impl Columns {
     }
 
     pub(crate) fn widths(&self) -> Vec<Constraint> {
-        let mut widths = vec![Constraint::Length(3)];
+        let mut widths = vec![Constraint::Length(1), Constraint::Length(3)];
 
         if self.chain {
             widths.push(Constraint::Length(12));

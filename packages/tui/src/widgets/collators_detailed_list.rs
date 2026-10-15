@@ -440,9 +440,10 @@ impl<'a> CollatorsDetailedListWidget<'a> {
         let is_current_author =
             aura.is_some_and(|a| collator.is_current_slot_author(a.authorities(), current_slot));
 
-        let mut cells = vec![Cell::from(
-            Text::from(collator.status().to_string()).alignment(Alignment::Left),
-        )];
+        let mut cells = vec![
+            Cell::from(Text::from(collator.origin.symbol()).style(theme.paragraph.label(false))),
+            Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
+        ];
 
         if columns.chain {
             cells.push(Cell::from(

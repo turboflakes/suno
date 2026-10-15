@@ -4,7 +4,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
     style::Styled,
-    text::Text,
+    text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
 use sp_arithmetic::traits::Zero;
@@ -89,10 +89,17 @@ impl StatefulWidget for CollatorsCompactWidget {
                 String::new()
             };
 
-            let mut row = vec![
-                Text::from(""),
-                Text::from(format!("{}{}", chain_label, c.display_name(4))),
-            ];
+            // Show origin alongside chain and identity only when active and selected
+            let mut name = Vec::new();
+            if is_active && selected == Some(i) {
+                name.push(Span::styled(
+                    format!("{} ", c.origin.symbol()),
+                    theme.paragraph.label(is_active),
+                ));
+            }
+            name.push(Span::raw(format!("{chain_label}{}", c.display_name(4))));
+
+            let mut row = vec![Text::from(""), Text::from(Line::from(name))];
 
             if proxies_available {
                 row.push(Text::from(c.proxies_as_str()).alignment(Alignment::Right));

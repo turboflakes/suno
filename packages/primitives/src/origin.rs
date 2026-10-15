@@ -18,6 +18,15 @@ impl Origin {
         *self != Self::OnChain
     }
 
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Self::Config => "▲",
+            Self::Remote => "⚑",
+            Self::Picked => "●",
+            Self::OnChain => "○",
+        }
+    }
+
     /// Nodes listed by the config, in the file or in its remote source, which can't be
     /// untracked from the UI.
     pub fn is_config(&self) -> bool {
