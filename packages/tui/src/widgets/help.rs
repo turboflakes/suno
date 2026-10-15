@@ -154,6 +154,10 @@ const KEYBINDINGS: &[HelpEntry] = &[
         "Input focus, Autocomplete or Navigate between pane sections and the main window.",
     ),
     ("esc ", "Close popup or Go back."),
+    (
+        "space ",
+        "Toggle as favourite the selected validator or collator.",
+    ),
     ("ctrl+e ", "Show commands."),
     ("ctrl+w ", "Switch to the next window."),
     ("ctrl+m ", "Toggle mask on hosts."),

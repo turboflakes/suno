@@ -2,6 +2,7 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::logs::Logs;
+use crate::prefs::{PickedNode, Prefs};
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
@@ -59,16 +60,6 @@ fn default_logs() -> Logs {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Subcommand {
     Update { version: Option<String> },
-}
-
-/// Runtime preferences saved from the TUI, layered on top of `config.yaml`
-/// on load without ever touching the user's own file. Grows over time as
-/// more things become editable from the TUI, each as its own optional
-/// field so unrelated prefs are preserved on every write.
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Prefs {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    active_theme: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -518,6 +509,16 @@ impl Config {
             .unwrap_or_default()
     }
 
+    /// The validators picked from the TUI, as saved in the prefs file.
+    pub fn picked_validators(&self) -> Vec<PickedNode> {
+        self.read_prefs().picked_validators()
+    }
+
+    /// The collators picked from the TUI, as saved in the prefs file.
+    pub fn picked_collators(&self) -> Vec<PickedNode> {
+        self.read_prefs().picked_collators()
+    }
+
     /// Reads the persisted active theme name, if the prefs file exists,
     /// is well-formed, and names a theme that's still in the catalog.
     fn load_prefs_active_theme(&self) -> Option<String> {
@@ -890,6 +891,26 @@ pub fn save_active_theme(name: &str) {
     }
 }
 
+/// Persists the validators picked from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_picked_validators(picked: Vec<PickedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_picked_validators(picked);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the picked validators: {}", e);
+    }
+}
+
+/// Persists the collators picked from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_picked_collators(picked: Vec<PickedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_picked_collators(picked);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the picked collators: {}", e);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1224,6 +1245,52 @@ explorer:
         assert!(dir.path().join(".config.local.polkadot.yaml").exists());
         assert!(!dir.path().join(".config.local.yaml").exists());
         assert!(!dir.path().join(".config.local.polkadot.yaml.tmp").exists());
+    }
+
+    #[test]
+    fn test_picked_nodes_persist_across_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+        let stash = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            .parse::<AccountId32>()
+            .unwrap();
+        let validators = vec![PickedNode {
+            chain: SupportedRuntime::Polkadot,
+            stash,
+        }];
+        let collators = vec![PickedNode {
+            chain: SupportedRuntime::AssetHubPolkadot,
+            stash,
+        }];
+
+        let mut prefs = config.read_prefs();
+        prefs.set_picked_validators(validators.clone());
+        prefs.set_picked_collators(collators.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert_eq!(reloaded.picked_validators(), validators);
+        assert_eq!(reloaded.picked_collators(), collators);
+
+        // Same shape as the chains of the config file, with the addresses of the network
+        let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();
+        let value: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+        let address = value["chains"][0]["polkadot"]["validators"][0]
+            .as_str()
+            .unwrap();
+        assert!(address.starts_with('1'), "{address}");
+        assert!(value["chains"][1]["asset_hub_polkadot"]["collators"][0].is_string());
+
+        // Changing the validators keeps the collators
+        let mut prefs = reloaded.read_prefs();
+        prefs.set_picked_validators(Vec::new());
+        reloaded.write_prefs(&prefs).unwrap();
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert!(reloaded.picked_validators().is_empty());
+        assert_eq!(reloaded.picked_collators(), collators);
     }
 
     #[test]

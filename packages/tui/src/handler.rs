@@ -86,6 +86,8 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        // Add or remove the selected validator or collator from the favourites on `Space`
+        KeyCode::Char(' ') => Action::Navigation(NavigationAction::ToggleFavourite),
         // Reset active selections
         KeyCode::Esc => Action::Navigation(NavigationAction::Reset),
         _ => Action::System(SystemAction::Noop),

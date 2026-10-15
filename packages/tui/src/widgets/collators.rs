@@ -8,11 +8,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use subxt::utils::AccountId32;
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use suno_config::{NodeConfig, PickedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     collator::{Collator, CollatorStatus},
     identity::Identity,
+    origin::Origin,
     proxy::ProxyKey,
     AccountDisplay, AccountKey,
 };
@@ -163,9 +164,79 @@ impl CollatorsList {
                 }
             }
         }
+
+        // The collators picked from the TUI, of the chains configured, unless already listed
+        let configured: HashSet<SupportedRuntime> = chains
+            .iter()
+            .flat_map(|chain| chain.keys().copied())
+            .collect();
+        for picked in CONFIG.picked_collators() {
+            let key = CollatorKey::new(picked.chain, picked.stash);
+            if configured.contains(&picked.chain) && !self.collators.contains_key(&key) {
+                let mut collator = Collator::new(picked.chain, picked.stash);
+                collator.origin = Origin::Picked;
+                self.add_collator(collator);
+            }
+        }
+
         if !self.collators.is_empty() {
             self.table_state.select(Some(0));
         }
+    }
+
+    /// Picks the collator, as a favourite, when it was only found on-chain, and the other way
+    /// around. The collators listed by the config are always tracked, so they stay as they are.
+    /// Returns the new origin of the collator, if it changed.
+    pub fn toggle_picked(&mut self, key: &CollatorKey) -> Option<Origin> {
+        let collator = self.collators.get_mut(key)?;
+        collator.origin = match collator.origin {
+            Origin::OnChain => Origin::Picked,
+            Origin::Picked => Origin::OnChain,
+            Origin::Config | Origin::Remote => return None,
+        };
+        let origin = collator.origin;
+
+        // The selection can only be on a tracked collator, outside of the main window
+        if self.focus != ListFocus::Main {
+            self.select_nearest_tracked();
+        }
+        Some(origin)
+    }
+
+    /// The collators picked from the TUI, to be persisted.
+    pub fn get_picked(&self) -> Vec<PickedNode> {
+        self.collators_iter()
+            .filter(|c| c.origin == Origin::Picked)
+            .map(|c| PickedNode {
+                chain: c.runtime(),
+                stash: c.account.stash(),
+            })
+            .collect()
+    }
+
+    /// Removes the collator from the list, e.g. when it is no longer picked and the collators
+    /// only found on-chain are not listed.
+    pub fn remove(&mut self, key: &CollatorKey) {
+        let selected = self.selected_key().filter(|selected| selected != key);
+        self.collators.remove(key);
+        self.requested.remove(key);
+        self.collators_order.retain(|k| k != key);
+        self.restore_selection(selected);
+    }
+
+    /// Moves the selection to the nearest tracked collator, the only ones the compact list has.
+    fn select_nearest_tracked(&mut self) {
+        if self.selected_collator_is_tracked() {
+            return;
+        }
+        let len = self.collators_order.len();
+        let nearest_tracked = self.table_state.selected().and_then(|sel| {
+            (0..len)
+                .map(|step| (sel + step) % len)
+                .find(|i| self.is_tracked_at(*i))
+        });
+        self.table_state.select(nearest_tracked);
+        self.ensure_selection_in_view();
     }
 
     /// Returns an iterator of collators in display order
@@ -406,16 +477,8 @@ impl CollatorsList {
     pub fn set_focus(&mut self, focus: ListFocus) {
         let was_main = self.focus == ListFocus::Main;
         self.focus = focus;
-        if was_main && focus != ListFocus::Main && !self.selected_collator_is_tracked() {
-            let selected = self.table_state.selected();
-            let len = self.collators_order.len();
-            let nearest_tracked = selected.and_then(|sel| {
-                (0..len)
-                    .map(|step| (sel + step) % len)
-                    .find(|i| self.is_tracked_at(*i))
-            });
-            self.table_state.select(nearest_tracked);
-            self.ensure_selection_in_view();
+        if was_main && focus != ListFocus::Main {
+            self.select_nearest_tracked();
         }
     }
 

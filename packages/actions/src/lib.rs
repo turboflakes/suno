@@ -72,6 +72,8 @@ pub enum NavigationAction {
     Copy,
     ToggleMask,
     ToggleView,
+    /// Space: add the selected validator or collator to the favourites, or remove it
+    ToggleFavourite,
 }
 
 type SpecVersion = u32;

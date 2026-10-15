@@ -24,13 +24,13 @@ use suno_actions::{
     TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
-    save_active_theme, CommandKind, CustomCalls, CustomCommand, NodeAccess, SupportedRuntime,
-    CONFIG,
+    save_active_theme, save_picked_collators, save_picked_validators, CommandKind, CustomCalls,
+    CustomCommand, NodeAccess, SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState,
-    AccountDisplay, AccountKey, Chain, Collator, NodeHost, Validator,
+    origin::Origin, AccountDisplay, AccountKey, Chain, Collator, NodeHost, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -271,6 +271,7 @@ impl App {
             NavigationAction::Copy => self.copy_to_clipboard(),
             NavigationAction::ToggleMask => self.toggle_mask(),
             NavigationAction::ToggleView => self.toggle_view(),
+            NavigationAction::ToggleFavourite => self.toggle_favourite(),
         }
     }
 
@@ -2080,6 +2081,44 @@ impl App {
         self.validators.toggle_mask();
         self.collators.toggle_mask();
         self.popup.toggle_mask();
+    }
+
+    /// Adds the selected validator or collator to the favourites, when it is not listed in the
+    /// config, or removes it from them. The favourites are kept in the prefs file.
+    fn toggle_favourite(&mut self) {
+        if self.popup.is_visible() {
+            return;
+        }
+
+        match self.window {
+            Window::Validators => {
+                let Some(key) = self.validators.get_selected_ref().map(|v| v.key().clone()) else {
+                    return;
+                };
+                let Some(origin) = self.validators.toggle_picked(&key) else {
+                    return;
+                };
+                // The validators only found on-chain are only listed when all of them are
+                if origin == Origin::OnChain && !CONFIG.features().all_validators_visible() {
+                    self.validators.remove(&key);
+                }
+                save_picked_validators(self.validators.get_picked());
+            }
+            Window::Collators => {
+                let Some(key) = self.collators.get_selected_ref().map(|c| c.key().clone()) else {
+                    return;
+                };
+                let Some(origin) = self.collators.toggle_picked(&key) else {
+                    return;
+                };
+                // The collators only found on-chain are only listed when all of them are
+                if origin == Origin::OnChain && !CONFIG.features().all_collators_visible() {
+                    self.collators.remove(&key);
+                }
+                save_picked_collators(self.collators.get_picked());
+            }
+            _ => {}
+        }
     }
 
     /// Toggles between grouped and listed view.

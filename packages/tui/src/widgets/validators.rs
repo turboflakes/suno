@@ -4,7 +4,7 @@ use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::utils::AccountId32;
-use suno_config::{fetch_validators_from_source, NodeConfig, SupportedRuntime, CONFIG};
+use suno_config::{fetch_validators_from_source, NodeConfig, PickedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
@@ -498,7 +498,76 @@ impl ValidatorsList {
                 }
             }
         }
+
+        // The validators picked from the TUI, of the chains configured, unless already listed
+        let configured: HashSet<SupportedRuntime> = chains
+            .iter()
+            .flat_map(|chain| chain.keys().copied())
+            .collect();
+        for picked in CONFIG.picked_validators() {
+            let validator = Validator::with_origin(picked.chain, picked.stash, Origin::Picked);
+            if configured.contains(&picked.chain) && !self.validators.contains_key(validator.key())
+            {
+                self.add_validator(validator);
+            }
+        }
+
         self.init_table();
+    }
+
+    /// Picks the validator, as a favourite, when it was only found on-chain, and the other way
+    /// around. The validators listed by the config are always tracked, so they stay as they are.
+    /// Returns the new origin of the validator, if it changed.
+    pub fn toggle_picked(&mut self, key: &ValidatorKey) -> Option<Origin> {
+        let validator = self.validators.get_mut(key)?;
+        validator.origin = match validator.origin {
+            Origin::OnChain => Origin::Picked,
+            Origin::Picked => Origin::OnChain,
+            Origin::Config | Origin::Remote => return None,
+        };
+        let origin = validator.origin;
+
+        // The selection can only be on a tracked validator, outside of the main window
+        if self.focus != ListFocus::Main {
+            self.select_nearest_tracked();
+        }
+        Some(origin)
+    }
+
+    /// The validators picked from the TUI, to be persisted.
+    pub fn get_picked(&self) -> Vec<PickedNode> {
+        self.validators_iter()
+            .filter(|v| v.origin == Origin::Picked)
+            .map(|v| PickedNode {
+                chain: v.runtime(),
+                stash: v.account.stash(),
+            })
+            .collect()
+    }
+
+    /// Removes the validator from the list, e.g. when it is no longer picked and the validators
+    /// only found on-chain are not listed.
+    pub fn remove(&mut self, key: &ValidatorKey) {
+        let selected = self.selected_key().filter(|selected| selected != key);
+        self.validators.remove(key);
+        self.requested.remove(key);
+        self.validators_order.retain(|k| k != key);
+        self.restore_selection(selected);
+    }
+
+    /// Moves the selection to the nearest tracked validator, the only ones the compact list has.
+    fn select_nearest_tracked(&mut self) {
+        if self.get_selected_ref().is_some_and(|v| v.is_tracked()) {
+            return;
+        }
+        let len = self.validators_order.len();
+        let nearest_tracked = self.table_state.selected().and_then(|sel| {
+            (0..len)
+                .map(|step| (sel + step) % len)
+                .find(|i| self.is_tracked_at(*i))
+        });
+        self.table_state.select(nearest_tracked);
+        self.ensure_selection_in_view();
     }
 
     fn process_validators(
@@ -631,16 +700,8 @@ impl ValidatorsList {
     pub fn set_focus(&mut self, focus: ListFocus) {
         let was_main = self.focus == ListFocus::Main;
         self.focus = focus;
-        let is_selected_tracked = self.get_selected_ref().is_some_and(|v| v.is_tracked());
-        if was_main && focus != ListFocus::Main && !is_selected_tracked {
-            let len = self.validators_order.len();
-            let nearest_tracked = self.table_state.selected().and_then(|sel| {
-                (0..len)
-                    .map(|step| (sel + step) % len)
-                    .find(|i| self.is_tracked_at(*i))
-            });
-            self.table_state.select(nearest_tracked);
-            self.ensure_selection_in_view();
+        if was_main && focus != ListFocus::Main {
+            self.select_nearest_tracked();
         }
     }
 
