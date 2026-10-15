@@ -1857,13 +1857,13 @@ impl App {
         }
 
         // The logs have no section of their own, they scroll while the main window is selected
-        if self.section.is_none() && self.window == Window::Logs {
+        if self.section.is_none() && self.window.is_logs_selected() {
             self.logs.move_down();
             return;
         }
 
         // The same for the help, whose text can be taller than the window
-        if self.section.is_none() && self.window == Window::Help {
+        if self.section.is_none() && self.window.is_help_selected() {
             self.help.scroll_down();
             return;
         }
@@ -1902,7 +1902,7 @@ impl App {
 
     /// Extends the selection up, on the logs. Anywhere else it moves the selection up.
     fn extend_up(&mut self) {
-        if self.section.is_none() && self.window == Window::Logs && !self.popup.is_visible() {
+        if self.section.is_none() && self.window.is_logs_selected() && !self.popup.is_visible() {
             self.logs.extend_up();
         } else {
             self.move_up();
@@ -1911,7 +1911,7 @@ impl App {
 
     /// Extends the selection down, on the logs. Anywhere else it moves the selection down.
     fn extend_down(&mut self) {
-        if self.section.is_none() && self.window == Window::Logs && !self.popup.is_visible() {
+        if self.section.is_none() && self.window.is_logs_selected() && !self.popup.is_visible() {
             self.logs.extend_down();
         } else {
             self.move_down();
