@@ -4,7 +4,7 @@ use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
+use tracing::{debug, warn};
 
 pub fn dispatch_response_action(
     response: Response,
@@ -165,7 +165,7 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!("No identity data found for {}", account_key,);
+                debug!("No identity data found for {}", account_key,);
             }
         }
         Response::TxSubmitted(data) => {
@@ -305,7 +305,7 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!(
+                debug!(
                     "No identity data found for collator {:?}",
                     data.value.account
                 );
