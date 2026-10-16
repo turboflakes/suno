@@ -158,6 +158,7 @@ const KEYBINDINGS: &[HelpEntry] = &[
         "space ",
         "Toggle as favourite the selected validator or collator.",
     ),
+    ("/ ", "Show commands."),
     ("ctrl+e ", "Show commands."),
     ("ctrl+w ", "Switch to the next window."),
     ("ctrl+m ", "Toggle mask on hosts."),

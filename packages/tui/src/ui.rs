@@ -249,12 +249,9 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         && !app.window.is_logs_selected()
         && !app.window.is_help_selected()
     {
-        legend.push(Span::styled("ctrl+e".to_string(), theme.paragraph.base));
+        legend.push(Span::styled("/".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled(
-            "show commands".to_string(),
-            theme.paragraph.label,
-        ));
+        legend.push(Span::styled("commands".to_string(), theme.paragraph.label));
     };
 
     if app.popup.is_visible() {
