@@ -416,8 +416,17 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         //
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
-        // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
+        // that table_state offset is ALWAYS 0. Has we always want to start from the top.
         *table_state.offset_mut() = 0;
+
+        // Every group renders its own table, but the selected index of the state counts the rows
+        // of all the groups. Translate it to the position of the selected collator in this group,
+        // or clear it when the selection is in another group, so only the right row is highlighted.
+        table_state.select(
+            validators
+                .iter()
+                .position(|item| Some(*item) == selected_validator),
+        );
 
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
