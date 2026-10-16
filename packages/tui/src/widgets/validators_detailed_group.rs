@@ -47,6 +47,11 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
             area.width
         };
 
+        // Values needed further down to render the table
+        let is_active = state.is_active();
+        let is_masked = state.is_masked();
+        let table_state = state.table_state;
+
         // Create a new area to fit all the content as total_height, but as wide as the screen.
         let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
@@ -80,12 +85,13 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 runtime,
                 &validators,
                 selected_validator,
-                group_area,
-                &mut full_content_buf,
-                &mut state.table_state.clone(),
-                state.is_masked(),
+                is_active,
+                is_masked,
                 is_odd,
                 block,
+                group_area,
+                &mut full_content_buf,
+                &mut table_state.clone(),
             );
 
             current_y_group += group_height;
@@ -145,12 +151,13 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        area: Rect,
-        buf: &mut Buffer,
-        table_state: &mut TableState,
+        is_active: bool,
         is_masked: bool,
         is_odd: bool,
         block: Block,
+        area: Rect,
+        buf: &mut Buffer,
+        table_state: &mut TableState,
     ) {
         let content_area = block.inner(area);
         block.render(area, buf);
@@ -172,11 +179,12 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             runtime,
             validators,
             selected_validator,
+            is_active,
+            is_masked,
+            is_odd,
             body_area,
             buf,
             table_state,
-            is_masked,
-            is_odd,
         );
     }
 
@@ -356,13 +364,15 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
+        is_active: bool,
+        is_masked: bool,
+        is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_masked: bool,
-        is_odd: bool,
     ) {
         let theme = self.theme;
+
         let features = CONFIG.features();
         let Some(ah_chain) = self.chains.get_chain_by_runtime(
             runtime
@@ -406,13 +416,23 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         //
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
-        // that table_state offset is ALWAYS 0. Has we alwasy want to start from the top.
+        // that table_state offset is ALWAYS 0. Has we always want to start from the top.
         *table_state.offset_mut() = 0;
+
+        // Every group renders its own table, but the selected index of the state counts the rows
+        // of all the groups. Translate it to the position of the selected collator in this group,
+        // or clear it when the selection is in another group, so only the right row is highlighted.
+        table_state.select(
+            validators
+                .iter()
+                .position(|item| Some(*item) == selected_validator),
+        );
 
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
-            .header(header.set_style(theme.table.header));
+            .header(header.set_style(theme.table.header))
+            .row_highlight_style(theme.table.row_highlight(is_active));
 
         StatefulWidget::render(table, area, buf, table_state);
     }
@@ -467,6 +487,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         };
 
         let mut cells = vec![
+            Cell::from(Text::from(validator.origin.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
@@ -638,6 +659,9 @@ impl Columns {
 
     fn header(&self) -> Row<'static> {
         let mut cells = vec![
+            // The origin of the validator
+            Cell::from(""),
+            // The status of the validator
             Cell::from(Text::from("◈").alignment(Alignment::Center)),
             Cell::from(Text::from("identity").alignment(Alignment::Left)),
         ];
@@ -708,7 +732,11 @@ impl Columns {
     }
 
     fn widths(&self) -> Vec<Constraint> {
-        let mut widths = vec![Constraint::Length(3), Constraint::Length(24)];
+        let mut widths = vec![
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(24),
+        ];
 
         if self.host {
             widths.push(Constraint::Fill(2));

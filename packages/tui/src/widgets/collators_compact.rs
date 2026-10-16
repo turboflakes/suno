@@ -3,10 +3,11 @@ use crate::widgets::scrollbar::render_scrollbar;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::Styled,
-    text::Text,
+    style::{Modifier, Styled},
+    text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
+use sp_arithmetic::traits::Zero;
 use suno_theme::Theme;
 
 #[derive(Debug, Default)]
@@ -40,7 +41,12 @@ impl StatefulWidget for CollatorsCompactWidget {
         // The underlying `table_state` selection index refers to `state.collators`,
         // so it's translated here to account for the extra header rows.
         // In list view, collators are regrouped by relay chain.
-        let mut indexed: Vec<(usize, _)> = state.collators_iter().enumerate().collect();
+        // Only the tracked collators, the ones listed in the config, are shown here.
+        let mut indexed: Vec<(usize, _)> = state
+            .collators_iter()
+            .enumerate()
+            .filter(|(_, c)| c.is_tracked())
+            .collect();
         if state.is_list_view() {
             indexed.sort_by_key(|(_, c)| c.runtime().relay_chain());
         }
@@ -83,10 +89,17 @@ impl StatefulWidget for CollatorsCompactWidget {
                 String::new()
             };
 
-            let mut row = vec![
-                Text::from(""),
-                Text::from(format!("{}{}", chain_label, c.display_name(4))),
-            ];
+            // Show origin alongside chain and identity only when active and selected
+            let mut name = Vec::new();
+            if is_active && selected == Some(i) {
+                name.push(Span::styled(
+                    format!("{} ", c.origin.symbol()),
+                    theme.paragraph.label(is_active),
+                ));
+            }
+            name.push(Span::raw(format!("{chain_label}{}", c.display_name(4))));
+
+            let mut row = vec![Text::from(""), Text::from(Line::from(name))];
 
             if proxies_available {
                 row.push(Text::from(c.proxies_as_str()).alignment(Alignment::Right));
@@ -94,6 +107,13 @@ impl StatefulWidget for CollatorsCompactWidget {
 
             row.push(Text::from(""));
             rows.push(Row::new(row));
+        }
+
+        if rows.len().is_zero() {
+            rows.push(Row::new(vec![
+                Text::from(""),
+                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+            ]));
         }
 
         // Define widths
@@ -104,11 +124,20 @@ impl StatefulWidget for CollatorsCompactWidget {
         }
         widths.push(Constraint::Length(1));
 
+        let title = "collators";
+        let title_span = if is_active {
+            Span::raw(format!(" {} ", title)).style(
+                theme
+                    .paragraph
+                    .header(true)
+                    .add_modifier(Modifier::REVERSED),
+            )
+        } else {
+            Span::raw(format!("{} ", title))
+        };
+
         // Define header cells
-        let mut header_cells = vec![
-            Cell::from(""),
-            Cell::from(Text::from("collators").alignment(Alignment::Left)),
-        ];
+        let mut header_cells = vec![Cell::from(""), Cell::from(Line::from(title_span))];
 
         if proxies_available {
             header_cells.push(Cell::from(

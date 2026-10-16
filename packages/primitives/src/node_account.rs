@@ -1,5 +1,5 @@
 use crate::balance::{Amount, Balance};
-use crate::display::{format_planks, to_compact_string};
+use crate::display::{format_planks, to_address_string, to_compact_string};
 use crate::session::KeysError;
 use crate::{identity::Identity, key::AccountKey};
 use std::{
@@ -16,6 +16,11 @@ pub trait AccountDisplay {
 
     fn to_compact_string(&self, size: usize) -> String {
         to_compact_string(&self.stash(), self.account_format(), size)
+    }
+
+    /// The full SS58 address of the stash.
+    fn to_address_string(&self) -> String {
+        to_address_string(&self.stash(), self.account_format())
     }
 }
 

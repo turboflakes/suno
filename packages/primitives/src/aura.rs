@@ -65,6 +65,10 @@ impl Aura {
         &self.invulnerables
     }
 
+    pub fn candidates(&self) -> &[(AccountBytes, Deposit)] {
+        &self.candidates
+    }
+
     /// Current authorities that are not part of the invulnerable set, i.e. the
     /// collators that got in through the candidacy (permissionless) route.
     pub fn permissionless(&self) -> Vec<AccountBytes> {

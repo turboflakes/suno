@@ -1,0 +1,35 @@
+/// Where a node, e.g. a collator or a validator, was listed from.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Origin {
+    /// Listed in the config file, it can carry hosts, commands and proxies.
+    #[default]
+    Config,
+    /// Listed in the remote source the config points to, e.g. a validators URL.
+    Remote,
+    /// Picked from the UI and persisted in the prefs file, only monitored.
+    Picked,
+    /// Only found on-chain, listed when all of them are shown.
+    OnChain,
+}
+
+impl Origin {
+    /// Nodes the user follows, as opposed to the ones only found on-chain.
+    pub fn is_tracked(&self) -> bool {
+        *self != Self::OnChain
+    }
+
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Self::Config => "▲",
+            Self::Remote => "⚑",
+            Self::Picked => "●",
+            Self::OnChain => "○",
+        }
+    }
+
+    /// Nodes listed by the config, in the file or in its remote source, which can't be
+    /// untracked from the UI.
+    pub fn is_config(&self) -> bool {
+        matches!(self, Self::Config | Self::Remote)
+    }
+}

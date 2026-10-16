@@ -3,10 +3,11 @@ use crate::widgets::validators::ValidatorsList;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::Styled,
-    text::Text,
+    style::{Modifier, Styled},
+    text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
+use sp_arithmetic::traits::Zero;
 use suno_theme::Theme;
 
 #[derive(Debug, Default)]
@@ -44,7 +45,12 @@ impl StatefulWidget for ValidatorsCompactWidget {
         let mut rows: Vec<Row> = Vec::new();
         let mut last_runtime = None;
 
-        for (i, v) in state.validators_iter().enumerate() {
+        // Only the tracked validators, the ones listed by the config, are shown here.
+        for (i, v) in state
+            .validators_iter()
+            .enumerate()
+            .filter(|(_, v)| v.is_tracked())
+        {
             if last_runtime != Some(v.runtime()) {
                 let mut header_row = vec![
                     Text::from(""),
@@ -62,7 +68,17 @@ impl StatefulWidget for ValidatorsCompactWidget {
                 display_selected = Some(rows.len());
             }
 
-            let mut row = vec![Text::from(""), Text::from(v.display_name(4))];
+            // Show origin alongside chain and identity only when active and selected
+            let mut name = Vec::new();
+            if is_active && selected == Some(i) {
+                name.push(Span::styled(
+                    format!("{} ", v.origin.symbol()),
+                    theme.paragraph.label(is_active),
+                ));
+            }
+            name.push(Span::raw(v.display_name(4)));
+
+            let mut row = vec![Text::from(""), Text::from(Line::from(name))];
 
             if proxies_available {
                 row.push(Text::from(v.proxies_as_str()).alignment(Alignment::Right));
@@ -72,6 +88,13 @@ impl StatefulWidget for ValidatorsCompactWidget {
             rows.push(Row::new(row));
         }
 
+        if rows.len().is_zero() {
+            rows.push(Row::new(vec![
+                Text::from(""),
+                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+            ]));
+        }
+
         // Define widths
         let mut widths = vec![Constraint::Length(1), Constraint::Fill(1)];
         if proxies_available {
@@ -79,11 +102,20 @@ impl StatefulWidget for ValidatorsCompactWidget {
         }
         widths.push(Constraint::Length(1));
 
+        let title = "validators";
+        let title_span = if is_active {
+            Span::raw(format!(" {} ", title)).style(
+                theme
+                    .paragraph
+                    .header(true)
+                    .add_modifier(Modifier::REVERSED),
+            )
+        } else {
+            Span::raw(format!("{} ", title))
+        };
+
         // Define header cells
-        let mut header_cells = vec![
-            Cell::from(""),
-            Cell::from(Text::from("validators").alignment(Alignment::Left)),
-        ];
+        let mut header_cells = vec![Cell::from(""), Cell::from(Line::from(title_span))];
         if proxies_available {
             header_cells.push(Cell::from(
                 Text::from("proxies").alignment(Alignment::Right),

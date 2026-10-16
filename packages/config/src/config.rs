@@ -2,6 +2,7 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::logs::Logs;
+use crate::prefs::{PickedNode, Prefs};
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
@@ -61,16 +62,6 @@ pub enum Subcommand {
     Update { version: Option<String> },
 }
 
-/// Runtime preferences saved from the TUI, layered on top of `config.yaml`
-/// on load without ever touching the user's own file. Grows over time as
-/// more things become editable from the TUI, each as its own optional
-/// field so unrelated prefs are preserved on every write.
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Prefs {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    active_theme: Option<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// CLI subcommand to execute.
@@ -101,6 +92,10 @@ pub struct Config {
     /// file that persists runtime preferences (e.g. the active theme).
     #[serde(skip)]
     config_path: PathBuf,
+    /// Network launched from the CLI (e.g. `suno polkadot`), added as a suffix to the prefs
+    /// file name so each network keeps its own runtime preferences.
+    #[serde(skip)]
+    network: Option<SupportedRuntime>,
 }
 
 impl Default for Config {
@@ -115,6 +110,7 @@ impl Default for Config {
             themes: default_themes(),
             logs: default_logs(),
             config_path: PathBuf::new(),
+            network: None,
         }
     }
 }
@@ -312,10 +308,14 @@ fn default_enable() -> bool {
 pub struct Features {
     #[serde(default = "default_enable")]
     enable_validators: bool,
-    #[serde(default)]
+    #[serde(default = "default_enable")]
     enable_collators: bool,
     #[serde(default)]
     enable_rpcs: bool,
+    #[serde(default = "default_enable")]
+    show_all_validators: bool,
+    #[serde(default = "default_enable")]
+    show_all_collators: bool,
     #[serde(default = "default_enable")]
     enable_check_update: bool,
     #[serde(default = "default_enable")]
@@ -330,14 +330,22 @@ pub struct Features {
     show_payee: bool,
     #[serde(default = "default_enable")]
     show_keys: bool,
+    #[serde(default = "default_enable")]
+    show_deposit: bool,
+    #[serde(default = "default_enable")]
+    show_last_block: bool,
+    #[serde(default = "default_enable")]
+    show_next_slot: bool,
 }
 
 impl Default for Features {
     fn default() -> Self {
         Self {
             enable_validators: true,
-            enable_collators: false,
+            enable_collators: true,
             enable_rpcs: false,
+            show_all_validators: true,
+            show_all_collators: true,
             enable_check_update: true,
             show_nominators_counter: true,
             show_nominators_stake: true,
@@ -345,6 +353,9 @@ impl Default for Features {
             show_commission: false,
             show_payee: true,
             show_keys: true,
+            show_deposit: true,
+            show_last_block: true,
+            show_next_slot: true,
         }
     }
 }
@@ -370,6 +381,16 @@ impl Features {
         self.enable_check_update
     }
 
+    /// Every on-chain collator is listed, only if the collators are enabled.
+    pub fn all_collators_visible(&self) -> bool {
+        self.enable_collators && self.show_all_collators
+    }
+
+    /// Every on-chain validator is listed, only if the validators are enabled.
+    pub fn all_validators_visible(&self) -> bool {
+        self.enable_validators && self.show_all_validators
+    }
+
     pub fn nominators_counter_visible(&self) -> bool {
         self.show_nominators_counter
     }
@@ -393,6 +414,18 @@ impl Features {
     pub fn keys_visible(&self) -> bool {
         self.show_keys
     }
+
+    pub fn deposit_visible(&self) -> bool {
+        self.show_deposit
+    }
+
+    pub fn last_block_visible(&self) -> bool {
+        self.show_last_block
+    }
+
+    pub fn next_slot_visible(&self) -> bool {
+        self.show_next_slot
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -402,6 +435,16 @@ pub struct Explorer {
 
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        Self::from_file_for(path, None)
+    }
+
+    /// Loads the config as `from_file` does, for the `network` launched from the CLI, if any.
+    /// The network is part of the prefs file name, so the preferences restored are the ones
+    /// persisted by the same network.
+    pub fn from_file_for<P: AsRef<Path>>(
+        path: P,
+        network: Option<SupportedRuntime>,
+    ) -> Result<Self, Error> {
         let path = path.as_ref();
 
         let mut config = if !path.exists() {
@@ -420,6 +463,7 @@ impl Config {
         };
 
         config.config_path = path.to_path_buf();
+        config.network = network;
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
@@ -444,10 +488,15 @@ impl Config {
     }
 
     /// Path of the small sibling file used to persist runtime preferences
-    /// across restarts, without touching the user's own config file.
+    /// across restarts, without touching the user's own config file. When launched for a
+    /// network, e.g. `suno polkadot`, the network is the suffix: `.config.local.polkadot.yaml`.
     fn prefs_path(&self) -> PathBuf {
         let dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
-        dir.join(".config.local.yaml")
+        let file_name = match self.network {
+            Some(network) => format!(".config.local.{}.yaml", network.to_string().to_lowercase()),
+            None => ".config.local.yaml".to_string(),
+        };
+        dir.join(file_name)
     }
 
     /// Reads the prefs file, if it exists and is well-formed. Defaults to
@@ -458,6 +507,16 @@ impl Config {
             .ok()
             .and_then(|content| serde_yaml::from_str(&content).ok())
             .unwrap_or_default()
+    }
+
+    /// The validators picked from the TUI, as saved in the prefs file.
+    pub fn picked_validators(&self) -> Vec<PickedNode> {
+        self.read_prefs().picked_validators()
+    }
+
+    /// The collators picked from the TUI, as saved in the prefs file.
+    pub fn picked_collators(&self) -> Vec<PickedNode> {
+        self.read_prefs().picked_collators()
     }
 
     /// Reads the persisted active theme name, if the prefs file exists,
@@ -477,7 +536,13 @@ impl Config {
     fn write_prefs(&self, prefs: &Prefs) -> Result<(), Error> {
         let path = self.prefs_path();
         let content = serde_yaml::to_string(prefs)?;
-        let tmp_path = path.with_file_name(".config.local.yaml.tmp");
+        let tmp_name = format!(
+            "{}.tmp",
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(".config.local.yaml")
+        );
+        let tmp_path = path.with_file_name(tmp_name);
         fs::write(&tmp_path, content)?;
         fs::rename(&tmp_path, &path)?;
         Ok(())
@@ -719,8 +784,14 @@ fn get_config() -> Result<Config, Error> {
         .map(|s| s.as_str())
         .unwrap_or(default_config_path);
 
+    // The network launched, if any, so the prefs persisted are the ones of that network
+    let network = match matches.subcommand() {
+        Some(("update", _)) | None => None,
+        Some((relay_chain, _)) => SupportedRuntime::from_str(relay_chain).ok(),
+    };
+
     // Read and parse the config file
-    let mut config = Config::from_file(config_path)?;
+    let mut config = Config::from_file_for(config_path, network)?;
 
     // If not specified in the config file, load the signer proxy path
     // from the CLI, otherwise try to load the default
@@ -817,6 +888,26 @@ pub fn save_active_theme(name: &str) {
     prefs.active_theme = Some(name.to_string());
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist active theme: {}", e);
+    }
+}
+
+/// Persists the validators picked from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_picked_validators(picked: Vec<PickedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_picked_validators(picked);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the picked validators: {}", e);
+    }
+}
+
+/// Persists the collators picked from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_picked_collators(picked: Vec<PickedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_picked_collators(picked);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the picked collators: {}", e);
     }
 }
 
@@ -942,6 +1033,7 @@ mod tests {
             themes: Themes::default(),
             logs: Logs::default(),
             config_path: PathBuf::new(),
+            network: None,
         };
         assert!(config.validate().is_err());
     }
@@ -1137,6 +1229,68 @@ explorer:
 
         let reloaded = Config::from_file(&config_path).unwrap();
         assert_eq!(reloaded.themes.active, other);
+    }
+
+    #[test]
+    fn test_prefs_file_has_the_network_as_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file_for(&config_path, Some(SupportedRuntime::Polkadot)).unwrap();
+        let mut prefs = config.read_prefs();
+        prefs.active_theme = Some(config.themes.active.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        assert!(dir.path().join(".config.local.polkadot.yaml").exists());
+        assert!(!dir.path().join(".config.local.yaml").exists());
+        assert!(!dir.path().join(".config.local.polkadot.yaml.tmp").exists());
+    }
+
+    #[test]
+    fn test_picked_nodes_persist_across_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+        let stash = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            .parse::<AccountId32>()
+            .unwrap();
+        let validators = vec![PickedNode {
+            chain: SupportedRuntime::Polkadot,
+            stash,
+        }];
+        let collators = vec![PickedNode {
+            chain: SupportedRuntime::AssetHubPolkadot,
+            stash,
+        }];
+
+        let mut prefs = config.read_prefs();
+        prefs.set_picked_validators(validators.clone());
+        prefs.set_picked_collators(collators.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert_eq!(reloaded.picked_validators(), validators);
+        assert_eq!(reloaded.picked_collators(), collators);
+
+        // Same shape as the chains of the config file, with the addresses of the network
+        let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();
+        let value: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+        let address = value["chains"][0]["polkadot"]["validators"][0]
+            .as_str()
+            .unwrap();
+        assert!(address.starts_with('1'), "{address}");
+        assert!(value["chains"][1]["asset_hub_polkadot"]["collators"][0].is_string());
+
+        // Changing the validators keeps the collators
+        let mut prefs = reloaded.read_prefs();
+        prefs.set_picked_validators(Vec::new());
+        reloaded.write_prefs(&prefs).unwrap();
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert!(reloaded.picked_validators().is_empty());
+        assert_eq!(reloaded.picked_collators(), collators);
     }
 
     #[test]

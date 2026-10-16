@@ -186,6 +186,7 @@ pub enum Response {
     CollatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
+    AllValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
     Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
@@ -319,6 +320,10 @@ impl Response {
 
     pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
         Response::AuraAuthorities(Data::new(authorities))
+    }
+
+    pub fn all_validators(validators: Vec<AccountBytes>) -> Self {
+        Response::AllValidators(Data::new(validators))
     }
 
     pub fn session_validators(validators: Vec<AccountBytes>) -> Self {

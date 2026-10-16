@@ -64,14 +64,16 @@ pub enum NavigationAction {
     ExtendDown,
     SectionUp,
     SectionDown,
-    MoveLeft,
-    MoveRight,
+    PrevTab,
+    NextTab,
     NextWindow,
     PrevWindow,
     Reset,
     Copy,
     ToggleMask,
     ToggleView,
+    /// Space: add the selected validator or collator to the favourites, or remove it
+    ToggleFavourite,
 }
 
 type SpecVersion = u32;
@@ -170,6 +172,7 @@ pub enum CollatorAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
+    UpdateAllValidators(SupportedRuntime, Vec<AccountBytes>),
     UpdateValidatorPrefs(ValidatorKey, ValidatorPrefs),
     UpdateValidatorPrefsNext(ValidatorKey, ValidatorPrefs),
     UpdatePoints(ValidatorKey, Points),
