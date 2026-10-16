@@ -3,7 +3,7 @@ use crate::widgets::scrollbar::render_scrollbar;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::Styled,
+    style::{Modifier, Styled},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
@@ -124,11 +124,20 @@ impl StatefulWidget for CollatorsCompactWidget {
         }
         widths.push(Constraint::Length(1));
 
+        let title = "collators";
+        let title_span = if is_active {
+            Span::raw(format!(" {} ", title)).style(
+                theme
+                    .paragraph
+                    .header(true)
+                    .add_modifier(Modifier::REVERSED),
+            )
+        } else {
+            Span::raw(format!("{} ", title))
+        };
+
         // Define header cells
-        let mut header_cells = vec![
-            Cell::from(""),
-            Cell::from(Text::from("collators").alignment(Alignment::Left)),
-        ];
+        let mut header_cells = vec![Cell::from(""), Cell::from(Line::from(title_span))];
 
         if proxies_available {
             header_cells.push(Cell::from(
