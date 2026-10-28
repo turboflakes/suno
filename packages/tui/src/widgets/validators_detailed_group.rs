@@ -48,7 +48,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
         };
 
         // Values needed further down to render the table
-        let is_active = state.is_active();
+        let is_active = state.is_highlighted();
         let is_masked = state.is_masked();
         let table_state = state.table_state;
 

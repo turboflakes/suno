@@ -1,4 +1,4 @@
-use crate::app::App;
+use crate::app::{App, Focus};
 use crate::widgets::collators::CollatorsView;
 use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
@@ -93,14 +93,45 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
-    let [tabs_area, body_area] =
-        Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+    let is_filter_visible = app.focus == Focus::Filter || app.is_filtered();
+    let (tabs_area, filter_area, body_area) = if is_filter_visible {
+        let [tabs_area, filter_area, body_area] = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Length(2),
+            Constraint::Fill(1),
+        ])
+        .areas(area);
+        (tabs_area, Some(filter_area), body_area)
+    } else {
+        let [tabs_area, body_area] =
+            Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+        (tabs_area, None, body_area)
+    };
+
     render_window_tabs(app, frame, tabs_area);
+    if let Some(filter_area) = filter_area {
+        render_filter_widget(app, frame, filter_area);
+    }
     // Switch between main body window.
     match app.window {
         Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
         Window::Logs => render_logs_widget(app, frame, body_area),
         Window::Help => render_help_widget(app, frame, body_area),
+    }
+}
+
+fn render_filter_widget(app: &App, frame: &mut Frame, area: Rect) {
+    let (input, matches) = match app.window {
+        Window::Validators => (app.validators.filter(), app.validators.count_matches()),
+        Window::Collators => (app.collators.filter(), app.collators.count_matches()),
+        _ => return,
+    };
+
+    frame.render_widget(&input.as_inline_filter(app.theme, matches), area);
+    if app.focus == Focus::Filter {
+        if let Some(position) = input.get_cursor_position() {
+            frame.set_cursor_position(position);
+        }
     }
 }
 
@@ -318,6 +349,18 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             }
             _ => {}
         }
+    } else if app.focus == Focus::Filter {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled(
+            "↑ ↓ or enter".to_string(),
+            theme.paragraph.base,
+        ));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("select".to_string(), theme.paragraph.label));
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("clear".to_string(), theme.paragraph.label));
     } else if has_selection {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
@@ -348,6 +391,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
+        if let Some(hint) = app.toggle_hint() {
+            legend.push(Span::styled("space".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
+            legend.push(Span::raw("   "));
+        }
         if app.collators.is_active() && app.window.is_collators_selected() {
             legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
@@ -357,10 +406,28 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
+    }
+
+    // The hints above are followed by their separator, so drop the last one
+    if legend.last().is_some_and(|span| span.content == "   ") {
+        legend.pop();
+    }
+
+    let can_filter = app.window.is_validators_selected() || app.window.is_collators_selected();
+    if app.popup.is_hidden() && app.focus != Focus::Filter && can_filter {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+f".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
-        legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
-    } else {
+        legend.push(Span::styled("filter".to_string(), theme.paragraph.label));
+    }
+    if app.popup.is_hidden() && app.popup.get_mode() != PopupMode::ThemeMenu {
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+t".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("themes".to_string(), theme.paragraph.label));
+    }
+    // The navigation hints go together, `tab` between the sections and `ctrl+w` between the windows
+    if app.popup.is_hidden() && app.focus != Focus::Filter {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
@@ -378,12 +445,6 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         "switch window".to_string(),
         theme.paragraph.label,
     ));
-    if app.popup.is_hidden() && app.popup.get_mode() != PopupMode::ThemeMenu {
-        legend.push(Span::raw("   "));
-        legend.push(Span::styled("ctrl+t".to_string(), theme.paragraph.base));
-        legend.push(Span::raw(" "));
-        legend.push(Span::styled("themes".to_string(), theme.paragraph.label));
-    }
     legend.push(Span::raw("   "));
     legend.push(Span::styled("ctrl+c".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));

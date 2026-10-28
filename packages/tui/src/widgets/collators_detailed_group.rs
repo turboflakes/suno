@@ -59,7 +59,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
         };
 
         // Values needed further down to render the table
-        let is_active = state.is_active();
+        let is_active = state.is_highlighted();
         let table_state = state.table_state;
 
         // Create a new area to fit all the content as total_height, but as wide as the screen.

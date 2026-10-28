@@ -1,6 +1,8 @@
 use crate::app::Focus;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use suno_actions::{Action, InputAction, NavigationAction, PopupAction, SystemAction};
+use suno_actions::{
+    Action, FilterAction, InputAction, NavigationAction, PopupAction, SystemAction,
+};
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
@@ -28,6 +30,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Open the theme selection popup
                 KeyCode::Char('t') => Action::Popup(PopupAction::OpenThemeMenu),
+                // Filter the list of validators or collators displayed
+                KeyCode::Char('f') => Action::Filter(FilterAction::Open),
                 // Select next main window/tab
                 KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
                 // Mask/Unmask Host IP addresses
@@ -60,6 +64,7 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
         Focus::Main => handle_main_key_events(key_event),
         Focus::Popup | Focus::Scanner => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
+        Focus::Filter => handle_filter_key_events(key_event),
         // _ => Action::System(SystemAction::Noop),
     }
 }
@@ -86,8 +91,17 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
-        // Add or remove the selected validator or collator from the favourites on `Space`
-        KeyCode::Char(' ') => Action::Navigation(NavigationAction::ToggleFavourite),
+        // Typing letters or digits starts the filter of the validators or the collators
+        KeyCode::Char(c)
+            if c.is_alphanumeric()
+                && !key_event
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            Action::Filter(FilterAction::Start(c))
+        }
+        // Pin or unpin the selected validator or collator on `Space`
+        KeyCode::Char(' ') => Action::Navigation(NavigationAction::TogglePin),
         // Open popup within the active section on `/`, same as on `ctrl-e`
         KeyCode::Char('/') => Action::Popup(PopupAction::Open),
         // Reset active selections
@@ -110,6 +124,19 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
         KeyCode::Tab => Action::Input(InputAction::Editing),
         KeyCode::Esc => Action::Popup(PopupAction::Cancel),
+        _ => Action::System(SystemAction::Noop),
+    }
+}
+
+fn handle_filter_key_events(key_event: KeyEvent) -> Action {
+    match key_event.code {
+        KeyCode::Char(c) => Action::Filter(FilterAction::Char(c)),
+        KeyCode::Backspace => Action::Filter(FilterAction::Delete),
+        KeyCode::Left => Action::Filter(FilterAction::CursorLeft),
+        KeyCode::Right => Action::Filter(FilterAction::CursorRight),
+        // Leave the input to the list, where the first row gets highlighted
+        KeyCode::Up | KeyCode::Down | KeyCode::Enter => Action::Filter(FilterAction::Select),
+        KeyCode::Esc => Action::Filter(FilterAction::Clear),
         _ => Action::System(SystemAction::Noop),
     }
 }

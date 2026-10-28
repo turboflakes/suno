@@ -13,31 +13,31 @@ use tracing::warn;
 pub(crate) struct Prefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) active_theme: Option<String>,
-    /// The validators and the collators picked from the TUI, by chain, in the same shape as the
+    /// The validators and the collators pinned from the TUI, by chain, in the same shape as the
     /// `chains` of the config file, so they can be moved there to be listed by the config.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    chains: Vec<HashMap<SupportedRuntime, PickedChain>>,
+    chains: Vec<HashMap<SupportedRuntime, PinnedChain>>,
 }
 
-/// The validators and the collators picked from the TUI of a chain, as addresses in the format
+/// The validators and the collators pinned from the TUI of a chain, as addresses in the format
 /// of the network.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-struct PickedChain {
+struct PinnedChain {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     validators: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     collators: Vec<String>,
 }
 
-/// A validator or a collator picked from the TUI, as a favourite, since it is not listed in the
+/// A validator or a collator pinned from the TUI, since it is not listed in the
 /// config file. The `chain` is the relay chain of a validator, and the chain of a collator.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PickedNode {
+pub struct PinnedNode {
     pub chain: SupportedRuntime,
     pub stash: AccountId32,
 }
 
-impl PickedNode {
+impl PinnedNode {
     /// The address of the stash, in the format of the network of the chain.
     fn address(&self) -> String {
         let account = sp_core::crypto::AccountId32::new(self.stash.0);
@@ -46,28 +46,28 @@ impl PickedNode {
 }
 
 impl Prefs {
-    pub(crate) fn picked_validators(&self) -> Vec<PickedNode> {
-        self.picked(|chain| &chain.validators)
+    pub(crate) fn pinned_validators(&self) -> Vec<PinnedNode> {
+        self.pinned(|chain| &chain.validators)
     }
 
-    pub(crate) fn picked_collators(&self) -> Vec<PickedNode> {
-        self.picked(|chain| &chain.collators)
+    pub(crate) fn pinned_collators(&self) -> Vec<PinnedNode> {
+        self.pinned(|chain| &chain.collators)
     }
 
-    fn picked(&self, list: impl Fn(&PickedChain) -> &Vec<String>) -> Vec<PickedNode> {
+    fn pinned(&self, list: impl Fn(&PinnedChain) -> &Vec<String>) -> Vec<PinnedNode> {
         self.chains
             .iter()
             .flatten()
-            .flat_map(|(chain, picked)| {
-                list(picked)
+            .flat_map(|(chain, pinned)| {
+                list(pinned)
                     .iter()
                     .filter_map(|address| match address.parse::<AccountId32>() {
-                        Ok(stash) => Some(PickedNode {
+                        Ok(stash) => Some(PinnedNode {
                             chain: *chain,
                             stash,
                         }),
                         Err(e) => {
-                            warn!("Ignoring the picked address {}: {}", address, e);
+                            warn!("Ignoring the pinned address {}: {}", address, e);
                             None
                         }
                     })
@@ -75,29 +75,29 @@ impl Prefs {
             .collect()
     }
 
-    pub(crate) fn set_picked_validators(&mut self, nodes: Vec<PickedNode>) {
-        self.set_picked(nodes, |chain| &mut chain.validators);
+    pub(crate) fn set_pinned_validators(&mut self, nodes: Vec<PinnedNode>) {
+        self.set_pinned(nodes, |chain| &mut chain.validators);
     }
 
-    pub(crate) fn set_picked_collators(&mut self, nodes: Vec<PickedNode>) {
-        self.set_picked(nodes, |chain| &mut chain.collators);
+    pub(crate) fn set_pinned_collators(&mut self, nodes: Vec<PinnedNode>) {
+        self.set_pinned(nodes, |chain| &mut chain.collators);
     }
 
-    /// Replaces the list of the picked `nodes`, validators or collators, and keeps the other.
-    fn set_picked(
+    /// Replaces the list of the pinned `nodes`, validators or collators, and keeps the other.
+    fn set_pinned(
         &mut self,
-        nodes: Vec<PickedNode>,
-        list: impl Fn(&mut PickedChain) -> &mut Vec<String>,
+        nodes: Vec<PinnedNode>,
+        list: impl Fn(&mut PinnedChain) -> &mut Vec<String>,
     ) {
-        let mut chains: BTreeMap<SupportedRuntime, PickedChain> = BTreeMap::new();
-        for (chain, picked) in self.chains.drain(..).flatten() {
+        let mut chains: BTreeMap<SupportedRuntime, PinnedChain> = BTreeMap::new();
+        for (chain, pinned) in self.chains.drain(..).flatten() {
             let entry = chains.entry(chain).or_default();
-            entry.validators.extend(picked.validators);
-            entry.collators.extend(picked.collators);
+            entry.validators.extend(pinned.validators);
+            entry.collators.extend(pinned.collators);
         }
 
-        for picked in chains.values_mut() {
-            list(picked).clear();
+        for pinned in chains.values_mut() {
+            list(pinned).clear();
         }
         for node in nodes {
             let address = node.address();
@@ -106,8 +106,8 @@ impl Prefs {
 
         self.chains = chains
             .into_iter()
-            .filter(|(_, picked)| !picked.validators.is_empty() || !picked.collators.is_empty())
-            .map(|(chain, picked)| HashMap::from([(chain, picked)]))
+            .filter(|(_, pinned)| !pinned.validators.is_empty() || !pinned.collators.is_empty())
+            .map(|(chain, pinned)| HashMap::from([(chain, pinned)]))
             .collect();
     }
 }

@@ -2,7 +2,7 @@ use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
 use crate::logs::Logs;
-use crate::prefs::{PickedNode, Prefs};
+use crate::prefs::{PinnedNode, Prefs};
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
@@ -509,14 +509,14 @@ impl Config {
             .unwrap_or_default()
     }
 
-    /// The validators picked from the TUI, as saved in the prefs file.
-    pub fn picked_validators(&self) -> Vec<PickedNode> {
-        self.read_prefs().picked_validators()
+    /// The validators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_validators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_validators()
     }
 
-    /// The collators picked from the TUI, as saved in the prefs file.
-    pub fn picked_collators(&self) -> Vec<PickedNode> {
-        self.read_prefs().picked_collators()
+    /// The collators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_collators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_collators()
     }
 
     /// Reads the persisted active theme name, if the prefs file exists,
@@ -891,23 +891,23 @@ pub fn save_active_theme(name: &str) {
     }
 }
 
-/// Persists the validators picked from the TUI so they are restored on the next launch.
+/// Persists the validators pinned from the TUI so they are restored on the next launch.
 /// Failures are logged and otherwise ignored, this is a nice-to-have.
-pub fn save_picked_validators(picked: Vec<PickedNode>) {
+pub fn save_pinned_validators(pinned: Vec<PinnedNode>) {
     let mut prefs = CONFIG.read_prefs();
-    prefs.set_picked_validators(picked);
+    prefs.set_pinned_validators(pinned);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
-        warn!("Failed to persist the picked validators: {}", e);
+        warn!("Failed to persist the pinned validators: {}", e);
     }
 }
 
-/// Persists the collators picked from the TUI so they are restored on the next launch.
+/// Persists the collators pinned from the TUI so they are restored on the next launch.
 /// Failures are logged and otherwise ignored, this is a nice-to-have.
-pub fn save_picked_collators(picked: Vec<PickedNode>) {
+pub fn save_pinned_collators(pinned: Vec<PinnedNode>) {
     let mut prefs = CONFIG.read_prefs();
-    prefs.set_picked_collators(picked);
+    prefs.set_pinned_collators(pinned);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
-        warn!("Failed to persist the picked collators: {}", e);
+        warn!("Failed to persist the pinned collators: {}", e);
     }
 }
 
@@ -1248,7 +1248,7 @@ explorer:
     }
 
     #[test]
-    fn test_picked_nodes_persist_across_reload() {
+    fn test_pinned_nodes_persist_across_reload() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config.yaml");
         std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
@@ -1257,23 +1257,23 @@ explorer:
         let stash = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
             .parse::<AccountId32>()
             .unwrap();
-        let validators = vec![PickedNode {
+        let validators = vec![PinnedNode {
             chain: SupportedRuntime::Polkadot,
             stash,
         }];
-        let collators = vec![PickedNode {
+        let collators = vec![PinnedNode {
             chain: SupportedRuntime::AssetHubPolkadot,
             stash,
         }];
 
         let mut prefs = config.read_prefs();
-        prefs.set_picked_validators(validators.clone());
-        prefs.set_picked_collators(collators.clone());
+        prefs.set_pinned_validators(validators.clone());
+        prefs.set_pinned_collators(collators.clone());
         config.write_prefs(&prefs).unwrap();
 
         let reloaded = Config::from_file(&config_path).unwrap();
-        assert_eq!(reloaded.picked_validators(), validators);
-        assert_eq!(reloaded.picked_collators(), collators);
+        assert_eq!(reloaded.pinned_validators(), validators);
+        assert_eq!(reloaded.pinned_collators(), collators);
 
         // Same shape as the chains of the config file, with the addresses of the network
         let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();
@@ -1286,11 +1286,11 @@ explorer:
 
         // Changing the validators keeps the collators
         let mut prefs = reloaded.read_prefs();
-        prefs.set_picked_validators(Vec::new());
+        prefs.set_pinned_validators(Vec::new());
         reloaded.write_prefs(&prefs).unwrap();
         let reloaded = Config::from_file(&config_path).unwrap();
-        assert!(reloaded.picked_validators().is_empty());
-        assert_eq!(reloaded.picked_collators(), collators);
+        assert!(reloaded.pinned_validators().is_empty());
+        assert_eq!(reloaded.pinned_collators(), collators);
     }
 
     #[test]

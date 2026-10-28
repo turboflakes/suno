@@ -220,6 +220,13 @@ impl ValidatorSpawner {
 // General chain fetcher tasks
 // ----
 
+/// How many keys, validators or collators, are fetched in parallel.
+const DEFAULT_CONCURRENCY: usize = 4;
+
+/// This is higher than `DEFAULT_CONCURRENCY` so that identities are fetched faster
+/// in parallel than other data.
+const IDENTITY_CONCURRENCY: usize = 8;
+
 pub fn spawn_fetch_era_data(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -350,7 +357,7 @@ pub fn spawn_fetch_collators_last_authored_block(
                 .fetch_collator_last_authored_block(&api, &stash)
                 .await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -362,7 +369,7 @@ pub fn spawn_fetch_collators_identity(
 ) {
     ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collator_identity(&api, &stash).await },
-        3,
+        IDENTITY_CONCURRENCY,
     );
 }
 
@@ -398,7 +405,7 @@ pub fn spawn_fetch_collators_next_keys(
 ) {
     ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collator_next_keys(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -495,7 +502,7 @@ pub fn spawn_fetch_validators_stake_overview(
         move |api, stash| async move {
             runtime.fetch_stake_overview(&api, era_index, &stash).await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -507,7 +514,7 @@ pub fn spawn_fetch_validators_staking_ledger(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_stake_ledger(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -519,7 +526,7 @@ pub fn spawn_fetch_validators_points(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_points(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -534,7 +541,7 @@ pub fn spawn_fetch_validators_prefs(
         move |api, stash| async move {
             runtime.fetch_validator_prefs(&api, era_index, &stash).await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -546,7 +553,7 @@ pub fn spawn_fetch_validators_prefs_next(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_prefs_next(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -558,7 +565,7 @@ pub fn spawn_fetch_validators_payee(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_payee(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -570,7 +577,7 @@ pub fn spawn_fetch_validators_next_keys(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_next_keys(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -582,7 +589,7 @@ pub fn spawn_fetch_validators_identity(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_identity(&api, &stash).await },
-        3,
+        IDENTITY_CONCURRENCY,
     );
 }
 
@@ -600,7 +607,7 @@ pub fn spawn_fetch_validators_proxy_status(
                 .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
                 .await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -618,7 +625,7 @@ pub fn spawn_fetch_collators_proxy_status(
                 .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
                 .await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -630,7 +637,7 @@ pub fn spawn_fetch_validators_account_balance(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validators_account_balance(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -642,7 +649,7 @@ pub fn spawn_fetch_collators_account_balance(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collators_account_balance(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 

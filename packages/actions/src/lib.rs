@@ -39,6 +39,8 @@ pub enum Action {
     Popup(PopupAction),
     /// Input related actions
     Input(InputAction),
+    /// Filter of the list displayed
+    Filter(FilterAction),
     /// Network related actions
     Chain(ChainAction),
     /// Validator actions
@@ -72,8 +74,7 @@ pub enum NavigationAction {
     Copy,
     ToggleMask,
     ToggleView,
-    /// Space: add the selected validator or collator to the favourites, or remove it
-    ToggleFavourite,
+    TogglePin,
 }
 
 type SpecVersion = u32;
@@ -133,6 +134,24 @@ pub enum InputAction {
     Paste(String),
     Success(String),
     Error(String),
+}
+
+/// Actions of the filter shown on top of the validators and the collators lists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterAction {
+    /// Start typing the filter of the list displayed
+    Open,
+    /// Start typing the filter of the list displayed, with the character typed in the list
+    Start(char),
+    Char(char),
+    Delete,
+    CursorLeft,
+    CursorRight,
+    Paste(String),
+    /// Keep the filter and go to the list, to select its first row
+    Select,
+    /// Remove the filter
+    Clear,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

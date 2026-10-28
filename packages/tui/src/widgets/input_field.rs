@@ -1,6 +1,7 @@
 use crate::widgets::spinner::Spinner;
 use crate::widgets::{
-    input_command::InputCommandWidget, input_filter::InputFilterWidget,
+    input_command::InputCommandWidget,
+    input_filter::{InputFilterWidget, InputInlineFilterWidget},
     input_password::InputPasswordWidget,
 };
 use ratatui::layout::Position;
@@ -486,6 +487,14 @@ impl InputFieldWidget {
         }
     }
 
+    pub fn as_inline_filter(&self, theme: Theme, matches: usize) -> InputInlineFilterWidget {
+        InputInlineFilterWidget {
+            state: self.state.clone(),
+            theme,
+            matches,
+        }
+    }
+
     pub fn as_filter(
         &self,
         theme: Theme,
@@ -502,6 +511,13 @@ impl InputFieldWidget {
 }
 
 impl InputFieldWidget {
+    /// An input to filter, which is not being edited.
+    pub fn new_filter() -> Self {
+        let mut input = Self::new();
+        input.reset_as_filter();
+        input
+    }
+
     pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(InputField::new())),

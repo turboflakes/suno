@@ -149,6 +149,7 @@ const CUSTOM_COMMANDS: &[HelpEntry] = &[
 ];
 
 const KEYBINDINGS: &[HelpEntry] = &[
+    ("/ or ctrl+e ", "Show commands."),
     (
         "tab ",
         "Input focus, Autocomplete or Navigate between pane sections and the main window.",
@@ -156,13 +157,15 @@ const KEYBINDINGS: &[HelpEntry] = &[
     ("esc ", "Close popup or Go back."),
     (
         "space ",
-        "Toggle as favourite the selected validator or collator.",
+        "Pin the selected validator or collator, or unpin it. Not for the ones listed in the config.",
     ),
-    ("/ ", "Show commands."),
-    ("ctrl+e ", "Show commands."),
     ("ctrl+w ", "Switch to the next window."),
     ("ctrl+m ", "Toggle mask on hosts."),
     ("ctrl+t ", "Show list of available themes."),
+    (
+        "ctrl+f ",
+        "Filter the validators or the collators by identity or address.",
+    ),
     ("ctrl+v ", "Toggle between grouped and listed view."),
     (
         "ctrl+h/ctrl+l/left/right ",

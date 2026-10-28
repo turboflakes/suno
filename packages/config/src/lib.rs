@@ -14,13 +14,13 @@ mod vault;
 
 pub use crate::access::{NodeAccess, SshConfig};
 pub use crate::config::{
-    save_active_theme, save_picked_collators, save_picked_validators, ChainConfig, Config,
+    save_active_theme, save_pinned_collators, save_pinned_validators, ChainConfig, Config,
     Features, Host, NodeConfig, Subcommand, CONFIG,
 };
 pub use crate::custom::{CommandKind, CustomCalls, CustomCommand};
 pub use crate::error::Error;
 pub use crate::fetch::fetch_validators_from_source;
-pub use crate::prefs::PickedNode;
+pub use crate::prefs::PinnedNode;
 pub use crate::runtime::{Runtime, SupportedRuntime};
 pub use crate::substrate::{CustomConfig, CustomExtrinsicParamsBuilder};
 pub use crate::themes::Themes;

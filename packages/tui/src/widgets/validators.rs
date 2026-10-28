@@ -1,10 +1,11 @@
 use crate::widgets::list_focus::{ListFocus, VISIBLE_ROWS_MARGIN};
 use crate::widgets::validators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
+use crate::widgets::{input_field::InputFieldWidget, input_filter::matches_query};
 use ratatui::widgets::TableState;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subxt::utils::AccountId32;
-use suno_config::{fetch_validators_from_source, NodeConfig, PickedNode, SupportedRuntime, CONFIG};
+use suno_config::{fetch_validators_from_source, NodeConfig, PinnedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
@@ -28,7 +29,7 @@ struct RowGroup<'a> {
     validators: Vec<&'a Validator>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ValidatorsList {
     pub validators: HashMap<ValidatorKey, Validator>,
     pub validators_order: Vec<ValidatorKey>,
@@ -43,8 +44,14 @@ pub struct ValidatorsList {
     /// Validators only found on-chain whose data was requested already, since it is only
     /// fetched for the ones displayed.
     requested: HashSet<ValidatorKey>,
+    /// Validators whose identity was requested already
+    identity_requested: HashSet<ValidatorKey>,
     /// Whether the window with this list is the one displayed.
     visible: bool,
+    /// Filters the validators listed in the detailed view
+    filter: InputFieldWidget,
+    /// What is typed in the filter, in lowercase
+    query: String,
 }
 
 impl Default for ValidatorsList {
@@ -59,7 +66,10 @@ impl Default for ValidatorsList {
             masked: true,
             navigated: false,
             requested: HashSet::new(),
+            identity_requested: HashSet::new(),
             visible: false,
+            filter: InputFieldWidget::new_filter(),
+            query: String::new(),
         }
     }
 }
@@ -119,6 +129,7 @@ impl ValidatorsList {
         for key in &stale {
             self.validators.remove(key);
             self.requested.remove(key);
+            self.identity_requested.remove(key);
         }
         self.validators_order.retain(|key| !stale.contains(key));
 
@@ -306,6 +317,11 @@ impl ValidatorsList {
         self.focus.is_active()
     }
 
+    /// Whether a row is highlighted, which it isn't while the filter is being typed.
+    pub fn is_highlighted(&self) -> bool {
+        self.focus.is_highlighted()
+    }
+
     pub fn focus(&self) -> ListFocus {
         self.focus
     }
@@ -371,11 +387,61 @@ impl ValidatorsList {
 
         for key in &self.validators_order {
             if let Some(validator) = self.get_validator_by_key(key) {
-                grouped.entry(key.runtime).or_default().push(validator);
+                if self.matches_filter(validator) {
+                    grouped.entry(key.runtime).or_default().push(validator);
+                }
             }
         }
 
         grouped
+    }
+
+    pub fn filter(&self) -> &InputFieldWidget {
+        &self.filter
+    }
+
+    /// Edits the filter. When what is typed changes, the selection goes to the first validator
+    /// that still matches.
+    pub fn edit_filter(&mut self, edit: impl FnOnce(&mut InputFieldWidget)) {
+        edit(&mut self.filter);
+        let query = self.filter.raw_value().to_lowercase();
+        if query != self.query {
+            self.query = query;
+            self.select_first_match();
+        }
+    }
+
+    /// Whether something is typed in the filter.
+    pub fn is_filtered(&self) -> bool {
+        !self.query.is_empty()
+    }
+
+    /// How many validators match the filter.
+    pub fn count_matches(&self) -> usize {
+        self.validators_iter()
+            .filter(|v| self.matches_filter(v))
+            .count()
+    }
+
+    fn matches_filter(&self, validator: &Validator) -> bool {
+        matches_query(
+            &self.query,
+            &[&validator.display_identity(), validator.account.address()],
+        )
+    }
+
+    fn matches_filter_at(&self, index: usize) -> bool {
+        self.get_validator_by_index(index)
+            .is_some_and(|v| self.matches_filter(v))
+    }
+
+    /// Selects the first validator that can be selected and matches the filter, from the top.
+    pub fn select_first_match(&mut self) {
+        let first = (0..self.validators_order.len()).find(|i| {
+            (self.focus.selects_every_row() || self.is_tracked_at(*i)) && self.matches_filter_at(*i)
+        });
+        self.table_state.select(first);
+        self.scroll_offset = 0;
     }
 
     /// Height needed by [`ValidatorsCompactWidget`] to display every validator without scrolling.
@@ -386,6 +452,11 @@ impl ValidatorsList {
         let runtimes: HashSet<SupportedRuntime> = tracked.iter().map(|v| v.runtime()).collect();
         let rows = (tracked.len() + runtimes.len()).max(1);
         3 + rows as u16
+    }
+
+    /// The selected validator, only while its row is highlighted.
+    pub fn get_highlighted_ref(&self) -> Option<&Validator> {
+        self.is_highlighted().then(|| self.get_selected_ref())?
     }
 
     pub fn get_selected_ref(&self) -> Option<&Validator> {
@@ -499,14 +570,14 @@ impl ValidatorsList {
             }
         }
 
-        // The validators picked from the TUI, of the chains configured, unless already listed
+        // The validators pinned from the TUI, of the chains configured, unless already listed
         let configured: HashSet<SupportedRuntime> = chains
             .iter()
             .flat_map(|chain| chain.keys().copied())
             .collect();
-        for picked in CONFIG.picked_validators() {
-            let validator = Validator::with_origin(picked.chain, picked.stash, Origin::Picked);
-            if configured.contains(&picked.chain) && !self.validators.contains_key(validator.key())
+        for pinned in CONFIG.pinned_validators() {
+            let validator = Validator::with_origin(pinned.chain, pinned.stash, Origin::Pinned);
+            if configured.contains(&pinned.chain) && !self.validators.contains_key(validator.key())
             {
                 self.add_validator(validator);
             }
@@ -515,42 +586,39 @@ impl ValidatorsList {
         self.init_table();
     }
 
-    /// Picks the validator, as a favourite, when it was only found on-chain, and the other way
+    /// Pins the validator when it was only found on-chain, and the other way
     /// around. The validators listed by the config are always tracked, so they stay as they are.
     /// Returns the new origin of the validator, if it changed.
-    pub fn toggle_picked(&mut self, key: &ValidatorKey) -> Option<Origin> {
+    pub fn toggle_pinned(&mut self, key: &ValidatorKey) -> Option<Origin> {
         let validator = self.validators.get_mut(key)?;
-        validator.origin = match validator.origin {
-            Origin::OnChain => Origin::Picked,
-            Origin::Picked => Origin::OnChain,
-            Origin::Config | Origin::Remote => return None,
-        };
-        let origin = validator.origin;
+        let origin = validator.origin.toggle()?;
+        validator.origin = origin;
 
         // The selection can only be on a tracked validator, outside of the main window
-        if self.focus != ListFocus::Main {
+        if !self.focus.selects_every_row() {
             self.select_nearest_tracked();
         }
         Some(origin)
     }
 
-    /// The validators picked from the TUI, to be persisted.
-    pub fn get_picked(&self) -> Vec<PickedNode> {
+    /// The validators pinned from the TUI, to be persisted.
+    pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.validators_iter()
-            .filter(|v| v.origin == Origin::Picked)
-            .map(|v| PickedNode {
+            .filter(|v| v.origin.is_pinned())
+            .map(|v| PinnedNode {
                 chain: v.runtime(),
                 stash: v.account.stash(),
             })
             .collect()
     }
 
-    /// Removes the validator from the list, e.g. when it is no longer picked and the validators
+    /// Removes the validator from the list, e.g. when it is no longer pinned and the validators
     /// only found on-chain are not listed.
     pub fn remove(&mut self, key: &ValidatorKey) {
         let selected = self.selected_key().filter(|selected| selected != key);
         self.validators.remove(key);
         self.requested.remove(key);
+        self.identity_requested.remove(key);
         self.validators_order.retain(|k| k != key);
         self.restore_selection(selected);
     }
@@ -614,8 +682,9 @@ impl ValidatorsList {
     /// since they are not listed in the compact view the selection is driven from.
     fn move_selection(&mut self, forward: bool) -> Option<Validator> {
         let len = self.validators_order.len();
-        let can_select =
-            |list: &Self, i: usize| list.focus == ListFocus::Main || list.is_tracked_at(i);
+        let can_select = |list: &Self, i: usize| {
+            (list.focus.selects_every_row() || list.is_tracked_at(i)) && list.matches_filter_at(i)
+        };
 
         // Nothing selected yet, e.g. no validator is tracked: start from the first one the
         // focus allows
@@ -698,9 +767,9 @@ impl ValidatorsList {
     /// Sets where the focus is. Back from the main window, where every validator can be selected,
     /// the selection moves to the nearest tracked one, the only ones the compact list has.
     pub fn set_focus(&mut self, focus: ListFocus) {
-        let was_main = self.focus == ListFocus::Main;
+        let was_every_row = self.focus.selects_every_row();
         self.focus = focus;
-        if was_main && focus != ListFocus::Main {
+        if was_every_row && !focus.selects_every_row() {
             self.select_nearest_tracked();
         }
     }
@@ -765,6 +834,28 @@ impl ValidatorsList {
             }
         }
         by_runtime
+    }
+
+    /// The validators whose identity wasn't requested yet, by relay chain. The identity is
+    /// fetched for every validator, listed or not, since it is what identifies them.
+    pub fn get_keys_without_identity_requested(
+        &self,
+    ) -> HashMap<SupportedRuntime, Vec<ValidatorKey>> {
+        let mut by_runtime: HashMap<SupportedRuntime, Vec<ValidatorKey>> = HashMap::new();
+        for validator in self.validators_iter() {
+            if validator.identity().is_none() && !self.identity_requested.contains(validator.key())
+            {
+                by_runtime
+                    .entry(validator.runtime())
+                    .or_default()
+                    .push(validator.key().clone());
+            }
+        }
+        by_runtime
+    }
+
+    pub fn mark_identity_requested(&mut self, keys: &[ValidatorKey]) {
+        self.identity_requested.extend(keys.iter().cloned());
     }
 
     /// Keys to sync periodically: the tracked validators and the on-chain only ones visible.
