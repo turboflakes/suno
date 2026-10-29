@@ -381,6 +381,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.push(Span::styled("clear".to_string(), theme.paragraph.label));
     } else if has_selection {
         legend.push(Span::raw("   "));
+        if let Some(hint) = app.toggle_hint() {
+            legend.push(Span::styled("space".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
+            legend.push(Span::raw("   "));
+        }
         legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         let up_down = if app.window.is_help_selected() {
@@ -409,17 +415,11 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        if let Some(hint) = app.toggle_hint() {
-            legend.push(Span::styled("space".to_string(), theme.paragraph.base));
-            legend.push(Span::raw(" "));
-            legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
-            legend.push(Span::raw("   "));
-        }
         if app.collators.is_active() && app.window.is_collators_selected() {
             legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
             legend.push(Span::styled(
-                "change view".to_string(),
+                "switch view".to_string(),
                 theme.paragraph.label,
             ));
             legend.push(Span::raw("   "));
