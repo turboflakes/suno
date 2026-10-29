@@ -30,6 +30,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Open the theme selection popup
                 KeyCode::Char('t') => Action::Popup(PopupAction::OpenThemeMenu),
+                // Open the features popup, to switch them on and off
+                KeyCode::Char('o') => Action::Popup(PopupAction::OpenFeatures),
                 // Filter the list of validators or collators displayed
                 KeyCode::Char('f') => Action::Filter(FilterAction::Open),
                 // Select next main window/tab
@@ -123,6 +125,11 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
         KeyCode::Tab => Action::Input(InputAction::Editing),
+        // The features popup: select a feature, switch it on or off, or back to the config file
+        KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
+        KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        KeyCode::Char(' ') | KeyCode::Enter => Action::Popup(PopupAction::ToggleFeature),
+        KeyCode::Char('r') => Action::Popup(PopupAction::ResetFeature),
         KeyCode::Esc => Action::Popup(PopupAction::Cancel),
         _ => Action::System(SystemAction::Noop),
     }

@@ -330,6 +330,24 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 legend.push(Span::raw(" "));
                 legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
             }
+            PopupMode::Features => {
+                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
+                if let Some(state) = app.popup.get_selected_feature() {
+                    legend.push(Span::raw("   "));
+                    legend.push(Span::styled("space".to_string(), theme.paragraph.base));
+                    legend.push(Span::raw(" "));
+                    legend.push(Span::styled(
+                        state.toggle_label().to_string(),
+                        theme.paragraph.label,
+                    ));
+                }
+                legend.push(Span::raw("   "));
+                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
+                legend.push(Span::raw(" "));
+                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
+            }
             PopupMode::Confirmation => {
                 legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
                 legend.push(Span::raw(" "));
@@ -425,6 +443,10 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.push(Span::styled("ctrl+t".to_string(), theme.paragraph.base));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("themes".to_string(), theme.paragraph.label));
+        legend.push(Span::raw("   "));
+        legend.push(Span::styled("ctrl+o".to_string(), theme.paragraph.base));
+        legend.push(Span::raw(" "));
+        legend.push(Span::styled("options".to_string(), theme.paragraph.label));
     }
     // The navigation hints go together, `tab` between the sections and `ctrl+w` between the windows
     if app.popup.is_hidden() && app.focus != Focus::Filter {

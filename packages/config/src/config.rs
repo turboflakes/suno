@@ -1,6 +1,7 @@
 use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
+use crate::features::{Feature, Features, ALL_FEATURES};
 use crate::logs::Logs;
 use crate::prefs::{PinnedNode, Prefs};
 use crate::runtime::SupportedRuntime;
@@ -300,134 +301,6 @@ impl FromStr for NodeConfig {
     }
 }
 
-fn default_enable() -> bool {
-    true
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Features {
-    #[serde(default = "default_enable")]
-    enable_validators: bool,
-    #[serde(default = "default_enable")]
-    enable_collators: bool,
-    #[serde(default)]
-    enable_rpcs: bool,
-    #[serde(default = "default_enable")]
-    show_all_validators: bool,
-    #[serde(default = "default_enable")]
-    show_all_collators: bool,
-    #[serde(default = "default_enable")]
-    enable_check_update: bool,
-    #[serde(default = "default_enable")]
-    show_nominators_counter: bool,
-    #[serde(default = "default_enable")]
-    show_nominators_stake: bool,
-    #[serde(default = "default_enable")]
-    show_own_stake: bool,
-    #[serde(default)]
-    show_commission: bool,
-    #[serde(default = "default_enable")]
-    show_payee: bool,
-    #[serde(default = "default_enable")]
-    show_keys: bool,
-    #[serde(default = "default_enable")]
-    show_deposit: bool,
-    #[serde(default = "default_enable")]
-    show_last_block: bool,
-    #[serde(default = "default_enable")]
-    show_next_slot: bool,
-}
-
-impl Default for Features {
-    fn default() -> Self {
-        Self {
-            enable_validators: true,
-            enable_collators: true,
-            enable_rpcs: false,
-            show_all_validators: true,
-            show_all_collators: true,
-            enable_check_update: true,
-            show_nominators_counter: true,
-            show_nominators_stake: true,
-            show_own_stake: true,
-            show_commission: false,
-            show_payee: true,
-            show_keys: true,
-            show_deposit: true,
-            show_last_block: true,
-            show_next_slot: true,
-        }
-    }
-}
-
-impl Features {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn validators_enabled(&self) -> bool {
-        self.enable_validators
-    }
-
-    pub fn collators_enabled(&self) -> bool {
-        self.enable_collators
-    }
-
-    pub fn rpcs_enabled(&self) -> bool {
-        self.enable_rpcs
-    }
-
-    pub fn check_update_enabled(&self) -> bool {
-        self.enable_check_update
-    }
-
-    /// Every on-chain collator is listed, only if the collators are enabled.
-    pub fn all_collators_visible(&self) -> bool {
-        self.enable_collators && self.show_all_collators
-    }
-
-    /// Every on-chain validator is listed, only if the validators are enabled.
-    pub fn all_validators_visible(&self) -> bool {
-        self.enable_validators && self.show_all_validators
-    }
-
-    pub fn nominators_counter_visible(&self) -> bool {
-        self.show_nominators_counter
-    }
-
-    pub fn nominators_stake_visible(&self) -> bool {
-        self.show_nominators_stake
-    }
-
-    pub fn own_stake_visible(&self) -> bool {
-        self.show_own_stake
-    }
-
-    pub fn commission_visible(&self) -> bool {
-        self.show_commission
-    }
-
-    pub fn payee_visible(&self) -> bool {
-        self.show_payee
-    }
-
-    pub fn keys_visible(&self) -> bool {
-        self.show_keys
-    }
-
-    pub fn deposit_visible(&self) -> bool {
-        self.show_deposit
-    }
-
-    pub fn last_block_visible(&self) -> bool {
-        self.show_last_block
-    }
-
-    pub fn next_slot_visible(&self) -> bool {
-        self.show_next_slot
-    }
-}
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Explorer {
     url: Option<String>,
@@ -484,6 +357,13 @@ impl Config {
             config.themes.active = active;
         }
 
+        // Apply the features changed from the TUI. The ones that need a restart are applied now.
+        for (key, value) in config.read_prefs().features {
+            if let Some(feature) = Feature::from_key(&key) {
+                config.features.set(feature, value);
+            }
+        }
+
         Ok(config)
     }
 
@@ -517,6 +397,37 @@ impl Config {
     /// The collators pinned from the TUI, as saved in the prefs file.
     pub fn pinned_collators(&self) -> Vec<PinnedNode> {
         self.read_prefs().pinned_collators()
+    }
+
+    /// The features as set in the config file, before any change from the TUI. The file is read
+    /// again, defaults apply if it is missing or malformed.
+    fn file_features(&self) -> Features {
+        let Ok(content) = fs::read_to_string(&self.config_path) else {
+            return Features::default();
+        };
+        match serde_yaml::from_str::<Config>(&content) {
+            Ok(config) => config.features,
+            Err(_) => Features::default(),
+        }
+    }
+
+    /// Every feature with the value set from the TUI, if any, otherwise the one of the config
+    /// file.
+    pub fn feature_states(&self) -> Vec<FeatureState> {
+        let overrides = self.read_prefs().features;
+        let file = self.file_features();
+        ALL_FEATURES
+            .into_iter()
+            .map(|feature| {
+                let saved = overrides.get(feature.key()).copied();
+                FeatureState {
+                    feature,
+                    value: saved.unwrap_or_else(|| file.get(feature)),
+                    changed: saved.is_some_and(|value| value != file.get(feature)),
+                    running: self.features.get(feature),
+                }
+            })
+            .collect()
     }
 
     /// Reads the persisted active theme name, if the prefs file exists,
@@ -881,6 +792,66 @@ fn get_config() -> Result<Config, Error> {
     Ok(config)
 }
 
+/// A feature and its value, as listed in the TUI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FeatureState {
+    pub feature: Feature,
+    /// The value saved, which is the one in use unless the feature needs a restart.
+    pub value: bool,
+    /// Whether the value differs from the config file.
+    pub changed: bool,
+    /// The value in use right now.
+    pub running: bool,
+}
+
+impl FeatureState {
+    /// Whether the value only applies once the app is started again.
+    pub fn pending_restart(&self) -> bool {
+        self.value != self.running
+    }
+
+    /// The symbol shown for the value: filled when the feature is on.
+    pub fn symbol(&self) -> &'static str {
+        if self.value {
+            "●"
+        } else {
+            "○"
+        }
+    }
+
+    /// What toggling the feature does, to show as a hint.
+    pub fn toggle_label(&self) -> &'static str {
+        if self.value {
+            "disable"
+        } else {
+            "enable"
+        }
+    }
+
+    /// The value in the config file.
+    pub fn file_value(&self) -> bool {
+        self.value != self.changed
+    }
+}
+
+/// Sets a feature from the TUI and persists it, so it is restored on the next launch. The
+/// features that need a restart are only persisted. A value equal to the config file's is not
+/// kept. Failures are logged and otherwise ignored.
+pub fn save_feature(feature: Feature, value: bool) {
+    if !feature.needs_restart() {
+        CONFIG.features.set(feature, value);
+    }
+    let mut prefs = CONFIG.read_prefs();
+    if value == CONFIG.file_features().get(feature) {
+        prefs.features.remove(feature.key());
+    } else {
+        prefs.features.insert(feature.key().to_string(), value);
+    }
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the feature {}: {}", feature.key(), e);
+    }
+}
+
 /// Persists the active theme so it's restored on the next launch.
 /// Failures are logged and otherwise ignored, this is a nice-to-have.
 pub fn save_active_theme(name: &str) {
@@ -1063,7 +1034,7 @@ explorer:
         let config = Config::from_file(file.path()).unwrap();
 
         assert_eq!(config.chains.len(), 1);
-        assert!(config.features.enable_validators);
+        assert!(config.features.validators_enabled());
     }
 
     #[test]
@@ -1115,8 +1086,8 @@ explorer:
         let config = Config::from_file(file.path()).unwrap();
 
         assert_eq!(config.chains.len(), 3);
-        assert!(config.features.enable_validators);
-        assert!(config.features.enable_collators);
+        assert!(config.features.validators_enabled());
+        assert!(config.features.collators_enabled());
     }
 
     #[test]

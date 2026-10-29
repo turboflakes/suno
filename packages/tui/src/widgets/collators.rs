@@ -232,6 +232,18 @@ impl CollatorsList {
         self.restore_selection(selected);
     }
 
+    /// Removes the collators only found on-chain, e.g. when they are no longer listed.
+    pub fn remove_on_chain(&mut self) {
+        let keys: Vec<_> = self
+            .collators_iter()
+            .filter(|c| c.origin.is_onchain())
+            .map(|c| c.key().clone())
+            .collect();
+        for key in keys {
+            self.remove(&key);
+        }
+    }
+
     /// Moves the selection to the nearest tracked collator, the only ones the compact list has.
     fn select_nearest_tracked(&mut self) {
         if self.selected_collator_is_tracked() {

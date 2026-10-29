@@ -163,6 +163,10 @@ const KEYBINDINGS: &[HelpEntry] = &[
     ("ctrl+m ", "Toggle mask on hosts."),
     ("ctrl+t ", "Show list of available themes."),
     (
+        "ctrl+o ",
+        "Show the features, to switch them on or off. Some apply once suno starts again.",
+    ),
+    (
         "ctrl+f ",
         "Filter the validators or the collators by identity or address.",
     ),

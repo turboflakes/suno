@@ -17,6 +17,9 @@ pub(crate) struct Prefs {
     /// `chains` of the config file, so they can be moved there to be listed by the config.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     chains: Vec<HashMap<SupportedRuntime, PinnedChain>>,
+    /// The features changed from the TUI, by name, overriding the ones of the config file.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) features: BTreeMap<String, bool>,
 }
 
 /// The validators and the collators pinned from the TUI of a chain, as addresses in the format

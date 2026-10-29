@@ -623,6 +623,18 @@ impl ValidatorsList {
         self.restore_selection(selected);
     }
 
+    /// Removes the validators only found on-chain, e.g. when they are no longer listed.
+    pub fn remove_on_chain(&mut self) {
+        let keys: Vec<_> = self
+            .validators_iter()
+            .filter(|v| v.origin.is_onchain())
+            .map(|v| v.key().clone())
+            .collect();
+        for key in keys {
+            self.remove(&key);
+        }
+    }
+
     /// Moves the selection to the nearest tracked validator, the only ones the compact list has.
     fn select_nearest_tracked(&mut self) {
         if self.get_selected_ref().is_some_and(|v| v.is_tracked()) {

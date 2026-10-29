@@ -25,8 +25,8 @@ use suno_actions::{
     ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
-    save_active_theme, save_pinned_collators, save_pinned_validators, CommandKind, CustomCalls,
-    CustomCommand, NodeAccess, SupportedRuntime, CONFIG,
+    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators, CommandKind,
+    CustomCalls, CustomCommand, Feature, NodeAccess, SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -287,6 +287,9 @@ impl App {
         match action {
             PopupAction::Open => self.open_popup(),
             PopupAction::OpenThemeMenu => self.open_theme_menu(),
+            PopupAction::OpenFeatures => self.open_features(),
+            PopupAction::ToggleFeature => self.toggle_feature(),
+            PopupAction::ResetFeature => self.reset_feature(),
             PopupAction::ShowConfirmAndSign(ctx) => {
                 self.open_confirm_and_sign_popup(&ctx);
             }
@@ -2012,6 +2015,110 @@ impl App {
 
         // Dispatch focus to the input field so typing filters and up/down/enter/esc navigate.
         let _ = self.tx.send(Action::Input(InputAction::Editing));
+    }
+
+    /// Shows the features, to be switched on and off.
+    fn open_features(&mut self) {
+        if self.popup.is_visible() {
+            return;
+        }
+        self.popup.show_features(CONFIG.feature_states());
+        self.focus = Focus::Popup;
+    }
+
+    /// Switches the selected feature on or off.
+    fn toggle_feature(&mut self) {
+        if let Some(state) = self.popup.get_selected_feature() {
+            self.set_feature(state.feature, !state.value);
+        }
+    }
+
+    /// Sets the selected feature back to the value of the config file.
+    fn reset_feature(&mut self) {
+        if let Some(state) = self.popup.get_selected_feature() {
+            self.set_feature(state.feature, state.file_value());
+        }
+    }
+
+    /// Saves the feature, and updates what it affects right away: the columns are read when
+    /// rendered, and the validators or the collators only found on-chain are removed or
+    /// fetched.
+    fn set_feature(&mut self, feature: Feature, value: bool) {
+        save_feature(feature, value);
+        self.popup.update_features(CONFIG.feature_states());
+
+        match feature {
+            Feature::ShowAllValidators => {
+                if CONFIG.features().all_validators_visible() {
+                    self.fetch_all_validators();
+                } else {
+                    self.validators.remove_on_chain();
+                }
+            }
+            Feature::ShowAllCollators => {
+                if CONFIG.features().all_collators_visible() {
+                    self.fetch_all_collator_sets();
+                } else {
+                    self.collators.remove_on_chain();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Fetches the validators found on-chain of the connected relay chains, held on their
+    /// Asset Hub.
+    fn fetch_all_validators(&self) {
+        for chain in self.chains.chains_iter() {
+            let runtime = chain.runtime();
+            if !matches!(
+                runtime,
+                SupportedRuntime::AssetHubPolkadot
+                    | SupportedRuntime::AssetHubKusama
+                    | SupportedRuntime::AssetHubPaseo
+                    | SupportedRuntime::AssetHubWestend
+            ) {
+                continue;
+            }
+            if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    match api.at_block(block_hash).await.boxed() {
+                        Ok(api_at) => sync::spawn_fetch_all_validators(&api_at, runtime, &tx),
+                        Err(e) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Failed to client at_block: {}",
+                                e
+                            ))));
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /// Fetches the collators found on-chain of the connected system chains.
+    fn fetch_all_collator_sets(&self) {
+        for chain in self.chains.chains_iter() {
+            let runtime = chain.runtime();
+            if !runtime.is_para_chain() {
+                continue;
+            }
+            if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    match api.at_block(block_hash).await.boxed() {
+                        Ok(api_at) => sync::spawn_fetch_collator_sets(&api_at, runtime, &tx),
+                        Err(e) => {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "Failed to client at_block: {}",
+                                e
+                            ))));
+                        }
+                    }
+                });
+            }
+        }
     }
 
     /// Applies the theme named `name` from `CONFIG.theme_catalog()`, if any.

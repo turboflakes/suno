@@ -113,6 +113,9 @@ pub struct MetadataContext {
 pub enum PopupAction {
     Open,
     OpenThemeMenu,
+    OpenFeatures,
+    ToggleFeature,
+    ResetFeature,
     ShowConfirmAndSign(Box<ConfirmationContext>),
     ShowChainSpecsQrcode(Box<ChainSpecsContext>),
     ShowMetadataQrcode(Box<MetadataContext>),
