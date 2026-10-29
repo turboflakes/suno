@@ -465,7 +465,14 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         theme: Theme,
         symbol: &Span<'static>,
     ) -> Row<'static> {
-        Row::new(self.validator_cells(validator, selected, columns, era, masked, theme, symbol))
+        let row = Row::new(
+            self.validator_cells(validator, selected, columns, era, masked, theme, symbol),
+        );
+        if validator.is_waiting() {
+            row.style(Style::default().add_modifier(Modifier::DIM))
+        } else {
+            row
+        }
     }
 
     #[allow(clippy::too_many_arguments)]

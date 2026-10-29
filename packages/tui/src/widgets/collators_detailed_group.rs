@@ -5,7 +5,7 @@ use crate::widgets::spinner::current_frame;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::Styled,
+    style::{Modifier, Style, Styled},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
@@ -542,7 +542,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             }
         }
 
-        Row::new(cells)
+        let row = Row::new(cells);
+        if collator.is_unknown() {
+            row.style(Style::default().add_modifier(Modifier::DIM))
+        } else {
+            row
+        }
     }
 }
 
