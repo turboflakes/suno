@@ -1,17 +1,20 @@
 use crate::widgets::collators_detailed_group::{GROUP_HEADER_HEIGHT, PADDING};
 use crate::widgets::collators_detailed_list::group_header_height;
-use crate::widgets::list_focus::ListFocus;
+use crate::widgets::list_focus::{ListFocus, VISIBLE_ROWS_MARGIN};
+use crate::widgets::{input_field::InputFieldWidget, input_filter::matches_query};
 use ratatui::widgets::TableState;
 use sp_arithmetic::traits::Zero;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     time::{SystemTime, UNIX_EPOCH},
 };
-use suno_config::{NodeConfig, SupportedRuntime, CONFIG};
+use subxt::utils::AccountId32;
+use suno_config::{NodeConfig, PinnedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
     collator::{Collator, CollatorStatus},
     identity::Identity,
+    origin::Origin,
     proxy::ProxyKey,
     AccountDisplay, AccountKey,
 };
@@ -27,6 +30,12 @@ pub enum CollatorsView {
     List,
 }
 
+/// A group of collators in the detailed view displayed, and the row of its first collator.
+struct RowGroup<'a> {
+    first_row: u16,
+    collators: Vec<&'a Collator>,
+}
+
 #[derive(Debug)]
 pub struct CollatorsList {
     pub collators: HashMap<CollatorKey, Collator>,
@@ -37,6 +46,18 @@ pub struct CollatorsList {
     focus: ListFocus,
     view: CollatorsView,
     masked: bool,
+    /// Collators only found on-chain whose data was requested already, since it is only
+    /// fetched for the ones displayed.
+    requested: HashSet<CollatorKey>,
+    /// Collators whose identity was requested already
+    identity_requested: HashSet<CollatorKey>,
+    /// Whether the window with this list is the one displayed.
+    visible: bool,
+    /// Filters the collators listed in the detailed views
+    filter: InputFieldWidget,
+    /// What is typed in the filter, in lowercase
+    query: String,
+    navigated: bool,
 }
 
 impl Default for CollatorsList {
@@ -50,6 +71,12 @@ impl Default for CollatorsList {
             focus: ListFocus::default(),
             view: CollatorsView::default(),
             masked: true,
+            requested: HashSet::new(),
+            identity_requested: HashSet::new(),
+            visible: false,
+            filter: InputFieldWidget::new_filter(),
+            query: String::new(),
+            navigated: false,
         }
     }
 }
@@ -68,7 +95,60 @@ impl CollatorsList {
         self.collators.insert(key, collator);
     }
 
+    /// Adds the on-chain `accounts` of `runtime` that aren't known yet as untracked collators,
+    /// returning the keys of the ones just added.
+    fn add_onchain_collators(
+        &mut self,
+        runtime: SupportedRuntime,
+        accounts: impl IntoIterator<Item = AccountBytes>,
+    ) -> Vec<CollatorKey> {
+        let selected = self.selected_key();
+        let mut added = Vec::new();
+        for bytes in accounts {
+            let key = CollatorKey::from_bytes(runtime, bytes);
+            if self.collators.contains_key(&key) {
+                continue;
+            }
+            self.add_collator(Collator::new_on_chain(runtime, AccountId32::from(bytes)));
+            added.push(key);
+        }
+        // New collators are inserted in order, which shifts the selected index
+        if !added.is_empty() {
+            self.restore_selection(selected);
+        }
+        added
+    }
+
+    /// Removes the untracked collators of `runtime` that are no longer part of the on-chain
+    /// `keep` set. Tracked collators are never removed.
+    pub fn prune_untracked(&mut self, runtime: SupportedRuntime, keep: &HashSet<AccountBytes>) {
+        let stale: Vec<CollatorKey> = self
+            .collators
+            .iter()
+            .filter(|(key, c)| {
+                !c.is_tracked() && key.runtime == runtime && !keep.contains(&key.bytes)
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+        if stale.is_empty() {
+            return;
+        }
+
+        let selected = self.selected_key().filter(|key| !stale.contains(key));
+        for key in &stale {
+            self.collators.remove(key);
+            self.requested.remove(key);
+            self.identity_requested.remove(key);
+        }
+        self.collators_order.retain(|key| !stale.contains(key));
+        self.restore_selection(selected);
+    }
+
     pub fn on_init(&mut self) {
+        if !CONFIG.features().collators_enabled() {
+            return;
+        }
+
         let chains = CONFIG.chains();
         for chain in chains.iter() {
             for (chain_name, chain_config) in chain {
@@ -95,9 +175,88 @@ impl CollatorsList {
                 }
             }
         }
+
+        // The collators pinned from the TUI, of the chains configured, unless already listed
+        let configured: HashSet<SupportedRuntime> = chains
+            .iter()
+            .flat_map(|chain| chain.keys().copied())
+            .collect();
+        for pinned in CONFIG.pinned_collators() {
+            let key = CollatorKey::new(pinned.chain, pinned.stash);
+            if configured.contains(&pinned.chain) && !self.collators.contains_key(&key) {
+                let mut collator = Collator::new(pinned.chain, pinned.stash);
+                collator.origin = Origin::Pinned;
+                self.add_collator(collator);
+            }
+        }
+
         if !self.collators.is_empty() {
             self.table_state.select(Some(0));
         }
+    }
+
+    /// Pins the collator when it was only found on-chain, and the other way
+    /// around. The collators listed by the config are always tracked, so they stay as they are.
+    /// Returns the new origin of the collator, if it changed.
+    pub fn toggle_pinned(&mut self, key: &CollatorKey) -> Option<Origin> {
+        let collator = self.collators.get_mut(key)?;
+        let origin = collator.origin.toggle()?;
+        collator.origin = origin;
+
+        // The selection can only be on a tracked collator, outside of the main window
+        if !self.focus.selects_every_row() {
+            self.select_nearest_tracked();
+        }
+        Some(origin)
+    }
+
+    /// The collators pinned from the TUI, to be persisted.
+    pub fn get_pinned(&self) -> Vec<PinnedNode> {
+        self.collators_iter()
+            .filter(|c| c.origin.is_pinned())
+            .map(|c| PinnedNode {
+                chain: c.runtime(),
+                stash: c.account.stash(),
+            })
+            .collect()
+    }
+
+    /// Removes the collator from the list, e.g. when it is no longer pinned and the collators
+    /// only found on-chain are not listed.
+    pub fn remove(&mut self, key: &CollatorKey) {
+        let selected = self.selected_key().filter(|selected| selected != key);
+        self.collators.remove(key);
+        self.requested.remove(key);
+        self.identity_requested.remove(key);
+        self.collators_order.retain(|k| k != key);
+        self.restore_selection(selected);
+    }
+
+    /// Removes the collators only found on-chain, e.g. when they are no longer listed.
+    pub fn remove_on_chain(&mut self) {
+        let keys: Vec<_> = self
+            .collators_iter()
+            .filter(|c| c.origin.is_onchain())
+            .map(|c| c.key().clone())
+            .collect();
+        for key in keys {
+            self.remove(&key);
+        }
+    }
+
+    /// Moves the selection to the nearest tracked collator, the only ones the compact list has.
+    fn select_nearest_tracked(&mut self) {
+        if self.selected_collator_is_tracked() {
+            return;
+        }
+        let len = self.collators_order.len();
+        let nearest_tracked = self.table_state.selected().and_then(|sel| {
+            (0..len)
+                .map(|step| (sel + step) % len)
+                .find(|i| self.is_tracked_at(*i))
+        });
+        self.table_state.select(nearest_tracked);
+        self.ensure_selection_in_view();
     }
 
     /// Returns an iterator of collators in display order
@@ -133,15 +292,151 @@ impl CollatorsList {
             .collect()
     }
 
+    /// Keys of the collators with a row in the viewport of the detailed view displayed, plus a
+    /// a few rows of margin above and below, so the data is there before the row is scrolled to.
+    fn get_visible_keys(&self) -> Vec<CollatorKey> {
+        // Not displayed, or nothing was rendered yet
+        if !self.visible || self.viewport_height == 0 {
+            return Vec::new();
+        }
+
+        let margin = VISIBLE_ROWS_MARGIN;
+        let top = self.scroll_offset.saturating_sub(margin);
+        let bottom = self
+            .scroll_offset
+            .saturating_add(self.viewport_height)
+            .saturating_add(margin);
+
+        let mut keys = Vec::new();
+        for group in self.get_row_groups() {
+            for (i, collator) in group.collators.iter().enumerate() {
+                let row = group.first_row.saturating_add(i as u16);
+                if row >= top && row < bottom {
+                    keys.push(collator.key().clone());
+                }
+            }
+        }
+        keys
+    }
+
+    /// The collators only found on-chain that are visible and whose data wasn't requested yet,
+    /// by runtime. They are marked as requested, so they are returned once.
+    pub fn take_unrequested_visible(&mut self) -> HashMap<SupportedRuntime, Vec<CollatorKey>> {
+        let mut by_runtime: HashMap<SupportedRuntime, Vec<CollatorKey>> = HashMap::new();
+        for key in self.get_visible_keys() {
+            let is_on_chain = self.collators.get(&key).is_some_and(|c| !c.is_tracked());
+            if is_on_chain && self.requested.insert(key.clone()) {
+                by_runtime.entry(key.runtime).or_default().push(key);
+            }
+        }
+        by_runtime
+    }
+
+    /// Same as [`Self::get_collator_keys_by_runtime`], only for the tracked collators.
+    pub fn get_tracked_collator_keys_by_runtime(
+        &self,
+        runtime: SupportedRuntime,
+    ) -> Vec<CollatorKey> {
+        self.get_collator_keys_by_runtime(runtime)
+            .into_iter()
+            .filter(|key| self.collators.get(key).is_some_and(|c| c.is_tracked()))
+            .collect()
+    }
+
+    /// The collators whose identity wasn't requested yet, by relay chain. The identity is
+    /// fetched for every collator, listed or not, since it is what identifies them.
+    pub fn get_keys_without_identity_requested(
+        &self,
+    ) -> HashMap<SupportedRuntime, Vec<CollatorKey>> {
+        let mut by_relay_chain: HashMap<SupportedRuntime, Vec<CollatorKey>> = HashMap::new();
+        for collator in self.collators_iter() {
+            if collator.identity().is_none() && !self.identity_requested.contains(collator.key()) {
+                by_relay_chain
+                    .entry(collator.runtime().relay_chain())
+                    .or_default()
+                    .push(collator.key().clone());
+            }
+        }
+        by_relay_chain
+    }
+
+    pub fn mark_identity_requested(&mut self, keys: &[CollatorKey]) {
+        self.identity_requested.extend(keys.iter().cloned());
+    }
+
+    /// Keys to sync periodically: the tracked collators and the on-chain only ones visible.
+    pub fn get_tracked_and_visible_keys_by_runtime(
+        &self,
+        runtime: SupportedRuntime,
+    ) -> Vec<CollatorKey> {
+        let visible = self.get_visible_keys();
+        self.get_collator_keys_by_runtime(runtime)
+            .into_iter()
+            .filter(|key| {
+                self.collators.get(key).is_some_and(|c| c.is_tracked()) || visible.contains(key)
+            })
+            .collect()
+    }
+
+    pub fn filter(&self) -> &InputFieldWidget {
+        &self.filter
+    }
+
+    /// Edits the filter. When what is typed changes, the selection goes to the first collator
+    /// that still matches.
+    pub fn edit_filter(&mut self, edit: impl FnOnce(&mut InputFieldWidget)) {
+        edit(&mut self.filter);
+        let query = self.filter.raw_value().to_lowercase();
+        if query != self.query {
+            self.query = query;
+            self.select_first_match();
+        }
+    }
+
+    /// Whether something is typed in the filter.
+    pub fn is_filtered(&self) -> bool {
+        !self.query.is_empty()
+    }
+
+    /// How many collators match the filter.
+    pub fn count_matches(&self) -> usize {
+        self.collators_iter()
+            .filter(|c| self.matches_filter(c))
+            .count()
+    }
+
+    fn matches_filter(&self, collator: &Collator) -> bool {
+        matches_query(
+            &self.query,
+            &[&collator.display_identity(), collator.account.address()],
+        )
+    }
+
+    fn matches_filter_at(&self, index: usize) -> bool {
+        self.get_collator_by_index(index)
+            .is_some_and(|c| self.matches_filter(c))
+    }
+
+    /// Selects the first collator that can be selected and matches the filter, from the top.
+    pub fn select_first_match(&mut self) {
+        let first = (0..self.collators_order.len()).find(|i| {
+            (self.focus.selects_every_row() || self.is_tracked_at(*i)) && self.matches_filter_at(*i)
+        });
+        self.table_state.select(first);
+        self.scroll_offset = 0;
+    }
+
     pub fn get_collators_grouped_by_runtime(&self) -> BTreeMap<SupportedRuntime, Vec<&Collator>> {
         let mut grouped: BTreeMap<SupportedRuntime, Vec<&Collator>> = BTreeMap::new();
 
         for key in &self.collators_order {
             if let Some(collator) = self.collators.get(key) {
-                grouped
-                    .entry(collator.runtime())
-                    .or_default()
-                    .push(collator);
+                if self.matches_filter(collator) {
+                    grouped
+                        .entry(collator.runtime())
+                        .or_default()
+                        .push(collator);
+                }
             }
         }
 
@@ -158,10 +453,12 @@ impl CollatorsList {
 
         for key in &self.collators_order {
             if let Some(collator) = self.collators.get(key) {
-                grouped
-                    .entry(collator.runtime().relay_chain())
-                    .or_default()
-                    .push(collator);
+                if self.matches_filter(collator) {
+                    grouped
+                        .entry(collator.runtime().relay_chain())
+                        .or_default()
+                        .push(collator);
+                }
             }
         }
 
@@ -181,6 +478,11 @@ impl CollatorsList {
         self.viewport_height = height;
     }
 
+    /// The selected collator, only while its row is highlighted.
+    pub fn get_highlighted_ref(&self) -> Option<&Collator> {
+        self.is_highlighted().then(|| self.get_selected_ref())?
+    }
+
     pub fn get_selected_ref(&self) -> Option<&Collator> {
         self.table_state
             .selected()
@@ -189,6 +491,11 @@ impl CollatorsList {
 
     // Scroll to the selected collator if it's not in view
     pub fn ensure_selection_in_view(&mut self) {
+        // Nothing was rendered yet, so there is no viewport to scroll within
+        if self.viewport_height == 0 {
+            return;
+        }
+
         let selected_y_position = self.get_selected_y_position();
 
         if selected_y_position < self.scroll_offset {
@@ -202,53 +509,84 @@ impl CollatorsList {
     fn get_selected_y_position(&self) -> u16 {
         let selected_ref = self.get_selected_ref();
 
-        match self.view {
-            CollatorsView::Group => {
-                let grouped = self.get_collators_grouped_by_runtime();
-                // Groups get a one row top padding when more than one is displayed
-                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
-                let mut selected_y_position = 0;
-                for (_, collators) in grouped {
-                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
-                        // Top padding + header + index + table header
-                        return selected_y_position
-                            + top_padding
-                            + GROUP_HEADER_HEIGHT
-                            + idx as u16
-                            + 1;
-                    }
-                    selected_y_position += GROUP_HEADER_HEIGHT + collators.len() as u16 + PADDING;
+        self.get_row_groups()
+            .iter()
+            .find_map(|group| {
+                let idx = group
+                    .collators
+                    .iter()
+                    .position(|c| Some(*c) == selected_ref)?;
+                Some(group.first_row + idx as u16)
+            })
+            .unwrap_or(0)
+    }
+
+    /// The groups of collators as laid out in the detailed view displayed: by parachain in the
+    /// group view, and by relay chain, with a header per parachain, in the list view.
+    fn get_row_groups(&self) -> Vec<RowGroup<'_>> {
+        let groups: Vec<(u16, Vec<&Collator>)> = match self.view {
+            CollatorsView::Group => self
+                .get_collators_grouped_by_runtime()
+                .into_values()
+                .map(|collators| (GROUP_HEADER_HEIGHT, collators))
+                .collect(),
+            CollatorsView::List => self
+                .get_collators_grouped_by_relay_chain()
+                .into_values()
+                .map(|collators| (group_header_height(&collators), collators))
+                .collect(),
+        };
+
+        // Groups get a one row top padding when more than one is displayed
+        let top_padding = if groups.len() > 1 { 1 } else { 0 };
+        let mut group_y = 0u16;
+        groups
+            .into_iter()
+            .map(|(header_height, collators)| {
+                // Top padding + header + table header
+                let first_row = group_y + top_padding + header_height + 1;
+                group_y = group_y.saturating_add(header_height + collators.len() as u16 + PADDING);
+                RowGroup {
+                    first_row,
+                    collators,
                 }
-                0
-            }
-            CollatorsView::List => {
-                let grouped = self.get_collators_grouped_by_relay_chain();
-                // Groups get a one row top padding when more than one is displayed
-                let top_padding = if grouped.len() > 1 { 1 } else { 0 };
-                let mut selected_y_position = 0;
-                for (_, collators) in grouped {
-                    let header_height = group_header_height(&collators);
-                    if let Some(idx) = collators.iter().position(|c| Some(*c) == selected_ref) {
-                        // Top padding + header + index + table header
-                        return selected_y_position + top_padding + header_height + idx as u16 + 1;
-                    }
-                    selected_y_position += header_height + collators.len() as u16 + PADDING;
-                }
-                0
-            }
-        }
+            })
+            .collect()
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
     }
 
     pub fn is_active(&self) -> bool {
         self.focus.is_active()
     }
 
+    /// Whether a row is highlighted, which it isn't while the filter is being typed.
+    pub fn is_highlighted(&self) -> bool {
+        self.focus.is_highlighted()
+    }
+
     pub fn focus(&self) -> ListFocus {
         self.focus
     }
 
+    /// Sets where the focus is. Back from the main window, where every collator can be selected,
+    /// the selection moves to the nearest tracked one, the only ones the compact list has.
     pub fn set_focus(&mut self, focus: ListFocus) {
+        let was_every_row = self.focus.selects_every_row();
         self.focus = focus;
+        if was_every_row && !focus.selects_every_row() {
+            self.select_nearest_tracked();
+        }
+    }
+
+    fn selected_collator_is_tracked(&self) -> bool {
+        self.get_selected_ref().is_some_and(|c| c.is_tracked())
     }
 
     pub fn view(&self) -> CollatorsView {
@@ -295,37 +633,93 @@ impl CollatorsList {
     }
 
     pub fn move_down(&mut self) -> Option<Collator> {
-        if let Some(selected) = self.table_state.selected() {
-            if selected == self.collators_order.len() - 1 {
-                self.table_state.select_first();
-                self.scroll_offset = 0;
-            } else {
-                self.table_state.scroll_down_by(1);
-            }
-            self.ensure_selection_in_view();
-            self.table_state
-                .selected()
-                .and_then(|i| self.get_collator_by_index_cloned(i))
-        } else {
-            None
-        }
+        self.move_selection(true)
     }
 
     pub fn move_up(&mut self) -> Option<Collator> {
-        if let Some(selected) = self.table_state.selected() {
-            if selected == 0 {
-                let i = self.collators_order.len() - 1;
-                self.table_state.select(Some(i));
-            } else {
-                self.table_state.scroll_up_by(1);
-                self.scroll_offset = self.scroll_offset.saturating_sub(1);
+        self.move_selection(false)
+    }
+
+    /// Moves the selection to the next (or previous) collator, wrapping around. Unless the
+    /// main window is focused, untracked collators, the ones only found on-chain, are skipped
+    /// since they are not listed in the compact view the selection is driven from.
+    fn move_selection(&mut self, forward: bool) -> Option<Collator> {
+        let len = self.collators_order.len();
+        let can_select = |list: &Self, i: usize| {
+            (list.focus.selects_every_row() || list.is_tracked_at(i)) && list.matches_filter_at(i)
+        };
+
+        // Nothing selected yet, e.g. no collator is tracked: start from the first one the
+        // focus allows
+        let first = (0..len).find(|i| can_select(self, *i))?;
+        let selected = match self.table_state.selected() {
+            Some(selected) => selected,
+            None => {
+                self.navigated = true;
+                self.table_state.select(Some(first));
+                self.ensure_selection_in_view();
+                return self.get_collator_by_index_cloned(first);
             }
+        };
+
+        // The first time the selection is moved, start from the top instead of from wherever
+        // the selection happens to be
+        if !self.navigated {
+            self.navigated = true;
+            if selected != first {
+                self.scroll_offset = 0;
+                self.table_state.select(Some(first));
+                self.ensure_selection_in_view();
+                return self.get_collator_by_index_cloned(first);
+            }
+        }
+
+        let next = (1..=len)
+            .map(|step| {
+                if forward {
+                    (selected + step) % len
+                } else {
+                    (selected + len - step) % len
+                }
+            })
+            .find(|i| can_select(self, *i))?;
+
+        // Wrapped around to the beginning, start again from the top
+        if forward && next <= selected {
+            self.scroll_offset = 0;
+        }
+        self.table_state.select(Some(next));
+        self.ensure_selection_in_view();
+        self.get_collator_by_index_cloned(next)
+    }
+
+    fn is_tracked_at(&self, index: usize) -> bool {
+        self.get_collator_by_index(index)
+            .is_some_and(|c| c.is_tracked())
+    }
+
+    fn selected_key(&self) -> Option<CollatorKey> {
+        self.table_state
+            .selected()
+            .and_then(|i| self.collators_order.get(i))
+            .cloned()
+    }
+
+    /// Selects `key` again after the order changed, or the first tracked collator (the first one
+    /// when none is tracked) when there is no `key` or it is gone.
+    fn restore_selection(&mut self, key: Option<CollatorKey>) {
+        let index = key
+            .and_then(|key| self.collators_order.iter().position(|k| *k == key))
+            .or_else(|| (0..self.collators_order.len()).find(|i| self.is_tracked_at(*i)))
+            // None is tracked, e.g. only the on-chain collators are listed, so start from the
+            // first one to be able to move from there on the main window
+            .or_else(|| (!self.collators_order.is_empty()).then_some(0));
+        self.table_state.select(index);
+        // Only follow the selection while it is being used, otherwise keep showing the top
+        if self.focus.is_active() {
             self.ensure_selection_in_view();
-            self.table_state
-                .selected()
-                .and_then(|i| self.get_collator_by_index_cloned(i))
         } else {
-            None
+            self.scroll_offset = 0;
         }
     }
 
@@ -333,11 +727,18 @@ impl CollatorsList {
     ///
     /// Leaves collators already marked `Invulnerable` untouched, since that status
     /// takes priority regardless of the order the two fetches resolve in.
-    pub fn update_aura_authorities(
+    ///
+    /// With `is_all_collators_visible`, the authorities not known yet are added first, as on-chain only
+    /// collators, so they get a status too.
+    pub fn update_authorities(
         &mut self,
         runtime: SupportedRuntime,
         authorities: &[AccountBytes],
+        is_all_collators_visible: bool,
     ) {
+        if is_all_collators_visible {
+            self.add_onchain_collators(runtime, authorities.iter().copied());
+        }
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime && *collator.status() != CollatorStatus::Invulnerable {
                 let stash_bytes: AccountBytes = *collator.stash().as_ref();
@@ -354,11 +755,18 @@ impl CollatorsList {
 
     /// Marks the collators of `runtime` found in the invulnerable set, overriding
     /// whatever status they currently have.
+    ///
+    /// With `is_all_collators_visible`, the invulnerables not known yet are added first, as on-chain only
+    /// collators, so they get a status too.
     pub fn update_invulnerables(
         &mut self,
         runtime: SupportedRuntime,
         invulnerables: &[AccountBytes],
+        is_all_collators_visible: bool,
     ) {
+        if is_all_collators_visible {
+            self.add_onchain_collators(runtime, invulnerables.iter().copied());
+        }
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime {
                 let stash_bytes: AccountBytes = *collator.stash().as_ref();
@@ -373,11 +781,18 @@ impl CollatorsList {
     ///
     /// Leaves collators already marked `Invulnerable` or `Permissionless` untouched, since those status
     /// takes priority regardless of the order the fetches resolve in.
+    ///
+    /// With `is_all_collators_visible`, the candidates not known yet are added first, as on-chain only
+    /// collators, so they get a status too.
     pub fn update_candidates(
         &mut self,
         runtime: SupportedRuntime,
         candidates: &[(AccountBytes, Amount)],
+        is_all_collators_visible: bool,
     ) {
+        if is_all_collators_visible {
+            self.add_onchain_collators(runtime, candidates.iter().map(|(who, _)| *who));
+        }
         for collator in self.collators.values_mut() {
             if collator.runtime() == runtime {
                 let stash_bytes: AccountBytes = *collator.stash().as_ref();

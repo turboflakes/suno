@@ -39,6 +39,8 @@ pub enum Action {
     Popup(PopupAction),
     /// Input related actions
     Input(InputAction),
+    /// Filter of the list displayed
+    Filter(FilterAction),
     /// Network related actions
     Chain(ChainAction),
     /// Validator actions
@@ -64,14 +66,15 @@ pub enum NavigationAction {
     ExtendDown,
     SectionUp,
     SectionDown,
-    MoveLeft,
-    MoveRight,
+    PrevTab,
+    NextTab,
     NextWindow,
     PrevWindow,
     Reset,
     Copy,
     ToggleMask,
     ToggleView,
+    TogglePin,
 }
 
 type SpecVersion = u32;
@@ -110,6 +113,9 @@ pub struct MetadataContext {
 pub enum PopupAction {
     Open,
     OpenThemeMenu,
+    OpenFeatures,
+    ToggleFeature,
+    ResetFeature,
     ShowConfirmAndSign(Box<ConfirmationContext>),
     ShowChainSpecsQrcode(Box<ChainSpecsContext>),
     ShowMetadataQrcode(Box<MetadataContext>),
@@ -131,6 +137,24 @@ pub enum InputAction {
     Paste(String),
     Success(String),
     Error(String),
+}
+
+/// Actions of the filter shown on top of the validators and the collators lists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterAction {
+    /// Start typing the filter of the list displayed
+    Open,
+    /// Start typing the filter of the list displayed, with the character typed in the list
+    Start(char),
+    Char(char),
+    Delete,
+    CursorLeft,
+    CursorRight,
+    Paste(String),
+    /// Keep the filter and go to the list, to select its first row
+    Select,
+    /// Remove the filter
+    Clear,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,6 +194,7 @@ pub enum CollatorAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorAction {
+    UpdateAllValidators(SupportedRuntime, Vec<AccountBytes>),
     UpdateValidatorPrefs(ValidatorKey, ValidatorPrefs),
     UpdateValidatorPrefsNext(ValidatorKey, ValidatorPrefs),
     UpdatePoints(ValidatorKey, Points),

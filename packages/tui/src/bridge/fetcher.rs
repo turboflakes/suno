@@ -67,6 +67,11 @@ pub trait RuntimeFetcher {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
+    async fn fetch_all_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
     async fn fetch_validators_queued_keys(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -407,6 +412,19 @@ impl RuntimeFetcher for Runtime {
             Runtime::Westend => {
                 suno_westend::fetch_validators_authority_status(api, validator_keys).await
             }
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
+    async fn fetch_all_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_all_validators(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_all_validators(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_all_validators(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_all_validators(api).await,
             _ => Err(Error::UnsupportedRuntime(*self)),
         }
     }

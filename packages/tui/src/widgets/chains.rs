@@ -4,8 +4,8 @@ use crate::widgets::scrollbar::render_scrollbar;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::Styled,
-    text::Text,
+    style::{Modifier, Styled},
+    text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
 };
 use sp_arithmetic::Permill;
@@ -527,9 +527,21 @@ impl Widget for &mut ChainsList {
             Constraint::Length(1),
         ];
 
+        let title = "chains";
+        let title_span = if self.is_active {
+            Span::raw(format!(" {} ", title)).style(
+                theme
+                    .paragraph
+                    .header(true)
+                    .add_modifier(Modifier::REVERSED),
+            )
+        } else {
+            Span::raw(format!("{} ", title))
+        };
+
         let header_cells = vec![
             Cell::from(""),
-            Cell::from(Text::from("chains").alignment(Alignment::Left)),
+            Cell::from(Line::from(title_span)),
             Cell::from(Text::from("best").alignment(Alignment::Right)),
             Cell::from(Text::from("finalized").alignment(Alignment::Right)),
             Cell::from(""),

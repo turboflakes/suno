@@ -15,7 +15,7 @@ use ratatui::{
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
-use suno_config::SupportedRuntime;
+use suno_config::{FeatureState, SupportedRuntime};
 use suno_primitives::{
     call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
@@ -45,6 +45,10 @@ struct ChainContext {
     runtime: SupportedRuntime,
 }
 
+struct FeaturesContext {
+    states: Vec<FeatureState>,
+}
+
 struct ThemeMenuContext {
     names: Vec<String>,
     active_name: String,
@@ -69,6 +73,7 @@ enum Context {
     CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
     ThemeMenu(Box<ThemeMenuContext>),
+    Features(Box<FeaturesContext>),
     Confirmation(Box<ConfirmationContext>),
     Message(MessageContext),
     ChainSpecs(Box<ChainSpecsContext>),
@@ -83,6 +88,7 @@ impl Context {
             Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
+            Context::Features(_) => Mode::Features,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Message(_) => Mode::Message,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
@@ -97,6 +103,7 @@ pub enum Mode {
     Hidden,
     Menu,
     ThemeMenu,
+    Features,
     Confirmation,
     Message,
     ChainSpecs,
@@ -163,6 +170,9 @@ impl Popup {
                 self.input.reset_as_filter();
                 let index = ctx.names.iter().position(|n| n == &ctx.active_name);
                 self.table_state.select(index.or(Some(0)));
+            }
+            Context::Features(_) => {
+                self.table_state.select(Some(0));
             }
             Context::Confirmation(ctx) => {
                 if !ctx.runtime.is_qrcode_enabled() {
@@ -469,6 +479,42 @@ impl Popup {
         self.on_init(Context::ThemeMenu(Box::new(ctx)));
     }
 
+    pub fn show_features(&mut self, states: Vec<FeatureState>) {
+        self.on_init(Context::Features(Box::new(FeaturesContext { states })));
+    }
+
+    /// Lists the features again, e.g. after one changed, keeping the one selected.
+    pub fn update_features(&mut self, states: Vec<FeatureState>) {
+        if let Context::Features(ctx) = &mut self.context {
+            ctx.states = states;
+        }
+    }
+
+    /// The feature selected, when the popup is showing the features.
+    pub fn get_selected_feature(&self) -> Option<FeatureState> {
+        let Context::Features(ctx) = &self.context else {
+            return None;
+        };
+        ctx.states.get(self.table_state.selected()?).copied()
+    }
+
+    fn move_feature_selection(&mut self, forward: bool) {
+        let Context::Features(ctx) = &self.context else {
+            return;
+        };
+        let len = ctx.states.len();
+        if len == 0 {
+            return;
+        }
+        let selected = self.table_state.selected().unwrap_or(0).min(len - 1);
+        let next = if forward {
+            (selected + 1) % len
+        } else {
+            (selected + len - 1) % len
+        };
+        self.table_state.select(Some(next));
+    }
+
     /// Returns the theme names matching the current filter text, when the
     /// popup is showing the theme menu.
     pub fn get_theme_names_filtered(&self) -> Vec<String> {
@@ -559,6 +605,10 @@ impl Popup {
     }
 
     pub fn move_down(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::Features(_)) {
+            self.move_feature_selection(true);
+            return None;
+        }
         if matches!(self.context, Context::ThemeMenu(_)) {
             self.move_theme_selection(true);
             return None;
@@ -585,6 +635,10 @@ impl Popup {
     }
 
     pub fn move_up(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::Features(_)) {
+            self.move_feature_selection(false);
+            return None;
+        }
         if matches!(self.context, Context::ThemeMenu(_)) {
             self.move_theme_selection(false);
             return None;
@@ -690,6 +744,7 @@ impl Popup {
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
                 | Context::ThemeMenu(_)
+                | Context::Features(_)
                 | Context::ChainSpecs(_)
                 | Context::Metadata(_)
                 | Context::Confirmation(_)
@@ -829,6 +884,7 @@ impl Widget for &mut Popup {
         match self.get_mode() {
             Mode::Menu => self.render_menu(area, buf),
             Mode::ThemeMenu => self.render_theme_menu(area, buf),
+            Mode::Features => self.render_features(area, buf),
             Mode::Confirmation => self.render_confirm_and_sign(area, buf),
             Mode::Message => self.render_message(area, buf),
             Mode::ChainSpecs => self.render_chain_specs_qrcode(area, buf),
@@ -935,9 +991,10 @@ impl Popup {
     fn render_theme_menu(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
 
-        if !matches!(self.context, Context::ThemeMenu(_)) {
+        let Context::ThemeMenu(_) = &self.context else {
             return;
-        }
+        };
+
         let names = self.get_theme_names_filtered();
         let selected_display_name = self.get_selected_theme().map(|name| to_slug_body(&name));
 
@@ -989,6 +1046,78 @@ impl Popup {
         self.input
             .as_filter(theme, selected_display_name, has_match)
             .render(input_area, buf);
+    }
+
+    fn render_features(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+
+        let Context::Features(ctx) = &self.context else {
+            return;
+        };
+
+        let rows = ctx.states.iter().map(|state| {
+            let mark = if state.pending_restart() {
+                "restart required"
+            } else if state.changed {
+                "overridden"
+            } else {
+                ""
+            };
+            Row::new([
+                Cell::from(""),
+                Cell::from(state.symbol()),
+                Cell::from(state.feature.key()),
+                Cell::from(state.feature.scope().to_string()),
+                Cell::from(state.feature.description()),
+                Cell::from(Line::from(mark).alignment(Alignment::Right)),
+                Cell::from(""),
+            ])
+        });
+
+        let details_len = (ctx.states.len() as u16 + 2).clamp(4, 20);
+        let [top_area, details_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Max(details_len)])
+            .flex(Flex::End)
+            .areas(area);
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::new(1, 1, 1, 0));
+
+        let header = Line::from(vec![Span::styled("Options", theme.paragraph.header(true))])
+            .alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        let widths = [
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(24),
+            Constraint::Length(12),
+            Constraint::Fill(1),
+            Constraint::Length(16),
+            Constraint::Length(1),
+        ];
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::bottom(1));
+
+        let table = Table::new(rows, widths)
+            .block(block)
+            .header(
+                Row::new(["", "", "feature", "scope", "description", ""]).style(theme.table.header),
+            )
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(true));
+
+        Clear.render(details_area, buf);
+        StatefulWidget::render(table, details_area, buf, &mut self.table_state);
     }
 
     fn render_confirm_and_sign(&mut self, area: Rect, buf: &mut Buffer) {

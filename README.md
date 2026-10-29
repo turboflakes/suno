@@ -244,11 +244,19 @@ chains:
 features:
   enable_validators: true
   enable_check_update: true
+  show_all_validators: true
+  show_all_collators: true
+  # validators specific flags
   show_nominators_counter: true
   show_nominators_stake: true
   show_own_stake: true
   show_commission: false
   show_payee: true
+  # collators specific flags
+  show_deposit: true
+  show_last_block: true
+  show_next_slot: true
+  # validators/collators flags
   show_keys: true
   
 themes:

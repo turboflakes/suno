@@ -1,6 +1,8 @@
 use crate::app::Focus;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use suno_actions::{Action, InputAction, NavigationAction, PopupAction, SystemAction};
+use suno_actions::{
+    Action, FilterAction, InputAction, NavigationAction, PopupAction, SystemAction,
+};
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
@@ -28,6 +30,10 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Open the theme selection popup
                 KeyCode::Char('t') => Action::Popup(PopupAction::OpenThemeMenu),
+                // Open the features popup, to switch them on and off
+                KeyCode::Char('o') => Action::Popup(PopupAction::OpenFeatures),
+                // Filter the list of validators or collators displayed
+                KeyCode::Char('f') => Action::Filter(FilterAction::Open),
                 // Select next main window/tab
                 KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
                 // Mask/Unmask Host IP addresses
@@ -36,10 +42,10 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('v') => Action::Navigation(NavigationAction::ToggleView),
                 _ => match app_focus {
                     Focus::Main => match key_event.code {
-                        KeyCode::Char('h') => Action::Navigation(NavigationAction::MoveLeft),
+                        KeyCode::Char('h') => Action::Navigation(NavigationAction::PrevTab),
                         KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
                         KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
-                        KeyCode::Char('l') => Action::Navigation(NavigationAction::MoveRight),
+                        KeyCode::Char('l') => Action::Navigation(NavigationAction::NextTab),
                         _ => Action::System(SystemAction::Noop),
                     },
                     Focus::Input => match key_event.code {
@@ -60,6 +66,7 @@ fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) ->
         Focus::Main => handle_main_key_events(key_event),
         Focus::Popup | Focus::Scanner => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
+        Focus::Filter => handle_filter_key_events(key_event),
         // _ => Action::System(SystemAction::Noop),
     }
 }
@@ -70,10 +77,10 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Tab => Action::Navigation(NavigationAction::SectionDown),
         // Section Up on `BackTab`
         KeyCode::BackTab => Action::Navigation(NavigationAction::SectionUp),
-        // Next section, or next window when the main window is selected, on `Right`
-        KeyCode::Right => Action::Navigation(NavigationAction::MoveRight),
-        // Previous section, or previous window when the main window is selected, on `Left`
-        KeyCode::Left => Action::Navigation(NavigationAction::MoveLeft),
+        // Focus the window tabs, and then the next window, on `Right`
+        KeyCode::Right => Action::Navigation(NavigationAction::NextTab),
+        // Focus the window tabs, and then the previous window, on `Left`
+        KeyCode::Left => Action::Navigation(NavigationAction::PrevTab),
         // Extend the selection on `Shift+Up`
         KeyCode::Up if key_event.modifiers.contains(KeyModifiers::SHIFT) => {
             Action::Navigation(NavigationAction::ExtendUp)
@@ -86,6 +93,19 @@ fn handle_main_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         // Move Down on `Down` inside the active section or list
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        // Typing letters or digits starts the filter of the validators or the collators
+        KeyCode::Char(c)
+            if c.is_alphanumeric()
+                && !key_event
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            Action::Filter(FilterAction::Start(c))
+        }
+        // Pin or unpin the selected validator or collator on `Space`
+        KeyCode::Char(' ') => Action::Navigation(NavigationAction::TogglePin),
+        // Open popup within the active section on `/`, same as on `ctrl-e`
+        KeyCode::Char('/') => Action::Popup(PopupAction::Open),
         // Reset active selections
         KeyCode::Esc => Action::Navigation(NavigationAction::Reset),
         _ => Action::System(SystemAction::Noop),
@@ -105,7 +125,25 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
         KeyCode::Tab => Action::Input(InputAction::Editing),
+        // The features popup: select a feature, switch it on or off, or back to the config file
+        KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
+        KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
+        KeyCode::Char(' ') | KeyCode::Enter => Action::Popup(PopupAction::ToggleFeature),
+        KeyCode::Char('r') => Action::Popup(PopupAction::ResetFeature),
         KeyCode::Esc => Action::Popup(PopupAction::Cancel),
+        _ => Action::System(SystemAction::Noop),
+    }
+}
+
+fn handle_filter_key_events(key_event: KeyEvent) -> Action {
+    match key_event.code {
+        KeyCode::Char(c) => Action::Filter(FilterAction::Char(c)),
+        KeyCode::Backspace => Action::Filter(FilterAction::Delete),
+        KeyCode::Left => Action::Filter(FilterAction::CursorLeft),
+        KeyCode::Right => Action::Filter(FilterAction::CursorRight),
+        // Leave the input to the list, where the first row gets highlighted
+        KeyCode::Up | KeyCode::Down | KeyCode::Enter => Action::Filter(FilterAction::Select),
+        KeyCode::Esc => Action::Filter(FilterAction::Clear),
         _ => Action::System(SystemAction::Noop),
     }
 }

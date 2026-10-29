@@ -10,6 +10,7 @@ pub mod identity;
 pub mod key;
 pub mod network;
 pub mod node_account;
+pub mod origin;
 pub mod proxy;
 pub mod session;
 pub mod staking;

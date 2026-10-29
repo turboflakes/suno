@@ -1,5 +1,5 @@
 use crate::balance::{Amount, Balance};
-use crate::display::{format_planks, to_compact_string};
+use crate::display::{format_planks, to_address_string, to_compact_string};
 use crate::session::KeysError;
 use crate::{identity::Identity, key::AccountKey};
 use std::{
@@ -16,6 +16,11 @@ pub trait AccountDisplay {
 
     fn to_compact_string(&self, size: usize) -> String {
         to_compact_string(&self.stash(), self.account_format(), size)
+    }
+
+    /// The full SS58 address of the stash.
+    fn to_address_string(&self) -> String {
+        to_address_string(&self.stash(), self.account_format())
     }
 }
 
@@ -47,8 +52,13 @@ pub trait NodeHost {
 /// Common struct for shared fields
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeAccount {
+    /// The Node account key
     account_key: AccountKey,
+    /// The SS58 address of the stash, in the format of the network
+    address: String,
+    /// The identity of the stash, if known
     identity: Option<Identity>,
+    /// The balance of the stash
     balance: Balance,
 }
 
@@ -56,6 +66,7 @@ impl NodeAccount {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account_key: AccountKey::new(runtime, stash),
+            address: to_address_string(&stash, runtime.account_format()),
             identity: None,
             balance: Balance::default(),
         }
@@ -63,6 +74,11 @@ impl NodeAccount {
 
     pub fn account_key(&self) -> &AccountKey {
         &self.account_key
+    }
+
+    /// The SS58 address of the stash, in the format of the network.
+    pub fn address(&self) -> &str {
+        &self.address
     }
 
     pub fn runtime(&self) -> SupportedRuntime {
