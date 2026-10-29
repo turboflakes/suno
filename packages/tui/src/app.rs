@@ -2173,6 +2173,10 @@ impl App {
 
         match self.window {
             Window::Validators => {
+                // Toggle pin only from the main window, not from the compact list
+                if self.validators.focus() != ListFocus::Main {
+                    return;
+                }
                 let Some(key) = self.validators.get_selected_ref().map(|v| v.key().clone()) else {
                     return;
                 };
@@ -2186,6 +2190,10 @@ impl App {
                 save_pinned_validators(self.validators.get_pinned());
             }
             Window::Collators => {
+                // Toggle pin only from the main window, not from the compact list
+                if self.collators.focus() != ListFocus::Main {
+                    return;
+                }
                 let Some(key) = self.collators.get_selected_ref().map(|c| c.key().clone()) else {
                     return;
                 };
@@ -2202,11 +2210,16 @@ impl App {
         }
     }
 
-    /// Returns the hint to show in the legend when the highlighted validator or collator is toggled.
+    /// Returns the hint to show in the legend when the highlighted validator or collator is toggled,
+    /// which only happens from the main window.
     pub fn toggle_hint(&self) -> Option<&'static str> {
         let origin = match self.window {
-            Window::Validators => self.validators.get_highlighted_ref()?.origin,
-            Window::Collators => self.collators.get_highlighted_ref()?.origin,
+            Window::Validators if self.validators.focus() == ListFocus::Main => {
+                self.validators.get_highlighted_ref()?.origin
+            }
+            Window::Collators if self.collators.focus() == ListFocus::Main => {
+                self.collators.get_highlighted_ref()?.origin
+            }
             _ => return None,
         };
         origin.toggle_label()
