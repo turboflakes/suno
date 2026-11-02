@@ -560,6 +560,11 @@ impl Config {
         &self.chains
     }
 
+    /// The network launched from the CLI, e.g. `suno polkadot`, if any.
+    pub fn network(&self) -> Option<SupportedRuntime> {
+        self.network
+    }
+
     pub fn features(&self) -> &Features {
         &self.features
     }

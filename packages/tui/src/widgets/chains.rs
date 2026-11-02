@@ -506,13 +506,22 @@ impl Widget for &mut ChainsList {
             .set_style(theme.block.pane_header(self.is_active))
             .padding(Padding::symmetric(0, 1));
 
+        // When launched for a network, e.g. `suno polkadot`, the system chains are listed without
+        // the name of the relay chain, e.g. `Asset Hub`
+        let is_network = CONFIG.network().is_some();
+
         let rows = self.chains_iter().map(|chain| {
+            let name = if is_network {
+                chain.runtime().system_name()
+            } else {
+                chain.runtime().to_string()
+            };
             let elapsed = get_elapsed_millis(chain.finalized_block_ts());
             let progress = create_progress_bar_by_millis(elapsed, 6);
 
             Row::new(vec![
                 Text::from(""),
-                Text::from(format!("{}{}", chain.state(), chain.runtime())),
+                Text::from(format!("{}{}", chain.state(), name)),
                 Text::from(format!("#{}", chain.best_block())).alignment(Alignment::Right),
                 Text::from(format!("#{}", chain.finalized_block())).alignment(Alignment::Right),
                 Text::from(progress.to_string()).alignment(Alignment::Right),
