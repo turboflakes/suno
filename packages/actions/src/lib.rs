@@ -174,8 +174,6 @@ pub enum ChainAction {
     UpdateCurrentSlot(ChainKey, BlockNumber, u64),
     UpdateSlotDuration(ChainKey, u64),
     UpdateSessionIndex(ChainKey, u32),
-    FetchValidatorData(ValidatorKey),
-    FetchValidatorsData(SupportedRuntime, Vec<ValidatorKey>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

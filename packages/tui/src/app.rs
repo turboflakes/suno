@@ -493,8 +493,6 @@ impl App {
                 self.chains
                     .update_aura_slot_duration_ms(&chain_key, duration_ms);
             }
-
-            _ => {}
         }
     }
 
@@ -531,28 +529,12 @@ impl App {
 
     /// Fetches what the chain holds once it is connected.
     fn on_chain_connected(&mut self, runtime: SupportedRuntime) {
-        match runtime {
-            SupportedRuntime::Polkadot
-            | SupportedRuntime::Kusama
-            | SupportedRuntime::Paseo
-            | SupportedRuntime::Westend => self.on_relay_chain_connected(runtime),
-            SupportedRuntime::AssetHubPolkadot
-            | SupportedRuntime::AssetHubKusama
-            | SupportedRuntime::AssetHubPaseo
-            | SupportedRuntime::AssetHubWestend => self.on_asset_hub_connected(runtime),
-            SupportedRuntime::PeoplePolkadot
-            | SupportedRuntime::PeopleKusama
-            | SupportedRuntime::PeoplePaseo
-            | SupportedRuntime::PeopleWestend
-            | SupportedRuntime::BridgeHubPolkadot
-            | SupportedRuntime::BridgeHubKusama
-            | SupportedRuntime::CoretimePolkadot
-            | SupportedRuntime::CoretimeKusama
-            | SupportedRuntime::CollectivesPolkadot
-            | SupportedRuntime::CollectivesWestend
-            | SupportedRuntime::BulletinPolkadot
-            | SupportedRuntime::BulletinPaseo => self.on_system_chain_connected(runtime),
-            _ => {}
+        if runtime.is_relay_chain() {
+            self.on_relay_chain_connected(runtime);
+        } else if runtime.is_asset_hub() {
+            self.on_asset_hub_connected(runtime);
+        } else if runtime.is_para_chain() {
+            self.on_system_chain_connected(runtime);
         }
     }
 
@@ -661,163 +643,127 @@ impl App {
 
     /// Fetches the data to be synced at every finalized block, e.g. all validators points.
     fn on_finalized_block(&mut self, runtime: SupportedRuntime, block_hash: BlockHash) {
-        match runtime {
-            SupportedRuntime::Polkadot
-            | SupportedRuntime::Kusama
-            | SupportedRuntime::Paseo
-            | SupportedRuntime::Westend => {
-                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                    return;
-                };
-                let keys = self
-                    .validators
-                    .get_tracked_and_visible_keys_by_runtime(runtime);
-                self.spawn_at_block(chain.client().clone(), block_hash, move |api_at, tx| {
-                    sync::spawn_fetch_validators_points(api_at, runtime, &keys, tx)
-                });
-            }
-            _ => {}
+        if !runtime.is_relay_chain() {
+            return;
         }
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+        let keys = self
+            .validators
+            .get_tracked_and_visible_keys_by_runtime(runtime);
+        self.spawn_at_block(chain.client().clone(), block_hash, move |api_at, tx| {
+            sync::spawn_fetch_validators_points(api_at, runtime, &keys, tx)
+        });
     }
 
     /// Fetches the data to be synced whenever the era changes.
     fn on_era_changed(&mut self, runtime: SupportedRuntime, era_index: u32) {
-        match runtime {
-            SupportedRuntime::AssetHubPolkadot
-            | SupportedRuntime::AssetHubKusama
-            | SupportedRuntime::AssetHubPaseo
-            | SupportedRuntime::AssetHubWestend => {
-                let tracked_validator_keys = self
-                    .validators
-                    .get_tracked_validator_keys_by_runtime(runtime);
-                let tracked_and_visible_validator_keys = self
-                    .validators
-                    .get_tracked_and_visible_keys_by_runtime(runtime);
-                let is_all_validators_visible = CONFIG.features().all_validators_visible();
-
-                self.spawn_at_latest_block(runtime, move |api_at, tx| {
-                    if is_all_validators_visible {
-                        sync::spawn_fetch_all_validators(api_at, runtime, tx);
-                    }
-
-                    sync::spawn_fetch_active_validators_count(api_at, runtime, era_index, tx);
-                    sync::spawn_fetch_active_nominators_count(api_at, runtime, era_index, tx);
-                    sync::spawn_fetch_total_staked(api_at, runtime, era_index, tx);
-
-                    sync::spawn_fetch_validators_prefs(
-                        api_at,
-                        runtime,
-                        era_index,
-                        &tracked_validator_keys,
-                        tx,
-                    );
-                    sync::spawn_fetch_validators_stake_overview(
-                        api_at,
-                        runtime,
-                        era_index,
-                        &tracked_and_visible_validator_keys,
-                        tx,
-                    );
-                    sync::spawn_fetch_validators_era_points(
-                        api_at,
-                        runtime,
-                        era_index,
-                        &tracked_and_visible_validator_keys,
-                        tx,
-                    );
-                });
-            }
-            _ => {}
+        if !runtime.is_asset_hub() {
+            return;
         }
+
+        let tracked_validator_keys = self
+            .validators
+            .get_tracked_validator_keys_by_runtime(runtime);
+        let tracked_and_visible_validator_keys = self
+            .validators
+            .get_tracked_and_visible_keys_by_runtime(runtime);
+        let is_all_validators_visible = CONFIG.features().all_validators_visible();
+
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            if is_all_validators_visible {
+                sync::spawn_fetch_all_validators(api_at, runtime, tx);
+            }
+
+            sync::spawn_fetch_active_validators_count(api_at, runtime, era_index, tx);
+            sync::spawn_fetch_active_nominators_count(api_at, runtime, era_index, tx);
+            sync::spawn_fetch_total_staked(api_at, runtime, era_index, tx);
+
+            sync::spawn_fetch_validators_prefs(
+                api_at,
+                runtime,
+                era_index,
+                &tracked_validator_keys,
+                tx,
+            );
+            sync::spawn_fetch_validators_stake_overview(
+                api_at,
+                runtime,
+                era_index,
+                &tracked_and_visible_validator_keys,
+                tx,
+            );
+            sync::spawn_fetch_validators_era_points(
+                api_at,
+                runtime,
+                era_index,
+                &tracked_and_visible_validator_keys,
+                tx,
+            );
+        });
     }
 
     /// Fetches the data to be synced whenever the session changes.
     fn on_epoch_changed(&mut self, runtime: SupportedRuntime) {
-        match runtime {
-            SupportedRuntime::Polkadot
-            | SupportedRuntime::Kusama
-            | SupportedRuntime::Paseo
-            | SupportedRuntime::Westend => {
-                self.fetch_validators_status(runtime);
+        if runtime.is_relay_chain() {
+            self.fetch_validators_status(runtime);
 
-                let keys = self
-                    .validators
-                    .get_tracked_and_visible_keys_by_runtime(runtime);
-                self.spawn_at_latest_block(runtime, move |api_at, tx| {
-                    sync::spawn_fetch_validators_session_keys(api_at, runtime, &keys, tx);
-                });
+            let keys = self
+                .validators
+                .get_tracked_and_visible_keys_by_runtime(runtime);
+            self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                sync::spawn_fetch_validators_session_keys(api_at, runtime, &keys, tx);
+            });
 
-                // Aura's expected block time is derived from this relay chain's
-                // epoch data, so only fetch the collators last authored now that
-                // the epoch has just been processed above.
-                for para_runtime in [
-                    runtime.asset_hub_runtime(),
-                    runtime.people_runtime(),
-                    runtime.bridge_hub_runtime(),
-                    runtime.coretime_runtime(),
-                    runtime.collectives_runtime(),
-                    runtime.bulletin_runtime(),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    let collator_keys = self
-                        .collators
-                        .get_tracked_and_visible_keys_by_runtime(para_runtime);
-                    self.spawn_at_latest_block(para_runtime, move |api_at, tx| {
-                        sync::spawn_fetch_collators_last_authored_block(
-                            api_at,
-                            para_runtime,
-                            &collator_keys,
-                            tx,
-                        );
-                    });
-                }
-            }
-            SupportedRuntime::AssetHubPolkadot
-            | SupportedRuntime::AssetHubKusama
-            | SupportedRuntime::AssetHubPaseo
-            | SupportedRuntime::AssetHubWestend => {
-                self.spawn_at_latest_block(runtime, move |api_at, tx| {
-                    sync::spawn_fetch_total_validators_count(api_at, runtime, tx);
-                    sync::spawn_fetch_total_nominators_count(api_at, runtime, tx);
+            // Aura's expected block time is derived from this relay chain's
+            // epoch data, so only fetch the collators last authored now that
+            // the epoch has just been processed above.
+            for para_runtime in [
+                runtime.asset_hub_runtime(),
+                runtime.people_runtime(),
+                runtime.bridge_hub_runtime(),
+                runtime.coretime_runtime(),
+                runtime.collectives_runtime(),
+                runtime.bulletin_runtime(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                let collator_keys = self
+                    .collators
+                    .get_tracked_and_visible_keys_by_runtime(para_runtime);
+                self.spawn_at_latest_block(para_runtime, move |api_at, tx| {
+                    sync::spawn_fetch_collators_last_authored_block(
+                        api_at,
+                        para_runtime,
+                        &collator_keys,
+                        tx,
+                    );
                 });
             }
-            _ => {}
+        } else if runtime.is_asset_hub() {
+            self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                sync::spawn_fetch_total_validators_count(api_at, runtime, tx);
+                sync::spawn_fetch_total_nominators_count(api_at, runtime, tx);
+            });
         }
     }
 
     /// Fetches the collators sets and session keys of the system chains whenever their session
     /// changes.
     fn on_session_index_changed(&mut self, runtime: SupportedRuntime) {
-        match runtime {
-            SupportedRuntime::AssetHubPolkadot
-            | SupportedRuntime::AssetHubKusama
-            | SupportedRuntime::AssetHubPaseo
-            | SupportedRuntime::AssetHubWestend
-            | SupportedRuntime::BridgeHubPolkadot
-            | SupportedRuntime::BridgeHubKusama
-            | SupportedRuntime::CoretimePolkadot
-            | SupportedRuntime::CoretimeKusama
-            | SupportedRuntime::CollectivesPolkadot
-            | SupportedRuntime::CollectivesWestend
-            | SupportedRuntime::BulletinPolkadot
-            | SupportedRuntime::BulletinPaseo
-            | SupportedRuntime::PeoplePolkadot
-            | SupportedRuntime::PeopleKusama
-            | SupportedRuntime::PeoplePaseo
-            | SupportedRuntime::PeopleWestend => {
-                let collator_keys = self
-                    .collators
-                    .get_tracked_and_visible_keys_by_runtime(runtime);
-                self.spawn_at_latest_block(runtime, move |api_at, tx| {
-                    // Fetched on connected and every new session
-                    sync::spawn_fetch_collator_sets(api_at, runtime, tx);
-                    sync::spawn_fetch_collators_session_keys(api_at, runtime, &collator_keys, tx);
-                });
-            }
-            _ => {}
+        if !runtime.is_para_chain() {
+            return;
         }
+        let collator_keys = self
+            .collators
+            .get_tracked_and_visible_keys_by_runtime(runtime);
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            // Fetched on connected and every new session
+            sync::spawn_fetch_collator_sets(api_at, runtime, tx);
+            sync::spawn_fetch_collators_session_keys(api_at, runtime, &collator_keys, tx);
+        });
     }
 
     /// Runs `fetch` with the `api` at the block `block_hash`, on its own task. The `fetch` is
@@ -1985,13 +1931,7 @@ impl App {
     fn fetch_all_validators(&self) {
         for chain in self.chains.chains_iter() {
             let runtime = chain.runtime();
-            if !matches!(
-                runtime,
-                SupportedRuntime::AssetHubPolkadot
-                    | SupportedRuntime::AssetHubKusama
-                    | SupportedRuntime::AssetHubPaseo
-                    | SupportedRuntime::AssetHubWestend
-            ) {
+            if !runtime.is_asset_hub() {
                 continue;
             }
             self.spawn_at_latest_block(runtime, move |api_at, tx| {

@@ -460,15 +460,8 @@ impl Popup {
         }));
 
         if ctx.runtime.is_para_chain() {
-            let is_asset_hub = matches!(
-                ctx.runtime,
-                SupportedRuntime::AssetHubPolkadot
-                    | SupportedRuntime::AssetHubKusama
-                    | SupportedRuntime::AssetHubPaseo
-                    | SupportedRuntime::AssetHubWestend
-            );
             let mut calls = Vec::new();
-            if is_asset_hub {
+            if ctx.runtime.is_asset_hub() {
                 calls.push(Call::AddValidator { stash: None });
             }
             calls.push(Call::AddCollator { stash: None });
