@@ -93,18 +93,22 @@ impl ChainsList {
         false
     }
 
+    /// Returns true when the era changed.
     pub fn set_era(&mut self, chain_key: &ChainKey, data: Era) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
+            let changed = chain.era().as_ref() != Some(&data);
             chain.set_era(Some(data));
-            return true;
+            return changed;
         }
         false
     }
 
+    /// Returns true when the epoch changed.
     pub fn set_epoch(&mut self, chain_key: &ChainKey, data: Epoch) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
+            let changed = chain.epoch().as_ref() != Some(&data);
             chain.set_epoch(Some(data));
-            return true;
+            return changed;
         }
         false
     }
