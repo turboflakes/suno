@@ -463,6 +463,7 @@ impl App {
                             | SupportedRuntime::Kusama
                             | SupportedRuntime::Paseo
                             | SupportedRuntime::Westend => {
+                                self.fetch_validators_status(runtime);
                                 if let Some((api, block_hash)) =
                                     self.chains.get_api_and_block_hash(runtime)
                                 {
@@ -480,13 +481,6 @@ impl App {
                                         };
 
                                         sync::spawn_fetch_epoch_data(&api_at, runtime, &tx);
-
-                                        sync::spawn_fetch_validators_authority_status(
-                                            &api_at,
-                                            runtime,
-                                            &tracked_and_visible_validator_keys,
-                                            &tx,
-                                        );
 
                                         sync::spawn_fetch_validators_session_keys(
                                             &api_at,
@@ -828,6 +822,7 @@ impl App {
                     | SupportedRuntime::Kusama
                     | SupportedRuntime::Paseo
                     | SupportedRuntime::Westend => {
+                        self.fetch_validators_status(runtime);
                         if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime)
                         {
                             let tx = self.tx.clone();
@@ -841,13 +836,6 @@ impl App {
                                         return;
                                     }
                                 };
-
-                                sync::spawn_fetch_validators_authority_status(
-                                    &api_at,
-                                    runtime,
-                                    &tracked_and_visible_validator_keys,
-                                    &tx,
-                                );
 
                                 sync::spawn_fetch_validators_session_keys(
                                     &api_at,
@@ -1036,6 +1024,40 @@ impl App {
         }
     }
 
+    /// Fetches the authority status, active or waiting, of the `keys` validators of the relay
+    /// chain `runtime`.
+    fn fetch_validators_authority_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if keys.is_empty() {
+            return;
+        }
+        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) else {
+            return;
+        };
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            match api.at_block(block_hash).await.boxed() {
+                Ok(api_at) => {
+                    sync::spawn_fetch_validators_authority_status(&api_at, runtime, &keys, &tx)
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                        "Failed to client at_block: {}",
+                        e
+                    ))));
+                }
+            }
+        });
+    }
+
+    /// Fetches the authority status of all the validators of the relay chain `runtime`. It
+    /// takes the same reads of the session set as the status of only one, so it is fetched for
+    /// all of them when the chain connects, once the session changes, and when validators are
+    /// added.
+    fn fetch_validators_status(&self, runtime: SupportedRuntime) {
+        let keys = self.validators.get_validator_keys_by_runtime(runtime);
+        self.fetch_validators_authority_status(runtime, keys);
+    }
+
     /// Fetches the data of the validators only found on-chain that became visible. It runs on
     /// every tick, an event the app already handles, since what is visible changes with the
     /// selection, the scroll, the size of the terminal or the window displayed.
@@ -1168,7 +1190,10 @@ impl App {
                     return;
                 }
                 let runtime = runtime.relay_chain();
-                self.validators.update_all_validators(runtime, &stashes);
+                let added = self.validators.update_all_validators(runtime, &stashes);
+                if !added.is_empty() {
+                    self.fetch_validators_status(runtime);
+                }
             }
             ValidatorAction::UpdateValidatorPrefs(validator_key, prefs) => {
                 self.validators.update_prefs(&validator_key, prefs);
