@@ -601,6 +601,28 @@ impl ValidatorsList {
         Some(origin)
     }
 
+    /// Adds a validator pinned from the TUI, or pins the one found on-chain. Returns its key,
+    /// or none when it is already tracked.
+    pub fn add_pinned(
+        &mut self,
+        runtime: SupportedRuntime,
+        stash: AccountId32,
+    ) -> Option<ValidatorKey> {
+        let key = AccountKey::new(runtime, stash);
+        match self.validators.get(&key) {
+            Some(validator) if validator.is_tracked() => return None,
+            Some(_) => {
+                self.toggle_pinned(&key)?;
+            }
+            None => {
+                let selected = self.selected_key();
+                self.add_validator(Validator::with_origin(runtime, stash, Origin::Pinned));
+                self.restore_selection(selected);
+            }
+        }
+        Some(key)
+    }
+
     /// The validators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.validators_iter()

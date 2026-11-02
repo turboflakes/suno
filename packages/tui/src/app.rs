@@ -18,15 +18,18 @@ use crate::{
 };
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::str::{from_utf8, FromStr};
 use std::{collections::HashSet, io, thread, time::Duration};
+use subxt::utils::AccountId32;
 use suno_actions::{
     Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, FilterAction,
     InputAction, MetadataContext, NavigationAction, PopupAction, ScannerAction, SystemAction,
     ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
-    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators, CommandKind,
-    CustomCalls, CustomCommand, Feature, NodeAccess, SupportedRuntime, CONFIG,
+    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators,
+    save_proxy_account, CommandKind, CustomCalls, CustomCommand, Feature, NodeAccess,
+    SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -37,6 +40,7 @@ use suno_qrcode::{
     build::{
         build_chain_specs_qrcode_signed, build_chain_specs_qrcode_unsigned, build_metadata_payload,
         build_metadata_qrcode_signed, build_metadata_qrcode_unsigned, build_transaction_qrcode,
+        extract_address_from_qr,
     },
     scanner::Scanner,
     NetworkSpecsToSend,
@@ -290,6 +294,7 @@ impl App {
             PopupAction::OpenFeatures => self.open_features(),
             PopupAction::ToggleFeature => self.toggle_feature(),
             PopupAction::ResetFeature => self.reset_feature(),
+            PopupAction::Confirm => self.confirm_popup(),
             PopupAction::ShowConfirmAndSign(ctx) => {
                 self.open_confirm_and_sign_popup(&ctx);
             }
@@ -1634,7 +1639,11 @@ impl App {
                 self.popup.start_scanner(ctrl_tx);
             }
             ScannerAction::Decoded(bytes) => {
-                self.on_qr_decoded_signature(&bytes);
+                if self.popup.is_confirmation_mode() {
+                    self.on_qr_decoded_signature(&bytes);
+                } else if self.popup.is_scan_account_mode() {
+                    self.on_qr_decoded_address(&bytes);
+                };
             }
             ScannerAction::Frame(frame) => {
                 self.popup.update_scanner_frame(frame);
@@ -2024,6 +2033,55 @@ impl App {
 
         // Dispatch focus to the input field so typing filters and up/down/enter/esc navigate.
         let _ = self.tx.send(Action::Input(InputAction::Editing));
+    }
+
+    /// Enter on a popup that is not editing the input.
+    fn confirm_popup(&mut self) {
+        if self.popup.get_mode() == PopupMode::Features {
+            self.toggle_feature();
+        }
+    }
+
+    /// Adds the account of the `call`, found on the Asset Hub `runtime`. A validator is added to
+    /// its relay chain, and a collator to the Asset Hub.
+    fn add_account(&mut self, call: Call, runtime: SupportedRuntime) {
+        match call {
+            Call::AddValidator { stash: Some(stash) } => {
+                let relay = runtime.relay_chain();
+                if let Some(key) = self.validators.add_pinned(relay, stash) {
+                    save_pinned_validators(self.validators.get_pinned());
+                    self.fetch_validators_data(relay, vec![key]);
+                }
+            }
+            Call::AddCollator { stash: Some(stash) } => {
+                if let Some(key) = self.collators.add_pinned(runtime, stash) {
+                    save_pinned_collators(self.collators.get_pinned());
+                    self.fetch_collators_chain_data(runtime, vec![key]);
+                }
+            }
+            Call::AddProxyAccount {
+                account: Some(account),
+            } => save_proxy_account(runtime, account),
+            _ => return,
+        }
+        self.close_popup();
+    }
+
+    /// Handle decoded bytes from qr code when popup is in scan account mode
+    fn on_qr_decoded_address(&mut self, bytes: &[u8]) {
+        let Some((call, runtime)) = self.popup.get_scan_account() else {
+            return;
+        };
+        let account = from_utf8(bytes)
+            .ok()
+            .and_then(|text| AccountId32::from_str(extract_address_from_qr(text)).ok());
+        match account {
+            Some(account) => self.add_account(call.with_address(account), runtime),
+            None => {
+                error!("The QR code is not an address");
+                let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
+            }
+        }
     }
 
     /// Shows the features, to be switched on and off.
@@ -2528,7 +2586,21 @@ impl App {
             Call::Metadata { .. } => {
                 self.build_metadata_qrcode_popup(chain);
             }
+            Call::AddValidator { .. } | Call::AddCollator { .. } | Call::AddProxyAccount { .. } => {
+                self.add_or_scan_account(call, chain.runtime())
+            }
             _ => {}
+        }
+    }
+
+    /// Adds the account of the `call`, or scans its address from the Vault when none was given.
+    fn add_or_scan_account(&mut self, call: Call, runtime: SupportedRuntime) {
+        if call.address().is_some() {
+            self.add_account(call, runtime);
+        } else {
+            self.popup.show_scan_account(call, runtime);
+            self.focus = Focus::Popup;
+            let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
         }
     }
 
@@ -3342,7 +3414,9 @@ impl App {
             return;
         }
 
-        if self.data_section() == Section::Validators && self.popup.get_mode() == PopupMode::Menu {
+        // The chain commands take an address, e.g. `add_validator <address>`
+        let is_menu_section = matches!(self.data_section(), Section::Validators | Section::Chains);
+        if is_menu_section && self.popup.get_mode() == PopupMode::Menu {
             self.popup.insert_input_paste_data(data);
         };
     }

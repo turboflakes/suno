@@ -210,6 +210,30 @@ impl CollatorsList {
         Some(origin)
     }
 
+    /// Adds a collator pinned from the TUI, or pins the one found on-chain. Returns its key, or
+    /// none when it is already tracked.
+    pub fn add_pinned(
+        &mut self,
+        runtime: SupportedRuntime,
+        stash: AccountId32,
+    ) -> Option<CollatorKey> {
+        let key = CollatorKey::new(runtime, stash);
+        match self.collators.get(&key) {
+            Some(collator) if collator.is_tracked() => return None,
+            Some(_) => {
+                self.toggle_pinned(&key)?;
+            }
+            None => {
+                let selected = self.selected_key();
+                let mut collator = Collator::new(runtime, stash);
+                collator.origin = Origin::Pinned;
+                self.add_collator(collator);
+                self.restore_selection(selected);
+            }
+        }
+        Some(key)
+    }
+
     /// The collators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.collators_iter()

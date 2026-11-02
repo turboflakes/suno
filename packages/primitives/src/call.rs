@@ -84,6 +84,18 @@ pub enum Call {
     Metadata {
         chain_name: String,
     },
+    /// Adds a validator stash to the list, scanning its address from the Vault when not given
+    AddValidator {
+        stash: Option<AccountId32>,
+    },
+    /// Adds a collator to the list, scanning its address from the Vault when not given
+    AddCollator {
+        stash: Option<AccountId32>,
+    },
+    /// Sets the proxy account, scanning its address from the Vault when not given
+    AddProxyAccount {
+        account: Option<AccountId32>,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -139,6 +151,9 @@ impl Call {
                 "metadata" => Ok(Self::Metadata {
                     chain_name: "".to_string(),
                 }),
+                "add_validator" => Ok(Self::AddValidator { stash: None }),
+                "add_collator" => Ok(Self::AddCollator { stash: None }),
+                "add_proxy_account" => Ok(Self::AddProxyAccount { account: None }),
                 _ => {
                     // Match against custom commands by cmd designation or name
                     custom_commands
@@ -266,6 +281,15 @@ impl Call {
                     }
                     _ => Err(CallError::InvalidArgument(input.to_string())),
                 },
+                "add_validator" => Ok(Self::AddValidator {
+                    stash: Some(parse_address(args)?),
+                }),
+                "add_collator" => Ok(Self::AddCollator {
+                    stash: Some(parse_address(args)?),
+                }),
+                "add_proxy_account" => Ok(Self::AddProxyAccount {
+                    account: Some(parse_address(args)?),
+                }),
                 "take_candidate_slot" => match args.split_once(' ') {
                     None => Err(CallError::MissingArgumentSilent),
                     Some((deposit, target)) => {
@@ -292,6 +316,38 @@ impl Call {
     }
 }
 
+impl Call {
+    /// The address of the account to add, for the commands that add one.
+    pub fn address(&self) -> Option<AccountId32> {
+        match self {
+            Self::AddValidator { stash } | Self::AddCollator { stash } => *stash,
+            Self::AddProxyAccount { account } => *account,
+            _ => None,
+        }
+    }
+
+    /// The command that adds the account with the `address`, when it adds one.
+    pub fn with_address(self, address: AccountId32) -> Self {
+        match self {
+            Self::AddValidator { .. } => Self::AddValidator {
+                stash: Some(address),
+            },
+            Self::AddCollator { .. } => Self::AddCollator {
+                stash: Some(address),
+            },
+            Self::AddProxyAccount { .. } => Self::AddProxyAccount {
+                account: Some(address),
+            },
+            call => call,
+        }
+    }
+}
+
+fn parse_address(address: &str) -> Result<AccountId32, CallError> {
+    let address = address.trim();
+    AccountId32::from_str(address).map_err(|_| CallError::InvalidAddress(address.to_string()))
+}
+
 impl std::fmt::Display for Call {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -314,6 +370,9 @@ impl std::fmt::Display for Call {
             Self::Custom(custom) => write!(f, "{}", custom.base_cmd()),
             Self::ChainSpecs { .. } => write!(f, "chain_specs"),
             Self::Metadata { .. } => write!(f, "metadata"),
+            Self::AddValidator { .. } => write!(f, "add_validator"),
+            Self::AddCollator { .. } => write!(f, "add_collator"),
+            Self::AddProxyAccount { .. } => write!(f, "add_proxy_account"),
         }
     }
 }
@@ -389,6 +448,17 @@ impl ToDescription for Call {
             Self::Metadata { chain_name } => {
                 format!("Show metadata QR code for the {} network", chain_name)
             }
+            Self::AddValidator { .. } => {
+                "Add a validator stash, typing the address or scanning it from the Vault"
+                    .to_string()
+            }
+            Self::AddCollator { .. } => {
+                "Add a collator, typing the address or scanning it from the Vault".to_string()
+            }
+            Self::AddProxyAccount { .. } => {
+                "Set the proxy account, typing the address or scanning it from the Vault"
+                    .to_string()
+            }
         }
     }
 }
@@ -422,6 +492,9 @@ impl ToPlaceholder for Call {
             Self::Custom(custom) => custom.placeholder(),
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
+            Self::AddValidator { .. } => "add_validator [<address>]".to_string(),
+            Self::AddCollator { .. } => "add_collator [<address>]".to_string(),
+            Self::AddProxyAccount { .. } => "add_proxy_account [<address>]".to_string(),
         }
     }
 }
@@ -462,6 +535,9 @@ impl ToMethod for Call {
             Self::Custom(custom) => format!("custom.{}", custom.cmd()),
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
+            Self::AddValidator { .. } => "add_validator".to_string(),
+            Self::AddCollator { .. } => "add_collator".to_string(),
+            Self::AddProxyAccount { .. } => "add_proxy_account".to_string(),
         }
     }
 }

@@ -114,6 +114,7 @@ pub enum PopupAction {
     Open,
     OpenThemeMenu,
     OpenFeatures,
+    Confirm,
     ToggleFeature,
     ResetFeature,
     ShowConfirmAndSign(Box<ConfirmationContext>),

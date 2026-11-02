@@ -539,6 +539,12 @@ impl InputFieldWidget {
         state.cursor_position()
     }
 
+    pub fn unfocus(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.clear_mode();
+        state.reset_cursor_position();
+    }
+
     pub fn get_parsed_call(&self) -> Option<Call> {
         let state = self.state.read().unwrap();
         state.parsed_call()

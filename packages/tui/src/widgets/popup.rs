@@ -45,6 +45,13 @@ struct ChainContext {
     runtime: SupportedRuntime,
 }
 
+struct ScanAccountContext {
+    /// The command that adds the account, whose address is scanned
+    call: Call,
+    /// The chain the account is added from, the Asset Hub
+    runtime: SupportedRuntime,
+}
+
 struct FeaturesContext {
     states: Vec<FeatureState>,
 }
@@ -74,6 +81,7 @@ enum Context {
     ChainMenu(Box<ChainContext>),
     ThemeMenu(Box<ThemeMenuContext>),
     Features(Box<FeaturesContext>),
+    ScanAccount(Box<ScanAccountContext>),
     Confirmation(Box<ConfirmationContext>),
     Message(MessageContext),
     ChainSpecs(Box<ChainSpecsContext>),
@@ -89,6 +97,7 @@ impl Context {
             Context::ChainMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Features(_) => Mode::Features,
+            Context::ScanAccount(_) => Mode::ScanAccount,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Message(_) => Mode::Message,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
@@ -104,6 +113,7 @@ pub enum Mode {
     Menu,
     ThemeMenu,
     Features,
+    ScanAccount,
     Confirmation,
     Message,
     ChainSpecs,
@@ -174,6 +184,8 @@ impl Popup {
             Context::Features(_) => {
                 self.table_state.select(Some(0));
             }
+            // The input of the menu before is not displayed, so it has no cursor
+            Context::ScanAccount(_) => self.input.unfocus(),
             Context::Confirmation(ctx) => {
                 if !ctx.runtime.is_qrcode_enabled() {
                     self.input.reset_as_password();
@@ -447,6 +459,26 @@ impl Popup {
             bytes: None,
         }));
 
+        if ctx.runtime.is_para_chain() {
+            let is_asset_hub = matches!(
+                ctx.runtime,
+                SupportedRuntime::AssetHubPolkadot
+                    | SupportedRuntime::AssetHubKusama
+                    | SupportedRuntime::AssetHubPaseo
+                    | SupportedRuntime::AssetHubWestend
+            );
+            let mut calls = Vec::new();
+            if is_asset_hub {
+                calls.push(Call::AddValidator { stash: None });
+            }
+            calls.push(Call::AddCollator { stash: None });
+            calls.push(Call::AddProxyAccount { account: None });
+            for call in calls {
+                self.options
+                    .push(Entry::new(Command::Instruction { call, bytes: None }));
+            }
+        }
+
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
         }
@@ -477,6 +509,21 @@ impl Popup {
     pub fn show_theme_menu(&mut self, names: Vec<String>, active_name: String) {
         let ctx = ThemeMenuContext { names, active_name };
         self.on_init(Context::ThemeMenu(Box::new(ctx)));
+    }
+
+    pub fn show_scan_account(&mut self, call: Call, runtime: SupportedRuntime) {
+        self.on_init(Context::ScanAccount(Box::new(ScanAccountContext {
+            call,
+            runtime,
+        })));
+    }
+
+    /// The command that adds the account scanned, and the chain it is added from.
+    pub fn get_scan_account(&self) -> Option<(Call, SupportedRuntime)> {
+        let Context::ScanAccount(ctx) = &self.context else {
+            return None;
+        };
+        Some((ctx.call.clone(), ctx.runtime))
     }
 
     pub fn show_features(&mut self, states: Vec<FeatureState>) {
@@ -625,6 +672,7 @@ impl Popup {
             .selected()
             .unwrap_or(0)
             .min(options.len() - 1);
+
         let next = if selected == options.len() - 1 {
             0
         } else {
@@ -726,6 +774,10 @@ impl Popup {
         self.context.mode()
     }
 
+    pub fn is_scan_account_mode(&self) -> bool {
+        matches!(self.context, Context::ScanAccount(_))
+    }
+
     pub fn is_confirmation_mode(&self) -> bool {
         matches!(self.context, Context::Confirmation(_))
     }
@@ -745,6 +797,7 @@ impl Popup {
                 | Context::ChainMenu(_)
                 | Context::ThemeMenu(_)
                 | Context::Features(_)
+                | Context::ScanAccount(_)
                 | Context::ChainSpecs(_)
                 | Context::Metadata(_)
                 | Context::Confirmation(_)
@@ -885,6 +938,7 @@ impl Widget for &mut Popup {
             Mode::Menu => self.render_menu(area, buf),
             Mode::ThemeMenu => self.render_theme_menu(area, buf),
             Mode::Features => self.render_features(area, buf),
+            Mode::ScanAccount => self.render_scan_account(area, buf),
             Mode::Confirmation => self.render_confirm_and_sign(area, buf),
             Mode::Message => self.render_message(area, buf),
             Mode::ChainSpecs => self.render_chain_specs_qrcode(area, buf),
@@ -1118,6 +1172,49 @@ impl Popup {
 
         Clear.render(details_area, buf);
         StatefulWidget::render(table, details_area, buf, &mut self.table_state);
+    }
+
+    fn render_scan_account(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+
+        let Context::ScanAccount(_) = &self.context else {
+            return;
+        };
+
+        let title = "SCAN TO ADD ADDRESS";
+        let header = Line::from(vec![Span::styled(title, theme.paragraph.header(true))])
+            .alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(
+                Block::new()
+                    .style(theme.block.popup_header)
+                    .padding(Padding::proportional(1)),
+            )
+            .wrap(Wrap { trim: false });
+
+        let [top_area, scanner_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Length(22)])
+            .flex(Flex::End)
+            .areas(area);
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        Clear.render(scanner_area, buf);
+        Block::new()
+            .style(theme.qrcode.base)
+            .padding(Padding::proportional(1))
+            .render(scanner_area, buf);
+        if let Some(scanner) = self.scanner.as_mut() {
+            if let Some(frame) = scanner.frame_protocol.as_mut() {
+                ScannerWidget::new(frame)
+                    .set_title("Scan QR code")
+                    .set_title_style(theme.qrcode.title)
+                    .set_style(theme.qrcode.scanner)
+                    .render(scanner_area, buf);
+            }
+        }
     }
 
     fn render_confirm_and_sign(&mut self, area: Rect, buf: &mut Buffer) {

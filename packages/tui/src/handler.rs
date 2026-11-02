@@ -132,7 +132,8 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // The features popup: select a feature, switch it on or off, or back to the config file
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
-        KeyCode::Char(' ') | KeyCode::Enter => Action::Popup(PopupAction::ToggleFeature),
+        KeyCode::Char(' ') => Action::Popup(PopupAction::ToggleFeature),
+        KeyCode::Enter => Action::Popup(PopupAction::Confirm),
         KeyCode::Char('r') => Action::Popup(PopupAction::ResetFeature),
         KeyCode::Esc => Action::Popup(PopupAction::Cancel),
         _ => Action::System(SystemAction::Noop),
