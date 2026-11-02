@@ -1585,9 +1585,12 @@ impl App {
                 self.focus = Focus::Scanner;
 
                 let tx = self.tx.clone();
+                // The QR code is read as text, unless it is the signature of a transaction
+                let is_qrcode_text = self.popup.is_scan_account_mode();
                 let (ctrl_tx, mut ctrl_rx) = mpsc::unbounded_channel::<ThreadAction>();
                 thread::spawn(move || {
                     let mut scanner = match Scanner::new() {
+                        Ok(s) if !is_qrcode_text => s.as_signature(),
                         Ok(s) => s,
                         Err(e) => {
                             let _ = tx.send(Action::Scanner(ScannerAction::Error(e.to_string())));
