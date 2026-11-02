@@ -41,7 +41,6 @@ pub type Runtime = SupportedRuntime;
 #[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedRuntime {
-    Local,
     Polkadot,
     Kusama,
     Paseo,
@@ -89,7 +88,6 @@ pub enum SupportedRuntime {
 impl SupportedRuntime {
     pub fn relay_chain(&self) -> Self {
         match &self {
-            Self::Local => Self::Local,
             Self::Polkadot
             | Self::AssetHubPolkadot
             | Self::BridgeHubPolkadot
@@ -114,6 +112,16 @@ impl SupportedRuntime {
             | Self::CoretimeWestend
             | Self::CollectivesWestend => Self::Westend,
         }
+    }
+
+    pub fn is_asset_hub(&self) -> bool {
+        matches!(
+            self,
+            Self::AssetHubPolkadot
+                | Self::AssetHubKusama
+                | Self::AssetHubPaseo
+                | Self::AssetHubWestend
+        )
     }
 
     pub fn asset_hub_runtime(&self) -> Option<Self> {
@@ -523,7 +531,7 @@ impl SupportedRuntime {
     pub fn is_relay_chain(&self) -> bool {
         matches!(
             self,
-            Self::Local | Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend
+            Self::Polkadot | Self::Kusama | Self::Paseo | Self::Westend
         )
     }
 
@@ -552,7 +560,6 @@ impl SupportedRuntime {
 
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Local => "Local",
             Self::Polkadot => "Polkadot",
             Self::Kusama => "Kusama",
             Self::Westend => "Westend",
@@ -581,7 +588,6 @@ impl SupportedRuntime {
 
     pub fn as_str_long(&self) -> &'static str {
         match self {
-            Self::Local => "Local",
             Self::Polkadot => "Polkadot",
             Self::Kusama => "Kusama",
             Self::Westend => "Westend",
@@ -610,7 +616,6 @@ impl SupportedRuntime {
 
     pub fn as_str_short(&self) -> &'static str {
         match self {
-            Self::Local => "Local",
             Self::Polkadot => "Polkadot",
             Self::Kusama => "Kusama",
             Self::Westend => "Westend",
@@ -791,5 +796,39 @@ fn get_decimals(chain_specs: &str) -> u32 {
             value as u32
         }
         Err(err) => panic!("Failed to parse JSON: {}", err),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RELAY_CHAINS: [SupportedRuntime; 4] = [
+        SupportedRuntime::Polkadot,
+        SupportedRuntime::Kusama,
+        SupportedRuntime::Paseo,
+        SupportedRuntime::Westend,
+    ];
+
+    #[test]
+    fn every_relay_chain_launched_has_an_asset_hub() {
+        for relay in RELAY_CHAINS {
+            assert!(relay.is_relay_chain());
+            let asset_hub = relay.asset_hub_runtime().unwrap();
+            assert!(asset_hub.is_asset_hub());
+            assert!(asset_hub.is_para_chain());
+            assert!(!asset_hub.is_relay_chain());
+        }
+    }
+
+    #[test]
+    fn the_default_system_chains_are_para_chains() {
+        for relay in RELAY_CHAINS {
+            for chain in relay.default_system_chains() {
+                assert!(chain.is_para_chain());
+                assert_eq!(chain.relay_chain(), relay);
+            }
+        }
+        assert!(!SupportedRuntime::Kusama.is_para_chain());
     }
 }

@@ -1012,7 +1012,6 @@ mod tests {
 
     #[test]
     fn test_supported_runtime_display() {
-        assert_eq!(SupportedRuntime::Local.as_str_long(), "Local");
         assert_eq!(SupportedRuntime::Polkadot.as_str_long(), "Polkadot");
         assert_eq!(SupportedRuntime::Kusama.as_str_long(), "Kusama");
         assert_eq!(SupportedRuntime::Paseo.as_str_long(), "Paseo");
