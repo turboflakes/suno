@@ -135,6 +135,7 @@ pub enum InputAction {
     Unfocus,
     Lock,
     Paste(String),
+    PasteClipboard,
     Success(String),
     Error(String),
 }

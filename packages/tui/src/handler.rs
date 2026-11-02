@@ -38,6 +38,10 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('w') => Action::Navigation(NavigationAction::NextWindow),
                 // Mask/Unmask Host IP addresses
                 KeyCode::Char('m') => Action::Navigation(NavigationAction::ToggleMask),
+                // Paste the clipboard while typing, instead of toggling the view
+                KeyCode::Char('v') if app_focus == Focus::Input => {
+                    Action::Input(InputAction::PasteClipboard)
+                }
                 // Toggle between grouped and listed detailed views
                 KeyCode::Char('v') => Action::Navigation(NavigationAction::ToggleView),
                 _ => match app_focus {

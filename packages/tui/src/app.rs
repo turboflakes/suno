@@ -342,6 +342,12 @@ impl App {
             InputAction::CursorRight => self.popup.move_cursor_right(),
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
+            InputAction::PasteClipboard => {
+                match Clipboard::new().and_then(|mut cb| cb.get_text()) {
+                    Ok(data) => self.on_input_paste(data),
+                    Err(e) => error!("{}", e),
+                }
+            }
             InputAction::Error(msg) => {
                 if (self.popup.can_close()) && self.popup.invalidate_input(&msg) {
                     self.focus = Focus::Input;
