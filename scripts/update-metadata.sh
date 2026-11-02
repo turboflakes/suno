@@ -85,6 +85,7 @@ fetch_metadata "bridge-hub-polkadot" "polkadot-bridge-hub-rpc.polkadot.io"   "$B
 # Coretime Chains
 fetch_metadata "coretime-kusama"   "kusama-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
 fetch_metadata "coretime-polkadot" "polkadot-coretime-rpc.polkadot.io"   "$CORETIME_PALLETS"
+fetch_metadata "coretime-westend"  "westend-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
 
 # Collectives Chains
 fetch_metadata "collectives-westend"  "westend-collectives-rpc.polkadot.io"    "$COLLECTIVES_PALLETS"

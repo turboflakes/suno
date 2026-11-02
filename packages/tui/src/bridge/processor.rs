@@ -47,6 +47,7 @@ impl RuntimeProcessor for Runtime {
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::process_transaction_events(events),
             Runtime::AssetHubWestend => suno_asset_hub_westend::process_transaction_events(events),
             Runtime::CoretimeKusama => suno_coretime_kusama::process_transaction_events(events),
+            Runtime::CoretimeWestend => suno_coretime_westend::process_transaction_events(events),
             Runtime::CoretimePolkadot => suno_coretime_polkadot::process_transaction_events(events),
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::process_transaction_events(events),
             Runtime::BridgeHubPolkadot => {
@@ -108,6 +109,9 @@ impl RuntimeProcessor for Runtime {
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::process_runtime_events(api, events).await
             }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::process_runtime_events(api, events).await
+            }
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::process_runtime_events(api, events).await
             }
@@ -149,6 +153,9 @@ impl RuntimeProcessor for Runtime {
             }
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::process_block_extrinsics(api, extrinsics).await
+            }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::process_block_extrinsics(api, extrinsics).await
             }
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::process_block_extrinsics(api, extrinsics).await

@@ -156,6 +156,7 @@ impl SupportedRuntime {
         match &self {
             Self::Polkadot => Some(Self::CoretimePolkadot),
             Self::Kusama => Some(Self::CoretimeKusama),
+            Self::Westend => Some(Self::CoretimeWestend),
             _ => None,
         }
     }

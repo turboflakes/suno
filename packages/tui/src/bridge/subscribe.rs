@@ -151,6 +151,7 @@ pub fn subscribe_finalized_block(chain: &Chain, tx: UnboundedSender<Action>) {
                                 | SupportedRuntime::BridgeHubKusama
                                 | SupportedRuntime::CoretimePolkadot
                                 | SupportedRuntime::CoretimeKusama
+                                | SupportedRuntime::CoretimeWestend
                                 | SupportedRuntime::CollectivesPolkadot
                                 | SupportedRuntime::CollectivesWestend
                                 | SupportedRuntime::BulletinPolkadot
