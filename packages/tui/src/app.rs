@@ -567,50 +567,14 @@ impl App {
         }
         self.fetch_collators_chain_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
-            if is_all_validators_visible {
-                sync::spawn_fetch_all_validators(api_at, runtime, tx);
-            }
-
-            sync::spawn_fetch_era_data(api_at, runtime, tx);
-
-            sync::spawn_fetch_total_validators_count(api_at, runtime, tx);
-            sync::spawn_fetch_total_nominators_count(api_at, runtime, tx);
-
-            sync::spawn_fetch_validators_prefs_next(api_at, runtime, &tracked_validator_keys, tx);
-            sync::spawn_fetch_validators_staking_ledger(
+            sync::spawn_fetch_validators_on_connect(
                 api_at,
                 runtime,
                 &tracked_validator_keys,
+                is_all_validators_visible,
                 tx,
             );
-            sync::spawn_fetch_validators_payee(api_at, runtime, &tracked_validator_keys, tx);
-            sync::spawn_fetch_validators_account_balance(
-                api_at,
-                runtime,
-                &tracked_validator_keys,
-                tx,
-            );
-
-            if let Ok(proxy) = runtime.signer_account_id() {
-                sync::spawn_fetch_validators_proxy_status(
-                    api_at,
-                    runtime,
-                    &tracked_validator_keys,
-                    &proxy,
-                    tx,
-                );
-                sync::spawn_fetch_collators_proxy_status(
-                    api_at,
-                    runtime,
-                    &collator_keys,
-                    &proxy,
-                    tx,
-                );
-            };
-
-            sync::spawn_fetch_slot_duration(api_at, runtime, tx);
-            sync::spawn_fetch_session_index(api_at, runtime, tx);
-            sync::spawn_fetch_collator_sets(api_at, runtime, tx);
+            sync::spawn_fetch_collators_on_connect(api_at, runtime, &collator_keys, tx);
         });
     }
 
@@ -625,19 +589,7 @@ impl App {
         }
         self.fetch_collators_chain_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
-            if let Ok(proxy) = runtime.signer_account_id() {
-                sync::spawn_fetch_collators_proxy_status(
-                    api_at,
-                    runtime,
-                    &collator_keys,
-                    &proxy,
-                    tx,
-                );
-            };
-
-            sync::spawn_fetch_slot_duration(api_at, runtime, tx);
-            sync::spawn_fetch_session_index(api_at, runtime, tx);
-            sync::spawn_fetch_collator_sets(api_at, runtime, tx);
+            sync::spawn_fetch_collators_on_connect(api_at, runtime, &collator_keys, tx);
         });
     }
 
@@ -672,33 +624,13 @@ impl App {
         let is_all_validators_visible = CONFIG.features().all_validators_visible();
 
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
-            if is_all_validators_visible {
-                sync::spawn_fetch_all_validators(api_at, runtime, tx);
-            }
-
-            sync::spawn_fetch_active_validators_count(api_at, runtime, era_index, tx);
-            sync::spawn_fetch_active_nominators_count(api_at, runtime, era_index, tx);
-            sync::spawn_fetch_total_staked(api_at, runtime, era_index, tx);
-
-            sync::spawn_fetch_validators_prefs(
+            sync::spawn_fetch_validators_on_era(
                 api_at,
                 runtime,
                 era_index,
                 &tracked_validator_keys,
-                tx,
-            );
-            sync::spawn_fetch_validators_stake_overview(
-                api_at,
-                runtime,
-                era_index,
                 &tracked_and_visible_validator_keys,
-                tx,
-            );
-            sync::spawn_fetch_validators_era_points(
-                api_at,
-                runtime,
-                era_index,
-                &tracked_and_visible_validator_keys,
+                is_all_validators_visible,
                 tx,
             );
         });
@@ -744,8 +676,7 @@ impl App {
             }
         } else if runtime.is_asset_hub() {
             self.spawn_at_latest_block(runtime, move |api_at, tx| {
-                sync::spawn_fetch_total_validators_count(api_at, runtime, tx);
-                sync::spawn_fetch_total_nominators_count(api_at, runtime, tx);
+                sync::spawn_fetch_validators_totals(api_at, runtime, tx);
             });
         }
     }
@@ -760,9 +691,7 @@ impl App {
             .collators
             .get_tracked_and_visible_keys_by_runtime(runtime);
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
-            // Fetched on connected and every new session
-            sync::spawn_fetch_collator_sets(api_at, runtime, tx);
-            sync::spawn_fetch_collators_session_keys(api_at, runtime, &collator_keys, tx);
+            sync::spawn_fetch_collators_on_session(api_at, runtime, &collator_keys, tx);
         });
     }
 
