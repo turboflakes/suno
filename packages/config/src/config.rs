@@ -347,22 +347,12 @@ impl Config {
             };
         }
 
-        // Load themes
+        // Load themes from the config file
         let themes = Themes::load(&config.themes.path)?;
         config.themes.set_themes(themes);
 
-        // Apply the last theme selected at runtime, if any, overriding
-        // whatever is configured in the file.
-        if let Some(active) = config.load_prefs_active_theme() {
-            config.themes.active = active;
-        }
-
-        // Apply the features changed from the TUI. The ones that need a restart are applied now.
-        for (key, value) in config.read_prefs().features {
-            if let Some(feature) = Feature::from_key(&key) {
-                config.features.set(feature, value);
-            }
-        }
+        // Apply preferences from the TUI, if any
+        config.apply_prefs();
 
         Ok(config)
     }
@@ -428,6 +418,24 @@ impl Config {
                 }
             })
             .collect()
+    }
+
+    /// Applies what was changed from the TUI, over what the config file sets: the last theme
+    /// selected, if any, and the features.
+    fn apply_prefs(&mut self) {
+        if let Some(active) = self.load_prefs_active_theme() {
+            self.themes.active = active;
+        }
+        self.load_prefs_features();
+    }
+
+    /// Reads and applies the features changed from the TUI, over the ones of the config file.
+    fn load_prefs_features(&self) {
+        for (key, value) in self.read_prefs().features {
+            if let Some(feature) = Feature::from_key(&key) {
+                self.features.set(feature, value);
+            }
+        }
     }
 
     /// Reads the persisted active theme name, if the prefs file exists,
@@ -786,6 +794,18 @@ fn get_config() -> Result<Config, Error> {
         config.set_default_theme();
     }
 
+    // Set the proxy accounts added from the TUI as the signers of the chains launched. A chain
+    // that is not launched is skipped, since it would be a new chain to connect to.
+    for (runtime, account) in config.read_prefs().proxy_accounts() {
+        let chain_config = config
+            .chains
+            .iter_mut()
+            .find_map(|chain| chain.get_mut(&runtime));
+        if let Some(chain_config) = chain_config {
+            chain_config.signer = Signer::from_address(&account.to_string()).ok();
+        }
+    }
+
     // Validate the configuration
     config.validate()?;
 
@@ -849,6 +869,16 @@ pub fn save_feature(feature: Feature, value: bool) {
     }
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist the feature {}: {}", feature.key(), e);
+    }
+}
+
+/// Persists the proxy account added from the TUI for the chain `runtime`, so it signs for it from
+/// the next launch. Failures are logged and otherwise ignored.
+pub fn save_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_proxy_account(runtime, account);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the proxy account: {}", e);
     }
 }
 

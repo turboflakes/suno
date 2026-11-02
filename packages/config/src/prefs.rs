@@ -13,23 +13,43 @@ use tracing::warn;
 pub(crate) struct Prefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) active_theme: Option<String>,
-    /// The validators and the collators pinned from the TUI, by chain, in the same shape as the
-    /// `chains` of the config file, so they can be moved there to be listed by the config.
+    /// The validators and the collators pinned from the TUI, and the signer account added, by
+    /// chain.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    chains: Vec<HashMap<SupportedRuntime, PinnedChain>>,
+    chains: Vec<HashMap<SupportedRuntime, ChainPrefs>>,
     /// The features changed from the TUI, by name, overriding the ones of the config file.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) features: BTreeMap<String, bool>,
 }
 
-/// The validators and the collators pinned from the TUI of a chain, as addresses in the format
-/// of the network.
+/// What was set from the TUI of a chain: the validators and the collators pinned, and the proxy
+/// account added, all as addresses in the format of the network.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-struct PinnedChain {
+struct ChainPrefs {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     validators: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     collators: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    signer: Option<SignerPrefs>,
+}
+
+impl ChainPrefs {
+    fn is_empty(&self) -> bool {
+        self.validators.is_empty() && self.collators.is_empty() && self.signer.is_none()
+    }
+}
+
+/// The signer of a chain, in the same shape as the `signer` of the config file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SignerPrefs {
+    proxy_account: String,
+}
+
+/// The address of the `account`, in the format of the network of the `chain`.
+fn to_address(chain: SupportedRuntime, account: &AccountId32) -> String {
+    let account = sp_core::crypto::AccountId32::new(account.0);
+    account.to_ss58check_with_version(Ss58AddressFormat::custom(chain.account_format()))
 }
 
 /// A validator or a collator pinned from the TUI, since it is not listed in the
@@ -43,12 +63,59 @@ pub struct PinnedNode {
 impl PinnedNode {
     /// The address of the stash, in the format of the network of the chain.
     fn address(&self) -> String {
-        let account = sp_core::crypto::AccountId32::new(self.stash.0);
-        account.to_ss58check_with_version(Ss58AddressFormat::custom(self.chain.account_format()))
+        to_address(self.chain, &self.stash)
     }
 }
 
 impl Prefs {
+    pub(crate) fn proxy_accounts(&self) -> Vec<(SupportedRuntime, AccountId32)> {
+        self.chains
+            .iter()
+            .flatten()
+            .filter_map(|(chain, prefs)| {
+                let address = &prefs.signer.as_ref()?.proxy_account;
+                match address.parse::<AccountId32>() {
+                    Ok(account) => Some((*chain, account)),
+                    Err(e) => {
+                        warn!("Ignoring the proxy account {}: {}", address, e);
+                        None
+                    }
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn set_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
+        let mut chains = self.take_chains();
+        chains.entry(chain).or_default().signer = Some(SignerPrefs {
+            proxy_account: to_address(chain, &account),
+        });
+        self.store_chains(chains);
+    }
+
+    /// The prefs of the chains, merged by chain.
+    fn take_chains(&mut self) -> BTreeMap<SupportedRuntime, ChainPrefs> {
+        let mut chains: BTreeMap<SupportedRuntime, ChainPrefs> = BTreeMap::new();
+        for (chain, prefs) in self.chains.drain(..).flatten() {
+            let entry = chains.entry(chain).or_default();
+            entry.validators.extend(prefs.validators);
+            entry.collators.extend(prefs.collators);
+            if prefs.signer.is_some() {
+                entry.signer = prefs.signer;
+            }
+        }
+        chains
+    }
+
+    /// Keeps the prefs of the chains that have something set.
+    fn store_chains(&mut self, chains: BTreeMap<SupportedRuntime, ChainPrefs>) {
+        self.chains = chains
+            .into_iter()
+            .filter(|(_, prefs)| !prefs.is_empty())
+            .map(|(chain, prefs)| HashMap::from([(chain, prefs)]))
+            .collect();
+    }
+
     pub(crate) fn pinned_validators(&self) -> Vec<PinnedNode> {
         self.pinned(|chain| &chain.validators)
     }
@@ -57,7 +124,7 @@ impl Prefs {
         self.pinned(|chain| &chain.collators)
     }
 
-    fn pinned(&self, list: impl Fn(&PinnedChain) -> &Vec<String>) -> Vec<PinnedNode> {
+    fn pinned(&self, list: impl Fn(&ChainPrefs) -> &Vec<String>) -> Vec<PinnedNode> {
         self.chains
             .iter()
             .flatten()
@@ -90,14 +157,9 @@ impl Prefs {
     fn set_pinned(
         &mut self,
         nodes: Vec<PinnedNode>,
-        list: impl Fn(&mut PinnedChain) -> &mut Vec<String>,
+        list: impl Fn(&mut ChainPrefs) -> &mut Vec<String>,
     ) {
-        let mut chains: BTreeMap<SupportedRuntime, PinnedChain> = BTreeMap::new();
-        for (chain, pinned) in self.chains.drain(..).flatten() {
-            let entry = chains.entry(chain).or_default();
-            entry.validators.extend(pinned.validators);
-            entry.collators.extend(pinned.collators);
-        }
+        let mut chains = self.take_chains();
 
         for pinned in chains.values_mut() {
             list(pinned).clear();
@@ -107,10 +169,6 @@ impl Prefs {
             list(chains.entry(node.chain).or_default()).push(address);
         }
 
-        self.chains = chains
-            .into_iter()
-            .filter(|(_, pinned)| !pinned.validators.is_empty() || !pinned.collators.is_empty())
-            .map(|(chain, pinned)| HashMap::from([(chain, pinned)]))
-            .collect();
+        self.store_chains(chains);
     }
 }

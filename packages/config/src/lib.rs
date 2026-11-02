@@ -15,8 +15,8 @@ mod vault;
 
 pub use crate::access::{NodeAccess, SshConfig};
 pub use crate::config::{
-    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators, ChainConfig,
-    Config, FeatureState, Host, NodeConfig, Subcommand, CONFIG,
+    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators,
+    save_proxy_account, ChainConfig, Config, FeatureState, Host, NodeConfig, Subcommand, CONFIG,
 };
 pub use crate::custom::{CommandKind, CustomCalls, CustomCommand};
 pub use crate::error::Error;
