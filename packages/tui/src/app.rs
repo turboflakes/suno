@@ -1772,13 +1772,15 @@ impl App {
                 let relay = runtime.relay_chain();
                 if let Some(key) = self.validators.add_pinned(relay, stash) {
                     save_pinned_validators(self.validators.get_pinned());
-                    self.fetch_validators_data(relay, vec![key]);
+                    self.fetch_validators_data(relay, vec![key.clone()]);
+                    self.fetch_validators_proxy_status(runtime, vec![key]);
                 }
             }
             Call::AddCollator { stash: Some(stash) } => {
                 if let Some(key) = self.collators.add_pinned(runtime, stash) {
                     save_pinned_collators(self.collators.get_pinned());
-                    self.fetch_collators_chain_data(runtime, vec![key]);
+                    self.fetch_collators_chain_data(runtime, vec![key.clone()]);
+                    self.fetch_collators_proxy_status(runtime, vec![key]);
                 }
             }
             Call::AddProxyAccount {
@@ -1881,16 +1883,31 @@ impl App {
             self.validators.clear_proxies(runtime.relay_chain());
         }
 
+        self.fetch_validators_proxy_status(runtime, validator_keys);
+        self.fetch_collators_proxy_status(runtime, collator_keys);
+    }
+
+    /// Fetches the proxy status of the `keys` validators, held on the Asset Hub `runtime`, for
+    /// all the signers of the chain. It checks if any of the proxy accounts available can be used.
+    fn fetch_validators_proxy_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        let proxies = runtime.signer_account_ids();
+        if keys.is_empty() || proxies.is_empty() {
+            return;
+        }
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
-            let proxies = runtime.signer_account_ids();
-            sync::spawn_fetch_validators_proxy_status(
-                api_at,
-                runtime,
-                &validator_keys,
-                &proxies,
-                tx,
-            );
-            sync::spawn_fetch_collators_proxy_status(api_at, runtime, &collator_keys, &proxies, tx);
+            sync::spawn_fetch_validators_proxy_status(api_at, runtime, &keys, &proxies, tx);
+        });
+    }
+
+    /// Fetches the proxy status of the `keys` collators of the chain `runtime`, for all the
+    /// signers of the chain.
+    fn fetch_collators_proxy_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        let proxies = runtime.signer_account_ids();
+        if keys.is_empty() || proxies.is_empty() {
+            return;
+        }
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_collators_proxy_status(api_at, runtime, &keys, &proxies, tx);
         });
     }
 
@@ -1988,6 +2005,14 @@ impl App {
                     self.validators.remove(&key);
                 }
                 save_pinned_validators(self.validators.get_pinned());
+                // Fetch proxy status only for pinned validators
+                if let Some(asset_hub) = key
+                    .runtime
+                    .asset_hub_runtime()
+                    .filter(|_| origin.is_pinned())
+                {
+                    self.fetch_validators_proxy_status(asset_hub, vec![key]);
+                }
             }
             Window::Collators => {
                 // Toggle pin only from the main window, not from the compact list
@@ -2005,6 +2030,10 @@ impl App {
                     self.collators.remove(&key);
                 }
                 save_pinned_collators(self.collators.get_pinned());
+                // Fetch proxy status only for pinned collators
+                if origin.is_pinned() {
+                    self.fetch_collators_proxy_status(key.runtime, vec![key]);
+                }
             }
             _ => {}
         }
