@@ -676,19 +676,28 @@ impl SupportedRuntime {
         };
     }
 
-    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+    /// The accounts of the signers of the chain, the ones of the chain, or the global signer.
+    pub fn signer_account_ids(&self) -> Vec<AccountId32> {
         let config = CONFIG.clone();
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
                 if self == chain_name {
-                    let Ok(account_id) = chain_config.signer_account_id() else {
-                        return config.signer_account_id();
-                    };
-                    return Ok(account_id);
+                    let accounts = chain_config.signer_account_ids();
+                    if !accounts.is_empty() {
+                        return accounts;
+                    }
                 }
             }
         }
-        Err(Error::SignerNotDefined)
+        config.signer_account_id().into_iter().collect()
+    }
+
+    /// The first signer of the chain.
+    pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
+        self.signer_account_ids()
+            .into_iter()
+            .next()
+            .ok_or(Error::SignerNotDefined)
     }
 
     pub fn is_qrcode_enabled(&self) -> bool {
@@ -696,7 +705,7 @@ impl SupportedRuntime {
         for chain in config.chains.iter() {
             for (chain_name, chain_config) in chain {
                 if self == chain_name {
-                    return if chain_config.signer.is_some() {
+                    return if chain_config.has_signers() {
                         chain_config.is_qrcode_enabled()
                     } else {
                         config.is_qrcode_enabled()

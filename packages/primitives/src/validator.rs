@@ -5,7 +5,7 @@ use crate::{
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount, NodeHost},
     origin::Origin,
-    proxy::{ProxyKey, SupportedProxy},
+    proxy::{select_proxy, ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
@@ -321,13 +321,13 @@ impl Validator {
         )
     }
 
-    /// Proxy type configured for `runtime` that is allowed to execute the given `call`.
-    pub fn get_proxy_for(&self, runtime: SupportedRuntime, call: &Call) -> SupportedProxy {
-        self.proxies
-            .iter()
-            .find(|p| p.runtime == runtime && p.proxy.can_call(call))
-            .map(|p| p.proxy)
-            .unwrap_or(SupportedProxy::None)
+    /// The signer to make the `call`, and its proxy type, see `select_proxy`.
+    pub fn get_proxy_for(
+        &self,
+        runtime: SupportedRuntime,
+        call: &Call,
+    ) -> Option<(AccountId32, SupportedProxy)> {
+        select_proxy(&self.proxies, runtime, call)
     }
 
     pub fn is_shell_command_available(&self) -> bool {

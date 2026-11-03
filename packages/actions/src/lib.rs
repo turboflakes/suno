@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use image::DynamicImage;
 use sp_arithmetic::Permill;
-use subxt::utils::H256;
+use subxt::utils::{AccountId32, H256};
 use suno_config::SupportedRuntime;
 use suno_primitives::{
     aura::Deposit,
@@ -89,6 +89,7 @@ pub struct ConfirmationContext {
     pub runtime: SupportedRuntime,
     pub spec_version: SpecVersion,
     pub proxy_identity: ProxyIdentity,
+    pub proxy_account: AccountId32,
     pub stash_identity: StashIdentity,
     pub call: Call,
     pub call_data_bytes: CallDataBytes,

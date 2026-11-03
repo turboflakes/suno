@@ -681,7 +681,7 @@ impl RuntimeFetcher for Runtime {
             .into_iter()
             .filter(|response| match response {
                 Response::SupportedProxy(data) => {
-                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
                     proxy_key.is_staking_valid()
                         || proxy_key.is_staking_operator_valid()
                         || proxy_key.is_non_transfer_valid()
@@ -689,6 +689,7 @@ impl RuntimeFetcher for Runtime {
                 }
                 _ => true,
             })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
             .collect())
     }
 
@@ -705,7 +706,7 @@ impl RuntimeFetcher for Runtime {
             .into_iter()
             .filter_map(|response| match response {
                 Response::SupportedProxy(data) => {
-                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
                     (proxy_key.is_collator_valid()
                         || proxy_key.is_non_transfer_valid()
                         || !proxy_key.is_valid())
@@ -713,6 +714,7 @@ impl RuntimeFetcher for Runtime {
                 }
                 other => Some(other),
             })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
             .collect())
     }
 

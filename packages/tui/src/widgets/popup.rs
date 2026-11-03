@@ -14,6 +14,7 @@ use ratatui::{
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
+use subxt::utils::AccountId32;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
 use suno_config::{FeatureState, SupportedRuntime};
 use suno_primitives::{
@@ -229,7 +230,7 @@ impl Popup {
                 payee: Payee::default(),
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond) && ctx.validator.is_unknown() {
+            if p.proxy_type().can_call(&bond) && ctx.validator.is_unknown() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: bond,
                     bytes: None,
@@ -240,7 +241,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond_extra)
+            if p.proxy_type().can_call(&bond_extra)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.free_balance() > 0
             {
@@ -254,7 +255,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.bounded_extended(4)),
             };
-            if p.proxy().can_call(&unbond)
+            if p.proxy_type().can_call(&unbond)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.bounded() > 0
             {
@@ -268,7 +269,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.unlocking_extended(ctx.era, 4)),
             };
-            if p.proxy().can_call(&rebond)
+            if p.proxy_type().can_call(&rebond)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocking(ctx.era) > 0
             {
@@ -281,7 +282,7 @@ impl Popup {
             let withdraw = Call::WithdrawUnbonded {
                 max: Some(ctx.validator.unlocked_extended(ctx.era, 4)),
             };
-            if p.proxy().can_call(&withdraw)
+            if p.proxy_type().can_call(&withdraw)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocked(ctx.era) > 0
             {
@@ -294,7 +295,7 @@ impl Popup {
             let set_payee = Call::SetPayee {
                 payee: Payee::default(),
             };
-            if p.proxy().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
+            if p.proxy_type().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_payee,
                     bytes: None,
@@ -305,7 +306,7 @@ impl Popup {
                 commission: Perbill::from_percent(0),
                 blocked: false,
             };
-            if p.proxy().can_call(&validate) {
+            if p.proxy_type().can_call(&validate) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: validate,
                     bytes: None,
@@ -313,7 +314,7 @@ impl Popup {
             }
 
             let chill = Call::Chill;
-            if p.proxy().can_call(&chill) && ctx.validator.is_active_or_waiting() {
+            if p.proxy_type().can_call(&chill) && ctx.validator.is_active_or_waiting() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: chill,
                     bytes: None,
@@ -324,7 +325,7 @@ impl Popup {
                 keys: Keys::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_keys) {
+            if p.proxy_type().can_call(&set_keys) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_keys,
                     bytes: None,
@@ -332,7 +333,7 @@ impl Popup {
             }
 
             let purge_keys = Call::PurgeKeys;
-            if p.proxy().can_call(&purge_keys)
+            if p.proxy_type().can_call(&purge_keys)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.has_keys()
             {
@@ -372,7 +373,9 @@ impl Popup {
 
         ctx.collator.proxies.iter().for_each(|p| {
             let register_as_candidate = Call::RegisterAsCandidate;
-            if p.proxy().can_call(&register_as_candidate) && ctx.collator.is_exiting_or_unknown() {
+            if p.proxy_type().can_call(&register_as_candidate)
+                && ctx.collator.is_exiting_or_unknown()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: register_as_candidate,
                     bytes: None,
@@ -380,7 +383,9 @@ impl Popup {
             }
 
             let leave_intent = Call::LeaveIntent;
-            if p.proxy().can_call(&leave_intent) && ctx.collator.is_permissionless_or_candidate() {
+            if p.proxy_type().can_call(&leave_intent)
+                && ctx.collator.is_permissionless_or_candidate()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: leave_intent,
                     bytes: None,
@@ -392,7 +397,9 @@ impl Popup {
                 current_deposit: Some(ctx.collator.deposit_extended(4)),
                 max: Some(ctx.collator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&update_bond) && ctx.collator.is_permissionless_or_candidate() {
+            if p.proxy_type().can_call(&update_bond)
+                && ctx.collator.is_permissionless_or_candidate()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: update_bond,
                     bytes: None,
@@ -403,7 +410,7 @@ impl Popup {
                 deposit: 0,
                 target: ctx.collator.stash(),
             };
-            if p.proxy().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
+            if p.proxy_type().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: take_candidate_slot,
                     bytes: None,
@@ -414,7 +421,7 @@ impl Popup {
                 aura_key: AuraKey::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_session_keys) {
+            if p.proxy_type().can_call(&set_session_keys) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_session_keys,
                     bytes: None,
@@ -422,7 +429,7 @@ impl Popup {
             }
 
             let purge_session_keys = Call::PurgeSessionKeys;
-            if p.proxy().can_call(&purge_session_keys) && ctx.collator.has_keys() {
+            if p.proxy_type().can_call(&purge_session_keys) && ctx.collator.has_keys() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: purge_session_keys,
                     bytes: None,
@@ -466,6 +473,7 @@ impl Popup {
             }
             calls.push(Call::AddCollator { stash: None });
             calls.push(Call::AddProxyAccount { account: None });
+            calls.push(Call::RemoveProxyAccount { account: None });
             for call in calls {
                 self.options
                     .push(Entry::new(Command::Instruction { call, bytes: None }));
@@ -749,6 +757,15 @@ impl Popup {
                 Command::Instruction { call, .. } => Some(call),
                 _ => None,
             })
+    }
+
+    /// The proxy account that signs, while confirming a transaction.
+    pub fn get_proxy_account(&self) -> Option<AccountId32> {
+        if let Context::Confirmation(ctx) = &self.context {
+            Some(ctx.proxy_account)
+        } else {
+            None
+        }
     }
 
     pub fn get_call_data_bytes(&self) -> Option<Vec<u8>> {

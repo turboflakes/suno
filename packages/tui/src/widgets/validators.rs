@@ -634,6 +634,16 @@ impl ValidatorsList {
             .collect()
     }
 
+    /// Forgets the proxies of the validators of the chain `runtime`, e.g. when the proxy accounts
+    /// changed, so they are fetched again.
+    pub fn clear_proxies(&mut self, runtime: SupportedRuntime) {
+        for validator in self.validators.values_mut() {
+            if validator.runtime() == runtime {
+                validator.proxies.clear();
+            }
+        }
+    }
+
     /// Removes the validator from the list, e.g. when it is no longer pinned and the validators
     /// only found on-chain are not listed.
     pub fn remove(&mut self, key: &ValidatorKey) {

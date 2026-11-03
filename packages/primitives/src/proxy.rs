@@ -1,4 +1,7 @@
 use crate::call::Call;
+use crate::key::AccountBytes;
+use std::collections::HashSet;
+use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
 pub type Proxy = SupportedProxy;
@@ -78,24 +81,34 @@ impl std::fmt::Display for SupportedProxy {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProxyKey {
     pub runtime: SupportedRuntime,
-    pub proxy: SupportedProxy,
+    pub proxy_type: SupportedProxy,
+    pub proxy_account: Option<AccountBytes>,
 }
 
 impl ProxyKey {
-    pub fn new(runtime: SupportedRuntime, proxy: SupportedProxy) -> Self {
-        Self { runtime, proxy }
+    pub fn new(runtime: SupportedRuntime, proxy_type: SupportedProxy) -> Self {
+        Self {
+            runtime,
+            proxy_type,
+            proxy_account: None,
+        }
+    }
+
+    pub fn with_proxy_account(mut self, proxy_account: Option<AccountBytes>) -> Self {
+        self.proxy_account = proxy_account;
+        self
     }
 
     pub fn runtime(&self) -> SupportedRuntime {
         self.runtime
     }
 
-    pub fn proxy(&self) -> SupportedProxy {
-        self.proxy
+    pub fn proxy_type(&self) -> SupportedProxy {
+        self.proxy_type
     }
 
     pub fn is_valid(&self) -> bool {
-        self.proxy != SupportedProxy::None
+        self.proxy_type != SupportedProxy::None
     }
 
     pub fn is_staking_valid(&self) -> bool {
@@ -103,7 +116,7 @@ impl ProxyKey {
             || self.runtime == SupportedRuntime::AssetHubKusama
             || self.runtime == SupportedRuntime::AssetHubPaseo
             || self.runtime == SupportedRuntime::AssetHubWestend)
-            && self.proxy == SupportedProxy::Staking
+            && self.proxy_type == SupportedProxy::Staking
     }
 
     pub fn is_staking_operator_valid(&self) -> bool {
@@ -111,20 +124,47 @@ impl ProxyKey {
             || self.runtime == SupportedRuntime::AssetHubKusama
             || self.runtime == SupportedRuntime::AssetHubPaseo
             || self.runtime == SupportedRuntime::AssetHubWestend)
-            && self.proxy == SupportedProxy::StakingOperator
+            && self.proxy_type == SupportedProxy::StakingOperator
     }
 
     pub fn is_non_transfer_valid(&self) -> bool {
-        self.runtime.is_para_chain() && self.proxy == SupportedProxy::NonTransfer
+        self.runtime.is_para_chain() && self.proxy_type == SupportedProxy::NonTransfer
     }
 
     pub fn is_collator_valid(&self) -> bool {
-        self.runtime.is_para_chain() && self.proxy == SupportedProxy::Collator
+        self.runtime.is_para_chain() && self.proxy_type == SupportedProxy::Collator
     }
 }
 
 impl std::fmt::Display for ProxyKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.proxy())
+        write!(f, "{}", self.proxy_type())
     }
+}
+
+/// The signer to make the `call` of a stash with the `proxies`, and its proxy type: the first
+/// signer of the chain `runtime` that is a proxy of the stash able to make the call. When none is,
+/// the first signer, without a proxy type. It is none when the chain has no signers.
+pub fn select_proxy(
+    proxies: &HashSet<ProxyKey>,
+    runtime: SupportedRuntime,
+    call: &Call,
+) -> Option<(AccountId32, SupportedProxy)> {
+    let signers = runtime.signer_account_ids();
+
+    for signer in &signers {
+        let proxy_account: AccountBytes = *signer.as_ref();
+        let proxy = proxies.iter().find(|p| {
+            p.runtime == runtime
+                && p.proxy_account == Some(proxy_account)
+                && p.proxy_type.can_call(call)
+        });
+        if let Some(proxy) = proxy {
+            return Some((*signer, proxy.proxy_type));
+        }
+    }
+
+    signers
+        .first()
+        .map(|signer| (*signer, SupportedProxy::None))
 }

@@ -16,7 +16,7 @@ use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
 use suno_theme::Theme;
 use tracing::warn;
@@ -152,8 +152,12 @@ pub struct ChainConfig {
     #[serde(default)]
     pub rpc_url: String,
     /// Signer configuration for the chain.
+    /// TODO: deprecate signer in favor of signers
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// A chain can have more than one proxy account, e.g. one for its validators and another for its collators.
+    #[serde(default)]
+    signers: RwLock<Vec<Signer>>,
     /// Validators stashes for the chain.
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
@@ -177,6 +181,7 @@ impl ChainConfig {
         Self {
             rpc_url: String::new(),
             signer: None,
+            signers: RwLock::new(Vec::new()),
             validators: Vec::new(),
             validators_source: None,
             collators: Vec::new(),
@@ -187,6 +192,7 @@ impl ChainConfig {
         Self {
             rpc_url: String::new(),
             signer: None,
+            signers: RwLock::new(Vec::new()),
             validators,
             validators_source,
             collators: Vec::new(),
@@ -199,11 +205,50 @@ impl ChainConfig {
             .map(|s| s.path().to_string_lossy().into_owned())
     }
 
+    /// The accounts of the signers of the chain, the `signer` first.
+    pub fn signer_account_ids(&self) -> Vec<AccountId32> {
+        let mut accounts = Vec::new();
+        if let Some(Ok(account)) = self.signer.as_ref().map(|signer| signer.account_id()) {
+            accounts.push(account);
+        }
+        for signer in self.signers.read().unwrap().iter() {
+            if let Ok(account) = signer.account_id() {
+                if !accounts.contains(&account) {
+                    accounts.push(account);
+                }
+            }
+        }
+        accounts
+    }
+
     pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
-        self.signer
-            .as_ref()
-            .ok_or(Error::SignerNotDefined)?
-            .account_id()
+        self.signer_account_ids()
+            .into_iter()
+            .next()
+            .ok_or(Error::SignerNotDefined)
+    }
+
+    pub fn has_signers(&self) -> bool {
+        self.signer.is_some() || !self.signers.read().unwrap().is_empty()
+    }
+
+    /// Adds the proxy `account` as a signer of the chain, unless it already is one.
+    pub fn add_signer(&self, account: AccountId32) {
+        if self.signer_account_ids().contains(&account) {
+            return;
+        }
+        if let Ok(signer) = Signer::from_address(&account.to_string()) {
+            self.signers.write().unwrap().push(signer);
+        }
+    }
+
+    /// Removes the proxy `account` from the signers added to the chain, not from the `signer` of
+    /// the config file. Returns false when it wasn't one of them.
+    pub fn remove_signer(&self, account: &AccountId32) -> bool {
+        let mut signers = self.signers.write().unwrap();
+        let count = signers.len();
+        signers.retain(|signer| signer.account_id().ok().as_ref() != Some(account));
+        signers.len() != count
     }
 
     pub fn is_qrcode_enabled(&self) -> bool {
@@ -211,6 +256,12 @@ impl ChainConfig {
             .as_ref()
             .map(|s| s.is_qrcode_enabled())
             .unwrap_or(false)
+            || self
+                .signers
+                .read()
+                .unwrap()
+                .iter()
+                .any(|s| s.is_qrcode_enabled())
     }
 
     pub fn set_signer_path(&mut self, path: &str) {
@@ -560,6 +611,18 @@ impl Config {
         &self.chains
     }
 
+    /// The configuration of the chain `runtime`, if it is launched.
+    fn chain_config(&self, runtime: SupportedRuntime) -> Option<&ChainConfig> {
+        self.chains.iter().find_map(|chain| chain.get(&runtime))
+    }
+
+    /// Adds the proxy `account` to the signers of the chain `runtime`, if it is launched.
+    pub fn add_proxy_account(&self, runtime: SupportedRuntime, account: AccountId32) {
+        if let Some(chain_config) = self.chain_config(runtime) {
+            chain_config.add_signer(account);
+        }
+    }
+
     /// The network launched from the CLI, e.g. `suno polkadot`, if any.
     pub fn network(&self) -> Option<SupportedRuntime> {
         self.network
@@ -799,16 +862,10 @@ fn get_config() -> Result<Config, Error> {
         config.set_default_theme();
     }
 
-    // Set the proxy accounts added from the TUI as the signers of the chains launched. A chain
+    // Add the proxy accounts added from the TUI to the signers of the chains launched. A chain
     // that is not launched is skipped, since it would be a new chain to connect to.
     for (runtime, account) in config.read_prefs().proxy_accounts() {
-        let chain_config = config
-            .chains
-            .iter_mut()
-            .find_map(|chain| chain.get_mut(&runtime));
-        if let Some(chain_config) = chain_config {
-            chain_config.signer = Signer::from_address(&account.to_string()).ok();
-        }
+        config.add_proxy_account(runtime, account);
     }
 
     // Validate the configuration
@@ -877,13 +934,28 @@ pub fn save_feature(feature: Feature, value: bool) {
     }
 }
 
-/// Persists the proxy account added from the TUI for the chain `runtime`, so it signs for it from
-/// the next launch. Failures are logged and otherwise ignored.
+/// Adds the proxy account to the signers of the chain `runtime`, and persists it so it is added
+/// on the next launches too. Failures are logged and otherwise ignored.
 pub fn save_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+    CONFIG.add_proxy_account(runtime, account);
     let mut prefs = CONFIG.read_prefs();
-    prefs.set_proxy_account(runtime, account);
+    prefs.add_proxy_account(runtime, account);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist the proxy account: {}", e);
+    }
+}
+
+/// Removes the proxy account from the signers of the chain `runtime`, and from the prefs. It only
+/// removes the accounts added from the TUI or listed under `signers`. Failures are logged and
+/// otherwise ignored.
+pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+    if let Some(chain_config) = CONFIG.chain_config(runtime) {
+        chain_config.remove_signer(&account);
+    }
+    let mut prefs = CONFIG.read_prefs();
+    prefs.remove_proxy_account(runtime, account);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the removed proxy account: {}", e);
     }
 }
 

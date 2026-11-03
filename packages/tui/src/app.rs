@@ -27,9 +27,9 @@ use suno_actions::{
     ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
-    save_active_theme, save_feature, save_pinned_collators, save_pinned_validators,
-    save_proxy_account, CommandKind, CustomCalls, CustomCommand, CustomConfig, Feature, NodeAccess,
-    SupportedRuntime, CONFIG,
+    remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
+    save_pinned_validators, save_proxy_account, CommandKind, CustomCalls, CustomCommand,
+    CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -1783,7 +1783,16 @@ impl App {
             }
             Call::AddProxyAccount {
                 account: Some(account),
-            } => save_proxy_account(runtime, account),
+            } => {
+                save_proxy_account(runtime, account);
+                self.fetch_proxy_status(runtime);
+            }
+            Call::RemoveProxyAccount {
+                account: Some(account),
+            } => {
+                remove_proxy_account(runtime, account);
+                self.fetch_proxy_status(runtime);
+            }
             _ => return,
         }
         self.close_popup();
@@ -1853,6 +1862,36 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// Fetches the proxy status of the validators, on an Asset Hub, and of the collators of the
+    /// chain `runtime`, for all its proxy accounts. The proxies known are forgotten first, since
+    /// the proxy accounts changed.
+    fn fetch_proxy_status(&mut self, runtime: SupportedRuntime) {
+        let collator_keys = self
+            .collators
+            .get_tracked_and_visible_keys_by_runtime(runtime);
+        self.collators.clear_proxies(runtime);
+
+        let mut validator_keys = Vec::new();
+        if runtime.is_asset_hub() {
+            validator_keys = self
+                .validators
+                .get_tracked_validator_keys_by_runtime(runtime);
+            self.validators.clear_proxies(runtime.relay_chain());
+        }
+
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            let proxies = runtime.signer_account_ids();
+            sync::spawn_fetch_validators_proxy_status(
+                api_at,
+                runtime,
+                &validator_keys,
+                &proxies,
+                tx,
+            );
+            sync::spawn_fetch_collators_proxy_status(api_at, runtime, &collator_keys, &proxies, tx);
+        });
     }
 
     /// Fetches the validators found on-chain of the connected relay chains, held on their
@@ -2280,9 +2319,10 @@ impl App {
             Call::Metadata { .. } => {
                 self.build_metadata_qrcode_popup(chain);
             }
-            Call::AddValidator { .. } | Call::AddCollator { .. } | Call::AddProxyAccount { .. } => {
-                self.add_or_scan_account(call, chain.runtime())
-            }
+            Call::AddValidator { .. }
+            | Call::AddCollator { .. }
+            | Call::AddProxyAccount { .. }
+            | Call::RemoveProxyAccount { .. } => self.add_or_scan_account(call, chain.runtime()),
             _ => {}
         }
     }
@@ -2323,14 +2363,11 @@ impl App {
         let api = chain.client().clone();
         let tx = self.tx.clone();
         let stash = validator.key().stash();
-        let proxy_account_id = match runtime.signer_account_id().boxed() {
-            Ok(address) => address,
-            Err(e) => {
-                error!("{}", e);
-                return;
-            }
+        let Some((proxy_account_id, supported_proxy)) = validator.get_proxy_for(runtime, &call)
+        else {
+            error!("No signer is defined for {}", runtime);
+            return;
         };
-        let supported_proxy = validator.get_proxy_for(runtime, &call);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = validator.display_name(3);
 
@@ -2387,6 +2424,7 @@ impl App {
                 runtime,
                 spec_version,
                 proxy_identity,
+                proxy_account: proxy_account_id,
                 stash_identity,
                 call,
                 call_data_bytes,
@@ -2418,14 +2456,11 @@ impl App {
         let api = chain.client().clone();
         let tx = self.tx.clone();
         let stash = collator.key().stash();
-        let proxy_account_id = match runtime.signer_account_id().boxed() {
-            Ok(address) => address,
-            Err(e) => {
-                error!("{}", e);
-                return;
-            }
+        let Some((proxy_account_id, supported_proxy)) = collator.get_proxy_for(runtime, &call)
+        else {
+            error!("No signer is defined for {}", runtime);
+            return;
         };
-        let supported_proxy = collator.get_proxy_for(runtime, &call);
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
         let stash_identity = collator.display_name(3);
 
@@ -2482,6 +2517,7 @@ impl App {
                 runtime,
                 spec_version,
                 proxy_identity,
+                proxy_account: proxy_account_id,
                 stash_identity,
                 call,
                 call_data_bytes,
@@ -2539,16 +2575,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = collator.key().stash();
-                    let proxy_account_id = match runtime.signer_account_id().boxed() {
-                        Ok(address) => address,
-                        Err(e) => {
-                            error!("{}", e);
-                            return;
-                        }
-                    };
                     let stash_identity = collator.display_name(3);
-                    let proxy_identity =
-                        to_compact_string(&proxy_account_id, runtime.account_format(), 6);
 
                     tokio::spawn(async move {
                         let (aura_key, proof) = match custom::rotate_keys(&collator).await {
@@ -2563,7 +2590,17 @@ impl App {
                             }
                         };
                         let call = Call::SetSessionKeys { aura_key, proof };
-                        let supported_proxy = collator.get_proxy_for(runtime, &call);
+                        let Some((proxy_account_id, supported_proxy)) =
+                            collator.get_proxy_for(runtime, &call)
+                        else {
+                            let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                "No signer is defined for {}",
+                                runtime
+                            ))));
+                            return;
+                        };
+                        let proxy_identity =
+                            to_compact_string(&proxy_account_id, runtime.account_format(), 6);
 
                         let at_block = match api.at_current_block().await.boxed() {
                             Ok(client) => client,
@@ -2615,6 +2652,7 @@ impl App {
                             runtime,
                             spec_version,
                             proxy_identity,
+                            proxy_account: proxy_account_id,
                             stash_identity,
                             call,
                             call_data_bytes,
@@ -2742,23 +2780,27 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
-                    let proxy_account_id = match runtime.signer_account_id().boxed() {
-                        Ok(address) => address,
-                        Err(e) => {
-                            error!("{}", e);
-                            return;
-                        }
-                    };
                     let stash_identity = validator.display_name(3);
-                    let proxy_identity =
-                        to_compact_string(&proxy_account_id, runtime.account_format(), 6);
 
                     tokio::spawn(async move {
                         let result = custom::rotate_keys(&validator).await;
                         match result {
                             Ok((keys, proof)) => {
                                 let call = Call::SetKeys { keys, proof };
-                                let supported_proxy = validator.get_proxy_for(runtime, &call);
+                                let Some((proxy_account_id, supported_proxy)) =
+                                    validator.get_proxy_for(runtime, &call)
+                                else {
+                                    let _ = tx.send(Action::System(SystemAction::Error(format!(
+                                        "No signer is defined for {}",
+                                        runtime
+                                    ))));
+                                    return;
+                                };
+                                let proxy_identity = to_compact_string(
+                                    &proxy_account_id,
+                                    runtime.account_format(),
+                                    6,
+                                );
 
                                 let at_block = match api.at_current_block().await.boxed() {
                                     Ok(client) => client,
@@ -2807,6 +2849,7 @@ impl App {
                                     runtime,
                                     spec_version,
                                     proxy_identity,
+                                    proxy_account: proxy_account_id,
                                     stash_identity,
                                     call,
                                     call_data_bytes,
@@ -2920,7 +2963,7 @@ impl App {
                 let api = chain.client().clone();
                 let tx = self.tx.clone();
 
-                if let Ok(signer) = runtime.signer_account_id() {
+                if let Some(signer) = self.popup.get_proxy_account() {
                     sync::spawn_submit_call_data_with_signature(
                         &api,
                         runtime,
@@ -2949,7 +2992,7 @@ impl App {
                 let api = chain.client().clone();
                 let tx = self.tx.clone();
 
-                if let Ok(signer) = runtime.signer_account_id() {
+                if let Some(signer) = self.popup.get_proxy_account() {
                     sync::spawn_submit_call_data_with_signature(
                         &api,
                         runtime,

@@ -245,6 +245,16 @@ impl CollatorsList {
             .collect()
     }
 
+    /// Forgets the proxies of the collators of the chain `runtime`, e.g. when the proxy accounts
+    /// changed, so they are fetched again.
+    pub fn clear_proxies(&mut self, runtime: SupportedRuntime) {
+        for collator in self.collators.values_mut() {
+            if collator.runtime() == runtime {
+                collator.proxies.clear();
+            }
+        }
+    }
+
     /// Removes the collator from the list, e.g. when it is no longer pinned and the collators
     /// only found on-chain are not listed.
     pub fn remove(&mut self, key: &CollatorKey) {

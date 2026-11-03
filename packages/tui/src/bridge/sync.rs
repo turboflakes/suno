@@ -448,9 +448,13 @@ pub fn spawn_fetch_collators_on_connect(
     collator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    if let Ok(proxy) = runtime.signer_account_id() {
-        spawn_fetch_collators_proxy_status(api, runtime, collator_keys, &proxy, tx);
-    }
+    spawn_fetch_collators_proxy_status(
+        api,
+        runtime,
+        collator_keys,
+        &runtime.signer_account_ids(),
+        tx,
+    );
 
     spawn_fetch_slot_duration(api, runtime, tx);
     spawn_fetch_session_index(api, runtime, tx);
@@ -617,36 +621,40 @@ pub fn spawn_fetch_validators_proxy_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
-    proxy: &AccountId32,
+    proxies: &[AccountId32],
     tx: &UnboundedSender<Action>,
 ) {
-    let proxy = *proxy;
-    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
-        move |api, stash| async move {
-            runtime
-                .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
-                .await
-        },
-        DEFAULT_CONCURRENCY,
-    );
+    for proxy in proxies {
+        let proxy = *proxy;
+        ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
+            move |api, stash| async move {
+                runtime
+                    .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
+                    .await
+            },
+            DEFAULT_CONCURRENCY,
+        );
+    }
 }
 
 pub fn spawn_fetch_collators_proxy_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     collator_keys: &[AccountKey],
-    proxy: &AccountId32,
+    proxies: &[AccountId32],
     tx: &UnboundedSender<Action>,
 ) {
-    let proxy = *proxy;
-    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
-        move |api, stash| async move {
-            runtime
-                .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
-                .await
-        },
-        DEFAULT_CONCURRENCY,
-    );
+    for proxy in proxies {
+        let proxy = *proxy;
+        ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
+            move |api, stash| async move {
+                runtime
+                    .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
+                    .await
+            },
+            DEFAULT_CONCURRENCY,
+        );
+    }
 }
 
 pub fn spawn_fetch_validators_account_balance(
@@ -722,9 +730,13 @@ pub fn spawn_fetch_validators_on_connect(
     spawn_fetch_validators_payee(api, runtime, tracked_validator_keys, tx);
     spawn_fetch_validators_account_balance(api, runtime, tracked_validator_keys, tx);
 
-    if let Ok(proxy) = runtime.signer_account_id() {
-        spawn_fetch_validators_proxy_status(api, runtime, tracked_validator_keys, &proxy, tx);
-    }
+    spawn_fetch_validators_proxy_status(
+        api,
+        runtime,
+        tracked_validator_keys,
+        &runtime.signer_account_ids(),
+        tx,
+    );
 }
 
 /// Fetches what an Asset Hub holds about the validators whenever the era changes: all the

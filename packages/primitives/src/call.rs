@@ -96,6 +96,11 @@ pub enum Call {
     AddProxyAccount {
         account: Option<AccountId32>,
     },
+    /// Removes a proxy account, added from the TUI, from the signers of the chain, scanning its
+    /// address from the Vault when not given
+    RemoveProxyAccount {
+        account: Option<AccountId32>,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -154,6 +159,7 @@ impl Call {
                 "add_validator" => Ok(Self::AddValidator { stash: None }),
                 "add_collator" => Ok(Self::AddCollator { stash: None }),
                 "add_proxy_account" => Ok(Self::AddProxyAccount { account: None }),
+                "remove_proxy_account" => Ok(Self::RemoveProxyAccount { account: None }),
                 _ => {
                     // Match against custom commands by cmd designation or name
                     custom_commands
@@ -290,6 +296,9 @@ impl Call {
                 "add_proxy_account" => Ok(Self::AddProxyAccount {
                     account: Some(parse_address(args)?),
                 }),
+                "remove_proxy_account" => Ok(Self::RemoveProxyAccount {
+                    account: Some(parse_address(args)?),
+                }),
                 "take_candidate_slot" => match args.split_once(' ') {
                     None => Err(CallError::MissingArgumentSilent),
                     Some((deposit, target)) => {
@@ -321,7 +330,7 @@ impl Call {
     pub fn address(&self) -> Option<AccountId32> {
         match self {
             Self::AddValidator { stash } | Self::AddCollator { stash } => *stash,
-            Self::AddProxyAccount { account } => *account,
+            Self::AddProxyAccount { account } | Self::RemoveProxyAccount { account } => *account,
             _ => None,
         }
     }
@@ -336,6 +345,9 @@ impl Call {
                 stash: Some(address),
             },
             Self::AddProxyAccount { .. } => Self::AddProxyAccount {
+                account: Some(address),
+            },
+            Self::RemoveProxyAccount { .. } => Self::RemoveProxyAccount {
                 account: Some(address),
             },
             call => call,
@@ -373,6 +385,7 @@ impl std::fmt::Display for Call {
             Self::AddValidator { .. } => write!(f, "add_validator"),
             Self::AddCollator { .. } => write!(f, "add_collator"),
             Self::AddProxyAccount { .. } => write!(f, "add_proxy_account"),
+            Self::RemoveProxyAccount { .. } => write!(f, "remove_proxy_account"),
         }
     }
 }
@@ -443,21 +456,22 @@ impl ToDescription for Call {
             Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
             Self::Custom(custom) => custom.to_string(),
             Self::ChainSpecs { chain_name } => {
-                format!("Show chain-specs QR code for the {} network", chain_name)
+                format!("Display the chain-specs QR code for the {} network", chain_name)
             }
             Self::Metadata { chain_name } => {
-                format!("Show metadata QR code for the {} network", chain_name)
+                format!("Display the metadata QR code for the {} network", chain_name)
             }
             Self::AddValidator { .. } => {
-                "Add a validator stash, typing the address or scanning it from the Vault"
-                    .to_string()
+                "Add a validator stash".to_string()
             }
             Self::AddCollator { .. } => {
-                "Add a collator, typing the address or scanning it from the Vault".to_string()
+                "Add a collator stash".to_string()
             }
             Self::AddProxyAccount { .. } => {
-                "Set the proxy account, typing the address or scanning it from the Vault"
-                    .to_string()
+                "Set a proxy account".to_string()
+            }
+            Self::RemoveProxyAccount { .. } => {
+                "Remove a proxy account".to_string()
             }
         }
     }
@@ -495,6 +509,7 @@ impl ToPlaceholder for Call {
             Self::AddValidator { .. } => "add_validator [<address>]".to_string(),
             Self::AddCollator { .. } => "add_collator [<address>]".to_string(),
             Self::AddProxyAccount { .. } => "add_proxy_account [<address>]".to_string(),
+            Self::RemoveProxyAccount { .. } => "remove_proxy_account [<address>]".to_string(),
         }
     }
 }
@@ -538,6 +553,7 @@ impl ToMethod for Call {
             Self::AddValidator { .. } => "add_validator".to_string(),
             Self::AddCollator { .. } => "add_collator".to_string(),
             Self::AddProxyAccount { .. } => "add_proxy_account".to_string(),
+            Self::RemoveProxyAccount { .. } => "remove_proxy_account".to_string(),
         }
     }
 }

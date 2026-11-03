@@ -30,13 +30,15 @@ struct ChainPrefs {
     validators: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     collators: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    signers: Vec<SignerPrefs>,
+    #[serde(default, skip_serializing)]
     signer: Option<SignerPrefs>,
 }
 
 impl ChainPrefs {
     fn is_empty(&self) -> bool {
-        self.validators.is_empty() && self.collators.is_empty() && self.signer.is_none()
+        self.validators.is_empty() && self.collators.is_empty() && self.signers.is_empty()
     }
 }
 
@@ -72,24 +74,38 @@ impl Prefs {
         self.chains
             .iter()
             .flatten()
-            .filter_map(|(chain, prefs)| {
-                let address = &prefs.signer.as_ref()?.proxy_account;
-                match address.parse::<AccountId32>() {
-                    Ok(account) => Some((*chain, account)),
-                    Err(e) => {
-                        warn!("Ignoring the proxy account {}: {}", address, e);
-                        None
-                    }
-                }
+            .flat_map(|(chain, prefs)| {
+                prefs
+                    .signer
+                    .iter()
+                    .chain(prefs.signers.iter())
+                    .filter_map(|signer| match signer.proxy_account.parse::<AccountId32>() {
+                        Ok(account) => Some((*chain, account)),
+                        Err(e) => {
+                            warn!("Ignoring the proxy account {}: {}", signer.proxy_account, e);
+                            None
+                        }
+                    })
             })
             .collect()
     }
 
-    pub(crate) fn set_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
+    pub(crate) fn add_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
         let mut chains = self.take_chains();
-        chains.entry(chain).or_default().signer = Some(SignerPrefs {
-            proxy_account: to_address(chain, &account),
-        });
+        let signers = &mut chains.entry(chain).or_default().signers;
+        let proxy_account = to_address(chain, &account);
+        if !signers.iter().any(|s| s.proxy_account == proxy_account) {
+            signers.push(SignerPrefs { proxy_account });
+        }
+        self.store_chains(chains);
+    }
+
+    pub(crate) fn remove_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
+        let mut chains = self.take_chains();
+        if let Some(prefs) = chains.get_mut(&chain) {
+            let proxy_account = to_address(chain, &account);
+            prefs.signers.retain(|s| s.proxy_account != proxy_account);
+        }
         self.store_chains(chains);
     }
 
@@ -100,8 +116,14 @@ impl Prefs {
             let entry = chains.entry(chain).or_default();
             entry.validators.extend(prefs.validators);
             entry.collators.extend(prefs.collators);
-            if prefs.signer.is_some() {
-                entry.signer = prefs.signer;
+            for signer in prefs.signer.into_iter().chain(prefs.signers) {
+                if !entry
+                    .signers
+                    .iter()
+                    .any(|s| s.proxy_account == signer.proxy_account)
+                {
+                    entry.signers.push(signer);
+                }
             }
         }
         chains

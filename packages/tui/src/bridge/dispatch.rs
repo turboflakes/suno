@@ -228,7 +228,8 @@ pub fn dispatch_response_action(
         Response::SupportedProxy(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
-            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            let proxy_key = ProxyKey::new(runtime, data.value.proxy_type)
+                .with_proxy_account(data.value.proxy_account);
             tx.send(Action::Validator(ValidatorAction::AddProxy(
                 account_key,
                 proxy_key,
@@ -237,7 +238,8 @@ pub fn dispatch_response_action(
         }
         Response::CollatorSupportedProxy(data) => {
             let collator_key = AccountKey::from_bytes(runtime, data.value.account);
-            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            let proxy_key = ProxyKey::new(runtime, data.value.proxy_type)
+                .with_proxy_account(data.value.proxy_account);
             tx.send(Action::Collator(CollatorAction::AddProxy(
                 collator_key,
                 proxy_key,
