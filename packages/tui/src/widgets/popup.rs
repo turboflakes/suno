@@ -202,6 +202,15 @@ impl Popup {
             Context::None => {}
         }
 
+        // Check that only the commands displayed are valid and actionable
+        if matches!(
+            context,
+            Context::ValidatorMenu(_) | Context::CollatorMenu(_) | Context::ChainMenu(_)
+        ) {
+            let commands = self.options.iter().map(|e| e.command()).collect();
+            self.input.set_valid_commands(commands);
+        }
+
         self.context = context;
     }
 
