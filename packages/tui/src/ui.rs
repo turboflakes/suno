@@ -477,22 +477,15 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     // The navigation hints go together, `tab` between the sections and `ctrl+w` between the windows
     if app.popup.is_hidden() && app.focus != Focus::Filter {
         legend.push(Span::raw("   "));
-        legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
+        legend.push(Span::styled(
+            "tab or ctrl+w or ← →".to_string(),
+            theme.paragraph.base,
+        ));
         legend.push(Span::raw(" "));
         legend.push(Span::styled("navigate".to_string(), theme.paragraph.label));
     }
 
     // Always visible
-    legend.push(Span::raw("   "));
-    legend.push(Span::styled(
-        "ctrl+w or ← →".to_string(),
-        theme.paragraph.base,
-    ));
-    legend.push(Span::raw(" "));
-    legend.push(Span::styled(
-        "switch window".to_string(),
-        theme.paragraph.label,
-    ));
     legend.push(Span::raw("   "));
     legend.push(Span::styled("ctrl+c".to_string(), theme.paragraph.base));
     legend.push(Span::raw(" "));

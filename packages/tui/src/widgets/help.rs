@@ -149,7 +149,7 @@ const CUSTOM_COMMANDS: &[HelpEntry] = &[
 ];
 
 const KEYBINDINGS: &[HelpEntry] = &[
-    ("/ or ctrl+e ", "Show commands."),
+    ("ctrl+e or / ", "Show commands."),
     (
         "tab ",
         "Input focus, Autocomplete or Navigate between pane sections and the main window.",
@@ -159,15 +159,14 @@ const KEYBINDINGS: &[HelpEntry] = &[
         "space ",
         "Pin the selected validator or collator, or unpin it. Not for the ones listed in the config.",
     ),
-    ("ctrl+w ", "Switch to the next window."),
-    ("ctrl+m ", "Toggle mask on hosts."),
-    ("ctrl+t ", "Show list of available themes."),
+    ("ctrl+w or left/right", "Navigate to the previous or next window."),
+    ("ctrl+t ", "Display list of available themes."),
     (
         "ctrl+o ",
-        "Show the features, to switch them on or off. Some apply once suno starts again.",
+        "Display the features, to switch them on or off. Some apply once suno starts again.",
     ),
     (
-        "ctrl+f ",
+        "ctrl+f or start typing",
         "Filter the validators or the collators by identity or address.",
     ),
     ("ctrl+v ", "Toggle between grouped and listed view."),
@@ -180,6 +179,7 @@ const KEYBINDINGS: &[HelpEntry] = &[
         "Select a chain, validator, or extrinsic depending on the highlighted area.",
     ),
     ("shift+ctrl+c ", "Copy to clipboard."),
+    ("ctrl+m ", "Toggle mask on hosts."),
     ("ctrl+c ", "Quit suno."),
 ];
 
