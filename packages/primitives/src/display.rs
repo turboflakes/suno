@@ -167,10 +167,15 @@ pub fn create_progress_bar_by_eighths_raw(
     bar
 }
 
-pub fn to_compact_string(account: &AccountId32, format: u16, size: usize) -> String {
+/// The full SS58 address of the `account`, for the network `format`.
+pub fn to_address_string(account: &AccountId32, format: u16) -> String {
     let account_id = Public::from_raw(account.0);
     let prefix = Ss58AddressFormat::custom(format);
-    let address = account_id.to_ss58check_with_version(prefix);
+    account_id.to_ss58check_with_version(prefix)
+}
+
+pub fn to_compact_string(account: &AccountId32, format: u16, size: usize) -> String {
+    let address = to_address_string(account, format);
     format!("{}..{}", &address[..size], &address[address.len() - size..])
 }
 

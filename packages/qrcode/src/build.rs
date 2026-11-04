@@ -171,6 +171,17 @@ fn wrap_single_frame(content: &[u8]) -> Vec<u8> {
     frame
 }
 
+/// Extracts the address from a Polkadot Vault account QR code,
+/// `substrate:<address>:<genesis hash>`, or a QR code of just the address.
+pub fn extract_address_from_qr(text: &str) -> &str {
+    let text = text.trim();
+    text.strip_prefix("substrate:")
+        .unwrap_or(text)
+        .split(':')
+        .next()
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,5 +225,15 @@ mod tests {
             v.extend_from_slice(&call_data);
             v
         });
+    }
+
+    #[test]
+    fn reads_the_address_of_a_vault_account() {
+        let address = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+        assert_eq!(
+            extract_address_from_qr(&format!("substrate:{address}:0x91b171bb158e2d38")),
+            address
+        );
+        assert_eq!(extract_address_from_qr(address), address);
     }
 }

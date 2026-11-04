@@ -277,6 +277,22 @@ pub async fn fetch_total_validators_count(
     Ok(Response::total_validators(value))
 }
 
+/// Fetch every validator, active or waiting, at the specified block hash. These are the
+/// accounts that have set their intention to validate.
+pub async fn fetch_all_validators(
+    api: &OnlineClientAtBlock<CustomConfig>,
+) -> Result<Response, Error> {
+    let addr = node_runtime::storage().staking().validators();
+
+    let mut validators = Vec::<[u8; 32]>::new();
+    let mut iter = api.storage().entry(addr).boxed()?.iter(()).await.boxed()?;
+    while let Some(Ok(storage_kv)) = iter.next().await {
+        validators.push(get_account_bytes_from_storage_key(storage_kv.key_bytes()));
+    }
+
+    Ok(Response::all_validators(validators))
+}
+
 /// Fetch total nominators at the specified block hash
 pub async fn fetch_total_nominators_count(
     api: &OnlineClientAtBlock<CustomConfig>,

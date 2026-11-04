@@ -181,6 +181,10 @@ impl ValidatorSpawner {
         F: Fn(OnlineClientAtBlock<CustomConfig>, Vec<AccountKey>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Response>, Error>> + Send,
     {
+        if self.validator_keys.is_empty() {
+            return;
+        }
+
         let Self {
             api,
             runtime,
@@ -215,6 +219,13 @@ impl ValidatorSpawner {
 // ----
 // General chain fetcher tasks
 // ----
+
+/// How many keys, validators or collators, are fetched in parallel.
+const DEFAULT_CONCURRENCY: usize = 4;
+
+/// This is higher than `DEFAULT_CONCURRENCY` so that identities are fetched faster
+/// in parallel than other data.
+const IDENTITY_CONCURRENCY: usize = 8;
 
 pub fn spawn_fetch_era_data(
     api: &OnlineClientAtBlock<CustomConfig>,
@@ -284,6 +295,29 @@ pub fn spawn_fetch_aura_authorities(
         .spawn(move |api| async move { runtime.fetch_aura_authorities(&api).await });
 }
 
+/// Fetches the on-chain sets that make up a system chain's collators: the Aura authorities, the
+/// session validators, the invulnerables and the candidates. They change with the session, so
+/// they are fetched when the chain connects and on every new session.
+pub fn spawn_fetch_collator_sets(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_aura_authorities(api, runtime, tx);
+    spawn_fetch_session_validators(api, runtime, tx);
+    spawn_fetch_invulnerables(api, runtime, tx);
+    spawn_fetch_candidate_list(api, runtime, tx);
+}
+
+pub fn spawn_fetch_all_validators(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    DefaultSpawner::new(api, runtime, tx)
+        .spawn(move |api| async move { runtime.fetch_all_validators(&api).await });
+}
+
 pub fn spawn_fetch_session_validators(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -323,7 +357,7 @@ pub fn spawn_fetch_collators_last_authored_block(
                 .fetch_collator_last_authored_block(&api, &stash)
                 .await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -335,7 +369,7 @@ pub fn spawn_fetch_collators_identity(
 ) {
     ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collator_identity(&api, &stash).await },
-        3,
+        IDENTITY_CONCURRENCY,
     );
 }
 
@@ -358,7 +392,7 @@ pub fn spawn_fetch_collators_next_keys(
 ) {
     ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collator_next_keys(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -387,6 +421,56 @@ pub fn spawn_fetch_total_nominators_count(
 ) {
     DefaultSpawner::new(api, runtime, tx)
         .spawn(move |api| async move { runtime.fetch_total_nominators_count(&api).await });
+}
+
+// ----
+// Collator spawners grouped by task
+// ----
+
+/// Fetches the session keys of the collators: the ones queued for the next session and the
+/// next ones. Both change with the session, so they are fetched when the chain connects and
+/// on every new session.
+pub fn spawn_fetch_collators_session_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_collators_queued_keys(api, runtime, collator_keys, tx);
+    spawn_fetch_collators_next_keys(api, runtime, collator_keys, tx);
+}
+
+/// Fetches what a system chain holds about its collators once it is connected: the proxy status
+/// of the collators, the slot duration, the session index and the collator sets.
+pub fn spawn_fetch_collators_on_connect(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_collators_proxy_status(
+        api,
+        runtime,
+        collator_keys,
+        &runtime.signer_account_ids(),
+        tx,
+    );
+
+    spawn_fetch_slot_duration(api, runtime, tx);
+    spawn_fetch_session_index(api, runtime, tx);
+    spawn_fetch_collator_sets(api, runtime, tx);
+}
+
+/// Fetches what a system chain holds about its collators whenever its session changes: the
+/// collator sets and the session keys of the collators.
+pub fn spawn_fetch_collators_on_session(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    collator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_collator_sets(api, runtime, tx);
+    spawn_fetch_collators_session_keys(api, runtime, collator_keys, tx);
 }
 
 // ----
@@ -442,7 +526,7 @@ pub fn spawn_fetch_validators_stake_overview(
         move |api, stash| async move {
             runtime.fetch_stake_overview(&api, era_index, &stash).await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -454,7 +538,7 @@ pub fn spawn_fetch_validators_staking_ledger(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_stake_ledger(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -466,7 +550,7 @@ pub fn spawn_fetch_validators_points(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_points(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -481,7 +565,7 @@ pub fn spawn_fetch_validators_prefs(
         move |api, stash| async move {
             runtime.fetch_validator_prefs(&api, era_index, &stash).await
         },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -493,7 +577,7 @@ pub fn spawn_fetch_validators_prefs_next(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_prefs_next(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -505,7 +589,7 @@ pub fn spawn_fetch_validators_payee(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_payee(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -517,7 +601,7 @@ pub fn spawn_fetch_validators_next_keys(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_next_keys(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -529,7 +613,7 @@ pub fn spawn_fetch_validators_identity(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validator_identity(&api, &stash).await },
-        3,
+        IDENTITY_CONCURRENCY,
     );
 }
 
@@ -537,36 +621,40 @@ pub fn spawn_fetch_validators_proxy_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     validator_keys: &[AccountKey],
-    proxy: &AccountId32,
+    proxies: &[AccountId32],
     tx: &UnboundedSender<Action>,
 ) {
-    let proxy = *proxy;
-    ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
-        move |api, stash| async move {
-            runtime
-                .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
-                .await
-        },
-        3,
-    );
+    for proxy in proxies {
+        let proxy = *proxy;
+        ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered_multi(
+            move |api, stash| async move {
+                runtime
+                    .fetch_and_validate_validators_proxy_account(&api, &stash, &proxy)
+                    .await
+            },
+            DEFAULT_CONCURRENCY,
+        );
+    }
 }
 
 pub fn spawn_fetch_collators_proxy_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     collator_keys: &[AccountKey],
-    proxy: &AccountId32,
+    proxies: &[AccountId32],
     tx: &UnboundedSender<Action>,
 ) {
-    let proxy = *proxy;
-    ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
-        move |api, stash| async move {
-            runtime
-                .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
-                .await
-        },
-        3,
-    );
+    for proxy in proxies {
+        let proxy = *proxy;
+        ValidatorSpawner::new(api, runtime, collator_keys, tx).spawn_unordered_multi(
+            move |api, stash| async move {
+                runtime
+                    .fetch_and_validate_collators_proxy_account(&api, &stash, &proxy)
+                    .await
+            },
+            DEFAULT_CONCURRENCY,
+        );
+    }
 }
 
 pub fn spawn_fetch_validators_account_balance(
@@ -577,7 +665,7 @@ pub fn spawn_fetch_validators_account_balance(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_validators_account_balance(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
     );
 }
 
@@ -589,7 +677,103 @@ pub fn spawn_fetch_collators_account_balance(
 ) {
     ValidatorSpawner::new(api, runtime, validator_keys, tx).spawn_unordered(
         move |api, stash| async move { runtime.fetch_collators_account_balance(&api, &stash).await },
-        3,
+        DEFAULT_CONCURRENCY,
+    );
+}
+
+// ----
+// Validator spawners grouped by task
+// ----
+
+/// Fetches the session keys of the validators: the ones queued for the next session and the
+/// next ones. Both change with the session, so they are fetched when the chain connects and
+/// on every new session.
+pub fn spawn_fetch_validators_session_keys(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    validator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_validators_queued_keys(api, runtime, validator_keys, tx);
+    spawn_fetch_validators_next_keys(api, runtime, validator_keys, tx);
+}
+
+/// Fetches the totals of validators and of nominators of an Asset Hub.
+pub fn spawn_fetch_validators_totals(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tx: &UnboundedSender<Action>,
+) {
+    spawn_fetch_total_validators_count(api, runtime, tx);
+    spawn_fetch_total_nominators_count(api, runtime, tx);
+}
+
+/// Fetches what an Asset Hub holds about the validators once it is connected: all the validators,
+/// when they are all listed, the era, the totals, and the data of the tracked validators: the
+/// next prefs, the staking ledger, the payee, the balance and the proxy status.
+pub fn spawn_fetch_validators_on_connect(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    tracked_validator_keys: &[AccountKey],
+    is_all_validators_visible: bool,
+    tx: &UnboundedSender<Action>,
+) {
+    if is_all_validators_visible {
+        spawn_fetch_all_validators(api, runtime, tx);
+    }
+
+    spawn_fetch_era_data(api, runtime, tx);
+    spawn_fetch_validators_totals(api, runtime, tx);
+
+    spawn_fetch_validators_prefs_next(api, runtime, tracked_validator_keys, tx);
+    spawn_fetch_validators_staking_ledger(api, runtime, tracked_validator_keys, tx);
+    spawn_fetch_validators_payee(api, runtime, tracked_validator_keys, tx);
+    spawn_fetch_validators_account_balance(api, runtime, tracked_validator_keys, tx);
+
+    spawn_fetch_validators_proxy_status(
+        api,
+        runtime,
+        tracked_validator_keys,
+        &runtime.signer_account_ids(),
+        tx,
+    );
+}
+
+/// Fetches what an Asset Hub holds about the validators whenever the era changes: all the
+/// validators, when they are all listed, the counts and the total staked of the era, the prefs of
+/// the tracked validators, and the stake overview and the era points of the tracked and visible
+/// ones.
+pub fn spawn_fetch_validators_on_era(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    era_index: u32,
+    tracked_validator_keys: &[AccountKey],
+    tracked_and_visible_validator_keys: &[AccountKey],
+    is_all_validators_visible: bool,
+    tx: &UnboundedSender<Action>,
+) {
+    if is_all_validators_visible {
+        spawn_fetch_all_validators(api, runtime, tx);
+    }
+
+    spawn_fetch_active_validators_count(api, runtime, era_index, tx);
+    spawn_fetch_active_nominators_count(api, runtime, era_index, tx);
+    spawn_fetch_total_staked(api, runtime, era_index, tx);
+
+    spawn_fetch_validators_prefs(api, runtime, era_index, tracked_validator_keys, tx);
+    spawn_fetch_validators_stake_overview(
+        api,
+        runtime,
+        era_index,
+        tracked_and_visible_validator_keys,
+        tx,
+    );
+    spawn_fetch_validators_era_points(
+        api,
+        runtime,
+        era_index,
+        tracked_and_visible_validator_keys,
+        tx,
     );
 }
 

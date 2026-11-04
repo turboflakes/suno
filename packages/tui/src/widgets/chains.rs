@@ -4,8 +4,8 @@ use crate::widgets::scrollbar::render_scrollbar;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
-    style::Styled,
-    text::Text,
+    style::{Modifier, Styled},
+    text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
 };
 use sp_arithmetic::Permill;
@@ -93,18 +93,22 @@ impl ChainsList {
         false
     }
 
+    /// Returns true when the era changed.
     pub fn set_era(&mut self, chain_key: &ChainKey, data: Era) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
+            let changed = chain.era().as_ref() != Some(&data);
             chain.set_era(Some(data));
-            return true;
+            return changed;
         }
         false
     }
 
+    /// Returns true when the epoch changed.
     pub fn set_epoch(&mut self, chain_key: &ChainKey, data: Epoch) -> bool {
         if let Some(chain) = self.chains.get_mut(chain_key) {
+            let changed = chain.epoch().as_ref() != Some(&data);
             chain.set_epoch(Some(data));
-            return true;
+            return changed;
         }
         false
     }
@@ -502,13 +506,22 @@ impl Widget for &mut ChainsList {
             .set_style(theme.block.pane_header(self.is_active))
             .padding(Padding::symmetric(0, 1));
 
+        // When launched for a network, e.g. `suno polkadot`, the system chains are listed without
+        // the name of the relay chain, e.g. `Asset Hub`
+        let is_network = CONFIG.network().is_some();
+
         let rows = self.chains_iter().map(|chain| {
+            let name = if is_network {
+                chain.runtime().system_name()
+            } else {
+                chain.runtime().to_string()
+            };
             let elapsed = get_elapsed_millis(chain.finalized_block_ts());
             let progress = create_progress_bar_by_millis(elapsed, 6);
 
             Row::new(vec![
                 Text::from(""),
-                Text::from(format!("{}{}", chain.state(), chain.runtime())),
+                Text::from(format!("{}{}", chain.state(), name)),
                 Text::from(format!("#{}", chain.best_block())).alignment(Alignment::Right),
                 Text::from(format!("#{}", chain.finalized_block())).alignment(Alignment::Right),
                 Text::from(progress.to_string()).alignment(Alignment::Right),
@@ -527,9 +540,21 @@ impl Widget for &mut ChainsList {
             Constraint::Length(1),
         ];
 
+        let title = "chains";
+        let title_span = if self.is_active {
+            Span::raw(format!(" {} ", title)).style(
+                theme
+                    .paragraph
+                    .header(true)
+                    .add_modifier(Modifier::REVERSED),
+            )
+        } else {
+            Span::raw(format!("{} ", title))
+        };
+
         let header_cells = vec![
             Cell::from(""),
-            Cell::from(Text::from("chains").alignment(Alignment::Left)),
+            Cell::from(Line::from(title_span)),
             Cell::from(Text::from("best").alignment(Alignment::Right)),
             Cell::from(Text::from("finalized").alignment(Alignment::Right)),
             Cell::from(""),

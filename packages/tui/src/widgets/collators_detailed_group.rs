@@ -5,11 +5,11 @@ use crate::widgets::spinner::current_frame;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::Styled,
+    style::{Modifier, Style, Styled},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
 };
-use suno_config::SupportedRuntime;
+use suno_config::{Features, SupportedRuntime, CONFIG};
 use suno_primitives::{
     collator::Collator,
     display::{create_progress_bar_by_blocks, format_millis, format_planks, get_elapsed_millis},
@@ -58,6 +58,10 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
             area.width
         };
 
+        // Values needed further down to render the table
+        let is_active = state.is_highlighted();
+        let table_state = state.table_state;
+
         // Create a new area to fit all the content as total_height, but as wide as the screen.
         let mut full_content_buf = Buffer::empty(Rect::new(0, 0, area_width, total_height));
 
@@ -71,9 +75,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
 
             // Get selected collator if one of the collators in the current section
             let selected_collator = match state.get_selected_ref() {
-                Some(selected) if collators.contains(&selected) && state.is_active() => {
-                    Some(selected)
-                }
+                Some(selected) if collators.contains(&selected) && is_active => Some(selected),
                 _ => None,
             };
 
@@ -91,11 +93,12 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 runtime,
                 &collators,
                 selected_collator,
-                group_area,
-                &mut full_content_buf,
-                &mut state.table_state.clone(),
+                is_active,
                 is_odd,
                 block,
+                group_area,
+                &mut full_content_buf,
+                &mut table_state.clone(),
             );
 
             current_y_group += group_height;
@@ -124,8 +127,6 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
 
         // Render scrollbar when active
         if state.is_active() && area.height < total_height {
-            let selected_pos = state.table_state.selected().unwrap_or_default();
-
             let scrollbar_area = Rect {
                 x: area.right().saturating_sub(1),
                 y: area.y + 1,
@@ -133,10 +134,12 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 height: area.height.saturating_sub(2),
             };
 
+            // The thumb follows what is displayed, the scrolled rows out of the ones that don't fit
+            let scrollable = total_height.saturating_sub(area.height) as usize;
             render_scrollbar(
                 self.theme,
-                state.scroll_offset as usize + selected_pos,
-                total_height as usize,
+                (state.scroll_offset as usize).min(scrollable),
+                scrollable + 1,
                 scrollbar_area,
                 buf,
             );
@@ -151,11 +154,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
+        is_active: bool,
+        is_odd: bool,
+        block: Block,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_odd: bool,
-        block: Block,
     ) {
         let content_area = block.inner(area);
         block.render(area, buf);
@@ -170,10 +174,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             runtime,
             collators,
             selected_collator,
+            is_active,
+            is_odd,
             body_area,
             buf,
             table_state,
-            is_odd,
         );
     }
 
@@ -345,10 +350,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
+        is_active: bool,
+        is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
         table_state: &mut TableState,
-        is_odd: bool,
     ) {
         let theme = self.theme;
 
@@ -364,43 +370,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             return;
         };
 
-        let show_next_keys = collators.iter().any(|c| c.is_next_keys_changed());
-        let show_host = collators.iter().any(|c| c.has_commands_available());
+        let columns = Columns::new(collators, CONFIG.features(), false);
 
-        let mut header_cells = vec![
-            Cell::from(Text::from("◈").alignment(Alignment::Center)),
-            Cell::from(Text::from("identity").alignment(Alignment::Left)),
-            Cell::from(Text::from("deposit").alignment(Alignment::Right)),
-            Cell::from(Text::from("last block").alignment(Alignment::Right)),
-            Cell::from(Text::from("(ago)").alignment(Alignment::Left)),
-            Cell::from(Text::from("next slot").alignment(Alignment::Right)),
-            Cell::from(Text::from("(blocks)").alignment(Alignment::Left)),
-            Cell::from(Text::from("keys").alignment(Alignment::Right)),
-        ];
-        if show_host {
-            header_cells.insert(2, Cell::from(Text::from("host").alignment(Alignment::Left)));
-        }
-        if show_next_keys {
-            header_cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
-        }
-        let header = Row::new(header_cells);
+        let widths = columns.widths();
 
-        let mut widths = vec![
-            Constraint::Length(3),
-            Constraint::Length(24),
-            Constraint::Fill(1),
-            Constraint::Fill(2),
-            Constraint::Fill(1),
-            Constraint::Fill(2),
-            Constraint::Fill(1),
-            Constraint::Fill(2),
-        ];
-        if show_host {
-            widths.insert(2, Constraint::Fill(2));
-        }
-        if show_next_keys {
-            widths.push(Constraint::Length(10));
-        }
+        let header = columns.header();
 
         let current_slot = chain.current_slot().unwrap_or_default();
         let current_slot_ts = chain.current_slot_ts();
@@ -411,12 +385,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
                 self.collator_row(
                     c,
                     selected_collator,
+                    &columns,
                     aura,
                     current_slot,
                     current_slot_ts,
                     theme,
-                    show_next_keys,
-                    show_host,
                 )
             })
             .collect::<Vec<_>>();
@@ -425,9 +398,19 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         // that table_state offset is ALWAYS 0. Has we always want to start from the top.
         *table_state.offset_mut() = 0;
 
+        // Every group renders its own table, but the selected index of the state counts the rows
+        // of all the groups. Translate it to the position of the selected collator in this group,
+        // or clear it when the selection is in another group, so only the right row is highlighted.
+        table_state.select(
+            collators
+                .iter()
+                .position(|item| Some(*item) == selected_collator),
+        );
+
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
+            .row_highlight_style(theme.table.row_highlight(is_active))
             .header(header.set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);
@@ -438,12 +421,11 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         &self,
         collator: &Collator,
         selected: Option<&Collator>,
+        columns: &Columns,
         aura: &Aura,
         current_slot: u64,
         current_slot_ts: u128,
         theme: Theme,
-        show_next_keys: bool,
-        show_host: bool,
     ) -> Row<'static> {
         let (cell_style, _highlight_symbol) = match selected {
             Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
@@ -454,95 +436,103 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let is_current_author = collator.is_current_slot_author(authorities, current_slot);
 
-        let blocks = collator.blocks_in_slot(current_slot);
-
-        // Blocks in slot is only meaningful while the collator is the current author
-        let blocks_in_slot_str = if is_current_author {
-            match aura.number_blocks_expected() {
-                Some(expected) => format!("{blocks:2}/{expected}"),
-                None => format!("{blocks:2}"),
-            }
-        } else {
-            String::new()
-        };
-
-        let last_block_str = collator
-            .last_block_authored()
-            .map(|b| format!("#{b}"))
-            .unwrap_or_default();
-
-        let last_block_ago_str = collator
-            .last_block_authored_ts
-            .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
-            .unwrap_or_default();
-
         let mut cells = vec![
+            Cell::from(Text::from(collator.origin.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),
         ];
 
-        if show_host {
+        if columns.host {
             cells.push(Cell::from(
                 Text::from(collator.host(self.masked)).alignment(Alignment::Left),
             ));
         }
 
-        if collator.is_permissionless_or_candidate() {
-            cells.push(Cell::from(
-                Line::from(vec![
-                    Span::raw(format_planks(
-                        collator.deposit(),
-                        collator.account.token_decimals(),
-                        4,
-                    )),
-                    Span::raw(collator.account.token_symbol()).style(theme.paragraph.label(false)),
-                ])
-                .alignment(Alignment::Right),
-            ));
-        } else {
-            cells.push(Cell::from(Text::from("")));
+        if columns.deposit {
+            if collator.is_permissionless_or_candidate() {
+                cells.push(Cell::from(
+                    Line::from(vec![
+                        Span::raw(format_planks(
+                            collator.deposit(),
+                            collator.account.token_decimals(),
+                            4,
+                        )),
+                        Span::raw(collator.account.token_symbol())
+                            .style(theme.paragraph.label(false)),
+                    ])
+                    .alignment(Alignment::Right),
+                ));
+            } else {
+                cells.push(Cell::from(Text::from("")));
+            }
         }
 
-        cells.push(Cell::from(
-            Text::from(last_block_str).alignment(Alignment::Right),
-        ));
-        cells.push(Cell::from(
-            Text::from(last_block_ago_str).alignment(Alignment::Left),
-        ));
+        if columns.last_block {
+            let last_block_str = collator
+                .last_block_authored()
+                .map(|b| format!("#{b}"))
+                .unwrap_or_default();
 
-        if is_current_author {
+            let last_block_ago_str = collator
+                .last_block_authored_ts
+                .map(|ts| format_millis(get_elapsed_millis(ts), false, false))
+                .unwrap_or_default();
+
             cells.push(Cell::from(
-                Text::from(current_frame())
-                    .style(theme.paragraph.label(false))
-                    .alignment(Alignment::Right),
+                Text::from(last_block_str).alignment(Alignment::Right),
             ));
-        } else {
-            let next_slot_countdown_str = match aura.slot_duration_ms() {
-                Some(slot_duration_ms) => collator
-                    .next_slot_countdown(
-                        authorities,
-                        current_slot,
-                        slot_duration_ms,
-                        current_slot_ts,
-                    )
-                    .unwrap_or_default(),
-                None => "".to_string(),
+            cells.push(Cell::from(
+                Text::from(last_block_ago_str).alignment(Alignment::Left),
+            ));
+        }
+
+        if columns.next_slot {
+            if is_current_author {
+                cells.push(Cell::from(
+                    Text::from(current_frame())
+                        .style(theme.paragraph.label(false))
+                        .alignment(Alignment::Right),
+                ));
+            } else {
+                let next_slot_countdown_str = match aura.slot_duration_ms() {
+                    Some(slot_duration_ms) => collator
+                        .next_slot_countdown(
+                            authorities,
+                            current_slot,
+                            slot_duration_ms,
+                            current_slot_ts,
+                        )
+                        .unwrap_or_default(),
+                    None => "".to_string(),
+                };
+                cells.push(Cell::from(
+                    Text::from(next_slot_countdown_str).alignment(Alignment::Right),
+                ));
+            }
+
+            // Blocks in slot is only meaningful while the collator is the current author
+            let blocks_in_slot_str = if is_current_author {
+                let blocks = collator.blocks_in_slot(current_slot);
+                match aura.number_blocks_expected() {
+                    Some(expected) => format!("{blocks:2}/{expected}"),
+                    None => format!("{blocks:2}"),
+                }
+            } else {
+                String::new()
             };
             cells.push(Cell::from(
-                Text::from(next_slot_countdown_str).alignment(Alignment::Right),
+                Text::from(blocks_in_slot_str).alignment(Alignment::Left),
             ));
         }
 
-        cells.push(Cell::from(
-            Text::from(blocks_in_slot_str).alignment(Alignment::Left),
-        ));
+        if columns.keys {
+            cells.push(Cell::from(
+                Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
+            ));
+        }
 
-        cells.push(Cell::from(
-            Text::from(collator.display_queued_keys(6)).alignment(Alignment::Right),
-        ));
-
-        if show_next_keys {
+        if columns.next_keys {
             if collator.is_next_keys_changed() {
                 cells.push(Cell::from(
                     Text::from(collator.display_next_keys(6)).alignment(Alignment::Left),
@@ -552,6 +542,130 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             }
         }
 
+        let row = Row::new(cells);
+        if collator.is_unknown() {
+            row.style(Style::default().add_modifier(Modifier::DIM))
+        } else {
+            row
+        }
+    }
+}
+
+/// The columns of a group of collators, each one visible according to its feature flag.
+pub(crate) struct Columns {
+    /// The chain of the collator, for views that mix the collators of several chains
+    pub(crate) chain: bool,
+    pub(crate) host: bool,
+    pub(crate) deposit: bool,
+    pub(crate) last_block: bool,
+    pub(crate) next_slot: bool,
+    pub(crate) keys: bool,
+    pub(crate) next_keys: bool,
+}
+
+impl Columns {
+    pub(crate) fn new(collators: &[&Collator], feat: &Features, chain: bool) -> Self {
+        Self {
+            chain,
+            host: collators.iter().any(|c| c.has_commands_available()),
+            deposit: feat.deposit_visible(),
+            last_block: feat.last_block_visible(),
+            next_slot: feat.next_slot_visible(),
+            keys: feat.keys_visible(),
+            next_keys: feat.keys_visible() && collators.iter().any(|c| c.is_next_keys_changed()),
+        }
+    }
+
+    pub(crate) fn header(&self) -> Row<'static> {
+        let mut cells = vec![
+            // The origin of the collator
+            Cell::from(""),
+            // The status of the collator
+            Cell::from(Text::from("◈").alignment(Alignment::Center)),
+        ];
+
+        if self.chain {
+            cells.push(Cell::from(Text::from("chain").alignment(Alignment::Left)));
+        }
+
+        cells.push(Cell::from(
+            Text::from("identity").alignment(Alignment::Left),
+        ));
+
+        if self.host {
+            cells.push(Cell::from(Text::from("host").alignment(Alignment::Left)));
+        }
+
+        if self.deposit {
+            cells.push(Cell::from(
+                Text::from("deposit").alignment(Alignment::Right),
+            ));
+        }
+
+        if self.last_block {
+            cells.push(Cell::from(
+                Text::from("last block").alignment(Alignment::Right),
+            ));
+            cells.push(Cell::from(Text::from("(ago)").alignment(Alignment::Left)));
+        }
+
+        if self.next_slot {
+            cells.push(Cell::from(
+                Text::from("next slot").alignment(Alignment::Right),
+            ));
+            cells.push(Cell::from(
+                Text::from("(blocks)").alignment(Alignment::Left),
+            ));
+        }
+
+        if self.keys {
+            cells.push(Cell::from(Text::from("keys").alignment(Alignment::Right)));
+        }
+
+        if self.next_keys {
+            cells.push(Cell::from(Text::from("(next)").alignment(Alignment::Left)));
+        }
+
         Row::new(cells)
+    }
+
+    pub(crate) fn widths(&self) -> Vec<Constraint> {
+        let mut widths = vec![Constraint::Length(1), Constraint::Length(3)];
+
+        if self.chain {
+            widths.push(Constraint::Length(12));
+        }
+
+        widths.push(Constraint::Length(24));
+
+        if self.host {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.deposit {
+            widths.push(Constraint::Fill(1));
+        }
+
+        if self.last_block {
+            // last block and (ago)
+            widths.push(Constraint::Fill(2));
+            widths.push(Constraint::Fill(1));
+        }
+
+        if self.next_slot {
+            // next slot and (blocks)
+            widths.push(Constraint::Fill(2));
+            widths.push(Constraint::Fill(1));
+        }
+
+        if self.keys {
+            widths.push(Constraint::Fill(2));
+        }
+
+        if self.next_keys {
+            widths.push(Constraint::Length(10));
+        }
+
+        widths
     }
 }

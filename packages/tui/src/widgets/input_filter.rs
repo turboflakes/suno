@@ -1,7 +1,7 @@
 use crate::widgets::input_field::InputField;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Position, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     text::{Line, Span},
     widgets::{Block, Clear, Padding, Paragraph, Widget},
 };
@@ -88,5 +88,99 @@ impl Widget for &InputFilterWidget {
         } else {
             state.reset_cursor_position();
         }
+    }
+}
+
+/// Whether any of the `texts` contains the `query`, ignoring the case. The `query` is expected to
+/// be lowercase, and everything matches when it is empty.
+pub fn matches_query(query: &str, texts: &[&str]) -> bool {
+    query.is_empty() || texts.iter().any(|text| text.to_lowercase().contains(query))
+}
+
+/// The filter as a single row, with a row of margin on top, shown on top of a list to filter its
+/// rows.
+#[derive(Debug)]
+pub struct InputInlineFilterWidget {
+    pub state: Arc<RwLock<InputField>>,
+    pub theme: Theme,
+    /// How many rows match, shown on the right
+    pub matches: usize,
+}
+
+/// Width of the marker cell: the left padding, and the marker.
+const INLINE_MARKER_WIDTH: u16 = 3;
+
+impl Widget for &InputInlineFilterWidget {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+        let mut state = self.state.write().unwrap();
+
+        let matches = format!("{} matches", self.matches);
+
+        let [margin_area, row_area] =
+            Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
+        Block::new()
+            .style(theme.block.main)
+            .render(margin_area, buf);
+
+        // The marker, the input field and the number of matches, each one in its own block
+        let [marker_area, field_area, matches_area] = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(INLINE_MARKER_WIDTH),
+                Constraint::Fill(1),
+                Constraint::Length(matches.chars().count() as u16 + 2),
+            ])
+            .areas(row_area);
+
+        let block = Block::new()
+            .style(theme.input.base(state.is_active()))
+            .padding(Padding::new(2, 0, 0, 0));
+
+        let marker = Paragraph::new(Line::from(vec![
+            Span::raw("/").style(theme.input.prefix(state.is_active()))
+        ]))
+        .block(block);
+        marker.render(marker_area, buf);
+
+        let block = Block::new()
+            .style(theme.input.base(state.is_active()))
+            .padding(Padding::new(0, 0, 0, 0));
+
+        let field =
+            Paragraph::new(Line::from(vec![Span::raw(state.value().to_string())])).block(block);
+        field.render(field_area, buf);
+
+        let block = Block::new()
+            .style(theme.input.base(state.is_active()))
+            .padding(Padding::new(0, 2, 0, 0));
+
+        let count = Paragraph::new(
+            Line::from(Span::raw(matches).style(theme.input.suffix(true)))
+                .alignment(Alignment::Right),
+        )
+        .block(block);
+        count.render(matches_area, buf);
+
+        if state.is_active() {
+            let position =
+                Position::new(field_area.x + state.character_index() as u16, field_area.y);
+            state.set_cursor_position(position);
+        } else {
+            state.reset_cursor_position();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matches_any_text_ignoring_the_case() {
+        assert!(matches_query("turbo", &["Turboflakes", "1abc"]));
+        assert!(matches_query("turbo", &["nothing", "x/TURBO"]));
+        assert!(!matches_query("turbo", &["nothing", "1abc"]));
+        assert!(matches_query("", &["anything"]));
     }
 }

@@ -1,6 +1,7 @@
 use crate::widgets::spinner::Spinner;
 use crate::widgets::{
-    input_command::InputCommandWidget, input_filter::InputFilterWidget,
+    input_command::InputCommandWidget,
+    input_filter::{InputFilterWidget, InputInlineFilterWidget},
     input_password::InputPasswordWidget,
 };
 use ratatui::layout::Position;
@@ -40,6 +41,9 @@ pub struct InputField {
     /// Set input metadata useful to validate input
     #[zeroize(skip)]
     metadata: Option<Metadata>,
+    /// The commands the input accepts, in lowercase, when only the ones displayed are actionable
+    #[zeroize(skip)]
+    valid_commands: Option<Vec<String>>,
     /// Hold spinner widget state
     #[zeroize(skip)]
     spinner: Spinner,
@@ -132,6 +136,7 @@ impl InputField {
             cursor_position: None,
             status: Status::default(),
             metadata: None,
+            valid_commands: None,
             spinner: Spinner::default(),
             hidden_paste_buffer: Vec::new(),
         }
@@ -201,19 +206,7 @@ impl InputField {
     fn validate(&mut self) {
         match self.r#type {
             Type::Command => {
-                let value = self.raw_value();
-                let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-                let custom_commands = self
-                    .metadata
-                    .as_ref()
-                    .map(|m| m.custom_commands.as_slice())
-                    .unwrap_or(&[]);
-                let call_context = self
-                    .metadata
-                    .as_ref()
-                    .map(|m| m.call_context)
-                    .unwrap_or_default();
-                match Call::parse(&value, decimals, custom_commands, call_context) {
+                match self.parse_call() {
                     Ok(_) => self.status = Status::Valid,
                     Err(e) => match e {
                         CallError::InvalidAddress(_)
@@ -255,21 +248,33 @@ impl InputField {
         true
     }
 
+    /// Parses the value as a call. A command that is not one of the accepted ones, when these
+    /// are set, is not a call.
+    fn parse_call(&self) -> Result<Call, CallError> {
+        let value = self.raw_value();
+        let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
+        let custom_commands = self
+            .metadata
+            .as_ref()
+            .map(|m| m.custom_commands.as_slice())
+            .unwrap_or(&[]);
+        let call_context = self
+            .metadata
+            .as_ref()
+            .map(|m| m.call_context)
+            .unwrap_or_default();
+        let call = Call::parse(&value, decimals, custom_commands, call_context)?;
+        match &self.valid_commands {
+            Some(commands) if !commands.contains(&call.to_string().to_lowercase()) => {
+                Err(CallError::MissingExtrinsic)
+            }
+            _ => Ok(call),
+        }
+    }
+
     pub fn parsed_call(&self) -> Option<Call> {
         if self.is_command() {
-            let value = self.raw_value();
-            let decimals = self.metadata.as_ref().map(|m| m.decimals).unwrap_or(0);
-            let custom_commands = self
-                .metadata
-                .as_ref()
-                .map(|m| m.custom_commands.as_slice())
-                .unwrap_or(&[]);
-            let call_context = self
-                .metadata
-                .as_ref()
-                .map(|m| m.call_context)
-                .unwrap_or_default();
-            Call::parse(&value, decimals, custom_commands, call_context).ok()
+            self.parse_call().ok()
         } else {
             None
         }
@@ -432,6 +437,7 @@ impl InputField {
     fn as_command(&mut self, metadata: Option<Metadata>) {
         self.r#type = Type::Command;
         self.metadata = metadata;
+        self.valid_commands = None;
     }
 
     const fn as_filter(&mut self) {
@@ -486,6 +492,14 @@ impl InputFieldWidget {
         }
     }
 
+    pub fn as_inline_filter(&self, theme: Theme, matches: usize) -> InputInlineFilterWidget {
+        InputInlineFilterWidget {
+            state: self.state.clone(),
+            theme,
+            matches,
+        }
+    }
+
     pub fn as_filter(
         &self,
         theme: Theme,
@@ -502,6 +516,13 @@ impl InputFieldWidget {
 }
 
 impl InputFieldWidget {
+    /// An input to filter, which is not being edited.
+    pub fn new_filter() -> Self {
+        let mut input = Self::new();
+        input.reset_as_filter();
+        input
+    }
+
     pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(InputField::new())),
@@ -523,6 +544,12 @@ impl InputFieldWidget {
         state.cursor_position()
     }
 
+    pub fn unfocus(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.clear_mode();
+        state.reset_cursor_position();
+    }
+
     pub fn get_parsed_call(&self) -> Option<Call> {
         let state = self.state.read().unwrap();
         state.parsed_call()
@@ -532,6 +559,12 @@ impl InputFieldWidget {
     pub fn reset_as_command(&mut self, metadata: Option<Metadata>) {
         let mut state = self.state.write().unwrap();
         state.reset_as_command(metadata);
+    }
+
+    pub fn set_valid_commands(&mut self, commands: Vec<String>) {
+        let mut state = self.state.write().unwrap();
+        state.valid_commands = Some(commands.into_iter().map(|c| c.to_lowercase()).collect());
+        state.validate();
     }
 
     pub fn reset_as_password(&mut self) {

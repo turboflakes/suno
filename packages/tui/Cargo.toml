@@ -43,6 +43,7 @@ suno-collectives-polkadot = { path = "../chains/collectives-polkadot" }
 suno-collectives-westend = { path = "../chains/collectives-westend" }
 suno-coretime-kusama = { path = "../chains/coretime-kusama" }
 suno-coretime-polkadot = { path = "../chains/coretime-polkadot" }
+suno-coretime-westend = { path = "../chains/coretime-westend" }
 suno-error = { path = "../error" }
 suno-kusama = { path = "../chains/kusama" }
 suno-paseo = { path = "../chains/paseo" }

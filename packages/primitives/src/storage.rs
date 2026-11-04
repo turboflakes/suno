@@ -103,14 +103,15 @@ pub struct ValidatorKeysData {
 #[derive(Debug)]
 pub struct SupportedProxyData {
     pub account: AccountBytes,
-    pub supported_proxy: SupportedProxy,
+    pub proxy_type: SupportedProxy,
+    pub proxy_account: Option<AccountBytes>,
 }
 
 /// Stash proxies data combining account and its supported proxies
 #[derive(Debug)]
 pub struct SupportedProxiesData {
     pub account: AccountBytes,
-    pub supported_proxies: Vec<SupportedProxy>,
+    pub proxy_types: Vec<SupportedProxy>,
 }
 
 /// Stash proxied data combining account and its proxied status
@@ -186,6 +187,7 @@ pub enum Response {
     CollatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
+    AllValidators(Data<Vec<AccountBytes>>),
     Invulnerables(Data<Vec<AccountBytes>>),
     Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
@@ -292,21 +294,35 @@ impl Response {
         Response::EventWithdrawn(Data::new(AmountData { account, amount }))
     }
 
-    pub fn supported_proxy(account: AccountBytes, supported_proxy: SupportedProxy) -> Self {
+    pub fn supported_proxy(account: AccountBytes, proxy_type: SupportedProxy) -> Self {
         Response::SupportedProxy(Data::new(SupportedProxyData {
             account,
-            supported_proxy,
+            proxy_type,
+            proxy_account: None,
         }))
     }
 
-    pub fn collator_supported_proxy(
-        account: AccountBytes,
-        supported_proxy: SupportedProxy,
-    ) -> Self {
+    pub fn collator_supported_proxy(account: AccountBytes, proxy_type: SupportedProxy) -> Self {
         Response::CollatorSupportedProxy(Data::new(SupportedProxyData {
             account,
-            supported_proxy,
+            proxy_type,
+            proxy_account: None,
         }))
+    }
+
+    /// Sets the proxy account the supported proxy was found for, when the response is one.
+    pub fn with_proxy_account(self, proxy_account: AccountBytes) -> Self {
+        match self {
+            Response::SupportedProxy(mut data) => {
+                data.value.proxy_account = Some(proxy_account);
+                Response::SupportedProxy(data)
+            }
+            Response::CollatorSupportedProxy(mut data) => {
+                data.value.proxy_account = Some(proxy_account);
+                Response::CollatorSupportedProxy(data)
+            }
+            other => other,
+        }
     }
 
     pub fn balance(account: AccountBytes, balance: Balance) -> Self {
@@ -319,6 +335,10 @@ impl Response {
 
     pub fn aura_authorities(authorities: Vec<AccountBytes>) -> Self {
         Response::AuraAuthorities(Data::new(authorities))
+    }
+
+    pub fn all_validators(validators: Vec<AccountBytes>) -> Self {
+        Response::AllValidators(Data::new(validators))
     }
 
     pub fn session_validators(validators: Vec<AccountBytes>) -> Self {

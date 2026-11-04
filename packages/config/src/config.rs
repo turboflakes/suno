@@ -1,7 +1,9 @@
 use crate::access::SshConfig;
 use crate::custom::CustomCommand;
 use crate::error::Error;
+use crate::features::{Feature, Features, ALL_FEATURES};
 use crate::logs::Logs;
+use crate::prefs::{PinnedNode, Prefs};
 use crate::runtime::SupportedRuntime;
 use crate::signer::{default_proxy_path, Signer};
 use crate::themes::{default_active_theme, Themes};
@@ -14,7 +16,7 @@ use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use subxt::utils::AccountId32;
 use suno_theme::Theme;
 use tracing::warn;
@@ -61,16 +63,6 @@ pub enum Subcommand {
     Update { version: Option<String> },
 }
 
-/// Runtime preferences saved from the TUI, layered on top of `config.yaml`
-/// on load without ever touching the user's own file. Grows over time as
-/// more things become editable from the TUI, each as its own optional
-/// field so unrelated prefs are preserved on every write.
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Prefs {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    active_theme: Option<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// CLI subcommand to execute.
@@ -101,6 +93,10 @@ pub struct Config {
     /// file that persists runtime preferences (e.g. the active theme).
     #[serde(skip)]
     config_path: PathBuf,
+    /// Network launched from the CLI (e.g. `suno polkadot`), added as a suffix to the prefs
+    /// file name so each network keeps its own runtime preferences.
+    #[serde(skip)]
+    network: Option<SupportedRuntime>,
 }
 
 impl Default for Config {
@@ -115,6 +111,7 @@ impl Default for Config {
             themes: default_themes(),
             logs: default_logs(),
             config_path: PathBuf::new(),
+            network: None,
         }
     }
 }
@@ -155,8 +152,12 @@ pub struct ChainConfig {
     #[serde(default)]
     pub rpc_url: String,
     /// Signer configuration for the chain.
+    /// TODO: deprecate signer in favor of signers
     #[serde(default)]
     pub signer: Option<Signer>,
+    /// A chain can have more than one proxy account, e.g. one for its validators and another for its collators.
+    #[serde(default)]
+    signers: RwLock<Vec<Signer>>,
     /// Validators stashes for the chain.
     #[serde(default)]
     pub validators: Vec<NodeConfig>,
@@ -180,6 +181,7 @@ impl ChainConfig {
         Self {
             rpc_url: String::new(),
             signer: None,
+            signers: RwLock::new(Vec::new()),
             validators: Vec::new(),
             validators_source: None,
             collators: Vec::new(),
@@ -190,6 +192,7 @@ impl ChainConfig {
         Self {
             rpc_url: String::new(),
             signer: None,
+            signers: RwLock::new(Vec::new()),
             validators,
             validators_source,
             collators: Vec::new(),
@@ -202,11 +205,50 @@ impl ChainConfig {
             .map(|s| s.path().to_string_lossy().into_owned())
     }
 
+    /// The accounts of the signers of the chain, the `signer` first.
+    pub fn signer_account_ids(&self) -> Vec<AccountId32> {
+        let mut accounts = Vec::new();
+        if let Some(Ok(account)) = self.signer.as_ref().map(|signer| signer.account_id()) {
+            accounts.push(account);
+        }
+        for signer in self.signers.read().unwrap().iter() {
+            if let Ok(account) = signer.account_id() {
+                if !accounts.contains(&account) {
+                    accounts.push(account);
+                }
+            }
+        }
+        accounts
+    }
+
     pub fn signer_account_id(&self) -> Result<AccountId32, Error> {
-        self.signer
-            .as_ref()
-            .ok_or(Error::SignerNotDefined)?
-            .account_id()
+        self.signer_account_ids()
+            .into_iter()
+            .next()
+            .ok_or(Error::SignerNotDefined)
+    }
+
+    pub fn has_signers(&self) -> bool {
+        self.signer.is_some() || !self.signers.read().unwrap().is_empty()
+    }
+
+    /// Adds the proxy `account` as a signer of the chain, unless it already is one.
+    pub fn add_signer(&self, account: AccountId32) {
+        if self.signer_account_ids().contains(&account) {
+            return;
+        }
+        if let Ok(signer) = Signer::from_address(&account.to_string()) {
+            self.signers.write().unwrap().push(signer);
+        }
+    }
+
+    /// Removes the proxy `account` from the signers added to the chain, not from the `signer` of
+    /// the config file. Returns false when it wasn't one of them.
+    pub fn remove_signer(&self, account: &AccountId32) -> bool {
+        let mut signers = self.signers.write().unwrap();
+        let count = signers.len();
+        signers.retain(|signer| signer.account_id().ok().as_ref() != Some(account));
+        signers.len() != count
     }
 
     pub fn is_qrcode_enabled(&self) -> bool {
@@ -214,6 +256,12 @@ impl ChainConfig {
             .as_ref()
             .map(|s| s.is_qrcode_enabled())
             .unwrap_or(false)
+            || self
+                .signers
+                .read()
+                .unwrap()
+                .iter()
+                .any(|s| s.is_qrcode_enabled())
     }
 
     pub fn set_signer_path(&mut self, path: &str) {
@@ -304,97 +352,6 @@ impl FromStr for NodeConfig {
     }
 }
 
-fn default_enable() -> bool {
-    true
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Features {
-    #[serde(default = "default_enable")]
-    enable_validators: bool,
-    #[serde(default)]
-    enable_collators: bool,
-    #[serde(default)]
-    enable_rpcs: bool,
-    #[serde(default = "default_enable")]
-    enable_check_update: bool,
-    #[serde(default = "default_enable")]
-    show_nominators_counter: bool,
-    #[serde(default = "default_enable")]
-    show_nominators_stake: bool,
-    #[serde(default = "default_enable")]
-    show_own_stake: bool,
-    #[serde(default)]
-    show_commission: bool,
-    #[serde(default = "default_enable")]
-    show_payee: bool,
-    #[serde(default = "default_enable")]
-    show_keys: bool,
-}
-
-impl Default for Features {
-    fn default() -> Self {
-        Self {
-            enable_validators: true,
-            enable_collators: false,
-            enable_rpcs: false,
-            enable_check_update: true,
-            show_nominators_counter: true,
-            show_nominators_stake: true,
-            show_own_stake: true,
-            show_commission: false,
-            show_payee: true,
-            show_keys: true,
-        }
-    }
-}
-
-impl Features {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn validators_enabled(&self) -> bool {
-        self.enable_validators
-    }
-
-    pub fn collators_enabled(&self) -> bool {
-        self.enable_collators
-    }
-
-    pub fn rpcs_enabled(&self) -> bool {
-        self.enable_rpcs
-    }
-
-    pub fn check_update_enabled(&self) -> bool {
-        self.enable_check_update
-    }
-
-    pub fn nominators_counter_visible(&self) -> bool {
-        self.show_nominators_counter
-    }
-
-    pub fn nominators_stake_visible(&self) -> bool {
-        self.show_nominators_stake
-    }
-
-    pub fn own_stake_visible(&self) -> bool {
-        self.show_own_stake
-    }
-
-    pub fn commission_visible(&self) -> bool {
-        self.show_commission
-    }
-
-    pub fn payee_visible(&self) -> bool {
-        self.show_payee
-    }
-
-    pub fn keys_visible(&self) -> bool {
-        self.show_keys
-    }
-}
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Explorer {
     url: Option<String>,
@@ -402,6 +359,16 @@ pub struct Explorer {
 
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        Self::from_file_for(path, None)
+    }
+
+    /// Loads the config as `from_file` does, for the `network` launched from the CLI, if any.
+    /// The network is part of the prefs file name, so the preferences restored are the ones
+    /// persisted by the same network.
+    pub fn from_file_for<P: AsRef<Path>>(
+        path: P,
+        network: Option<SupportedRuntime>,
+    ) -> Result<Self, Error> {
         let path = path.as_ref();
 
         let mut config = if !path.exists() {
@@ -420,6 +387,7 @@ impl Config {
         };
 
         config.config_path = path.to_path_buf();
+        config.network = network;
 
         // Verify and validate if signer path exists
         if let Some(signer) = config.signer {
@@ -430,24 +398,26 @@ impl Config {
             };
         }
 
-        // Load themes
+        // Load themes from the config file
         let themes = Themes::load(&config.themes.path)?;
         config.themes.set_themes(themes);
 
-        // Apply the last theme selected at runtime, if any, overriding
-        // whatever is configured in the file.
-        if let Some(active) = config.load_prefs_active_theme() {
-            config.themes.active = active;
-        }
+        // Apply preferences from the TUI, if any
+        config.apply_prefs();
 
         Ok(config)
     }
 
     /// Path of the small sibling file used to persist runtime preferences
-    /// across restarts, without touching the user's own config file.
+    /// across restarts, without touching the user's own config file. When launched for a
+    /// network, e.g. `suno polkadot`, the network is the suffix: `.config.local.polkadot.yaml`.
     fn prefs_path(&self) -> PathBuf {
         let dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
-        dir.join(".config.local.yaml")
+        let file_name = match self.network {
+            Some(network) => format!(".config.local.{}.yaml", network.to_string().to_lowercase()),
+            None => ".config.local.yaml".to_string(),
+        };
+        dir.join(file_name)
     }
 
     /// Reads the prefs file, if it exists and is well-formed. Defaults to
@@ -458,6 +428,65 @@ impl Config {
             .ok()
             .and_then(|content| serde_yaml::from_str(&content).ok())
             .unwrap_or_default()
+    }
+
+    /// The validators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_validators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_validators()
+    }
+
+    /// The collators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_collators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_collators()
+    }
+
+    /// The features as set in the config file, before any change from the TUI. The file is read
+    /// again, defaults apply if it is missing or malformed.
+    fn file_features(&self) -> Features {
+        let Ok(content) = fs::read_to_string(&self.config_path) else {
+            return Features::default();
+        };
+        match serde_yaml::from_str::<Config>(&content) {
+            Ok(config) => config.features,
+            Err(_) => Features::default(),
+        }
+    }
+
+    /// Every feature with the value set from the TUI, if any, otherwise the one of the config
+    /// file.
+    pub fn feature_states(&self) -> Vec<FeatureState> {
+        let overrides = self.read_prefs().features;
+        let file = self.file_features();
+        ALL_FEATURES
+            .into_iter()
+            .map(|feature| {
+                let saved = overrides.get(feature.key()).copied();
+                FeatureState {
+                    feature,
+                    value: saved.unwrap_or_else(|| file.get(feature)),
+                    changed: saved.is_some_and(|value| value != file.get(feature)),
+                    running: self.features.get(feature),
+                }
+            })
+            .collect()
+    }
+
+    /// Applies what was changed from the TUI, over what the config file sets: the last theme
+    /// selected, if any, and the features.
+    fn apply_prefs(&mut self) {
+        if let Some(active) = self.load_prefs_active_theme() {
+            self.themes.active = active;
+        }
+        self.load_prefs_features();
+    }
+
+    /// Reads and applies the features changed from the TUI, over the ones of the config file.
+    fn load_prefs_features(&self) {
+        for (key, value) in self.read_prefs().features {
+            if let Some(feature) = Feature::from_key(&key) {
+                self.features.set(feature, value);
+            }
+        }
     }
 
     /// Reads the persisted active theme name, if the prefs file exists,
@@ -477,7 +506,13 @@ impl Config {
     fn write_prefs(&self, prefs: &Prefs) -> Result<(), Error> {
         let path = self.prefs_path();
         let content = serde_yaml::to_string(prefs)?;
-        let tmp_path = path.with_file_name(".config.local.yaml.tmp");
+        let tmp_name = format!(
+            "{}.tmp",
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(".config.local.yaml")
+        );
+        let tmp_path = path.with_file_name(tmp_name);
         fs::write(&tmp_path, content)?;
         fs::rename(&tmp_path, &path)?;
         Ok(())
@@ -574,6 +609,33 @@ impl Config {
 
     pub fn chains(&self) -> &Chains {
         &self.chains
+    }
+
+    /// The configuration of the chain `runtime`, if it is launched.
+    fn chain_config(&self, runtime: SupportedRuntime) -> Option<&ChainConfig> {
+        self.chains.iter().find_map(|chain| chain.get(&runtime))
+    }
+
+    /// Adds the proxy `account` to the signers of the chain `runtime`, if it is launched.
+    pub fn add_proxy_account(&self, runtime: SupportedRuntime, account: AccountId32) {
+        if let Some(chain_config) = self.chain_config(runtime) {
+            chain_config.add_signer(account);
+        }
+    }
+
+    /// The proxy accounts of the chain `runtime` as saved in the prefs.
+    pub fn pinned_proxy_accounts(&self, runtime: SupportedRuntime) -> Vec<AccountId32> {
+        self.read_prefs()
+            .proxy_accounts()
+            .into_iter()
+            .filter(|(chain, _)| *chain == runtime)
+            .map(|(_, account)| account)
+            .collect()
+    }
+
+    /// The network launched from the CLI, e.g. `suno polkadot`, if any.
+    pub fn network(&self) -> Option<SupportedRuntime> {
+        self.network
     }
 
     pub fn features(&self) -> &Features {
@@ -719,8 +781,14 @@ fn get_config() -> Result<Config, Error> {
         .map(|s| s.as_str())
         .unwrap_or(default_config_path);
 
+    // The network launched, if any, so the prefs persisted are the ones of that network
+    let network = match matches.subcommand() {
+        Some(("update", _)) | None => None,
+        Some((relay_chain, _)) => SupportedRuntime::from_str(relay_chain).ok(),
+    };
+
     // Read and parse the config file
-    let mut config = Config::from_file(config_path)?;
+    let mut config = Config::from_file_for(config_path, network)?;
 
     // If not specified in the config file, load the signer proxy path
     // from the CLI, otherwise try to load the default
@@ -804,10 +872,101 @@ fn get_config() -> Result<Config, Error> {
         config.set_default_theme();
     }
 
+    // Add the proxy accounts added from the TUI to the signers of the chains launched. A chain
+    // that is not launched is skipped, since it would be a new chain to connect to.
+    for (runtime, account) in config.read_prefs().proxy_accounts() {
+        config.add_proxy_account(runtime, account);
+    }
+
     // Validate the configuration
     config.validate()?;
 
     Ok(config)
+}
+
+/// A feature and its value, as listed in the TUI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FeatureState {
+    pub feature: Feature,
+    /// The value saved, which is the one in use unless the feature needs a restart.
+    pub value: bool,
+    /// Whether the value differs from the config file.
+    pub changed: bool,
+    /// The value in use right now.
+    pub running: bool,
+}
+
+impl FeatureState {
+    /// Whether the value only applies once the app is started again.
+    pub fn pending_restart(&self) -> bool {
+        self.value != self.running
+    }
+
+    /// The symbol shown for the value: filled when the feature is on.
+    pub fn symbol(&self) -> &'static str {
+        if self.value {
+            "●"
+        } else {
+            "○"
+        }
+    }
+
+    /// What toggling the feature does, to show as a hint.
+    pub fn toggle_label(&self) -> &'static str {
+        if self.value {
+            "disable"
+        } else {
+            "enable"
+        }
+    }
+
+    /// The value in the config file.
+    pub fn file_value(&self) -> bool {
+        self.value != self.changed
+    }
+}
+
+/// Sets a feature from the TUI and persists it, so it is restored on the next launch. The
+/// features that need a restart are only persisted. A value equal to the config file's is not
+/// kept. Failures are logged and otherwise ignored.
+pub fn save_feature(feature: Feature, value: bool) {
+    if !feature.needs_restart() {
+        CONFIG.features.set(feature, value);
+    }
+    let mut prefs = CONFIG.read_prefs();
+    if value == CONFIG.file_features().get(feature) {
+        prefs.features.remove(feature.key());
+    } else {
+        prefs.features.insert(feature.key().to_string(), value);
+    }
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the feature {}: {}", feature.key(), e);
+    }
+}
+
+/// Adds the proxy account to the signers of the chain `runtime`, and persists it so it is added
+/// on the next launches too. Failures are logged and otherwise ignored.
+pub fn save_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+    CONFIG.add_proxy_account(runtime, account);
+    let mut prefs = CONFIG.read_prefs();
+    prefs.add_proxy_account(runtime, account);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the proxy account: {}", e);
+    }
+}
+
+/// Removes the proxy account from the signers of the chain `runtime`, and from the prefs. It only
+/// removes the accounts added from the TUI or listed under `signers`. Failures are logged and
+/// otherwise ignored.
+pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+    if let Some(chain_config) = CONFIG.chain_config(runtime) {
+        chain_config.remove_signer(&account);
+    }
+    let mut prefs = CONFIG.read_prefs();
+    prefs.remove_proxy_account(runtime, account);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the removed proxy account: {}", e);
+    }
 }
 
 /// Persists the active theme so it's restored on the next launch.
@@ -817,6 +976,26 @@ pub fn save_active_theme(name: &str) {
     prefs.active_theme = Some(name.to_string());
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist active theme: {}", e);
+    }
+}
+
+/// Persists the validators pinned from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_pinned_validators(pinned: Vec<PinnedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_pinned_validators(pinned);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the pinned validators: {}", e);
+    }
+}
+
+/// Persists the collators pinned from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_pinned_collators(pinned: Vec<PinnedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_pinned_collators(pinned);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the pinned collators: {}", e);
     }
 }
 
@@ -920,7 +1099,6 @@ mod tests {
 
     #[test]
     fn test_supported_runtime_display() {
-        assert_eq!(SupportedRuntime::Local.as_str_long(), "Local");
         assert_eq!(SupportedRuntime::Polkadot.as_str_long(), "Polkadot");
         assert_eq!(SupportedRuntime::Kusama.as_str_long(), "Kusama");
         assert_eq!(SupportedRuntime::Paseo.as_str_long(), "Paseo");
@@ -942,6 +1120,7 @@ mod tests {
             themes: Themes::default(),
             logs: Logs::default(),
             config_path: PathBuf::new(),
+            network: None,
         };
         assert!(config.validate().is_err());
     }
@@ -971,7 +1150,7 @@ explorer:
         let config = Config::from_file(file.path()).unwrap();
 
         assert_eq!(config.chains.len(), 1);
-        assert!(config.features.enable_validators);
+        assert!(config.features.validators_enabled());
     }
 
     #[test]
@@ -1023,8 +1202,8 @@ explorer:
         let config = Config::from_file(file.path()).unwrap();
 
         assert_eq!(config.chains.len(), 3);
-        assert!(config.features.enable_validators);
-        assert!(config.features.enable_collators);
+        assert!(config.features.validators_enabled());
+        assert!(config.features.collators_enabled());
     }
 
     #[test]
@@ -1137,6 +1316,68 @@ explorer:
 
         let reloaded = Config::from_file(&config_path).unwrap();
         assert_eq!(reloaded.themes.active, other);
+    }
+
+    #[test]
+    fn test_prefs_file_has_the_network_as_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file_for(&config_path, Some(SupportedRuntime::Polkadot)).unwrap();
+        let mut prefs = config.read_prefs();
+        prefs.active_theme = Some(config.themes.active.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        assert!(dir.path().join(".config.local.polkadot.yaml").exists());
+        assert!(!dir.path().join(".config.local.yaml").exists());
+        assert!(!dir.path().join(".config.local.polkadot.yaml.tmp").exists());
+    }
+
+    #[test]
+    fn test_pinned_nodes_persist_across_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(&config_path, "chains:\n  - polkadot:\n").unwrap();
+
+        let config = Config::from_file(&config_path).unwrap();
+        let stash = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            .parse::<AccountId32>()
+            .unwrap();
+        let validators = vec![PinnedNode {
+            chain: SupportedRuntime::Polkadot,
+            stash,
+        }];
+        let collators = vec![PinnedNode {
+            chain: SupportedRuntime::AssetHubPolkadot,
+            stash,
+        }];
+
+        let mut prefs = config.read_prefs();
+        prefs.set_pinned_validators(validators.clone());
+        prefs.set_pinned_collators(collators.clone());
+        config.write_prefs(&prefs).unwrap();
+
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert_eq!(reloaded.pinned_validators(), validators);
+        assert_eq!(reloaded.pinned_collators(), collators);
+
+        // Same shape as the chains of the config file, with the addresses of the network
+        let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();
+        let value: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+        let address = value["chains"][0]["polkadot"]["validators"][0]
+            .as_str()
+            .unwrap();
+        assert!(address.starts_with('1'), "{address}");
+        assert!(value["chains"][1]["asset_hub_polkadot"]["collators"][0].is_string());
+
+        // Changing the validators keeps the collators
+        let mut prefs = reloaded.read_prefs();
+        prefs.set_pinned_validators(Vec::new());
+        reloaded.write_prefs(&prefs).unwrap();
+        let reloaded = Config::from_file(&config_path).unwrap();
+        assert!(reloaded.pinned_validators().is_empty());
+        assert_eq!(reloaded.pinned_collators(), collators);
     }
 
     #[test]

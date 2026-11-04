@@ -4,7 +4,7 @@ use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
+use tracing::{debug, warn};
 
 pub fn dispatch_response_action(
     response: Response,
@@ -165,7 +165,7 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!("No identity data found for {}", account_key,);
+                debug!("No identity data found for {}", account_key,);
             }
         }
         Response::TxSubmitted(data) => {
@@ -228,7 +228,8 @@ pub fn dispatch_response_action(
         Response::SupportedProxy(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
-            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            let proxy_key = ProxyKey::new(runtime, data.value.proxy_type)
+                .with_proxy_account(data.value.proxy_account);
             tx.send(Action::Validator(ValidatorAction::AddProxy(
                 account_key,
                 proxy_key,
@@ -237,7 +238,8 @@ pub fn dispatch_response_action(
         }
         Response::CollatorSupportedProxy(data) => {
             let collator_key = AccountKey::from_bytes(runtime, data.value.account);
-            let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+            let proxy_key = ProxyKey::new(runtime, data.value.proxy_type)
+                .with_proxy_account(data.value.proxy_account);
             tx.send(Action::Collator(CollatorAction::AddProxy(
                 collator_key,
                 proxy_key,
@@ -271,6 +273,12 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::AllValidators(data) => {
+            tx.send(Action::Validator(ValidatorAction::UpdateAllValidators(
+                runtime, data.value,
+            )))
+            .boxed()?;
+        }
         Response::Invulnerables(data) => {
             tx.send(Action::Collator(CollatorAction::UpdateInvulnerables(
                 runtime, data.value,
@@ -299,7 +307,7 @@ pub fn dispatch_response_action(
                 )))
                 .boxed()?;
             } else {
-                warn!(
+                debug!(
                     "No identity data found for collator {:?}",
                     data.value.account
                 );

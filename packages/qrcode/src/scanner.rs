@@ -18,6 +18,9 @@ pub struct Scanner {
     camera: Camera,
     /// Reused across frames to avoid per-frame allocation.
     reader: QRCodeReader,
+    /// Whether the QR code is a signature, decoded from hex. Otherwise the text of the QR code is
+    /// returned as it is, e.g. the address of a Vault account.
+    is_signature: bool,
 }
 
 impl Scanner {
@@ -32,7 +35,14 @@ impl Scanner {
         Ok(Self {
             camera,
             reader: QRCodeReader,
+            is_signature: false,
         })
+    }
+
+    /// Reads the QR code as a signature, decoding its hex.
+    pub fn as_signature(mut self) -> Self {
+        self.is_signature = true;
+        self
     }
 
     pub fn open(&mut self) -> Result<(), Error> {
@@ -59,7 +69,10 @@ impl Scanner {
 
         let result = self.reader.decode(&mut bitmap).ok()?;
         let qr_text = result.getText();
-        hex::decode(result.getText().strip_prefix("0x").unwrap_or(qr_text)).ok()
+        if self.is_signature {
+            return hex::decode(qr_text.strip_prefix("0x").unwrap_or(qr_text)).ok();
+        }
+        Some(qr_text.as_bytes().to_vec())
     }
 
     pub fn scan_frame(&mut self) -> Result<(Option<Vec<u8>>, DynamicImage), Error> {

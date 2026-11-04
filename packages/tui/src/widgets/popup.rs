@@ -14,11 +14,13 @@ use ratatui::{
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
+use subxt::utils::AccountId32;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
-use suno_config::SupportedRuntime;
+use suno_config::{FeatureState, SupportedRuntime};
 use suno_primitives::{
     call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
+    proxy::ProxyState,
     session::{AuraKey, Keys, Proof},
     staking::Payee,
     AccountDisplay, Chain, Collator, NodeHost, Validator,
@@ -41,8 +43,23 @@ struct CollatorContext {
     collator: Collator,
 }
 
+struct ProxyContext {
+    proxy: ProxyState,
+}
+
 struct ChainContext {
     runtime: SupportedRuntime,
+}
+
+struct ScanAccountContext {
+    /// The command that adds the account, whose address is scanned
+    call: Call,
+    /// The chain the account is added from, the Asset Hub
+    runtime: SupportedRuntime,
+}
+
+struct FeaturesContext {
+    states: Vec<FeatureState>,
 }
 
 struct ThemeMenuContext {
@@ -68,7 +85,10 @@ enum Context {
     ValidatorMenu(Box<ValidatorContext>),
     CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
+    ProxyMenu(Box<ProxyContext>),
     ThemeMenu(Box<ThemeMenuContext>),
+    Features(Box<FeaturesContext>),
+    ScanAccount(Box<ScanAccountContext>),
     Confirmation(Box<ConfirmationContext>),
     Message(MessageContext),
     ChainSpecs(Box<ChainSpecsContext>),
@@ -82,7 +102,10 @@ impl Context {
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
+            Context::ProxyMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
+            Context::Features(_) => Mode::Features,
+            Context::ScanAccount(_) => Mode::ScanAccount,
             Context::Confirmation(_) => Mode::Confirmation,
             Context::Message(_) => Mode::Message,
             Context::ChainSpecs(_) => Mode::ChainSpecs,
@@ -97,6 +120,8 @@ pub enum Mode {
     Hidden,
     Menu,
     ThemeMenu,
+    Features,
+    ScanAccount,
     Confirmation,
     Message,
     ChainSpecs,
@@ -159,11 +184,17 @@ impl Popup {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
             Context::CollatorMenu(ctx) => self.init_collator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::ProxyMenu(ctx) => self.init_proxy_menu(ctx),
             Context::ThemeMenu(ctx) => {
                 self.input.reset_as_filter();
                 let index = ctx.names.iter().position(|n| n == &ctx.active_name);
                 self.table_state.select(index.or(Some(0)));
             }
+            Context::Features(_) => {
+                self.table_state.select(Some(0));
+            }
+            // The input of the menu before is not displayed, so it has no cursor
+            Context::ScanAccount(_) => self.input.unfocus(),
             Context::Confirmation(ctx) => {
                 if !ctx.runtime.is_qrcode_enabled() {
                     self.input.reset_as_password();
@@ -177,6 +208,18 @@ impl Popup {
                 self.metadata = Some(MetadataState::new(&ctx.qr_bytes));
             }
             Context::None => {}
+        }
+
+        // Check that only the commands displayed are valid and actionable
+        if matches!(
+            context,
+            Context::ValidatorMenu(_)
+                | Context::CollatorMenu(_)
+                | Context::ChainMenu(_)
+                | Context::ProxyMenu(_)
+        ) {
+            let commands = self.options.iter().map(|e| e.command()).collect();
+            self.input.set_valid_commands(commands);
         }
 
         self.context = context;
@@ -207,7 +250,7 @@ impl Popup {
                 payee: Payee::default(),
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond) && ctx.validator.is_unknown() {
+            if p.proxy_type().can_call(&bond) && ctx.validator.is_unknown() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: bond,
                     bytes: None,
@@ -218,7 +261,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&bond_extra)
+            if p.proxy_type().can_call(&bond_extra)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.free_balance() > 0
             {
@@ -232,7 +275,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.bounded_extended(4)),
             };
-            if p.proxy().can_call(&unbond)
+            if p.proxy_type().can_call(&unbond)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.bounded() > 0
             {
@@ -246,7 +289,7 @@ impl Popup {
                 amount: 0,
                 max: Some(ctx.validator.unlocking_extended(ctx.era, 4)),
             };
-            if p.proxy().can_call(&rebond)
+            if p.proxy_type().can_call(&rebond)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocking(ctx.era) > 0
             {
@@ -259,7 +302,7 @@ impl Popup {
             let withdraw = Call::WithdrawUnbonded {
                 max: Some(ctx.validator.unlocked_extended(ctx.era, 4)),
             };
-            if p.proxy().can_call(&withdraw)
+            if p.proxy_type().can_call(&withdraw)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocked(ctx.era) > 0
             {
@@ -272,7 +315,7 @@ impl Popup {
             let set_payee = Call::SetPayee {
                 payee: Payee::default(),
             };
-            if p.proxy().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
+            if p.proxy_type().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_payee,
                     bytes: None,
@@ -283,7 +326,7 @@ impl Popup {
                 commission: Perbill::from_percent(0),
                 blocked: false,
             };
-            if p.proxy().can_call(&validate) {
+            if p.proxy_type().can_call(&validate) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: validate,
                     bytes: None,
@@ -291,7 +334,7 @@ impl Popup {
             }
 
             let chill = Call::Chill;
-            if p.proxy().can_call(&chill) && ctx.validator.is_active_or_waiting() {
+            if p.proxy_type().can_call(&chill) && ctx.validator.is_active_or_waiting() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: chill,
                     bytes: None,
@@ -302,7 +345,7 @@ impl Popup {
                 keys: Keys::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_keys) {
+            if p.proxy_type().can_call(&set_keys) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_keys,
                     bytes: None,
@@ -310,7 +353,7 @@ impl Popup {
             }
 
             let purge_keys = Call::PurgeKeys;
-            if p.proxy().can_call(&purge_keys)
+            if p.proxy_type().can_call(&purge_keys)
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.has_keys()
             {
@@ -350,7 +393,9 @@ impl Popup {
 
         ctx.collator.proxies.iter().for_each(|p| {
             let register_as_candidate = Call::RegisterAsCandidate;
-            if p.proxy().can_call(&register_as_candidate) && ctx.collator.is_exiting_or_unknown() {
+            if p.proxy_type().can_call(&register_as_candidate)
+                && ctx.collator.is_exiting_or_unknown()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: register_as_candidate,
                     bytes: None,
@@ -358,7 +403,9 @@ impl Popup {
             }
 
             let leave_intent = Call::LeaveIntent;
-            if p.proxy().can_call(&leave_intent) && ctx.collator.is_permissionless_or_candidate() {
+            if p.proxy_type().can_call(&leave_intent)
+                && ctx.collator.is_permissionless_or_candidate()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: leave_intent,
                     bytes: None,
@@ -370,7 +417,9 @@ impl Popup {
                 current_deposit: Some(ctx.collator.deposit_extended(4)),
                 max: Some(ctx.collator.free_balance_extended(4)),
             };
-            if p.proxy().can_call(&update_bond) && ctx.collator.is_permissionless_or_candidate() {
+            if p.proxy_type().can_call(&update_bond)
+                && ctx.collator.is_permissionless_or_candidate()
+            {
                 self.options.push(Entry::new(Command::Instruction {
                     call: update_bond,
                     bytes: None,
@@ -381,7 +430,7 @@ impl Popup {
                 deposit: 0,
                 target: ctx.collator.stash(),
             };
-            if p.proxy().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
+            if p.proxy_type().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: take_candidate_slot,
                     bytes: None,
@@ -392,7 +441,7 @@ impl Popup {
                 aura_key: AuraKey::default(),
                 proof: Proof::default(),
             };
-            if p.proxy().can_call(&set_session_keys) {
+            if p.proxy_type().can_call(&set_session_keys) {
                 self.options.push(Entry::new(Command::Instruction {
                     call: set_session_keys,
                     bytes: None,
@@ -400,7 +449,7 @@ impl Popup {
             }
 
             let purge_session_keys = Call::PurgeSessionKeys;
-            if p.proxy().can_call(&purge_session_keys) && ctx.collator.has_keys() {
+            if p.proxy_type().can_call(&purge_session_keys) && ctx.collator.has_keys() {
                 self.options.push(Entry::new(Command::Instruction {
                     call: purge_session_keys,
                     bytes: None,
@@ -414,6 +463,23 @@ impl Popup {
                 bytes: None,
             }));
         });
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn init_proxy_menu(&mut self, ctx: &ProxyContext) {
+        self.input.reset_as_command(None);
+
+        if ctx.proxy.is_removable() {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::RemoveProxyAccount {
+                    account: Some(ctx.proxy.account),
+                },
+                bytes: None,
+            }));
+        }
 
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
@@ -436,6 +502,20 @@ impl Popup {
             },
             bytes: None,
         }));
+
+        if ctx.runtime.is_para_chain() {
+            let mut calls = Vec::new();
+            if ctx.runtime.is_asset_hub() {
+                calls.push(Call::AddValidator { stash: None });
+            }
+            calls.push(Call::AddCollator { stash: None });
+            calls.push(Call::AddProxyAccount { account: None });
+            calls.push(Call::RemoveProxyAccount { account: None });
+            for call in calls {
+                self.options
+                    .push(Entry::new(Command::Instruction { call, bytes: None }));
+            }
+        }
 
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
@@ -464,9 +544,67 @@ impl Popup {
         self.on_init(Context::ChainMenu(Box::new(ctx)));
     }
 
+    pub fn show_proxy_commands(&mut self, proxy: &ProxyState) {
+        let ctx = ProxyContext {
+            proxy: proxy.clone(),
+        };
+        self.on_init(Context::ProxyMenu(Box::new(ctx)));
+    }
+
     pub fn show_theme_menu(&mut self, names: Vec<String>, active_name: String) {
         let ctx = ThemeMenuContext { names, active_name };
         self.on_init(Context::ThemeMenu(Box::new(ctx)));
+    }
+
+    pub fn show_scan_account(&mut self, call: Call, runtime: SupportedRuntime) {
+        self.on_init(Context::ScanAccount(Box::new(ScanAccountContext {
+            call,
+            runtime,
+        })));
+    }
+
+    /// The command that adds the account scanned, and the chain it is added from.
+    pub fn get_scan_account(&self) -> Option<(Call, SupportedRuntime)> {
+        let Context::ScanAccount(ctx) = &self.context else {
+            return None;
+        };
+        Some((ctx.call.clone(), ctx.runtime))
+    }
+
+    pub fn show_features(&mut self, states: Vec<FeatureState>) {
+        self.on_init(Context::Features(Box::new(FeaturesContext { states })));
+    }
+
+    /// Lists the features again, e.g. after one changed, keeping the one selected.
+    pub fn update_features(&mut self, states: Vec<FeatureState>) {
+        if let Context::Features(ctx) = &mut self.context {
+            ctx.states = states;
+        }
+    }
+
+    /// The feature selected, when the popup is showing the features.
+    pub fn get_selected_feature(&self) -> Option<FeatureState> {
+        let Context::Features(ctx) = &self.context else {
+            return None;
+        };
+        ctx.states.get(self.table_state.selected()?).copied()
+    }
+
+    fn move_feature_selection(&mut self, forward: bool) {
+        let Context::Features(ctx) = &self.context else {
+            return;
+        };
+        let len = ctx.states.len();
+        if len == 0 {
+            return;
+        }
+        let selected = self.table_state.selected().unwrap_or(0).min(len - 1);
+        let next = if forward {
+            (selected + 1) % len
+        } else {
+            (selected + len - 1) % len
+        };
+        self.table_state.select(Some(next));
     }
 
     /// Returns the theme names matching the current filter text, when the
@@ -559,6 +697,10 @@ impl Popup {
     }
 
     pub fn move_down(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::Features(_)) {
+            self.move_feature_selection(true);
+            return None;
+        }
         if matches!(self.context, Context::ThemeMenu(_)) {
             self.move_theme_selection(true);
             return None;
@@ -575,6 +717,7 @@ impl Popup {
             .selected()
             .unwrap_or(0)
             .min(options.len() - 1);
+
         let next = if selected == options.len() - 1 {
             0
         } else {
@@ -585,6 +728,10 @@ impl Popup {
     }
 
     pub fn move_up(&mut self) -> Option<Entry<Call>> {
+        if matches!(self.context, Context::Features(_)) {
+            self.move_feature_selection(false);
+            return None;
+        }
         if matches!(self.context, Context::ThemeMenu(_)) {
             self.move_theme_selection(false);
             return None;
@@ -656,6 +803,15 @@ impl Popup {
             })
     }
 
+    /// The proxy account that signs, while confirming a transaction.
+    pub fn get_proxy_account(&self) -> Option<AccountId32> {
+        if let Context::Confirmation(ctx) = &self.context {
+            Some(ctx.proxy_account)
+        } else {
+            None
+        }
+    }
+
     pub fn get_call_data_bytes(&self) -> Option<Vec<u8>> {
         if let Context::Confirmation(ctx) = &self.context {
             Some(ctx.call_data_bytes.clone())
@@ -672,6 +828,10 @@ impl Popup {
         self.context.mode()
     }
 
+    pub fn is_scan_account_mode(&self) -> bool {
+        matches!(self.context, Context::ScanAccount(_))
+    }
+
     pub fn is_confirmation_mode(&self) -> bool {
         matches!(self.context, Context::Confirmation(_))
     }
@@ -679,7 +839,7 @@ impl Popup {
     pub fn is_menu_mode(&self) -> bool {
         matches!(
             self.context,
-            Context::ValidatorMenu(_) | Context::ChainMenu(_)
+            Context::ValidatorMenu(_) | Context::ChainMenu(_) | Context::ProxyMenu(_)
         )
     }
 
@@ -689,7 +849,10 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::ProxyMenu(_)
                 | Context::ThemeMenu(_)
+                | Context::Features(_)
+                | Context::ScanAccount(_)
                 | Context::ChainSpecs(_)
                 | Context::Metadata(_)
                 | Context::Confirmation(_)
@@ -829,6 +992,8 @@ impl Widget for &mut Popup {
         match self.get_mode() {
             Mode::Menu => self.render_menu(area, buf),
             Mode::ThemeMenu => self.render_theme_menu(area, buf),
+            Mode::Features => self.render_features(area, buf),
+            Mode::ScanAccount => self.render_scan_account(area, buf),
             Mode::Confirmation => self.render_confirm_and_sign(area, buf),
             Mode::Message => self.render_message(area, buf),
             Mode::ChainSpecs => self.render_chain_specs_qrcode(area, buf),
@@ -865,6 +1030,10 @@ impl Popup {
             }
             Context::ChainMenu(ctx) => (
                 Some(ctx.runtime.as_str_long().to_uppercase()),
+                Some("Commands".to_string()),
+            ),
+            Context::ProxyMenu(ctx) => (
+                Some(ctx.proxy.compact_address(6)),
                 Some("Commands".to_string()),
             ),
             _ => (None, None),
@@ -935,9 +1104,10 @@ impl Popup {
     fn render_theme_menu(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
 
-        if !matches!(self.context, Context::ThemeMenu(_)) {
+        let Context::ThemeMenu(_) = &self.context else {
             return;
-        }
+        };
+
         let names = self.get_theme_names_filtered();
         let selected_display_name = self.get_selected_theme().map(|name| to_slug_body(&name));
 
@@ -960,7 +1130,7 @@ impl Popup {
             .style(theme.block.popup_header)
             .padding(Padding::new(1, 1, 1, 0));
 
-        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.header(true))])
+        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.label(true))])
             .alignment(Alignment::Right);
         let top = Paragraph::new(header)
             .block(block)
@@ -989,6 +1159,121 @@ impl Popup {
         self.input
             .as_filter(theme, selected_display_name, has_match)
             .render(input_area, buf);
+    }
+
+    fn render_features(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+
+        let Context::Features(ctx) = &self.context else {
+            return;
+        };
+
+        let rows = ctx.states.iter().map(|state| {
+            let mark = if state.pending_restart() {
+                "restart required"
+            } else if state.changed {
+                "overridden"
+            } else {
+                ""
+            };
+            Row::new([
+                Cell::from(""),
+                Cell::from(state.symbol()),
+                Cell::from(state.feature.key()),
+                Cell::from(state.feature.scope().to_string()),
+                Cell::from(state.feature.description()),
+                Cell::from(Line::from(mark).alignment(Alignment::Right)),
+                Cell::from(""),
+            ])
+        });
+
+        let details_len = (ctx.states.len() as u16 + 3).clamp(4, 20);
+        let [top_area, details_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Max(details_len)])
+            .flex(Flex::End)
+            .areas(area);
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::new(1, 1, 1, 0));
+
+        let header = Line::from(vec![Span::styled("Options", theme.paragraph.label(true))])
+            .alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        let widths = [
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(24),
+            Constraint::Length(12),
+            Constraint::Fill(1),
+            Constraint::Length(16),
+            Constraint::Length(1),
+        ];
+
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::bottom(1));
+
+        let table = Table::new(rows, widths)
+            .block(block)
+            .header(
+                Row::new(["", "", "feature", "scope", "description", ""]).style(theme.table.header),
+            )
+            .style(theme.table.base)
+            .row_highlight_style(theme.table.row_highlight(true));
+
+        Clear.render(details_area, buf);
+        StatefulWidget::render(table, details_area, buf, &mut self.table_state);
+    }
+
+    fn render_scan_account(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+
+        let Context::ScanAccount(_) = &self.context else {
+            return;
+        };
+
+        let title = "SCAN TO ADD ADDRESS";
+        let header = Line::from(vec![Span::styled(title, theme.paragraph.header(true))])
+            .alignment(Alignment::Right);
+        let top = Paragraph::new(header)
+            .block(
+                Block::new()
+                    .style(theme.block.popup_header)
+                    .padding(Padding::proportional(1)),
+            )
+            .wrap(Wrap { trim: false });
+
+        let [top_area, scanner_area] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Length(22)])
+            .flex(Flex::End)
+            .areas(area);
+
+        Clear.render(top_area, buf);
+        top.render(top_area, buf);
+
+        Clear.render(scanner_area, buf);
+        Block::new()
+            .style(theme.qrcode.base)
+            .padding(Padding::proportional(1))
+            .render(scanner_area, buf);
+        if let Some(scanner) = self.scanner.as_mut() {
+            if let Some(frame) = scanner.frame_protocol.as_mut() {
+                ScannerWidget::new(frame)
+                    .set_title("Scan QR code")
+                    .set_title_style(theme.qrcode.title)
+                    .set_style(theme.qrcode.scanner)
+                    .render(scanner_area, buf);
+            }
+        }
     }
 
     fn render_confirm_and_sign(&mut self, area: Rect, buf: &mut Buffer) {

@@ -6,69 +6,49 @@ pub enum Section {
     Chains,
     Validators,
     Collators,
+    Proxies,
     /// No section is selected.
     None,
 }
 
 impl Section {
-    pub fn up(&self, features: &Features) -> Self {
-        use Section::*;
-
-        match self {
-            Chains => None,
-            None => Self::up_from_none(features),
-            Validators => Chains,
-            Collators => Self::up_from_collators(features),
-        }
-    }
-
-    fn up_from_none(features: &Features) -> Self {
-        if features.collators_enabled() {
-            Self::Collators
-        } else if features.validators_enabled() {
-            Self::Validators
-        } else {
-            Self::Chains
-        }
-    }
-
-    fn up_from_collators(features: &Features) -> Self {
+    /// The sections that can be selected, from top to bottom.
+    fn selectable(features: &Features, has_proxies: bool) -> Vec<Self> {
+        let mut sections = vec![Self::Chains];
         if features.validators_enabled() {
-            Self::Validators
-        } else {
-            Self::Chains
+            sections.push(Self::Validators);
         }
-    }
-
-    pub fn down(&self, features: &Features) -> Self {
-        use Section::*;
-
-        match self {
-            Chains => Self::down_from_chains(features),
-            Validators => Self::down_from_validators(features),
-            Collators => Self::down_from_collators(),
-            None => Chains,
-        }
-    }
-
-    fn down_from_chains(features: &Features) -> Self {
-        if features.validators_enabled() {
-            Self::Validators
-        } else {
-            Self::down_from_validators(features)
-        }
-    }
-
-    fn down_from_validators(features: &Features) -> Self {
         if features.collators_enabled() {
-            Self::Collators
-        } else {
-            Self::down_from_collators()
+            sections.push(Self::Collators);
+        }
+        if has_proxies {
+            sections.push(Self::Proxies);
+        }
+        sections
+    }
+
+    pub fn up(&self, features: &Features, has_proxies: bool) -> Self {
+        let sections = Self::selectable(features, has_proxies);
+        match self {
+            Self::Chains => Self::None,
+            // A section that can't be selected anymore, e.g. the proxies once removed, goes
+            // back to the last one that can
+            _ => match sections.iter().position(|s| s == self) {
+                Some(index) if index > 0 => sections[index - 1].clone(),
+                _ => sections.last().cloned().unwrap_or(Self::Chains),
+            },
         }
     }
 
-    fn down_from_collators() -> Self {
-        Self::None
+    pub fn down(&self, features: &Features, has_proxies: bool) -> Self {
+        let sections = Self::selectable(features, has_proxies);
+        match self {
+            Self::None => Self::Chains,
+            _ => match sections.iter().position(|s| s == self) {
+                Some(index) => sections.get(index + 1).cloned().unwrap_or(Self::None),
+                None => Self::None,
+            },
+        }
     }
 
     pub fn is_none(&self) -> bool {

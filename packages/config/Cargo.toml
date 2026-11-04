@@ -21,6 +21,7 @@ serde = { workspace = true }
 semver = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sp-core = { workspace = true }
 shellexpand = { workspace = true }
 sp-crypto-hashing = { workspace = true }
 subxt = { workspace = true }

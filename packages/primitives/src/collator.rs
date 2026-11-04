@@ -4,7 +4,8 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     node_account::{AccountDisplay, NodeAccount, NodeHost},
-    proxy::{ProxyKey, SupportedProxy},
+    origin::Origin,
+    proxy::{select_proxy, ProxyKey, SupportedProxy},
     session::AuraKey,
 };
 use std::collections::HashSet;
@@ -45,6 +46,8 @@ type Amount = u128;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
     pub account: NodeAccount,
+    /// Where the collator was listed from.
+    pub origin: Origin,
     pub deposit: Amount,
     pub last_block_authored: Option<u64>,
     pub last_block_authored_ts: Option<u128>,
@@ -68,6 +71,7 @@ impl Collator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: NodeAccount::new(runtime, stash),
+            origin: Origin::Config,
             deposit: 0,
             last_block_authored: None,
             last_block_authored_ts: None,
@@ -80,6 +84,14 @@ impl Collator {
             ssh: None,
             commands: Vec::new(),
             status: CollatorStatus::default(),
+        }
+    }
+
+    /// Instantiates a new collator that isn't listed in the config.
+    pub fn new_on_chain(runtime: SupportedRuntime, stash: AccountId32) -> Self {
+        Self {
+            origin: Origin::OnChain,
+            ..Self::new(runtime, stash)
         }
     }
 
@@ -362,13 +374,17 @@ impl Collator {
         )
     }
 
-    /// Proxy type configured for `runtime` that is allowed to execute the given `call`.
-    pub fn get_proxy_for(&self, runtime: SupportedRuntime, call: &Call) -> SupportedProxy {
-        self.proxies
-            .iter()
-            .find(|p| p.runtime == runtime && p.proxy.can_call(call))
-            .map(|p| p.proxy)
-            .unwrap_or(SupportedProxy::None)
+    /// The signer to make the `call`, and its proxy type, see `select_proxy`.
+    pub fn get_proxy_for(
+        &self,
+        runtime: SupportedRuntime,
+        call: &Call,
+    ) -> Option<(AccountId32, SupportedProxy)> {
+        select_proxy(&self.proxies, runtime, call)
+    }
+
+    pub fn is_tracked(&self) -> bool {
+        self.origin.is_tracked()
     }
 
     pub fn has_commands_available(&self) -> bool {

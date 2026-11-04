@@ -31,6 +31,7 @@ members = [
     "packages/chains/collectives-westend",
     "packages/chains/coretime-kusama",
     "packages/chains/coretime-polkadot",
+    "packages/chains/coretime-westend",
 ]
 
 resolver = "2"

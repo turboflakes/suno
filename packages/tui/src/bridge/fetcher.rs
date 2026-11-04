@@ -67,6 +67,11 @@ pub trait RuntimeFetcher {
         validator_keys: &[AccountKey],
     ) -> Result<Vec<Response>, Error>;
 
+    async fn fetch_all_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error>;
+
     async fn fetch_validators_queued_keys(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -411,6 +416,19 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_all_validators(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubPolkadot => suno_asset_hub_polkadot::fetch_all_validators(api).await,
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_all_validators(api).await,
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_all_validators(api).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_all_validators(api).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
     async fn fetch_validators_queued_keys(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -626,6 +644,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::fetch_and_validate_proxy_account(api, stash, proxy).await
             }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::fetch_and_validate_proxy_account(api, stash, proxy).await
+            }
             Runtime::CoretimePolkadot => {
                 suno_coretime_polkadot::fetch_and_validate_proxy_account(api, stash, proxy).await
             }
@@ -660,7 +681,7 @@ impl RuntimeFetcher for Runtime {
             .into_iter()
             .filter(|response| match response {
                 Response::SupportedProxy(data) => {
-                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
                     proxy_key.is_staking_valid()
                         || proxy_key.is_staking_operator_valid()
                         || proxy_key.is_non_transfer_valid()
@@ -668,6 +689,7 @@ impl RuntimeFetcher for Runtime {
                 }
                 _ => true,
             })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
             .collect())
     }
 
@@ -684,7 +706,7 @@ impl RuntimeFetcher for Runtime {
             .into_iter()
             .filter_map(|response| match response {
                 Response::SupportedProxy(data) => {
-                    let proxy_key = ProxyKey::new(runtime, data.value.supported_proxy);
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
                     (proxy_key.is_collator_valid()
                         || proxy_key.is_non_transfer_valid()
                         || !proxy_key.is_valid())
@@ -692,6 +714,7 @@ impl RuntimeFetcher for Runtime {
                 }
                 other => Some(other),
             })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
             .collect())
     }
 
@@ -706,6 +729,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_balance(api, stash).await,
             Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_balance(api, stash).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_balance(api, stash).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_balance(api, stash).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_balance(api, stash).await,
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_balance(api, stash).await,
             Runtime::BridgeHubPolkadot => suno_bridge_hub_polkadot::fetch_balance(api, stash).await,
@@ -767,6 +791,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_aura_authorities(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_aura_authorities(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_aura_authorities(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_aura_authorities(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_aura_authorities(api).await
             }
@@ -802,6 +827,7 @@ impl RuntimeFetcher for Runtime {
                 suno_coretime_polkadot::fetch_session_validators(api).await
             }
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_validators(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_session_validators(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_session_validators(api).await
             }
@@ -833,6 +859,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_invulnerables(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_invulnerables(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_invulnerables(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_invulnerables(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_invulnerables(api).await
             }
@@ -860,6 +887,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_candidate_list(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_candidate_list(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_candidate_list(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_candidate_list(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_candidate_list(api).await
             }
@@ -913,6 +941,9 @@ impl RuntimeFetcher for Runtime {
             }
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::fetch_collator_last_authored_block(api, stash).await
+            }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::fetch_collator_last_authored_block(api, stash).await
             }
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_collator_last_authored_block(api, stash).await
@@ -973,6 +1004,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::fetch_collators_queued_keys(api, collator_keys).await
             }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::fetch_collators_queued_keys(api, collator_keys).await
+            }
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_collators_queued_keys(api, collator_keys).await
             }
@@ -1028,6 +1062,9 @@ impl RuntimeFetcher for Runtime {
             Runtime::CoretimeKusama => {
                 suno_coretime_kusama::fetch_collator_next_keys(api, stash).await
             }
+            Runtime::CoretimeWestend => {
+                suno_coretime_westend::fetch_collator_next_keys(api, stash).await
+            }
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_collator_next_keys(api, stash).await
             }
@@ -1062,6 +1099,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_slot_duration(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_slot_duration(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_slot_duration(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_slot_duration(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_slot_duration(api).await
             }
@@ -1089,6 +1127,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_session_index(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_session_index(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_session_index(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_session_index(api).await,
             Runtime::CollectivesPolkadot => {
                 suno_collectives_polkadot::fetch_session_index(api).await
             }
@@ -1120,6 +1159,7 @@ impl RuntimeFetcher for Runtime {
             Runtime::BridgeHubKusama => suno_bridge_hub_kusama::fetch_metadata(api).await,
             Runtime::CoretimePolkadot => suno_coretime_polkadot::fetch_metadata(api).await,
             Runtime::CoretimeKusama => suno_coretime_kusama::fetch_metadata(api).await,
+            Runtime::CoretimeWestend => suno_coretime_westend::fetch_metadata(api).await,
             Runtime::CollectivesPolkadot => suno_collectives_polkadot::fetch_metadata(api).await,
             Runtime::CollectivesWestend => suno_collectives_westend::fetch_metadata(api).await,
             Runtime::BulletinPolkadot => suno_bulletin_polkadot::fetch_metadata(api).await,
