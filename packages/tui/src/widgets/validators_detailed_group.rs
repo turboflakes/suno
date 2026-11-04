@@ -65,9 +65,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
 
             // Get selected validator if one of the validators in the current section
             let selected_validator = match state.get_selected_ref() {
-                Some(selected) if validators.contains(&selected) && state.is_active() => {
-                    Some(selected)
-                }
+                Some(selected) if validators.contains(&selected) && is_active => Some(selected),
                 _ => None,
             };
 
