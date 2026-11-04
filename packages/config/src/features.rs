@@ -105,20 +105,24 @@ impl Feature {
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::EnableCheckUpdate => "check for a new version on start",
-            Self::EnableValidators => "enable the validators window and its data",
-            Self::ShowAllValidators => "show every on-chain validator, active or waiting",
-            Self::ShowNominatorsCounter => "show the number of nominators",
-            Self::ShowNominatorsStake => "show the stake of the nominators",
-            Self::ShowOwnStake => "show the stake of the validator",
-            Self::ShowCommission => "show the validator commission",
-            Self::ShowPayee => "show the reward destination",
-            Self::ShowKeys => "show the session keys",
-            Self::EnableCollators => "enable the collators window and its data",
-            Self::ShowAllCollators => "show every on-chain collator",
-            Self::ShowDeposit => "show the deposit of the collators",
-            Self::ShowLastBlock => "show the last produced block and how long ago",
-            Self::ShowNextSlot => "show the next slot number and blocks produced in the slot",
+            Self::EnableCheckUpdate => "Check for new versions on startup",
+            Self::EnableValidators => "Enable the validators window and its data",
+            Self::ShowAllValidators => "Display all on-chain validators, active or waiting",
+            Self::ShowNominatorsCounter => "Display the number of nominators",
+            Self::ShowNominatorsStake => "Display the nominator's total stake",
+            Self::ShowOwnStake => "Display the validator's own stake",
+            Self::ShowCommission => "Display the validator's commission",
+            Self::ShowPayee => "Display the reward destination",
+            Self::ShowKeys => "Display the session keys",
+            Self::EnableCollators => "Enable the collators window and its data",
+            Self::ShowAllCollators => "Display all on-chain collators",
+            Self::ShowDeposit => "Display the collator's deposit",
+            Self::ShowLastBlock => {
+                "Display the last produced block and how long ago it was produced"
+            }
+            Self::ShowNextSlot => {
+                "Display the next slot number and the blocks produced in that slot"
+            }
         }
     }
 

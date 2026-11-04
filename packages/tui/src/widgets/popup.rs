@@ -1130,7 +1130,7 @@ impl Popup {
             .style(theme.block.popup_header)
             .padding(Padding::new(1, 1, 1, 0));
 
-        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.header(true))])
+        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.label(true))])
             .alignment(Alignment::Right);
         let top = Paragraph::new(header)
             .block(block)
@@ -1187,7 +1187,7 @@ impl Popup {
             ])
         });
 
-        let details_len = (ctx.states.len() as u16 + 2).clamp(4, 20);
+        let details_len = (ctx.states.len() as u16 + 3).clamp(4, 20);
         let [top_area, details_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(2), Constraint::Max(details_len)])
@@ -1198,7 +1198,7 @@ impl Popup {
             .style(theme.block.popup_header)
             .padding(Padding::new(1, 1, 1, 0));
 
-        let header = Line::from(vec![Span::styled("Options", theme.paragraph.header(true))])
+        let header = Line::from(vec![Span::styled("Options", theme.paragraph.label(true))])
             .alignment(Alignment::Right);
         let top = Paragraph::new(header)
             .block(block)
