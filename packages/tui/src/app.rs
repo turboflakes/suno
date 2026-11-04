@@ -1610,10 +1610,13 @@ impl App {
         };
     }
 
-    /// Focuses the window tabs, and when they already are, selects the previous window.
     fn prev_tab(&mut self) {
         if self.section.is_none() {
-            self.prev_window();
+            if self.window == Window::first(CONFIG.features()) {
+                self.set_section(Section::Chains);
+            } else {
+                self.prev_window();
+            }
         } else {
             self.set_section(Section::None);
         }
