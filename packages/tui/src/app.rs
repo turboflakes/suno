@@ -8,6 +8,7 @@ use crate::widgets::{
     list_focus::ListFocus,
     logs::LogsState,
     popup::{Mode as PopupMode, Popup},
+    proxies::ProxiesList,
     validators::ValidatorsList,
     window::Window,
 };
@@ -34,7 +35,7 @@ use suno_config::{
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
     call::Call, display::to_compact_string, entry::ToMethod, network::ConnectionState,
-    AccountDisplay, AccountKey, BlockHash, Chain, Collator, NodeHost, Validator,
+    proxy::ProxyState, AccountDisplay, AccountKey, BlockHash, Chain, Collator, NodeHost, Validator,
 };
 use suno_qrcode::{
     build::{
@@ -89,6 +90,7 @@ pub struct App {
     main_section: Section,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
+    pub proxies: ProxiesList,
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
@@ -130,6 +132,8 @@ impl App {
 
         let mut chains = ChainsList::default();
         chains.set_theme(theme);
+        let mut proxies = ProxiesList::default();
+        proxies.set_theme(theme);
         let mut popup = Popup::default();
         popup.set_theme(theme);
         let mut logs = LogsState::new(rx_logs);
@@ -145,6 +149,7 @@ impl App {
             section: Section::None,
             main_section: Section::default(),
             chains,
+            proxies,
             validators: ValidatorsList::default(),
             collators: CollatorsList::default(),
             popup,
@@ -165,6 +170,7 @@ impl App {
         self.update_active_section();
         self.validators.on_init().await;
         self.collators.on_init();
+        self.refresh_proxies();
         self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
     }
@@ -1002,6 +1008,7 @@ impl App {
             }
             ValidatorAction::AddProxy(validator_key, proxy) => {
                 self.validators.add_proxy(&validator_key, proxy);
+                self.refresh_proxies();
             }
             ValidatorAction::UpdateBalance(validator_key, balance) => {
                 self.validators.update_balance(&validator_key, balance);
@@ -1268,6 +1275,7 @@ impl App {
             }
             CollatorAction::AddProxy(collator_key, proxy) => {
                 self.collators.add_proxy(&collator_key, proxy);
+                self.refresh_proxies();
             }
             CollatorAction::UpdateStatus(collator_key, status) => {
                 self.collators.update_status(&collator_key, status);
@@ -1558,6 +1566,9 @@ impl App {
             Section::Collators => {
                 self.collators.move_up();
             }
+            Section::Proxies => {
+                self.proxies.move_up();
+            }
             _ => {}
         };
     }
@@ -1591,6 +1602,9 @@ impl App {
             }
             Section::Collators => {
                 self.collators.move_down();
+            }
+            Section::Proxies => {
+                self.proxies.move_down();
             }
             _ => {}
         };
@@ -1635,14 +1649,16 @@ impl App {
     /// Moves the active section up.
     pub fn section_up(&mut self) {
         let config = CONFIG.clone();
-        let section = self.section.up(&config.features);
+        let section = self.section.up(&config.features, !self.proxies.is_empty());
         self.set_section(section);
     }
 
     /// Moves the active section down.
     pub fn section_down(&mut self) {
         let config = CONFIG.clone();
-        let section = self.section.down(&config.features);
+        let section = self
+            .section
+            .down(&config.features, !self.proxies.is_empty());
         self.set_section(section);
     }
 
@@ -1706,6 +1722,7 @@ impl App {
         let collators_focus = focus_of(data_section == Section::Collators);
 
         self.chains.set_active(self.section == Section::Chains);
+        self.proxies.set_active(self.section == Section::Proxies);
         self.validators.set_focus(validators_focus);
         self.collators.set_focus(collators_focus);
     }
@@ -1788,12 +1805,14 @@ impl App {
             } => {
                 save_proxy_account(runtime, account);
                 self.fetch_proxy_status(runtime);
+                self.refresh_proxies();
             }
             Call::RemoveProxyAccount {
                 account: Some(account),
             } => {
                 remove_proxy_account(runtime, account);
                 self.fetch_proxy_status(runtime);
+                self.refresh_proxies();
             }
             _ => return,
         }
@@ -1815,6 +1834,39 @@ impl App {
                 let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
             }
         }
+    }
+
+    /// Lists the proxy accounts of every chain, with the validators and the collators that hold
+    /// a proxy with each of them.
+    fn refresh_proxies(&mut self) {
+        let mut proxies = ProxyState::list_all();
+        for proxy in &mut proxies {
+            for validator in self.validators.validators_iter() {
+                proxy.track_validator(&validator.proxies);
+            }
+            for collator in self.collators.collators_iter() {
+                proxy.track_collator(&collator.proxies);
+            }
+        }
+        self.proxies.load(proxies);
+
+        // The proxies section can't stay selected once there are no proxy accounts
+        if self.section == Section::Proxies && self.proxies.is_empty() {
+            self.section_up();
+        }
+    }
+
+    /// Removes the proxy account selected
+    fn remove_proxy_selected(&mut self) {
+        let Some(proxy) = self.proxies.get_selected() else {
+            return;
+        };
+        if !proxy.is_removable() {
+            return;
+        }
+        remove_proxy_account(proxy.runtime, proxy.account);
+        self.fetch_proxy_status(proxy.runtime);
+        self.refresh_proxies();
     }
 
     /// Shows the features, to be switched on and off.
@@ -1947,6 +1999,7 @@ impl App {
         self.theme_index = index;
         self.theme = catalog[index].1;
         self.chains.set_theme(self.theme);
+        self.proxies.set_theme(self.theme);
         self.popup.set_theme(self.theme);
         self.logs.set_theme(self.theme);
         self.help.set_theme(self.theme);
@@ -2005,14 +2058,6 @@ impl App {
                     self.validators.remove(&key);
                 }
                 save_pinned_validators(self.validators.get_pinned());
-                // Fetch proxy status only for pinned validators
-                if let Some(asset_hub) = key
-                    .runtime
-                    .asset_hub_runtime()
-                    .filter(|_| origin.is_pinned())
-                {
-                    self.fetch_validators_proxy_status(asset_hub, vec![key]);
-                }
             }
             Window::Collators => {
                 // Toggle pin only from the main window, not from the compact list
@@ -2030,10 +2075,6 @@ impl App {
                     self.collators.remove(&key);
                 }
                 save_pinned_collators(self.collators.get_pinned());
-                // Fetch proxy status only for pinned collators
-                if origin.is_pinned() {
-                    self.fetch_collators_proxy_status(key.runtime, vec![key]);
-                }
             }
             _ => {}
         }
@@ -2117,6 +2158,17 @@ impl App {
             };
 
             self.popup.show_chain_commands(&chain);
+
+            // Dispatch focus to the input field
+            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        };
+
+        if self.section == Section::Proxies && self.proxies.is_active() {
+            let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
+                return;
+            };
+
+            self.popup.show_proxy_commands(&proxy);
 
             // Dispatch focus to the input field
             let _ = self.tx.send(Action::Input(InputAction::Editing));
@@ -2332,6 +2384,20 @@ impl App {
                 self.on_chain_menu_enter(&chain);
             }
         }
+
+        if self.section == Section::Proxies && self.popup.get_mode() == PopupMode::Menu {
+            self.on_proxy_menu_enter();
+        }
+    }
+
+    /// Handle enter when a proxy account is selected and popup is in menu mode, showing the
+    /// commands available for it.
+    fn on_proxy_menu_enter(&mut self) {
+        let Some(Call::RemoveProxyAccount { .. }) = self.popup.get_input_parsed_call() else {
+            return;
+        };
+        self.remove_proxy_selected();
+        self.close_popup();
     }
 
     /// Handle enter when a chain is selected and popup is in menu mode
@@ -3215,6 +3281,7 @@ impl App {
         }
 
         self.chains.set_active(false);
+        self.proxies.set_active(false);
         self.validators.set_focus(ListFocus::None);
         self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();

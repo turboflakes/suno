@@ -4,6 +4,7 @@ use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
+use crate::widgets::proxies_compact::{compact_height, ProxiesCompactWidget};
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{help::HelpWidget, logo::Logo, popup::Mode as PopupMode, window::Window};
@@ -51,10 +52,18 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         Constraint::Length(0)
     };
 
+    // The proxy accounts are only displayed when there are any
+    let proxies_constraint = if app.proxies.is_empty() {
+        Constraint::Length(0)
+    } else {
+        Constraint::Length(compact_height(&app.proxies))
+    };
+
     let constraints = vec![
         Constraint::Length(3 + config.chains.len() as u16),
         validators_constraint,
         collators_constraint,
+        proxies_constraint,
     ];
 
     let left_layout = Layout::default()
@@ -71,6 +80,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     if config.features.collators_enabled() {
         render_collators_widget(app, frame, left_layout[2]);
+    }
+
+    if !app.proxies.is_empty() {
+        render_proxies_widget(app, frame, left_layout[3]);
     }
 
     render_window(app, frame, outer_layout[1]);
@@ -209,6 +222,10 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
+fn render_proxies_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    frame.render_stateful_widget(ProxiesCompactWidget::new(app.theme), area, &mut app.proxies);
+}
+
 fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
     let block = Block::default()
@@ -265,6 +282,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     // Esc clears the selection without changing the section, so ask the lists, not the section
     let has_selection = app.chains.is_active()
+        || app.proxies.is_active()
         || app.validators.is_active()
         || app.collators.is_active()
         || (app.section.is_none()
@@ -275,7 +293,9 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
         || (app.collators.is_active()
             && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
-        || app.chains.is_active())
+        || app.chains.is_active()
+        || (app.proxies.is_active()
+            && app.proxies.get_selected().is_some_and(|p| p.is_removable())))
         && !app.popup.is_visible()
         && !app.window.is_logs_selected()
         && !app.window.is_help_selected()

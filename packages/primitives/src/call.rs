@@ -468,10 +468,13 @@ impl ToDescription for Call {
                 "Add a collator stash".to_string()
             }
             Self::AddProxyAccount { .. } => {
-                "Set a proxy account".to_string()
+                "Add a proxy account".to_string()
+            }
+            Self::RemoveProxyAccount { account: None } => {
+                "Remove a proxy account".to_string()
             }
             Self::RemoveProxyAccount { .. } => {
-                "Remove a proxy account".to_string()
+                "Remove the proxy account".to_string()
             }
         }
     }
@@ -509,7 +512,10 @@ impl ToPlaceholder for Call {
             Self::AddValidator { .. } => "add_validator [<address>]".to_string(),
             Self::AddCollator { .. } => "add_collator [<address>]".to_string(),
             Self::AddProxyAccount { .. } => "add_proxy_account [<address>]".to_string(),
-            Self::RemoveProxyAccount { .. } => "remove_proxy_account [<address>]".to_string(),
+            Self::RemoveProxyAccount { account: None } => {
+                "remove_proxy_account [<address>]".to_string()
+            }
+            Self::RemoveProxyAccount { .. } => "remove_proxy_account".to_string(),
         }
     }
 }

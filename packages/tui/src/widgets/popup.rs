@@ -20,6 +20,7 @@ use suno_config::{FeatureState, SupportedRuntime};
 use suno_primitives::{
     call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
+    proxy::ProxyState,
     session::{AuraKey, Keys, Proof},
     staking::Payee,
     AccountDisplay, Chain, Collator, NodeHost, Validator,
@@ -40,6 +41,10 @@ struct ValidatorContext {
 #[derive(Clone, PartialEq, Eq)]
 struct CollatorContext {
     collator: Collator,
+}
+
+struct ProxyContext {
+    proxy: ProxyState,
 }
 
 struct ChainContext {
@@ -80,6 +85,7 @@ enum Context {
     ValidatorMenu(Box<ValidatorContext>),
     CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
+    ProxyMenu(Box<ProxyContext>),
     ThemeMenu(Box<ThemeMenuContext>),
     Features(Box<FeaturesContext>),
     ScanAccount(Box<ScanAccountContext>),
@@ -96,6 +102,7 @@ impl Context {
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
+            Context::ProxyMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Features(_) => Mode::Features,
             Context::ScanAccount(_) => Mode::ScanAccount,
@@ -177,6 +184,7 @@ impl Popup {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
             Context::CollatorMenu(ctx) => self.init_collator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::ProxyMenu(ctx) => self.init_proxy_menu(ctx),
             Context::ThemeMenu(ctx) => {
                 self.input.reset_as_filter();
                 let index = ctx.names.iter().position(|n| n == &ctx.active_name);
@@ -205,7 +213,10 @@ impl Popup {
         // Check that only the commands displayed are valid and actionable
         if matches!(
             context,
-            Context::ValidatorMenu(_) | Context::CollatorMenu(_) | Context::ChainMenu(_)
+            Context::ValidatorMenu(_)
+                | Context::CollatorMenu(_)
+                | Context::ChainMenu(_)
+                | Context::ProxyMenu(_)
         ) {
             let commands = self.options.iter().map(|e| e.command()).collect();
             self.input.set_valid_commands(commands);
@@ -458,6 +469,23 @@ impl Popup {
         }
     }
 
+    fn init_proxy_menu(&mut self, ctx: &ProxyContext) {
+        self.input.reset_as_command(None);
+
+        if ctx.proxy.is_removable() {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::RemoveProxyAccount {
+                    account: Some(ctx.proxy.account),
+                },
+                bytes: None,
+            }));
+        }
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
     fn init_chain_menu(&mut self, ctx: &ChainContext) {
         self.input.reset_as_command(None);
 
@@ -514,6 +542,13 @@ impl Popup {
             runtime: chain.runtime(),
         };
         self.on_init(Context::ChainMenu(Box::new(ctx)));
+    }
+
+    pub fn show_proxy_commands(&mut self, proxy: &ProxyState) {
+        let ctx = ProxyContext {
+            proxy: proxy.clone(),
+        };
+        self.on_init(Context::ProxyMenu(Box::new(ctx)));
     }
 
     pub fn show_theme_menu(&mut self, names: Vec<String>, active_name: String) {
@@ -804,7 +839,7 @@ impl Popup {
     pub fn is_menu_mode(&self) -> bool {
         matches!(
             self.context,
-            Context::ValidatorMenu(_) | Context::ChainMenu(_)
+            Context::ValidatorMenu(_) | Context::ChainMenu(_) | Context::ProxyMenu(_)
         )
     }
 
@@ -814,6 +849,7 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::ProxyMenu(_)
                 | Context::ThemeMenu(_)
                 | Context::Features(_)
                 | Context::ScanAccount(_)
@@ -994,6 +1030,10 @@ impl Popup {
             }
             Context::ChainMenu(ctx) => (
                 Some(ctx.runtime.as_str_long().to_uppercase()),
+                Some("Commands".to_string()),
+            ),
+            Context::ProxyMenu(ctx) => (
+                Some(ctx.proxy.compact_address(6)),
                 Some("Commands".to_string()),
             ),
             _ => (None, None),

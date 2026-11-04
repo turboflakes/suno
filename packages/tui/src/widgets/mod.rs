@@ -12,6 +12,8 @@ pub mod list_focus;
 pub mod logo;
 pub mod logs;
 pub mod popup;
+pub mod proxies;
+pub mod proxies_compact;
 pub mod scrollbar;
 pub mod spinner;
 pub mod validators;

@@ -623,6 +623,16 @@ impl Config {
         }
     }
 
+    /// The proxy accounts of the chain `runtime` as saved in the prefs.
+    pub fn pinned_proxy_accounts(&self, runtime: SupportedRuntime) -> Vec<AccountId32> {
+        self.read_prefs()
+            .proxy_accounts()
+            .into_iter()
+            .filter(|(chain, _)| *chain == runtime)
+            .map(|(_, account)| account)
+            .collect()
+    }
+
     /// The network launched from the CLI, e.g. `suno polkadot`, if any.
     pub fn network(&self) -> Option<SupportedRuntime> {
         self.network
