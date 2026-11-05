@@ -357,6 +357,28 @@ pub struct Explorer {
     url: Option<String>,
 }
 
+/// Writes `content` to `path`, readable and writable by the owner only (`0600` on unix).
+pub(crate) fn write_private_atomic(path: &Path, content: &[u8]) -> Result<(), Error> {
+    use std::io::Write;
+    let tmp_name = format!(
+        "{}.tmp",
+        path.file_name().and_then(|n| n.to_str()).unwrap_or(".file")
+    );
+    let tmp_path = path.with_file_name(tmp_name);
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&tmp_path)?;
+    file.write_all(content)?;
+    file.sync_all()?;
+    fs::rename(&tmp_path, path)?;
+    Ok(())
+}
+
 impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         Self::from_file_for(path, None)
@@ -508,21 +530,9 @@ impl Config {
     }
 
     /// Persists the prefs file, overwriting it with the given snapshot.
-    /// Writes to a temp file and renames over the original, so a crash
-    /// mid-write can't leave a corrupt file behind.
     fn write_prefs(&self, prefs: &Prefs) -> Result<(), Error> {
-        let path = self.prefs_path();
         let content = serde_yaml::to_string(prefs)?;
-        let tmp_name = format!(
-            "{}.tmp",
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(".config.local.yaml")
-        );
-        let tmp_path = path.with_file_name(tmp_name);
-        fs::write(&tmp_path, content)?;
-        fs::rename(&tmp_path, &path)?;
-        Ok(())
+        write_private_atomic(&self.prefs_path(), content.as_bytes())
     }
 
     pub fn validate(&self) -> Result<(), Error> {

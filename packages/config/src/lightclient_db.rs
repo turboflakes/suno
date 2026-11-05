@@ -1,6 +1,7 @@
+use crate::config::write_private_atomic;
 use crate::error::Error;
 use std::fs;
-use std::io::{ErrorKind, Write};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
@@ -69,35 +70,10 @@ fn try_load(path: &Path) -> Result<Option<String>, Error> {
     Ok(Some(fs::read_to_string(path)?))
 }
 
-/// Persists the database, overwriting it with the given content.
-/// Writes to a temp file (`0600`) and renames over the original, so a crash
-/// mid-write can't leave a corrupt file behind.
-fn write_database(path: &Path, content: &str) -> Result<(), Error> {
-    let tmp_name = format!(
-        "{}.tmp",
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(".smol.db")
-    );
-    let tmp_path = path.with_file_name(tmp_name);
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(&tmp_path)?;
-    file.write_all(content.as_bytes())?;
-    file.sync_all()?;
-    fs::rename(&tmp_path, path)?;
-    Ok(())
-}
-
 async fn save(path: &Path, rpc: &LightClientRpc) {
     match rpc.database_content(Some(MAX_SIZE_BYTES)).await {
         Ok(db) if db.is_empty() => debug!("Light client database is empty, not saved"),
-        Ok(db) => match write_database(path, &db) {
+        Ok(db) => match write_private_atomic(path, db.as_bytes()) {
             Ok(()) => debug!("Light client database saved to {}", path.display()),
             Err(e) => warn!("Light client database not saved: {e}"),
         },
