@@ -420,6 +420,13 @@ impl Config {
         dir.join(file_name)
     }
 
+    /// Path of the file where the smoldot database of a relay chain is persisted, e.g.
+    /// `.smol.polkadot.db`, next to the config file.
+    pub fn lightclient_db_path(&self, chain_name: &str) -> PathBuf {
+        let dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
+        dir.join(format!(".smol.{}.db", chain_name.to_lowercase()))
+    }
+
     /// Reads the prefs file, if it exists and is well-formed. Defaults to
     /// an empty `Prefs` otherwise, so a missing or corrupt file never
     /// blocks startup.

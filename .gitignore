@@ -44,3 +44,6 @@ bump-version.sh
 
 # Claude
 .claude/settings.local.json
+
+# Lightclient database
+.smol*.db

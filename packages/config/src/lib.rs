@@ -4,6 +4,7 @@ mod custom;
 mod error;
 mod features;
 mod fetch;
+pub mod lightclient_db;
 mod logs;
 mod prefs;
 mod runtime;

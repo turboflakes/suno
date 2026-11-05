@@ -1,7 +1,9 @@
 use std::time::Duration;
 use subxt::{
     ext::jsonrpsee::ws_client::PingConfig,
-    lightclient::{LightClient, LightClientError, LightClientRpc},
+    lightclient::{
+        ChainConfig as LightClientConfig, LightClient, LightClientError, LightClientRpc,
+    },
 };
 use subxt_rpcs::{
     client::{
@@ -10,7 +12,7 @@ use subxt_rpcs::{
     },
     utils::validate_url_is_secure,
 };
-use suno_config::{ChainConfig, SupportedRuntime};
+use suno_config::{lightclient_db, ChainConfig, SupportedRuntime, CONFIG};
 use tracing::{info, warn};
 
 pub async fn _create_substrate_rpc_client_from_url(
@@ -61,8 +63,11 @@ pub async fn create_rpc_client_from_config(
         }
         // Relay chain default: create a light client when no rpc_url is configured.
         (true, true, _) => {
+            let db_path = CONFIG.lightclient_db_path(&runtime.chain_name());
             let (lc, rpc) =
-                create_light_client_from_relay_chain_specs(runtime.chain_specs()).await?;
+                create_light_client_from_relay_chain_specs(runtime.chain_specs(), &db_path)
+                    .await?;
+            lightclient_db::register(db_path, rpc.clone());
             Ok((rpc.into(), Some((*runtime, lc))))
         }
         // Parachain default: derive from the matching relay light client.
@@ -80,8 +85,11 @@ pub async fn create_rpc_client_from_config(
 
 async fn create_light_client_from_relay_chain_specs(
     chain_specs: &str,
+    db_path: &std::path::Path,
 ) -> Result<(LightClient, LightClientRpc), LightClientError> {
-    let (lc, rpc) = LightClient::relay_chain(chain_specs)?;
+    let database = lightclient_db::load(db_path);
+    let config = LightClientConfig::chain_spec(chain_specs).set_database_content(database);
+    let (lc, rpc) = LightClient::relay_chain(config)?;
 
     Ok((lc, rpc))
 }

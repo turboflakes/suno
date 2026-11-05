@@ -83,9 +83,9 @@ sp-arithmetic = "28.0.1"
 sp-core = "43.0.0"
 sp-crypto-hashing = "0.1"
 strum = { version = "0.26.3", features = ["derive"] }
-subxt = { git = "https://github.com/turboflakes/subxt", rev = "b4955a7", features = ["reconnecting-rpc-client", "light-client", "jsonrpsee"] }
-subxt-signer = { git = "https://github.com/turboflakes/subxt", rev = "b4955a7", features = ["polkadot-js-compat"] }
-subxt-rpcs = { git = "https://github.com/turboflakes/subxt", rev = "b4955a7" }
+subxt = { git = "https://github.com/turboflakes/subxt", rev = "2593159", features = ["reconnecting-rpc-client", "light-client", "unstable-light-client", "jsonrpsee"] }
+subxt-signer = { git = "https://github.com/turboflakes/subxt", rev = "2593159", features = ["polkadot-js-compat"] }
+subxt-rpcs = { git = "https://github.com/turboflakes/subxt", rev = "2593159" }
 tar = "0.4"
 tempfile = "3.2"
 time = { version = "0.3", features = ["formatting", "macros"] }

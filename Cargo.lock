@@ -3612,9 +3612,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee"
-version = "0.24.11"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c4b1f204b655b36b24dc4939af20366c649431d4711863bbbae5c495f3eeb4"
+checksum = "4826d5921c90b936eae1b0c09fef26697c4d7269ba5d6bb976f762a870a5ed82"
 dependencies = [
  "jsonrpsee-client-transport",
  "jsonrpsee-core",
@@ -3624,9 +3624,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-client-transport"
-version = "0.24.11"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e1420b1792cff778e2a1ebaa44115f156ee62a94dd106eaa51163f037d2023"
+checksum = "844daecf918f7dfb45ae84aa4ac1f07b514e9369bdfe0352d5369809e2c0827a"
 dependencies = [
  "base64 0.22.1",
  "futures-util",
@@ -3637,7 +3637,7 @@ dependencies = [
  "rustls-pki-types",
  "rustls-platform-verifier",
  "soketto",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -3647,46 +3647,49 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-core"
-version = "0.24.11"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f49bfa9334963e1c85866b39dff3ffcc81f1c286eb23334267c5cb97677543a4"
+checksum = "ba6e425d1828eb60a9e054f77b60e375fbf46aabff72c46b5ea24406566f7e91"
 dependencies = [
  "async-trait",
  "futures-timer",
  "futures-util",
+ "http",
  "jsonrpsee-types",
  "pin-project",
  "rustc-hash 2.1.3",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
+ "tower",
  "tracing",
 ]
 
 [[package]]
 name = "jsonrpsee-types"
-version = "0.24.11"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d86fc943f81dab0ecdd6c0240b6e0f55ad57a2ea9ad8ad7efe8456fb9cc7a4"
+checksum = "e6e6de48c2fb8ba2773f4429c28349576f98d73a3b1d647d963f96df53210312"
 dependencies = [
  "http",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "jsonrpsee-ws-client"
-version = "0.24.11"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9df5bd5c38c0906a6e8b3a38c8c22cc8525fda25fd1a03a3fe010686aea66b70"
+checksum = "06cd5b8daf2d7c0730731a97f96c0d1d0dd38def07001ff80df1cf6063442235"
 dependencies = [
  "http",
  "jsonrpsee-client-transport",
  "jsonrpsee-core",
  "jsonrpsee-types",
+ "tower",
  "url",
 ]
 
@@ -6605,9 +6608,9 @@ dependencies = [
 
 [[package]]
 name = "smoldot"
-version = "4.0.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4720bc1498521cb1094a2a377bfccbbf384a996a4f3bb510a4098f5138b46cee"
+checksum = "b780906b3a7480f18c148366bf223d76258ce73c4a45685bc131fff24b1d7b1c"
 dependencies = [
  "ark-bls12-381 0.6.0",
  "ark-ec 0.6.0",
@@ -6658,6 +6661,7 @@ dependencies = [
  "slab",
  "smallvec",
  "soketto",
+ "strum 0.27.2",
  "twox-hash 2.1.4",
  "wasmi",
  "x25519-dalek",
@@ -6666,9 +6670,9 @@ dependencies = [
 
 [[package]]
 name = "smoldot-light"
-version = "2.1.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "966af62409c5fca98e23cb5dcda4044fe2aa380f217c8dddc967dca468198c8f"
+checksum = "ea708747ec694c138492e4b244795b556be7e98f4f1eb683db8dd68b25cfac72"
 dependencies = [
  "async-channel",
  "async-lock",
@@ -7001,8 +7005,8 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subxt"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "async-trait",
  "derive-where",
@@ -7041,8 +7045,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-codegen"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "heck",
  "parity-scale-codec",
@@ -7057,8 +7061,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-lightclient"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "futures",
  "futures-util",
@@ -7073,8 +7077,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-macro"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "darling 0.20.11",
  "parity-scale-codec",
@@ -7089,8 +7093,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-metadata"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "frame-decode",
  "frame-metadata",
@@ -7105,8 +7109,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-rpcs"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "derive-where",
  "finito",
@@ -7129,8 +7133,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-signer"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "base64 0.22.1",
  "bip39",
@@ -7157,8 +7161,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-utils-accountid32"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "base58",
  "blake2",
@@ -7172,8 +7176,8 @@ dependencies = [
 
 [[package]]
 name = "subxt-utils-fetchmetadata"
-version = "0.51.0"
-source = "git+https://github.com/turboflakes/subxt?rev=b4955a7#b4955a751dd8d07eeb44d50c4e260dcdf1fcef57"
+version = "0.51.1"
+source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
 dependencies = [
  "hex",
  "parity-scale-codec",
@@ -7350,6 +7354,7 @@ version = "0.9.0"
 dependencies = [
  "clap",
  "lazy_static",
+ "libc",
  "openssh",
  "parity-scale-codec",
  "regex",
