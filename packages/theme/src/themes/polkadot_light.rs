@@ -6,6 +6,7 @@ use ratatui::style::Color;
 const GRAY_00: Color = Color::Rgb(255, 255, 255); // color_00
 const GRAY_01: Color = Color::Rgb(227, 227, 227); // color_01
 const GRAY_02: Color = Color::Rgb(198, 198, 198); // color_02
+const GRAY_04: Color = Color::Rgb(96, 96, 96); // color_04
 const BLACK: Color = Color::Rgb(0, 0, 0);
 const PINK: Color = Color::Rgb(230, 0, 122);
 
@@ -18,8 +19,8 @@ pub const SUNO_POLKADOT_LIGHT_PALETTE: (Name, Palette) = (
         color_01: BLACK,
         color_02: BLACK,
         color_03: BLACK,
-        color_04: GRAY_02,
-        color_05: GRAY_01,
+        color_04: GRAY_04,
+        color_05: GRAY_02,
         color_06: GRAY_00,
         color_07: GRAY_02,
         color_08: GRAY_01,
