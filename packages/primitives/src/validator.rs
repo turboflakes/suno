@@ -1,9 +1,9 @@
 use crate::{
+    account::{Account, AccountDisplay, NodeHost},
     call::Call,
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount, NodeHost},
     origin::Origin,
     proxy::{select_proxy, ProxyKey, SupportedProxy},
     session::Keys,
@@ -39,16 +39,18 @@ impl std::fmt::Display for ValidatorStatus {
     }
 }
 
+/// An account backing a validator with its stake, through a nomination.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nominator {
+pub struct Backer {
     pub stash: AccountId32,
     pub stake: u128,
     pub is_backer: bool,
 }
 
+/// An account that represents a validator, holding its stake and running a node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
-    pub account: NodeAccount,
+    pub account: Account,
     pub origin: Origin,
     pub host_rpc: Host,
     pub ssh: Option<SshConfig>,
@@ -59,7 +61,7 @@ pub struct Validator {
     pub payee: Payee,
     pub next_keys: Option<Keys>,
     pub queued_keys: Option<Keys>,
-    pub nominators: Vec<Nominator>,
+    pub backers: Vec<Backer>,
     // Track session points from staking_ah_client.validator_points
     pub points: Points,
     // Track old points so it can be better rendered the delta points
@@ -77,7 +79,7 @@ pub struct Validator {
 impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
-            account: NodeAccount::new(runtime, stash),
+            account: Account::new(runtime, stash),
             origin: Origin::Config,
             host_rpc: Host::default(),
             ssh: None,
@@ -88,7 +90,7 @@ impl Validator {
             payee: Payee::None,
             next_keys: None,
             queued_keys: None,
-            nominators: Vec::new(),
+            backers: Vec::new(),
             points: 0,
             old_points: 0,
             old_points_ts: 0,
@@ -356,7 +358,7 @@ impl AccountDisplay for Validator {
 impl NodeHost for Validator {
     type SessionKeys = Keys;
 
-    fn node_account(&self) -> &NodeAccount {
+    fn account(&self) -> &Account {
         &self.account
     }
 

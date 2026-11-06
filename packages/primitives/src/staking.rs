@@ -1,4 +1,5 @@
 use crate::display::{format_millis, to_compact_string};
+use crate::key::AccountBytes;
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::{
@@ -234,4 +235,15 @@ impl FromStr for Payee {
             },
         }
     }
+}
+
+/// The targets a nominator has chosen
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Nominations {
+    /// The validators nominated
+    pub targets: Vec<AccountBytes>,
+    /// The era in which the nominations were submitted
+    pub submitted_in: u32,
+    /// Whether the nominations were suppressed, e.g. after a slash
+    pub suppressed: bool,
 }

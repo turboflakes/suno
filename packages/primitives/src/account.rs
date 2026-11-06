@@ -30,14 +30,14 @@ pub trait AccountDisplay {
 pub trait NodeHost {
     type SessionKeys: FromStr<Err = KeysError> + Display + Debug;
 
-    fn node_account(&self) -> &NodeAccount;
+    fn account(&self) -> &Account;
     fn ssh(&self) -> Option<&SshConfig>;
     fn host_rpc(&self) -> &Host;
     fn next_session_keys(&self) -> Option<Self::SessionKeys>;
     fn queued_session_keys(&self) -> Option<Self::SessionKeys>;
 
     fn public_key(&self) -> String {
-        self.node_account().public_key()
+        self.account().public_key()
     }
 
     fn host(&self, masked: bool) -> String {
@@ -51,7 +51,7 @@ pub trait NodeHost {
 
 /// Common struct for shared fields
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NodeAccount {
+pub struct Account {
     /// The Node account key
     account_key: AccountKey,
     /// The SS58 address of the stash, in the format of the network
@@ -62,7 +62,7 @@ pub struct NodeAccount {
     balance: Balance,
 }
 
-impl NodeAccount {
+impl Account {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account_key: AccountKey::new(runtime, stash),
@@ -153,7 +153,7 @@ impl NodeAccount {
     }
 }
 
-impl AccountDisplay for NodeAccount {
+impl AccountDisplay for Account {
     fn stash(&self) -> AccountId32 {
         self.stash()
     }
