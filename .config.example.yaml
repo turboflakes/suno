@@ -79,6 +79,7 @@ chains:
 features:
   enable_validators: true # default true
   enable_check_update: true # default true
+  enable_lightclient_db: true # default true, saves the light client database to speed up the next start
   show_nominators_counter: true # default true
   show_nominators_stake: true # default true
   show_own_stake: true # default true

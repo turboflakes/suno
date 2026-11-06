@@ -20,8 +20,9 @@ impl std::fmt::Display for FeatureScope {
 }
 
 /// Every feature, in the order they are listed.
-pub const ALL_FEATURES: [Feature; 14] = [
+pub const ALL_FEATURES: [Feature; 15] = [
     Feature::EnableCheckUpdate,
+    Feature::EnableLightclientDb,
     Feature::EnableValidators,
     Feature::ShowAllValidators,
     Feature::ShowNominatorsCounter,
@@ -41,6 +42,7 @@ pub const ALL_FEATURES: [Feature; 14] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Feature {
     EnableCheckUpdate,
+    EnableLightclientDb,
     EnableValidators,
     ShowAllValidators,
     ShowNominatorsCounter,
@@ -61,6 +63,7 @@ impl Feature {
     pub fn key(&self) -> &'static str {
         match self {
             Self::EnableCheckUpdate => "enable_check_update",
+            Self::EnableLightclientDb => "enable_lightclient_db",
             Self::EnableValidators => "enable_validators",
             Self::ShowAllValidators => "show_all_validators",
             Self::ShowNominatorsCounter => "show_nominators_counter",
@@ -85,7 +88,7 @@ impl Feature {
 
     pub fn scope(&self) -> FeatureScope {
         match self {
-            Self::EnableCheckUpdate => FeatureScope::General,
+            Self::EnableCheckUpdate | Self::EnableLightclientDb => FeatureScope::General,
             Self::EnableValidators
             | Self::ShowAllValidators
             | Self::ShowNominatorsCounter
@@ -106,6 +109,9 @@ impl Feature {
     pub fn description(&self) -> &'static str {
         match self {
             Self::EnableCheckUpdate => "Check for new versions on startup",
+            Self::EnableLightclientDb => {
+                "Store the light client database on disk to speed up startup"
+            }
             Self::EnableValidators => "Enable the validators window and its data",
             Self::ShowAllValidators => "Display all on-chain validators, active or waiting",
             Self::ShowNominatorsCounter => "Display the number of nominators",
@@ -130,7 +136,10 @@ impl Feature {
     pub fn needs_restart(&self) -> bool {
         matches!(
             self,
-            Self::EnableCheckUpdate | Self::EnableValidators | Self::EnableCollators
+            Self::EnableCheckUpdate
+                | Self::EnableLightclientDb
+                | Self::EnableValidators
+                | Self::EnableCollators
         )
     }
 }
@@ -154,6 +163,8 @@ pub struct Features {
     show_all_collators: AtomicBool,
     #[serde(default = "enabled")]
     enable_check_update: AtomicBool,
+    #[serde(default = "enabled")]
+    enable_lightclient_db: AtomicBool,
     #[serde(default = "enabled")]
     show_nominators_counter: AtomicBool,
     #[serde(default = "enabled")]
@@ -183,6 +194,7 @@ impl Default for Features {
             show_all_validators: enabled(),
             show_all_collators: enabled(),
             enable_check_update: enabled(),
+            enable_lightclient_db: enabled(),
             show_nominators_counter: enabled(),
             show_nominators_stake: enabled(),
             show_own_stake: enabled(),
@@ -204,6 +216,7 @@ impl Features {
     fn flag(&self, feature: Feature) -> &AtomicBool {
         match feature {
             Feature::EnableCheckUpdate => &self.enable_check_update,
+            Feature::EnableLightclientDb => &self.enable_lightclient_db,
             Feature::EnableValidators => &self.enable_validators,
             Feature::ShowAllValidators => &self.show_all_validators,
             Feature::ShowNominatorsCounter => &self.show_nominators_counter,
@@ -250,6 +263,10 @@ impl Features {
 
     pub fn check_update_enabled(&self) -> bool {
         self.get(Feature::EnableCheckUpdate)
+    }
+
+    pub fn lightclient_db_enabled(&self) -> bool {
+        self.get(Feature::EnableLightclientDb)
     }
 
     /// Every on-chain collator is listed, only if the collators are enabled.
@@ -326,5 +343,12 @@ mod tests {
         assert!(features.commission_visible());
         assert!(!features.payee_visible());
         assert!(features.validators_enabled());
+        assert!(features.lightclient_db_enabled());
+    }
+
+    #[test]
+    fn the_lightclient_db_can_be_opted_out() {
+        let features: Features = serde_yaml::from_str("enable_lightclient_db: false\n").unwrap();
+        assert!(!features.lightclient_db_enabled());
     }
 }

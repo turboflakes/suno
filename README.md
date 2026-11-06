@@ -244,6 +244,7 @@ chains:
 features:
   enable_validators: true
   enable_check_update: true
+  enable_lightclient_db: true
   show_all_validators: true
   show_all_collators: true
   # validators specific flags

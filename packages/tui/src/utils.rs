@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::Duration;
 use subxt::{
     ext::jsonrpsee::ws_client::PingConfig,
@@ -63,11 +64,19 @@ pub async fn create_rpc_client_from_config(
         }
         // Relay chain default: create a light client when no rpc_url is configured.
         (true, true, _) => {
-            let db_path = CONFIG.lightclient_db_path(&runtime.chain_name());
+            let path = CONFIG.lightclient_db_path(&runtime.chain_name());
+            let db_path = if CONFIG.features().lightclient_db_enabled() {
+                Some(path)
+            } else {
+                lightclient_db::remove(&path);
+                None
+            };
             let (lc, rpc) =
-                create_light_client_from_relay_chain_specs(runtime.chain_specs(), &db_path)
+                create_light_client_from_relay_chain_specs(runtime.chain_specs(), db_path.as_deref())
                     .await?;
-            lightclient_db::register(db_path, rpc.clone());
+            if let Some(db_path) = db_path {
+                lightclient_db::register(db_path, rpc.clone());
+            }
             Ok((rpc.into(), Some((*runtime, lc))))
         }
         // Parachain default: derive from the matching relay light client.
@@ -85,9 +94,9 @@ pub async fn create_rpc_client_from_config(
 
 async fn create_light_client_from_relay_chain_specs(
     chain_specs: &str,
-    db_path: &std::path::Path,
+    db_path: Option<&Path>,
 ) -> Result<(LightClient, LightClientRpc), LightClientError> {
-    let database = lightclient_db::load(db_path);
+    let database = db_path.map(lightclient_db::load).unwrap_or_default();
     let config = LightClientConfig::chain_spec(chain_specs).set_database_content(database);
     let (lc, rpc) = LightClient::relay_chain(config)?;
 

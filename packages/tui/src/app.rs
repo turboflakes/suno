@@ -28,7 +28,7 @@ use suno_actions::{
     ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
-    lightclient_db, remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
+    remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
     save_pinned_validators, save_proxy_account, CommandKind, CustomCalls, CustomCommand,
     CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
 };
@@ -223,9 +223,6 @@ impl App {
 
         // Exit the user interface.
         tui.exit()?;
-        // Persist the databases of the relay chain light clients, if any, for a faster next start.
-        // NOTE: No-op when every chain connects through a trusted `rpc_url`.
-        lightclient_db::save_all().await;
         Ok(())
     }
 
