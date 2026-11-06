@@ -3,7 +3,7 @@ pub mod dracula;
 pub mod homebrew;
 pub mod monokai_remastered;
 pub mod nightrun;
-pub mod polkadot_light;
+pub mod polkadot_classic;
 pub mod suno;
 pub mod tokyo_night;
 
@@ -21,6 +21,6 @@ pub const BUILTIN_PALETTES: &[(Name, Palette)] = &[
     borland::SUNO_BORLAND_PALETTE,
     homebrew::SUNO_HOMEBREW_PALETTE,
     monokai_remastered::SUNO_MONOKAI_REMASTERED_PALETTE,
-    polkadot_light::SUNO_POLKADOT_LIGHT_PALETTE,
+    polkadot_classic::SUNO_POLKADOT_CLASSIC_PALETTE,
     tokyo_night::SUNO_TOKYO_NIGHT_PALETTE,
 ];
