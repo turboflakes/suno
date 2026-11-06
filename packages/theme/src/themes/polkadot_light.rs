@@ -4,8 +4,8 @@ use ratatui::style::Color;
 // Polkadot Original brand colors: Pink #E6007A (Pantone PMS 213 C), Black and White.
 
 const GRAY_00: Color = Color::Rgb(255, 255, 255); // color_00
-const GRAY_01: Color = Color::Rgb(227, 227, 227); // color_01
-const GRAY_02: Color = Color::Rgb(198, 198, 198); // color_02
+const GRAY_01: Color = Color::Rgb(245, 245, 245); // color_01
+const GRAY_02: Color = Color::Rgb(234, 234, 234); // color_02
 const GRAY_04: Color = Color::Rgb(96, 96, 96); // color_04
 const BLACK: Color = Color::Rgb(0, 0, 0);
 const PINK: Color = Color::Rgb(230, 0, 122);
@@ -33,7 +33,7 @@ pub const SUNO_POLKADOT_LIGHT_PALETTE: (Name, Palette) = (
         color_15: PINK,
         background: GRAY_00,
         foreground: BLACK,
-        cursor_color: GRAY_01,
+        cursor_color: GRAY_00,
         cursor_text: BLACK,
         selection_background: BLACK,
         selection_foreground: GRAY_00,
