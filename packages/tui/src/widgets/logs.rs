@@ -2,7 +2,7 @@ use crate::widgets::scrollbar::render_scrollbar;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::{Color, Style, Styled},
+    style::{Color, Modifier, Style, Styled},
     widgets::{Block, Cell, Row, StatefulWidget, Table, TableState, Widget},
 };
 use std::collections::VecDeque;
@@ -179,23 +179,39 @@ impl StatefulWidget for LogsWidget<'_> {
 
         let selected_range = state.selected_range();
         let rows = state.entries().iter().enumerate().map(|(i, log)| {
+            // NOTE: Warn and error keep their ANSI hues so they stay recognisable in every theme,
+            // the remaining levels follow the theme, text for info and the dimmer label for the rest.
             let level_style = match log.level {
-                tracing::Level::TRACE => Style::default().fg(Color::DarkGray),
-                tracing::Level::DEBUG => Style::default().fg(Color::Blue),
-                tracing::Level::INFO => Style::default().fg(Color::Green),
+                tracing::Level::TRACE => theme.paragraph.label.add_modifier(Modifier::DIM),
+                tracing::Level::DEBUG => theme.paragraph.label,
+                tracing::Level::INFO => theme.paragraph.base,
                 tracing::Level::WARN => Style::default().fg(Color::Yellow),
                 tracing::Level::ERROR => Style::default().fg(Color::Red),
             };
 
+            let is_selected = selected_range
+                .as_ref()
+                .is_some_and(|range| range.contains(&i));
+
+            // The highlight of a selected row sets its own colors, a level color on top of it
+            // could be unreadable, e.g. text on a text colored highlight.
+            let level_cell = Cell::from(log.level.to_string());
+            let level_cell = if is_selected {
+                level_cell
+            } else {
+                level_cell.style(level_style)
+            };
+
             let row = Row::new([
                 Cell::from(format_date(log.ts)),
-                Cell::from(log.level.to_string()).style(level_style),
+                level_cell,
                 Cell::from(log.message.clone()),
             ]);
 
-            match &selected_range {
-                Some(range) if range.contains(&i) => row.style(theme.table.row_highlight(true)),
-                _ => row,
+            if is_selected {
+                row.style(theme.table.row_highlight(true))
+            } else {
+                row
             }
         });
 
