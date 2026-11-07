@@ -1,5 +1,7 @@
 use crate::bridge::sync::spawn_process_transaction_progress;
-use suno_actions::{Action, ChainAction, CollatorAction, TxAction, ValidatorAction};
+use suno_actions::{
+    Action, ChainAction, CollatorAction, NominatorAction, TxAction, ValidatorAction,
+};
 use suno_config::SupportedRuntime;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{proxy::ProxyKey, AccountKey, Response};
@@ -134,6 +136,16 @@ pub fn dispatch_response_action(
             tx.send(Action::Validator(ValidatorAction::UpdatePayee(
                 account_key,
                 data.value.payee,
+            )))
+            .boxed()?;
+        }
+        Response::Nominations(data) => {
+            // NOTE: The nominators are listed under the asset hub, as the collators are under
+            // their own chain, not under the relay chain as the validators.
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::UpdateNominations(
+                nominator_key,
+                data.value.nominations,
             )))
             .boxed()?;
         }
@@ -361,4 +373,37 @@ pub fn dispatch_response_action(
           // }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use subxt::utils::AccountId32;
+    use suno_primitives::{staking::Nominations, Nominator};
+    use tokio::sync::mpsc;
+
+    #[test]
+    fn the_nominations_are_dispatched_with_the_key_of_the_nominator_listed() {
+        let runtime = SupportedRuntime::AssetHubKusama;
+        let stash = AccountId32::from([7; 32]);
+        // The nominators are listed under the asset hub of the config
+        let nominator = Nominator::new(runtime, stash);
+        let nominations = Nominations {
+            targets: vec![[1; 32], [2; 32]],
+            submitted_in: 42,
+            suppressed: false,
+        };
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let response = Response::nominations([7; 32], Some(nominations.clone()));
+        dispatch_response_action(response, runtime, &tx).unwrap();
+
+        match rx.try_recv().unwrap() {
+            Action::Nominator(NominatorAction::UpdateNominations(key, data)) => {
+                assert_eq!(&key, nominator.key());
+                assert_eq!(data, Some(nominations));
+            }
+            action => panic!("unexpected action {action:?}"),
+        }
+    }
 }

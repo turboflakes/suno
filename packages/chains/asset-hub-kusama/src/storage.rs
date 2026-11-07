@@ -19,11 +19,11 @@ use subxt::{ext::futures::StreamExt, utils::AccountId32, OnlineClientAtBlock};
 use suno_config::CustomConfig;
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
+    account::get_account_bytes_from_storage_key,
     balance::Balance,
-    node_account::get_account_bytes_from_storage_key,
     proxy::SupportedProxy,
     staking,
-    staking::{Chunk, Payee},
+    staking::{Chunk, Nominations as NominationsInfo, Payee},
     AccountKey, Response,
 };
 
@@ -108,6 +108,28 @@ pub async fn fetch_validator_prefs(
     }
 
     Ok(Response::validator_prefs(account_bytes, None))
+}
+
+/// Fetch the validators nominated by a stash
+pub async fn fetch_nominations(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    stash: &AccountId32,
+) -> Result<Response, Error> {
+    let account_bytes = *stash.as_ref();
+    let nominations = fetch_nominators(api, stash)
+        .await?
+        .map(|nominations| NominationsInfo {
+            targets: nominations
+                .targets
+                .0
+                .iter()
+                .map(|target| *target.as_ref())
+                .collect(),
+            submitted_in: nominations.submitted_in,
+            suppressed: nominations.suppressed,
+        });
+
+    Ok(Response::nominations(account_bytes, nominations))
 }
 
 /// Fetch validator next prefs
@@ -787,21 +809,23 @@ async fn fetch_eras_stakers_overview(
     Ok(value)
 }
 
-/// Fetch nominators at the specified block hash
-async fn _fetch_nominators(
+/// Fetch the nominations of a stash at the specified block hash,
+/// none if the stash is not a nominator
+async fn fetch_nominators(
     api: &OnlineClientAtBlock<CustomConfig>,
     stash: &AccountId32,
-) -> Result<Nominations, Error> {
+) -> Result<Option<Nominations>, Error> {
     let addr = node_runtime::storage().staking().nominators();
 
     let value = api
         .storage()
         .entry(addr)
         .boxed()?
-        .fetch((*stash,))
+        .try_fetch((*stash,))
         .await
         .boxed()?
-        .decode()
+        .map(|entry| entry.decode())
+        .transpose()
         .boxed()?;
 
     Ok(value)

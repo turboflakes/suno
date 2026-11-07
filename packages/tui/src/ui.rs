@@ -4,7 +4,12 @@ use crate::widgets::collators_compact::CollatorsCompactWidget;
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
-use crate::widgets::proxies_compact::{compact_height, ProxiesCompactWidget};
+use crate::widgets::nominators_compact::{
+    compact_height as nominators_compact_height, NominatorsCompactWidget,
+};
+use crate::widgets::proxies_compact::{
+    compact_height as proxies_compact_height, ProxiesCompactWidget,
+};
 use crate::widgets::validators_compact::ValidatorsCompactWidget;
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{help::HelpWidget, logo::Logo, popup::Mode as PopupMode, window::Window};
@@ -40,6 +45,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let validators_enabled = config.features.validators_enabled();
     let collators_enabled = config.features.collators_enabled();
+    let nominators_enabled = config.features.nominators_enabled();
 
     let validators_constraint = match (validators_enabled, collators_enabled) {
         (true, true) => Constraint::Length(app.validators.total_compact_height()),
@@ -52,17 +58,24 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         Constraint::Length(0)
     };
 
+    let nominators_constraint = if nominators_enabled {
+        Constraint::Length(nominators_compact_height(&app.nominators))
+    } else {
+        Constraint::Length(0)
+    };
+
     // The proxy accounts are only displayed when there are any
     let proxies_constraint = if app.proxies.is_empty() {
         Constraint::Length(0)
     } else {
-        Constraint::Length(compact_height(&app.proxies))
+        Constraint::Length(proxies_compact_height(&app.proxies))
     };
 
     let constraints = vec![
         Constraint::Length(3 + config.chains.len() as u16),
         validators_constraint,
         collators_constraint,
+        nominators_constraint,
         proxies_constraint,
     ];
 
@@ -82,8 +95,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
+    if config.features.nominators_enabled() {
+        render_nominators_widget(app, frame, left_layout[3]);
+    }
+
     if !app.proxies.is_empty() {
-        render_proxies_widget(app, frame, left_layout[3]);
+        render_proxies_widget(app, frame, left_layout[4]);
     }
 
     render_window(app, frame, outer_layout[1]);
@@ -222,6 +239,14 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
+fn render_nominators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    frame.render_stateful_widget(
+        NominatorsCompactWidget::new(app.theme),
+        area,
+        &mut app.nominators,
+    );
+}
+
 fn render_proxies_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_stateful_widget(ProxiesCompactWidget::new(app.theme), area, &mut app.proxies);
 }
@@ -283,6 +308,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     // Esc clears the selection without changing the section, so ask the lists, not the section
     let has_selection = app.chains.is_active()
         || app.proxies.is_active()
+        || app.nominators.is_active()
         || app.validators.is_active()
         || app.collators.is_active()
         || (app.section.is_none()

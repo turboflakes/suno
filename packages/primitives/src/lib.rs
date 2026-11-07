@@ -26,6 +26,7 @@ pub use chain::{BlockHash, BlockNumber, Chain, RecentBlocks};
 pub use collator::Collator;
 pub use key::AccountKey;
 pub use nominator::Nominator;
+pub use origin::Origins;
 pub use staking::Era;
 pub use storage::Response;
 pub use validator::Validator;

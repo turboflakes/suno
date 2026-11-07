@@ -13,11 +13,17 @@ use suno_config::SupportedRuntime;
 /// An account that nominates validators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nominator {
+    /// Stash account that nominates validators.
     pub account: Account,
+    /// The origin of the nominator, e.g. whether it's listed in the config or pinned from the UI.
     pub origin: Origin,
+    /// The nominations made by the nominator.
     pub nominations: Option<Nominations>,
+    /// Stake ledger of the nominator.
     pub ledger: StakeLedger,
+    /// Payee of the nominator.
     pub payee: Payee,
+    /// Proxies of the nominator.
     pub proxies: HashSet<ProxyKey>,
 }
 

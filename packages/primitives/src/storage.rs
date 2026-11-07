@@ -7,7 +7,7 @@ use crate::{
     key::AccountBytes,
     proxy::SupportedProxy,
     session::Keys,
-    staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Chunk, Era, Nominations, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::Permill;
@@ -92,6 +92,14 @@ pub struct ValidatorPayeeData {
     pub payee: Payee,
 }
 
+/// Nominator nominations combining account and the validators nominated, none if the stash
+/// is not a nominator
+#[derive(Debug)]
+pub struct NominationsData {
+    pub account: AccountBytes,
+    pub nominations: Option<Nominations>,
+}
+
 /// Validator keys combining account and session keys
 #[derive(Debug)]
 pub struct ValidatorKeysData {
@@ -164,6 +172,7 @@ pub enum Response {
     ValidatorPrefs(Data<ValidatorPrefsData>),
     ValidatorPrefsNext(Data<ValidatorPrefsData>),
     ValidatorPayee(Data<ValidatorPayeeData>),
+    Nominations(Data<NominationsData>),
     ValidatorNextKeys(Data<ValidatorKeysData>),
     ValidatorQueuedKeys(Data<ValidatorKeysData>),
     Identity(Data<IdentityData>),
@@ -262,6 +271,13 @@ impl Response {
 
     pub fn validator_payee(account: AccountBytes, payee: Payee) -> Self {
         Response::ValidatorPayee(Data::new(ValidatorPayeeData { account, payee }))
+    }
+
+    pub fn nominations(account: AccountBytes, nominations: Option<Nominations>) -> Self {
+        Response::Nominations(Data::new(NominationsData {
+            account,
+            nominations,
+        }))
     }
 
     pub fn validator_next_keys(account: AccountBytes, keys: Option<Keys>) -> Self {

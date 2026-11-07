@@ -165,9 +165,11 @@ pub struct ChainConfig {
     #[serde(default)]
     pub validators_source: Option<Source>,
     /// Collators for the system chains.
-    /// TODO: To be supported in the future.
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
+    /// Nominators stashes, only available on asset hub chains.
+    #[serde(default)]
+    pub nominators: Vec<NodeConfig>,
 }
 
 impl Default for ChainConfig {
@@ -185,6 +187,7 @@ impl ChainConfig {
             validators: Vec::new(),
             validators_source: None,
             collators: Vec::new(),
+            nominators: Vec::new(),
         }
     }
 
@@ -196,6 +199,7 @@ impl ChainConfig {
             validators,
             validators_source,
             collators: Vec::new(),
+            nominators: Vec::new(),
         }
     }
 
@@ -340,6 +344,14 @@ pub enum NodeConfig {
         #[serde(default)]
         commands: Option<Vec<CustomCommand>>,
     },
+}
+
+impl NodeConfig {
+    pub fn stash(&self) -> Stash {
+        match self {
+            Self::Address(stash) | Self::Detailed { stash, .. } => *stash,
+        }
+    }
 }
 
 impl FromStr for NodeConfig {
@@ -535,6 +547,18 @@ impl Config {
         write_private_atomic(&self.prefs_path(), content.as_bytes())
     }
 
+    /// The nominators are only available on the Asset Hub.
+    fn validate_nominators(&self) -> Result<(), Error> {
+        for chain in &self.chains {
+            for (runtime, chain_config) in chain {
+                if !chain_config.nominators.is_empty() && !runtime.is_asset_hub() {
+                    return Err(Error::NominatorsNotSupported(runtime.to_string()));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), Error> {
         // Validate that at least one chain is configured
         if self.chains.is_empty() {
@@ -543,6 +567,9 @@ impl Config {
 
         // Validate themes
         self.themes.validate()?;
+
+        // Validate nominators
+        self.validate_nominators()?;
 
         // Validate custom commands don't clash with built-in call names
         for chain in &self.chains {
@@ -1221,6 +1248,68 @@ explorer:
         assert_eq!(config.chains.len(), 3);
         assert!(config.features.validators_enabled());
         assert!(config.features.collators_enabled());
+    }
+
+    #[test]
+    fn test_config_nominators_on_asset_hub() {
+        let yaml = r#"
+chains:
+  - asset_hub_kusama:
+      rpc_url: "wss://rpc.asset.hub"
+      nominators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+        let chain = config.chains[0].values().next().unwrap();
+
+        assert_eq!(chain.nominators.len(), 2);
+        assert!(chain.validators.is_empty());
+        assert!(config.validate_nominators().is_ok());
+    }
+
+    #[test]
+    fn test_config_nominators_default_to_none() {
+        let yaml = r#"
+chains:
+  - asset_hub_kusama:
+      rpc_url: "wss://rpc.asset.hub"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert!(config.chains[0]
+            .values()
+            .next()
+            .unwrap()
+            .nominators
+            .is_empty());
+    }
+
+    #[test]
+    fn test_config_nominators_are_not_supported_outside_asset_hub() {
+        for chain in ["polkadot", "kusama", "people_kusama"] {
+            let yaml = format!(
+                r#"
+chains:
+  - {chain}:
+      rpc_url: "wss://rpc.example.io"
+      nominators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+"#
+            );
+            let file = create_temp_file(&yaml);
+            let config = Config::from_file(file.path()).unwrap();
+
+            assert!(
+                matches!(
+                    config.validate_nominators(),
+                    Err(Error::NominatorsNotSupported(_))
+                ),
+                "nominators should be rejected on {chain}"
+            );
+        }
     }
 
     #[test]

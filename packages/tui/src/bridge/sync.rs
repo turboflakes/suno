@@ -778,6 +778,28 @@ pub fn spawn_fetch_validators_on_era(
 }
 
 // ----
+// Nominators spawners grouped by task
+// ----
+
+/// Fetches what an Asset Hub holds about the tracked nominators once it is connected: the
+/// validators they nominate.
+/// TODO: the staking ledger, the payee, the balance and the proxy status.
+pub fn spawn_fetch_nominators_on_connect(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    if !runtime.is_asset_hub() || nominator_keys.is_empty() {
+        return;
+    }
+    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_nominations(&api, &stash).await },
+        DEFAULT_CONCURRENCY,
+    );
+}
+
+// ----
 // Caller tasks
 // ----
 pub fn spawn_sign_and_submit_call_data(

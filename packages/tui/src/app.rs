@@ -7,6 +7,7 @@ use crate::widgets::{
     input_field::InputFieldWidget,
     list_focus::ListFocus,
     logs::LogsState,
+    nominators::NominatorsList,
     popup::{Mode as PopupMode, Popup},
     proxies::ProxiesList,
     validators::ValidatorsList,
@@ -24,8 +25,8 @@ use std::{collections::HashSet, io, thread, time::Duration};
 use subxt::{utils::AccountId32, OnlineClient, OnlineClientAtBlock};
 use suno_actions::{
     Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, FilterAction,
-    InputAction, MetadataContext, NavigationAction, PopupAction, ScannerAction, SystemAction,
-    ThreadAction, TxAction, UpdateAction, ValidatorAction,
+    InputAction, MetadataContext, NavigationAction, NominatorAction, PopupAction, ScannerAction,
+    SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
     remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
@@ -91,6 +92,8 @@ pub struct App {
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
     pub proxies: ProxiesList,
+    /// Holds the nominators listed in the config.
+    pub nominators: NominatorsList,
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
@@ -134,6 +137,8 @@ impl App {
         chains.set_theme(theme);
         let mut proxies = ProxiesList::default();
         proxies.set_theme(theme);
+        let mut nominators = NominatorsList::default();
+        nominators.set_theme(theme);
         let mut popup = Popup::default();
         popup.set_theme(theme);
         let mut logs = LogsState::new(rx_logs);
@@ -150,6 +155,7 @@ impl App {
             main_section: Section::default(),
             chains,
             proxies,
+            nominators,
             validators: ValidatorsList::default(),
             collators: CollatorsList::default(),
             popup,
@@ -170,6 +176,7 @@ impl App {
         self.update_active_section();
         self.validators.on_init().await;
         self.collators.on_init();
+        self.nominators.on_init();
         self.refresh_proxies();
         self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
@@ -254,6 +261,7 @@ impl App {
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Collator(act) => self.handle_collator_actions(act),
+                Action::Nominator(act) => self.handle_nominator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
                 Action::Update(act) => self.handle_update_actions(act),
@@ -566,6 +574,7 @@ impl App {
         let collator_keys = self
             .collators
             .get_tracked_and_visible_keys_by_runtime(runtime);
+        let nominator_keys = self.nominators.keys_by_runtime(runtime);
         let is_all_validators_visible = CONFIG.features().all_validators_visible();
 
         if self.chains.get_api_and_block_hash(runtime).is_none() {
@@ -573,6 +582,7 @@ impl App {
         }
         self.fetch_collators_chain_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_on_connect(api_at, runtime, &nominator_keys, tx);
             sync::spawn_fetch_validators_on_connect(
                 api_at,
                 runtime,
@@ -1179,6 +1189,47 @@ impl App {
         true
     }
 
+    fn handle_nominator_actions(&mut self, action: NominatorAction) {
+        match action {
+            NominatorAction::UpdateNominations(nominator_key, nominations) => {
+                self.nominators
+                    .update_nominations(&nominator_key, nominations);
+                self.update_nominated_validators(nominator_key.runtime().relay_chain());
+            }
+        }
+    }
+
+    /// Lists the validators nominated by the nominators on the validators list,
+    /// and fetches the data of the ones not listed before.
+    fn update_nominated_validators(&mut self, runtime: SupportedRuntime) {
+        if !CONFIG.features().validators_enabled() {
+            return;
+        }
+
+        let targets = self.nominators.targets_by_relay_chain(runtime);
+        let keep_onchain = CONFIG.features().all_validators_visible();
+        let added = self
+            .validators
+            .update_nominated(runtime, &targets, keep_onchain);
+        if added.is_empty() {
+            return;
+        }
+
+        // The data of a validator listed after the start, the same as the one pinned
+        self.fetch_validators_data(runtime, added.clone());
+        if let Some(asset_hub_runtime) = runtime.asset_hub_runtime() {
+            self.spawn_at_latest_block(asset_hub_runtime, move |api_at, tx| {
+                sync::spawn_fetch_validators_on_connect(
+                    api_at,
+                    asset_hub_runtime,
+                    &added,
+                    false,
+                    tx,
+                );
+            });
+        }
+    }
+
     fn handle_collator_actions(&mut self, action: CollatorAction) {
         match action {
             CollatorAction::UpdateAuraAuthorities(runtime, authorities) => {
@@ -1566,6 +1617,9 @@ impl App {
             Section::Collators => {
                 self.collators.move_up();
             }
+            Section::Nominators => {
+                self.nominators.move_up();
+            }
             Section::Proxies => {
                 self.proxies.move_up();
             }
@@ -1602,6 +1656,9 @@ impl App {
             }
             Section::Collators => {
                 self.collators.move_down();
+            }
+            Section::Nominators => {
+                self.nominators.move_down();
             }
             Section::Proxies => {
                 self.proxies.move_down();
@@ -1726,6 +1783,8 @@ impl App {
 
         self.chains.set_active(self.section == Section::Chains);
         self.proxies.set_active(self.section == Section::Proxies);
+        self.nominators
+            .set_active(self.section == Section::Nominators);
         self.validators.set_focus(validators_focus);
         self.collators.set_focus(collators_focus);
     }
@@ -2003,6 +2062,7 @@ impl App {
         self.theme = catalog[index].1;
         self.chains.set_theme(self.theme);
         self.proxies.set_theme(self.theme);
+        self.nominators.set_theme(self.theme);
         self.popup.set_theme(self.theme);
         self.logs.set_theme(self.theme);
         self.help.set_theme(self.theme);
@@ -2086,16 +2146,17 @@ impl App {
     /// Returns the hint to show in the legend when the highlighted validator or collator is toggled,
     /// which only happens from the main window.
     pub fn toggle_hint(&self) -> Option<&'static str> {
-        let origin = match self.window {
-            Window::Validators if self.validators.focus() == ListFocus::Main => {
-                self.validators.get_highlighted_ref()?.origin
-            }
+        match self.window {
+            Window::Validators if self.validators.focus() == ListFocus::Main => self
+                .validators
+                .get_highlighted_ref()?
+                .origins
+                .toggle_label(),
             Window::Collators if self.collators.focus() == ListFocus::Main => {
-                self.collators.get_highlighted_ref()?.origin
+                self.collators.get_highlighted_ref()?.origin.toggle_label()
             }
-            _ => return None,
-        };
-        origin.toggle_label()
+            _ => None,
+        }
     }
 
     /// Toggles between grouped and listed view.
@@ -3285,6 +3346,7 @@ impl App {
 
         self.chains.set_active(false);
         self.proxies.set_active(false);
+        self.nominators.set_active(false);
         self.validators.set_focus(ListFocus::None);
         self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();
