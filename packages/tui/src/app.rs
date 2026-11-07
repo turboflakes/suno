@@ -30,8 +30,8 @@ use suno_actions::{
 };
 use suno_config::{
     remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
-    save_pinned_validators, save_proxy_account, CommandKind, CustomCalls, CustomCommand,
-    CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
+    save_pinned_nominators, save_pinned_validators, save_proxy_account, CommandKind, CustomCalls,
+    CustomCommand, CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -1114,6 +1114,13 @@ impl App {
         }
     }
 
+    /// Fetches the validators nominated by the nominators with the `keys` of the Asset Hub `runtime`.
+    fn fetch_nominations(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_on_connect(api_at, runtime, &keys, tx);
+        });
+    }
+
     /// Fetches the balance, the session keys and the last authored block of the `keys` collators,
     /// all of them held on the collator's own chain.
     fn fetch_collators_chain_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
@@ -1855,6 +1862,12 @@ impl App {
                     self.fetch_validators_proxy_status(runtime, vec![key]);
                 }
             }
+            Call::AddNominator { stash: Some(stash) } => {
+                if let Some(key) = self.nominators.add_pinned(runtime, stash) {
+                    save_pinned_nominators(self.nominators.get_pinned());
+                    self.fetch_nominations(runtime, vec![key]);
+                }
+            }
             Call::AddCollator { stash: Some(stash) } => {
                 if let Some(key) = self.collators.add_pinned(runtime, stash) {
                     save_pinned_collators(self.collators.get_pinned());
@@ -2479,6 +2492,7 @@ impl App {
                 self.build_metadata_qrcode_popup(chain);
             }
             Call::AddValidator { .. }
+            | Call::AddNominator { .. }
             | Call::AddCollator { .. }
             | Call::AddProxyAccount { .. }
             | Call::RemoveProxyAccount { .. } => self.add_or_scan_account(call, chain.runtime()),

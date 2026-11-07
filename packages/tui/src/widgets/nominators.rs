@@ -1,7 +1,10 @@
 use ratatui::widgets::TableState;
 use std::collections::HashSet;
-use suno_config::{SupportedRuntime, CONFIG};
-use suno_primitives::{key::AccountBytes, staking::Nominations, AccountKey, Nominator};
+use subxt::utils::AccountId32;
+use suno_config::{PinnedNode, SupportedRuntime, CONFIG};
+use suno_primitives::{
+    key::AccountBytes, origin::Origin, staking::Nominations, AccountKey, Nominator,
+};
 use suno_theme::Theme;
 
 /// The nominators listed in the config, one row each.
@@ -41,8 +44,54 @@ impl NominatorsList {
                 }
             }
         }
+
+        // The nominators pinned from the TUI, of the chains configured, unless already listed
+        for pinned in CONFIG.pinned_nominators() {
+            if pinned.chain.is_asset_hub()
+                && CONFIG
+                    .chains()
+                    .iter()
+                    .any(|c| c.contains_key(&pinned.chain))
+            {
+                self.add(Nominator::with_origin(
+                    pinned.chain,
+                    pinned.stash,
+                    Origin::Pinned,
+                ));
+            }
+        }
         self.table_state
             .select((!self.nominators.is_empty()).then_some(0));
+    }
+
+    /// Adds a nominator pinned from the TUI. Returns its key, or none when it is already listed.
+    pub fn add_pinned(
+        &mut self,
+        runtime: SupportedRuntime,
+        stash: AccountId32,
+    ) -> Option<AccountKey> {
+        let nominator = Nominator::with_origin(runtime, stash, Origin::Pinned);
+        let key = nominator.key().clone();
+        if self.nominators.iter().any(|n| n.key() == &key) {
+            return None;
+        }
+        self.nominators.push(nominator);
+        if self.table_state.selected().is_none() {
+            self.table_state.select(Some(0));
+        }
+        Some(key)
+    }
+
+    /// The nominators pinned from the TUI, to be persisted.
+    pub fn get_pinned(&self) -> Vec<PinnedNode> {
+        self.nominators
+            .iter()
+            .filter(|n| n.origin.is_pinned())
+            .map(|n| PinnedNode {
+                chain: n.runtime(),
+                stash: n.account.stash(),
+            })
+            .collect()
     }
 
     /// Adds the nominator, unless the same stash is already listed for the chain.
@@ -112,8 +161,6 @@ impl NominatorsList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use subxt::utils::AccountId32;
-
     fn nominator(byte: u8) -> Nominator {
         Nominator::new(
             SupportedRuntime::AssetHubKusama,
@@ -205,5 +252,22 @@ mod tests {
         list.move_up();
         assert_eq!(list.table_state.selected(), None);
         assert!(list.get_selected().is_none());
+    }
+
+    #[test]
+    fn test_add_pinned_lists_once_and_is_persisted() {
+        let mut list = list();
+        let stash = AccountId32::from([9; 32]);
+
+        let key = list.add_pinned(SupportedRuntime::AssetHubKusama, stash.clone());
+        assert!(key.is_some());
+        assert!(list
+            .add_pinned(SupportedRuntime::AssetHubKusama, stash.clone())
+            .is_none());
+
+        // Only the pinned ones are persisted, not the ones of the config
+        let pinned = list.get_pinned();
+        assert_eq!(pinned.len(), 1);
+        assert_eq!(pinned[0].stash, stash);
     }
 }

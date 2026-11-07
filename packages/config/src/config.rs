@@ -481,6 +481,11 @@ impl Config {
         self.read_prefs().pinned_collators()
     }
 
+    /// The nominators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_nominators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_nominators()
+    }
+
     /// The features as set in the config file, before any change from the TUI. The file is read
     /// again, defaults apply if it is missing or malformed.
     fn file_features(&self) -> Features {
@@ -1043,6 +1048,16 @@ pub fn save_pinned_collators(pinned: Vec<PinnedNode>) {
     }
 }
 
+/// Persists the nominators pinned from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_pinned_nominators(pinned: Vec<PinnedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_pinned_nominators(pinned);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the pinned nominators: {}", e);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1462,11 +1477,13 @@ explorer:
         let mut prefs = config.read_prefs();
         prefs.set_pinned_validators(validators.clone());
         prefs.set_pinned_collators(collators.clone());
+        prefs.set_pinned_nominators(collators.clone());
         config.write_prefs(&prefs).unwrap();
 
         let reloaded = Config::from_file(&config_path).unwrap();
         assert_eq!(reloaded.pinned_validators(), validators);
         assert_eq!(reloaded.pinned_collators(), collators);
+        assert_eq!(reloaded.pinned_nominators(), collators);
 
         // Same shape as the chains of the config file, with the addresses of the network
         let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();
