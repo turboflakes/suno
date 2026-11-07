@@ -6,6 +6,7 @@ pub enum Section {
     Chains,
     Validators,
     Collators,
+    Nominators,
     Proxies,
     /// No section is selected.
     None,
@@ -20,6 +21,9 @@ impl Section {
         }
         if features.collators_enabled() {
             sections.push(Self::Collators);
+        }
+        if features.nominators_enabled() {
+            sections.push(Self::Nominators);
         }
         if has_proxies {
             sections.push(Self::Proxies);

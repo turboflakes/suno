@@ -1,9 +1,9 @@
 use crate::{
+    account::{Account, AccountDisplay, NodeHost},
     call::Call,
     display::{format_millis, format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount, NodeHost},
     origin::Origin,
     proxy::{select_proxy, ProxyKey, SupportedProxy},
     session::AuraKey,
@@ -45,7 +45,7 @@ type Amount = u128;
 /// Specific types using composition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
-    pub account: NodeAccount,
+    pub account: Account,
     /// Where the collator was listed from.
     pub origin: Origin,
     pub deposit: Amount,
@@ -70,7 +70,7 @@ pub struct Collator {
 impl Collator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
-            account: NodeAccount::new(runtime, stash),
+            account: Account::new(runtime, stash),
             origin: Origin::Config,
             deposit: 0,
             last_block_authored: None,
@@ -405,7 +405,7 @@ impl AccountDisplay for Collator {
 impl NodeHost for Collator {
     type SessionKeys = AuraKey;
 
-    fn node_account(&self) -> &NodeAccount {
+    fn account(&self) -> &Account {
         &self.account
     }
 

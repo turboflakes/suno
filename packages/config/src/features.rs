@@ -7,6 +7,7 @@ pub enum FeatureScope {
     General,
     Validators,
     Collators,
+    Nominators,
 }
 
 impl std::fmt::Display for FeatureScope {
@@ -15,12 +16,13 @@ impl std::fmt::Display for FeatureScope {
             Self::General => write!(f, "general"),
             Self::Validators => write!(f, "validators"),
             Self::Collators => write!(f, "collators"),
+            Self::Nominators => write!(f, "nominators"),
         }
     }
 }
 
 /// Every feature, in the order they are listed.
-pub const ALL_FEATURES: [Feature; 15] = [
+pub const ALL_FEATURES: [Feature; 16] = [
     Feature::EnableCheckUpdate,
     Feature::EnableLightclientDb,
     Feature::EnableValidators,
@@ -36,6 +38,7 @@ pub const ALL_FEATURES: [Feature; 15] = [
     Feature::ShowDeposit,
     Feature::ShowLastBlock,
     Feature::ShowNextSlot,
+    Feature::EnableNominators,
 ];
 
 /// The features that can be switched on and off, from the config file or from the TUI.
@@ -56,6 +59,7 @@ pub enum Feature {
     ShowDeposit,
     ShowLastBlock,
     ShowNextSlot,
+    EnableNominators,
 }
 
 impl Feature {
@@ -77,6 +81,7 @@ impl Feature {
             Self::ShowDeposit => "show_deposit",
             Self::ShowLastBlock => "show_last_block",
             Self::ShowNextSlot => "show_next_slot",
+            Self::EnableNominators => "enable_nominators",
         }
     }
 
@@ -103,6 +108,7 @@ impl Feature {
             | Self::ShowDeposit
             | Self::ShowLastBlock
             | Self::ShowNextSlot => FeatureScope::Collators,
+            Self::EnableNominators => FeatureScope::Nominators,
         }
     }
 
@@ -121,6 +127,7 @@ impl Feature {
             Self::ShowPayee => "Display the reward destination",
             Self::ShowKeys => "Display the session keys",
             Self::EnableCollators => "Enable the collators window and its data",
+            Self::EnableNominators => "Enable the nominators section and its data",
             Self::ShowAllCollators => "Display all on-chain collators",
             Self::ShowDeposit => "Display the collator's deposit",
             Self::ShowLastBlock => {
@@ -140,6 +147,7 @@ impl Feature {
                 | Self::EnableLightclientDb
                 | Self::EnableValidators
                 | Self::EnableCollators
+                | Self::EnableNominators
         )
     }
 }
@@ -155,6 +163,8 @@ pub struct Features {
     enable_validators: AtomicBool,
     #[serde(default = "enabled")]
     enable_collators: AtomicBool,
+    #[serde(default = "enabled")]
+    enable_nominators: AtomicBool,
     #[serde(default)]
     enable_rpcs: AtomicBool,
     #[serde(default = "enabled")]
@@ -190,6 +200,7 @@ impl Default for Features {
         Self {
             enable_validators: enabled(),
             enable_collators: enabled(),
+            enable_nominators: enabled(),
             enable_rpcs: AtomicBool::new(false),
             show_all_validators: enabled(),
             show_all_collators: enabled(),
@@ -226,6 +237,7 @@ impl Features {
             Feature::ShowPayee => &self.show_payee,
             Feature::ShowKeys => &self.show_keys,
             Feature::EnableCollators => &self.enable_collators,
+            Feature::EnableNominators => &self.enable_nominators,
             Feature::ShowAllCollators => &self.show_all_collators,
             Feature::ShowDeposit => &self.show_deposit,
             Feature::ShowLastBlock => &self.show_last_block,
@@ -255,6 +267,10 @@ impl Features {
 
     pub fn collators_enabled(&self) -> bool {
         self.get(Feature::EnableCollators)
+    }
+
+    pub fn nominators_enabled(&self) -> bool {
+        self.get(Feature::EnableNominators)
     }
 
     pub fn rpcs_enabled(&self) -> bool {
@@ -344,6 +360,16 @@ mod tests {
         assert!(!features.payee_visible());
         assert!(features.validators_enabled());
         assert!(features.lightclient_db_enabled());
+    }
+
+    #[test]
+    fn the_nominators_are_enabled_unless_the_user_opts_out() {
+        assert!(Features::default().nominators_enabled());
+        let features: Features = serde_yaml::from_str("enable_nominators: false\n").unwrap();
+        assert!(!features.nominators_enabled());
+        assert!(features
+            .values()
+            .contains(&(Feature::EnableNominators, false)));
     }
 
     #[test]

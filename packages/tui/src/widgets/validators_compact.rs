@@ -72,7 +72,7 @@ impl StatefulWidget for ValidatorsCompactWidget {
             let mut name = Vec::new();
             if is_active && selected == Some(i) {
                 name.push(Span::styled(
-                    format!("{} ", v.origin.symbol()),
+                    format!("{} ", v.origins.symbols()),
                     theme.paragraph.label(is_active),
                 ));
             }

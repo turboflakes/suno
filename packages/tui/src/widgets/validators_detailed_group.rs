@@ -492,7 +492,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         };
 
         let mut cells = vec![
-            Cell::from(Text::from(validator.origin.symbol()).style(theme.paragraph.label(false))),
+            Cell::from(Text::from(validator.origins.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
             Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
                 .style(cell_style),

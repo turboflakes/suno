@@ -1,10 +1,10 @@
 use crate::{
+    account::{Account, AccountDisplay, NodeHost},
     call::Call,
     display::{format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount, NodeHost},
-    origin::Origin,
+    origin::{Origin, Origins},
     proxy::{select_proxy, ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -39,46 +39,65 @@ impl std::fmt::Display for ValidatorStatus {
     }
 }
 
+/// An account backing a validator with its stake, through a nomination.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nominator {
+pub struct Backer {
     pub stash: AccountId32,
     pub stake: u128,
     pub is_backer: bool,
 }
 
+/// An account that represents a validator, holding its stake and running a node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
-    pub account: NodeAccount,
-    pub origin: Origin,
+    /// Stash account of the validator.
+    pub account: Account,
+    /// Everywhere the validator is listed from, it can be more than one
+    pub origins: Origins,
+    /// Host RPC configuration for the validator's node.
     pub host_rpc: Host,
+    /// SSH configuration for the validator's node.
     pub ssh: Option<SshConfig>,
+    /// Validator preferences.
     pub prefs: ValidatorPrefs,
+    /// Next validator preferences.
     pub prefs_next: ValidatorPrefs,
+    /// Stake overview of the validator.
     pub stake: StakeOverview,
+    /// Stake ledger of the validator.
     pub ledger: StakeLedger,
+    /// Payee of the validator.
     pub payee: Payee,
+    /// Next keys of the validator.
     pub next_keys: Option<Keys>,
+    /// Queued keys of the validator.
     pub queued_keys: Option<Keys>,
-    pub nominators: Vec<Nominator>,
-    // Track session points from staking_ah_client.validator_points
+    /// Backers of the validator.
+    pub backers: Vec<Backer>,
+    /// Track session points from staking_ah_client.validator_points
     pub points: Points,
-    // Track old points so it can be better rendered the delta points
+    /// Track old points so it can be better rendered the delta points
     pub old_points: Points,
+    /// Timestamp of the old points.
     pub old_points_ts: u128,
-    // Track era points accumulated at every new session from staking.era_reward_points
-    // the total points earned at any single time will be sum of points + era_points
+    /// Track era points accumulated at every new session from staking.era_reward_points
+    /// the total points earned at any single time will be sum of points + era_points
     pub era_points: Points,
+    /// Whether the validator is chilled.
     pub is_chilled: bool,
+    /// Proxies of the validator.
     pub proxies: HashSet<ProxyKey>,
+    /// Commands of the validator.
     pub commands: Vec<CustomCommand>,
+    /// Status of the validator.
     pub status: ValidatorStatus,
 }
 
 impl Validator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
-            account: NodeAccount::new(runtime, stash),
-            origin: Origin::Config,
+            account: Account::new(runtime, stash),
+            origins: Origins::new(Origin::Config),
             host_rpc: Host::default(),
             ssh: None,
             prefs: ValidatorPrefs::default(),
@@ -88,7 +107,7 @@ impl Validator {
             payee: Payee::None,
             next_keys: None,
             queued_keys: None,
-            nominators: Vec::new(),
+            backers: Vec::new(),
             points: 0,
             old_points: 0,
             old_points_ts: 0,
@@ -103,13 +122,13 @@ impl Validator {
     /// Validator listed from the given `origin`, e.g. the remote source of the config.
     pub fn with_origin(runtime: SupportedRuntime, stash: AccountId32, origin: Origin) -> Self {
         Self {
-            origin,
+            origins: Origins::new(origin),
             ..Self::new(runtime, stash)
         }
     }
 
     pub fn is_tracked(&self) -> bool {
-        self.origin.is_tracked()
+        self.origins.is_tracked()
     }
 
     pub fn key(&self) -> &AccountKey {
@@ -356,7 +375,7 @@ impl AccountDisplay for Validator {
 impl NodeHost for Validator {
     type SessionKeys = Keys;
 
-    fn node_account(&self) -> &NodeAccount {
+    fn account(&self) -> &Account {
         &self.account
     }
 

@@ -16,7 +16,7 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use subxt::utils::AccountId32;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
-use suno_config::{FeatureState, SupportedRuntime};
+use suno_config::{FeatureState, SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
@@ -506,9 +506,16 @@ impl Popup {
         if ctx.runtime.is_para_chain() {
             let mut calls = Vec::new();
             if ctx.runtime.is_asset_hub() {
-                calls.push(Call::AddValidator { stash: None });
+                if CONFIG.features().validators_enabled() {
+                    calls.push(Call::AddValidator { stash: None });
+                }
+                if CONFIG.features().nominators_enabled() {
+                    calls.push(Call::AddNominator { stash: None });
+                }
             }
-            calls.push(Call::AddCollator { stash: None });
+            if CONFIG.features().collators_enabled() {
+                calls.push(Call::AddCollator { stash: None });
+            }
             calls.push(Call::AddProxyAccount { account: None });
             calls.push(Call::RemoveProxyAccount { account: None });
             for call in calls {

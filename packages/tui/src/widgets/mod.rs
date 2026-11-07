@@ -11,6 +11,8 @@ pub mod input_password;
 pub mod list_focus;
 pub mod logo;
 pub mod logs;
+pub mod nominators;
+pub mod nominators_compact;
 pub mod popup;
 pub mod proxies;
 pub mod proxies_compact;
