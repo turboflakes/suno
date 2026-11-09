@@ -45,7 +45,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 // Toggle between grouped and listed detailed views
                 KeyCode::Char('v') => Action::Navigation(NavigationAction::ToggleView),
                 _ => match app_focus {
-                    Focus::Main => match key_event.code {
+                    Focus::Main | Focus::None => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::PrevTab),
                         KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
                         KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
@@ -67,7 +67,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
 
 fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) -> Action {
     match app_focus {
-        Focus::Main => handle_main_key_events(key_event),
+        Focus::Main | Focus::None => handle_main_key_events(key_event),
         Focus::Popup | Focus::Scanner => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
         Focus::Filter => handle_filter_key_events(key_event),

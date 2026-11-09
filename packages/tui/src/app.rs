@@ -69,6 +69,7 @@ pub enum Focus {
     Filter,  // Typing filters the list of the window displayed
     Scanner, // Esc/Tab change mode state
     Popup,   // Esc/Tab change mode state
+    None,    // Nothing is selected, after `esc` clears the selections
 }
 
 /// Thread control messages, useful for controlling threads from the app, eg. stopping a scanner thread.
@@ -1880,6 +1881,11 @@ impl App {
             .set_active(self.section == Section::Nominators);
         self.validators.set_focus(validators_focus);
         self.collators.set_focus(collators_focus);
+
+        // Selecting a section brings back the focus to the main
+        if self.focus == Focus::None {
+            self.focus = Focus::Main;
+        }
     }
 
     /// Selects the previous window.
@@ -2346,6 +2352,21 @@ impl App {
         if self.section == Section::Proxies && self.proxies.is_active() && self.show_proxy_popup() {
             let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
+
+        // Without anything focused, the commands of the first chain are the ones who become visible
+        if self.focus == Focus::None
+            && !self.popup.is_visible()
+            && !self.window.is_logs_selected()
+            && !self.window.is_help_selected()
+        {
+            self.set_section(Section::Chains);
+            if self.chains.get_selected().is_none() {
+                self.chains.init_table();
+            }
+            if self.show_chain_popup() {
+                let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+            }
+        }
     }
 
     /// Open confirm and sign popup
@@ -3487,6 +3508,9 @@ impl App {
         self.validators.set_focus(ListFocus::None);
         self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();
+        if self.focus == Focus::Main {
+            self.focus = Focus::None;
+        }
     }
 
     /// Copy to clipboard

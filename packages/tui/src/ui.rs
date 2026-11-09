@@ -314,9 +314,11 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         || (app.section.is_none()
             && (app.window.is_logs_selected() || app.window.is_help_selected()));
 
-    // show how to open popup with available commands depending on the active section
-    if ((app.validators.is_active()
-        && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
+    // show how to open popup with available commands depending on the active section, or the
+    // ones of the first chain when nothing is selected
+    if (app.focus == Focus::None
+        || (app.validators.is_active()
+            && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
         || (app.collators.is_active()
             && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
         || app.chains.is_active()
