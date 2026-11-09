@@ -105,13 +105,22 @@ impl Prefs {
         self.store_chains(chains);
     }
 
-    pub(crate) fn remove_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
+    /// Removes the proxy account of the chain. Returns whether it was pinned.
+    pub(crate) fn remove_proxy_account(
+        &mut self,
+        chain: SupportedRuntime,
+        account: AccountId32,
+    ) -> bool {
         let mut chains = self.take_chains();
+        let mut removed = false;
         if let Some(prefs) = chains.get_mut(&chain) {
             let proxy_account = to_address(chain, &account);
+            let count = prefs.signers.len();
             prefs.signers.retain(|s| s.proxy_account != proxy_account);
+            removed = prefs.signers.len() != count;
         }
         self.store_chains(chains);
+        removed
     }
 
     /// The prefs of the chains, merged by chain.

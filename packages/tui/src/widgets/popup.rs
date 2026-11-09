@@ -23,7 +23,7 @@ use suno_primitives::{
     proxy::ProxyState,
     session::{AuraKey, Keys, Proof},
     staking::Payee,
-    AccountDisplay, Chain, Collator, NodeHost, Validator,
+    AccountDisplay, Chain, Collator, NodeHost, Nominator, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use suno_theme::Theme;
@@ -41,6 +41,11 @@ struct ValidatorContext {
 #[derive(Clone, PartialEq, Eq)]
 struct CollatorContext {
     collator: Collator,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct NominatorContext {
+    nominator: Nominator,
 }
 
 struct ProxyContext {
@@ -85,6 +90,7 @@ enum Context {
     ValidatorMenu(Box<ValidatorContext>),
     CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
+    NominatorMenu(Box<NominatorContext>),
     ProxyMenu(Box<ProxyContext>),
     ThemeMenu(Box<ThemeMenuContext>),
     Features(Box<FeaturesContext>),
@@ -102,6 +108,7 @@ impl Context {
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
+            Context::NominatorMenu(_) => Mode::Menu,
             Context::ProxyMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Features(_) => Mode::Features,
@@ -184,6 +191,7 @@ impl Popup {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
             Context::CollatorMenu(ctx) => self.init_collator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::NominatorMenu(ctx) => self.init_nominator_menu(ctx),
             Context::ProxyMenu(ctx) => self.init_proxy_menu(ctx),
             Context::ThemeMenu(ctx) => {
                 self.input.reset_as_filter();
@@ -216,6 +224,7 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
                 | Context::ProxyMenu(_)
         ) {
             let commands = self.options.iter().map(|e| e.command()).collect();
@@ -226,7 +235,9 @@ impl Popup {
     }
 
     fn init_validator_menu(&mut self, ctx: &ValidatorContext) {
-        if !ctx.validator.is_proxy_valid() && !ctx.validator.has_commands_available() {
+        let is_pinned = ctx.validator.origins.is_pinned();
+        if !ctx.validator.is_proxy_valid() && !ctx.validator.has_commands_available() && !is_pinned
+        {
             return;
         }
 
@@ -371,13 +382,23 @@ impl Popup {
             }));
         });
 
+        if is_pinned {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::RemoveValidator {
+                    stash: Some(ctx.validator.account.stash()),
+                },
+                bytes: None,
+            }));
+        }
+
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
         }
     }
 
     fn init_collator_menu(&mut self, ctx: &CollatorContext) {
-        if !ctx.collator.is_proxy_valid() && !ctx.collator.has_commands_available() {
+        let is_pinned = ctx.collator.origin.is_pinned();
+        if !ctx.collator.is_proxy_valid() && !ctx.collator.has_commands_available() && !is_pinned {
             return;
         }
 
@@ -464,6 +485,32 @@ impl Popup {
             }));
         });
 
+        if is_pinned {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::RemoveCollator {
+                    stash: Some(ctx.collator.account.stash()),
+                },
+                bytes: None,
+            }));
+        }
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn init_nominator_menu(&mut self, ctx: &NominatorContext) {
+        self.input.reset_as_command(None);
+
+        if ctx.nominator.origin.is_pinned() {
+            self.options.push(Entry::new(Command::Instruction {
+                call: Call::RemoveNominator {
+                    stash: Some(ctx.nominator.stash()),
+                },
+                bytes: None,
+            }));
+        }
+
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
         }
@@ -508,13 +555,16 @@ impl Popup {
             if ctx.runtime.is_asset_hub() {
                 if CONFIG.features().validators_enabled() {
                     calls.push(Call::AddValidator { stash: None });
+                    calls.push(Call::RemoveValidator { stash: None });
                 }
                 if CONFIG.features().nominators_enabled() {
                     calls.push(Call::AddNominator { stash: None });
+                    calls.push(Call::RemoveNominator { stash: None });
                 }
             }
             if CONFIG.features().collators_enabled() {
                 calls.push(Call::AddCollator { stash: None });
+                calls.push(Call::RemoveCollator { stash: None });
             }
             calls.push(Call::AddProxyAccount { account: None });
             calls.push(Call::RemoveProxyAccount { account: None });
@@ -542,6 +592,13 @@ impl Popup {
             collator: collator.clone(),
         };
         self.on_init(Context::CollatorMenu(Box::new(ctx)));
+    }
+
+    pub fn show_nominator_commands(&mut self, nominator: &Nominator) {
+        let ctx = NominatorContext {
+            nominator: nominator.clone(),
+        };
+        self.on_init(Context::NominatorMenu(Box::new(ctx)));
     }
 
     pub fn show_chain_commands(&mut self, chain: &Chain) {
@@ -848,6 +905,10 @@ impl Popup {
         matches!(self.context, Context::CollatorMenu(_))
     }
 
+    pub fn is_nominator_menu(&self) -> bool {
+        matches!(self.context, Context::NominatorMenu(_))
+    }
+
     pub fn is_chain_menu(&self) -> bool {
         matches!(self.context, Context::ChainMenu(_))
     }
@@ -863,7 +924,10 @@ impl Popup {
     pub fn is_menu_mode(&self) -> bool {
         matches!(
             self.context,
-            Context::ValidatorMenu(_) | Context::ChainMenu(_) | Context::ProxyMenu(_)
+            Context::ValidatorMenu(_)
+                | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
+                | Context::ProxyMenu(_)
         )
     }
 
@@ -873,6 +937,7 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
                 | Context::ProxyMenu(_)
                 | Context::ThemeMenu(_)
                 | Context::Features(_)
@@ -1200,6 +1265,7 @@ impl Popup {
                 (Some(ctx.collator.display_identity()), label)
             }
             Context::ChainMenu(ctx) => (Some(ctx.runtime.as_str_long().to_uppercase()), None),
+            Context::NominatorMenu(ctx) => (Some(ctx.nominator.to_compact_string(6)), None),
             Context::ProxyMenu(ctx) => (Some(ctx.proxy.compact_address(6)), None),
             _ => (None, None),
         };

@@ -1954,11 +1954,29 @@ impl App {
                     self.fetch_validators_proxy_status(runtime, vec![key]);
                 }
             }
+            Call::RemoveValidator { stash: Some(stash) } => {
+                if !self.validators.remove_pinned(runtime.relay_chain(), stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a validator account",
+                    );
+                    return;
+                }
+                save_pinned_validators(self.validators.get_pinned());
+            }
             Call::AddNominator { stash: Some(stash) } => {
                 if let Some(key) = self.nominators.add_pinned(runtime, stash) {
                     save_pinned_nominators(self.nominators.get_pinned());
                     self.fetch_nominations(runtime, vec![key]);
                 }
+            }
+            Call::RemoveNominator { stash: Some(stash) } => {
+                if !self.nominators.remove_pinned(runtime, stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a nominator account",
+                    );
+                    return;
+                }
+                save_pinned_nominators(self.nominators.get_pinned());
             }
             Call::AddCollator { stash: Some(stash) } => {
                 if let Some(key) = self.collators.add_pinned(runtime, stash) {
@@ -1966,6 +1984,15 @@ impl App {
                     self.fetch_collators_chain_data(runtime, vec![key.clone()]);
                     self.fetch_collators_proxy_status(runtime, vec![key]);
                 }
+            }
+            Call::RemoveCollator { stash: Some(stash) } => {
+                if !self.collators.remove_pinned(runtime, stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a collator account",
+                    );
+                    return;
+                }
+                save_pinned_collators(self.collators.get_pinned());
             }
             Call::AddProxyAccount {
                 account: Some(account),
@@ -1977,13 +2004,29 @@ impl App {
             Call::RemoveProxyAccount {
                 account: Some(account),
             } => {
-                remove_proxy_account(runtime, account);
+                if !remove_proxy_account(runtime, account) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a proxy account",
+                    );
+                    return;
+                }
                 self.fetch_proxy_status(runtime);
                 self.refresh_proxies();
             }
             _ => return,
         }
         self.close_popup();
+    }
+
+    /// Shows why the account of a command could not be added or removed. The popup of the commands
+    /// shows it below the input, and the scanner starts again when an address was being scanned.
+    fn on_account_error(&mut self, msg: &str) {
+        error!("{}", msg);
+        if self.popup.is_scan_account_mode() {
+            let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
+        } else if self.popup.invalidate_input(msg) {
+            self.focus = Focus::Input;
+        }
     }
 
     /// Handle decoded bytes from qr code when popup is in scan account mode
@@ -1996,10 +2039,7 @@ impl App {
             .and_then(|text| AccountId32::from_str(extract_address_from_qr(text)).ok());
         match account {
             Some(account) => self.add_account(call.with_address(account), runtime),
-            None => {
-                error!("The QR code is not an address");
-                let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
-            }
+            None => self.on_account_error("The QR code is not an address"),
         }
     }
 
@@ -2273,12 +2313,15 @@ impl App {
 
     /// Shows the commands of the validator selected.
     fn show_validator_popup(&mut self) -> bool {
-        if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
-            return false;
-        }
         let Some(validator) = self.validators.get_selected() else {
             return false;
         };
+        if !validator.origins.is_pinned()
+            && !self.validators.is_proxy_valid()
+            && !self.validators.has_commands_available()
+        {
+            return false;
+        }
         let Some(chain) = self.chains.get_chain_by_runtime(
             validator
                 .runtime()
@@ -2297,12 +2340,15 @@ impl App {
 
     /// Shows the commands of the collator selected.
     fn show_collator_popup(&mut self) -> bool {
-        if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
-            return false;
-        }
         let Some(collator) = self.collators.get_selected() else {
             return false;
         };
+        if !collator.origin.is_pinned()
+            && !self.collators.is_proxy_valid()
+            && !self.collators.has_commands_available()
+        {
+            return false;
+        }
         self.popup.show_collator_commands(&collator);
         true
     }
@@ -2313,6 +2359,19 @@ impl App {
             return false;
         };
         self.popup.show_chain_commands(&chain);
+        true
+    }
+
+    /// Shows the commands of the nominator selected.
+    fn show_nominator_popup(&mut self) -> bool {
+        let Some(nominator) = self
+            .nominators
+            .get_selected()
+            .filter(|n| n.origin.is_pinned())
+        else {
+            return false;
+        };
+        self.popup.show_nominator_commands(nominator);
         true
     }
 
@@ -2346,6 +2405,13 @@ impl App {
         };
 
         if self.section == Section::Chains && self.chains.is_active() && self.show_chain_popup() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        if self.section == Section::Nominators
+            && self.nominators.is_active()
+            && self.show_nominator_popup()
+        {
             let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
 
@@ -2537,51 +2603,61 @@ impl App {
             return;
         }
 
-        if self.data_section() == Section::Validators {
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
+        let mode = self.popup.get_mode();
 
-            match self.popup.get_mode() {
-                PopupMode::Menu => {
+        // The commands of a menu are the ones of the popup displayed, not of the section selected
+        if mode == PopupMode::Menu {
+            if self.popup.is_validator_menu() {
+                if let Some(validator) = self.validators.get_selected() {
                     self.on_validator_menu_enter(validator);
                 }
-                PopupMode::Confirmation => {
-                    self.on_validator_confirm_enter(validator);
-                }
-                _ => {}
-            }
-        };
-
-        if self.data_section() == Section::Collators {
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            match self.popup.get_mode() {
-                PopupMode::Menu => {
+            } else if self.popup.is_collator_menu() {
+                if let Some(collator) = self.collators.get_selected() {
                     self.on_collator_menu_enter(collator);
                 }
-                PopupMode::Confirmation => {
-                    self.on_collator_confirm_enter(collator);
+            } else if self.popup.is_chain_menu() {
+                if let Some(chain) = self.chains.get_selected() {
+                    self.on_chain_menu_enter(&chain);
+                }
+            } else if self.popup.is_nominator_menu() {
+                self.on_nominator_menu_enter();
+            } else if self.section == Section::Proxies {
+                self.on_proxy_menu_enter();
+            }
+            return;
+        }
+
+        if mode == PopupMode::Confirmation {
+            match self.data_section() {
+                Section::Validators => {
+                    if let Some(validator) = self.validators.get_selected() {
+                        self.on_validator_confirm_enter(validator);
+                    }
+                }
+                Section::Collators => {
+                    if let Some(collator) = self.collators.get_selected() {
+                        self.on_collator_confirm_enter(collator);
+                    }
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// Handle enter when a nominator is selected and popup is in menu mode, showing the commands
+    /// available for it.
+    fn on_nominator_menu_enter(&mut self) {
+        let Some(Call::RemoveNominator { .. }) = self.popup.get_input_parsed_call() else {
+            return;
         };
-
-        if self.section == Section::Chains {
-            let Some(chain) = self.chains.get_selected() else {
-                return;
-            };
-
-            if self.popup.get_mode() == PopupMode::Menu {
-                self.on_chain_menu_enter(&chain);
-            }
-        }
-
-        if self.section == Section::Proxies && self.popup.get_mode() == PopupMode::Menu {
-            self.on_proxy_menu_enter();
-        }
+        let Some(nominator) = self.nominators.get_selected() else {
+            return;
+        };
+        let call = Call::RemoveNominator {
+            stash: Some(nominator.stash()),
+        };
+        let runtime = nominator.runtime();
+        self.add_account(call, runtime);
     }
 
     /// Handle enter when a proxy account is selected and popup is in menu mode, showing the
@@ -2609,8 +2685,11 @@ impl App {
                 self.build_metadata_qrcode_popup(chain);
             }
             Call::AddValidator { .. }
+            | Call::RemoveValidator { .. }
             | Call::AddNominator { .. }
+            | Call::RemoveNominator { .. }
             | Call::AddCollator { .. }
+            | Call::RemoveCollator { .. }
             | Call::AddProxyAccount { .. }
             | Call::RemoveProxyAccount { .. } => self.add_or_scan_account(call, chain.runtime()),
             _ => {}
@@ -2637,6 +2716,15 @@ impl App {
 
         match call {
             Call::Custom(custom) => self.handle_custom_command(custom, validator),
+            Call::RemoveValidator { .. } => {
+                let Some(runtime) = validator.runtime().asset_hub_runtime() else {
+                    return;
+                };
+                let call = Call::RemoveValidator {
+                    stash: Some(validator.key().stash()),
+                };
+                self.add_account(call, runtime);
+            }
             _ => self.handle_extrinsic_calls(call, validator),
         }
     }
@@ -2733,6 +2821,12 @@ impl App {
 
         match call {
             Call::Custom(custom) => self.handle_collator_custom_command(custom, collator),
+            Call::RemoveCollator { .. } => {
+                let call = Call::RemoveCollator {
+                    stash: Some(collator.key().stash()),
+                };
+                self.add_account(call, collator.runtime());
+            }
             _ => self.handle_collator_extrinsic_calls(call, collator),
         }
     }
@@ -3486,6 +3580,7 @@ impl App {
         match self.section {
             Section::Chains => self.show_chain_popup(),
             Section::Proxies => self.show_proxy_popup(),
+            Section::Nominators => self.show_nominator_popup(),
             _ => match self.data_section() {
                 Section::Validators => self.show_validator_popup(),
                 Section::Collators => self.show_collator_popup(),

@@ -685,6 +685,26 @@ impl ValidatorsList {
         Some(key)
     }
 
+    /// Unpins the validator pinned from the TUI, which is no longer listed when it is only found
+    /// on-chain and those are not listed. Returns whether it was pinned.
+    pub fn remove_pinned(&mut self, runtime: SupportedRuntime, stash: AccountId32) -> bool {
+        let key = AccountKey::new(runtime, stash);
+        if !self
+            .validators
+            .get(&key)
+            .is_some_and(|v| v.origins.is_pinned())
+        {
+            return false;
+        }
+        let Some(origins) = self.toggle_pinned(&key) else {
+            return false;
+        };
+        if origins.is_onchain() && !CONFIG.features().all_validators_visible() {
+            self.remove(&key);
+        }
+        true
+    }
+
     /// The validators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.validators_iter()

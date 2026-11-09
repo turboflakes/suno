@@ -1004,18 +1004,20 @@ pub fn save_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
     }
 }
 
-/// Removes the proxy account from the signers of the chain `runtime`, and from the prefs. It only
-/// removes the accounts added from the TUI or listed under `signers`. Failures are logged and
-/// otherwise ignored.
-pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+/// Removes the proxy account pinned from the TUI, from the signers of the chain `runtime` and from
+/// the prefs. Returns whether it was pinned. Failures to persist are logged and otherwise ignored.
+pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) -> bool {
+    let mut prefs = CONFIG.read_prefs();
+    if !prefs.remove_proxy_account(runtime, account) {
+        return false;
+    }
     if let Some(chain_config) = CONFIG.chain_config(runtime) {
         chain_config.remove_signer(&account);
     }
-    let mut prefs = CONFIG.read_prefs();
-    prefs.remove_proxy_account(runtime, account);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist the removed proxy account: {}", e);
     }
+    true
 }
 
 /// Persists the active theme so it's restored on the next launch.

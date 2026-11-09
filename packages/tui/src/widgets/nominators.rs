@@ -82,6 +82,26 @@ impl NominatorsList {
         Some(key)
     }
 
+    /// Removes the nominator pinned from the TUI. Returns whether it was pinned.
+    pub fn remove_pinned(&mut self, runtime: SupportedRuntime, stash: AccountId32) -> bool {
+        let key = AccountKey::new(runtime, stash);
+        let Some(index) = self
+            .nominators
+            .iter()
+            .position(|n| n.key() == &key && n.origin.is_pinned())
+        else {
+            return false;
+        };
+        self.nominators.remove(index);
+        let last = self.nominators.len().checked_sub(1);
+        let selected = self
+            .table_state
+            .selected()
+            .map(|i| i.min(last.unwrap_or(0)));
+        self.table_state.select(selected.filter(|_| last.is_some()));
+        true
+    }
+
     /// The nominators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.nominators
@@ -269,5 +289,18 @@ mod tests {
         let pinned = list.get_pinned();
         assert_eq!(pinned.len(), 1);
         assert_eq!(pinned[0].stash, stash);
+    }
+
+    #[test]
+    fn test_remove_pinned_only_removes_the_pinned_ones() {
+        let mut list = list();
+        let stash = AccountId32::from([9; 32]);
+        let runtime = SupportedRuntime::AssetHubKusama;
+
+        assert!(!list.remove_pinned(runtime, stash));
+        list.add_pinned(runtime, stash);
+        assert!(list.remove_pinned(runtime, stash));
+        assert!(list.get_pinned().is_empty());
+        assert!(!list.remove_pinned(runtime, stash));
     }
 }

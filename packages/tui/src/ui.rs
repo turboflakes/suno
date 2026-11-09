@@ -318,9 +318,24 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     // ones of the first chain when nothing is selected
     if (app.focus == Focus::None
         || (app.validators.is_active()
-            && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
+            && (app.validators.is_proxy_valid()
+                || app.validators.has_commands_available()
+                || app
+                    .validators
+                    .get_selected_ref()
+                    .is_some_and(|v| v.origins.is_pinned())))
         || (app.collators.is_active()
-            && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
+            && (app.collators.is_proxy_valid()
+                || app.collators.has_commands_available()
+                || app
+                    .collators
+                    .get_selected_ref()
+                    .is_some_and(|c| c.origin.is_pinned())))
+        || (app.nominators.is_active()
+            && app
+                .nominators
+                .get_selected()
+                .is_some_and(|n| n.origin.is_pinned()))
         || app.chains.is_active()
         || (app.proxies.is_active()
             && app.proxies.get_selected().is_some_and(|p| p.is_removable())))
