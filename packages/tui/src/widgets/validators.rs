@@ -408,6 +408,10 @@ impl ValidatorsList {
         self.get_validator_by_index(index).cloned()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.validators.is_empty()
+    }
+
     /// Returns an iterator of validators in display order
     pub fn validators_iter(&self) -> impl Iterator<Item = &Validator> {
         self.validators_order

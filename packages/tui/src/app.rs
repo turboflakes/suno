@@ -519,7 +519,7 @@ impl App {
         if self.popup.is_visible() {
             return;
         }
-        if !self.window.is_validators_selected() && !self.window.is_collators_selected() {
+        if !self.can_filter() {
             return;
         }
         self.set_section(Section::None);
@@ -542,6 +542,15 @@ impl App {
             Window::Validators => self.validators.edit_filter(edit),
             Window::Collators => self.collators.edit_filter(edit),
             _ => {}
+        }
+    }
+
+    /// Wheter the validators or the collators can be filtered.
+    pub fn can_filter(&self) -> bool {
+        match self.window {
+            Window::Validators => !self.validators.is_empty(),
+            Window::Collators => !self.collators.is_empty(),
+            _ => false,
         }
     }
 

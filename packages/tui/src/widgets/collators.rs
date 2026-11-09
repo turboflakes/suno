@@ -313,6 +313,10 @@ impl CollatorsList {
         self.ensure_selection_in_view();
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.collators.is_empty()
+    }
+
     /// Returns an iterator of collators in display order
     pub fn collators_iter(&self) -> impl Iterator<Item = &Collator> {
         self.collators_order

@@ -402,15 +402,29 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
             legend.push(Span::raw("   "));
         }
-        legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
-        legend.push(Span::raw(" "));
-        let up_down = if app.window.is_help_selected() {
-            "scroll"
-        } else {
-            "select"
-        };
-        legend.push(Span::styled(up_down.to_string(), theme.paragraph.label));
-        legend.push(Span::raw("   "));
+        let has_items = (app.validators.is_active() || app.collators.is_active())
+            && (app.window.is_validators_selected() || app.window.is_collators_selected())
+            && app.can_filter();
+        if has_items {
+            legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            let up_down = if app.window.is_help_selected() {
+                "scroll"
+            } else {
+                "select"
+            };
+            legend.push(Span::styled(up_down.to_string(), theme.paragraph.label));
+            legend.push(Span::raw("   "));
+        }
+        if has_items && app.collators.is_active() && app.window.is_collators_selected() {
+            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "switch view".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
         if app.section.is_none() && app.window.is_logs_selected() {
             legend.push(Span::styled("shift+↑/↓".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
@@ -430,15 +444,6 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        if app.collators.is_active() && app.window.is_collators_selected() {
-            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
-            legend.push(Span::raw(" "));
-            legend.push(Span::styled(
-                "switch view".to_string(),
-                theme.paragraph.label,
-            ));
-            legend.push(Span::raw("   "));
-        }
     }
 
     // The hints above are followed by their separator, so drop the last one
@@ -446,7 +451,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.pop();
     }
 
-    let can_filter = app.window.is_validators_selected() || app.window.is_collators_selected();
+    let can_filter = app.can_filter();
     if app.popup.is_hidden() && app.focus != Focus::Filter && can_filter {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("ctrl+f".to_string(), theme.paragraph.base));
