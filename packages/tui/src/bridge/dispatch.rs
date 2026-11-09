@@ -149,6 +149,36 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::NominatorStakeLedger(data) => {
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            if let Some(ledger) = data.value.ledger {
+                tx.send(Action::Nominator(NominatorAction::UpdateStakeLedger(
+                    nominator_key,
+                    ledger,
+                )))
+                .boxed()?;
+            } else {
+                warn!("No stake ledger data found for {}", nominator_key,);
+            }
+        }
+        Response::NominatorPayee(data) => {
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::UpdatePayee(
+                nominator_key,
+                data.value.payee,
+            )))
+            .boxed()?;
+        }
+        Response::NominatorSupportedProxy(data) => {
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            let proxy_key = ProxyKey::new(runtime, data.value.proxy_type)
+                .with_proxy_account(data.value.proxy_account);
+            tx.send(Action::Nominator(NominatorAction::AddProxy(
+                nominator_key,
+                proxy_key,
+            )))
+            .boxed()?;
+        }
         Response::ValidatorNextKeys(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);

@@ -3,7 +3,11 @@ use std::collections::HashSet;
 use subxt::utils::AccountId32;
 use suno_config::{PinnedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
-    key::AccountBytes, origin::Origin, staking::Nominations, AccountKey, Nominator,
+    key::AccountBytes,
+    origin::Origin,
+    proxy::ProxyKey,
+    staking::{Nominations, Payee, StakeLedger},
+    AccountKey, Nominator,
 };
 use suno_theme::Theme;
 
@@ -102,6 +106,34 @@ impl NominatorsList {
         true
     }
 
+    pub fn update_stake_ledger(&mut self, key: &AccountKey, ledger: StakeLedger) {
+        if let Some(nominator) = self.nominators.iter_mut().find(|n| n.key() == key) {
+            nominator.ledger = ledger;
+        }
+    }
+
+    pub fn update_payee(&mut self, key: &AccountKey, payee: Payee) {
+        if let Some(nominator) = self.nominators.iter_mut().find(|n| n.key() == key) {
+            nominator.payee = payee;
+        }
+    }
+
+    pub fn add_proxy(&mut self, key: &AccountKey, proxy: ProxyKey) {
+        if let Some(nominator) = self.nominators.iter_mut().find(|n| n.key() == key) {
+            nominator.proxies.insert(proxy);
+        }
+    }
+
+    /// Forgets the proxies of the nominators of the chain `runtime`, e.g. when the proxy accounts
+    /// changed, so they are fetched again.
+    pub fn clear_proxies(&mut self, runtime: SupportedRuntime) {
+        for nominator in &mut self.nominators {
+            if nominator.runtime() == runtime {
+                nominator.proxies.clear();
+            }
+        }
+    }
+
     /// The nominators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.nominators
@@ -127,6 +159,11 @@ impl NominatorsList {
 
     pub fn is_empty(&self) -> bool {
         self.nominators.is_empty()
+    }
+
+    /// Returns true if any of the nominators listed has valid proxies to show.
+    pub fn proxies_available(&self) -> bool {
+        self.nominators_iter().any(|n| n.has_proxies())
     }
 
     /// The keys of the nominators of the chain `runtime`.

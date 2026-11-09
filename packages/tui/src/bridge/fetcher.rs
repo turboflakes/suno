@@ -141,6 +141,25 @@ pub trait RuntimeFetcher {
         proxy: &AccountId32,
     ) -> Result<Vec<Response>, Error>;
 
+    async fn fetch_nominator_stake_ledger(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_nominator_payee(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_and_validate_nominators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error>;
+
     async fn fetch_and_validate_validators_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -710,6 +729,56 @@ impl RuntimeFetcher for Runtime {
                         || !proxy_key.is_valid()
                 }
                 _ => true,
+            })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
+            .collect())
+    }
+
+    async fn fetch_nominator_stake_ledger(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // The ledger is read the same way for every stash, it's the response that tells whom
+        // it belongs to
+        Ok(match self.fetch_stake_ledger(api, stash).await? {
+            Response::StakeLedger(data) => Response::NominatorStakeLedger(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_nominator_payee(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        Ok(match self.fetch_validator_payee(api, stash).await? {
+            Response::ValidatorPayee(data) => Response::NominatorPayee(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_and_validate_nominators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error> {
+        let responses = self.fetch_proxy_account(api, stash, proxy).await?;
+
+        let runtime = *self;
+        Ok(responses
+            .into_iter()
+            .filter_map(|response| match response {
+                Response::SupportedProxy(data) => {
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
+                    (proxy_key.is_staking_valid()
+                        || proxy_key.is_staking_operator_valid()
+                        || proxy_key.is_non_transfer_valid()
+                        || !proxy_key.is_valid())
+                    .then(|| Response::NominatorSupportedProxy(data))
+                }
+                other => Some(other),
             })
             .map(|response| response.with_proxy_account(*proxy.as_ref()))
             .collect())

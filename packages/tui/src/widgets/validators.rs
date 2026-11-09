@@ -419,11 +419,10 @@ impl ValidatorsList {
             .filter_map(move |key| self.validators.get(key))
     }
 
-    /// Returns true if any validator has proxies available
+    /// Returns true if any of the tracked validators, has valid proxies to show.
     pub fn proxies_available(&self) -> bool {
-        self.validators_order
-            .iter()
-            .any(|key| self.validators.get(key).is_some_and(|v| v.has_proxies()))
+        self.validators_iter()
+            .any(|v| v.is_tracked() && v.has_proxies())
     }
 
     /// Get all AccountKeys for a specific runtime

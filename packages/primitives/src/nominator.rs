@@ -3,7 +3,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     origin::Origin,
-    proxy::ProxyKey,
+    proxy::{proxies_to_string, ProxyKey},
     staking::{Nominations, Payee, StakeLedger},
 };
 use std::collections::HashSet;
@@ -66,6 +66,15 @@ impl Nominator {
         self.nominations
             .as_ref()
             .is_some_and(|nominations| !nominations.targets.is_empty())
+    }
+
+    /// Whether any of the proxies is valid, so there is something to show.
+    pub fn has_proxies(&self) -> bool {
+        self.proxies.iter().any(|p| p.is_valid())
+    }
+
+    pub fn proxies_as_str(&self) -> String {
+        proxies_to_string(&self.proxies)
     }
 
     pub fn targets_count(&self) -> usize {

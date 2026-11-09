@@ -69,7 +69,7 @@ impl StatefulWidget for ProxiesCompactWidget {
         let widths = [
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(8),
+            Constraint::Length(10),
             Constraint::Length(1),
         ];
 
@@ -87,7 +87,7 @@ impl StatefulWidget for ProxiesCompactWidget {
         let header_cells = vec![
             Cell::from(""),
             Cell::from(Line::from(title_span)),
-            Cell::from(Text::from("nodes").alignment(Alignment::Right)),
+            Cell::from(Text::from("used by").alignment(Alignment::Right)),
             Cell::from(""),
         ];
 

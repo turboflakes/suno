@@ -186,6 +186,9 @@ pub enum ChainAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NominatorAction {
     UpdateNominations(NominatorKey, Option<Nominations>),
+    UpdateStakeLedger(NominatorKey, StakeLedger),
+    UpdatePayee(NominatorKey, Payee),
+    AddProxy(NominatorKey, ProxyKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

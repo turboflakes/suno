@@ -173,6 +173,9 @@ pub enum Response {
     ValidatorPrefsNext(Data<ValidatorPrefsData>),
     ValidatorPayee(Data<ValidatorPayeeData>),
     Nominations(Data<NominationsData>),
+    NominatorStakeLedger(Data<StakeLedgerData>),
+    NominatorPayee(Data<ValidatorPayeeData>),
+    NominatorSupportedProxy(Data<SupportedProxyData>),
     ValidatorNextKeys(Data<ValidatorKeysData>),
     ValidatorQueuedKeys(Data<ValidatorKeysData>),
     Identity(Data<IdentityData>),
@@ -336,6 +339,10 @@ impl Response {
             Response::CollatorSupportedProxy(mut data) => {
                 data.value.proxy_account = Some(proxy_account);
                 Response::CollatorSupportedProxy(data)
+            }
+            Response::NominatorSupportedProxy(mut data) => {
+                data.value.proxy_account = Some(proxy_account);
+                Response::NominatorSupportedProxy(data)
             }
             other => other,
         }

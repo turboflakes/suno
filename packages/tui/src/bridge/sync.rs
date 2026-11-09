@@ -448,6 +448,10 @@ pub fn spawn_fetch_collators_on_connect(
     collator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
+    spawn_fetch_slot_duration(api, runtime, tx);
+    spawn_fetch_session_index(api, runtime, tx);
+    spawn_fetch_collator_sets(api, runtime, tx);
+
     spawn_fetch_collators_proxy_status(
         api,
         runtime,
@@ -455,10 +459,6 @@ pub fn spawn_fetch_collators_on_connect(
         &runtime.signer_account_ids(),
         tx,
     );
-
-    spawn_fetch_slot_duration(api, runtime, tx);
-    spawn_fetch_session_index(api, runtime, tx);
-    spawn_fetch_collator_sets(api, runtime, tx);
 }
 
 /// Fetches what a system chain holds about its collators whenever its session changes: the
@@ -781,21 +781,80 @@ pub fn spawn_fetch_validators_on_era(
 // Nominators spawners grouped by task
 // ----
 
+pub fn spawn_fetch_nominators_nominations(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_nominations(&api, &stash).await },
+        DEFAULT_CONCURRENCY,
+    );
+}
+
+pub fn spawn_fetch_nominators_staking_ledger(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_nominator_stake_ledger(&api, &stash).await },
+        DEFAULT_CONCURRENCY,
+    );
+}
+
+pub fn spawn_fetch_nominators_payee(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_nominator_payee(&api, &stash).await },
+        DEFAULT_CONCURRENCY,
+    );
+}
+
+pub fn spawn_fetch_nominators_proxy_status(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    proxies: &[AccountId32],
+    tx: &UnboundedSender<Action>,
+) {
+    for proxy in proxies {
+        let proxy = *proxy;
+        ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered_multi(
+            move |api, stash| async move {
+                runtime
+                    .fetch_and_validate_nominators_proxy_account(&api, &stash, &proxy)
+                    .await
+            },
+            DEFAULT_CONCURRENCY,
+        );
+    }
+}
+
 /// Fetches what an Asset Hub holds about the tracked nominators once it is connected: the
-/// validators they nominate.
-/// TODO: the staking ledger, the payee, the balance and the proxy status.
+/// validators they nominate, the staking ledger, the payee and the proxy status.
 pub fn spawn_fetch_nominators_on_connect(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
     nominator_keys: &[AccountKey],
     tx: &UnboundedSender<Action>,
 ) {
-    if !runtime.is_asset_hub() || nominator_keys.is_empty() {
-        return;
-    }
-    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
-        move |api, stash| async move { runtime.fetch_nominations(&api, &stash).await },
-        DEFAULT_CONCURRENCY,
+    spawn_fetch_nominators_nominations(api, runtime, nominator_keys, tx);
+    spawn_fetch_nominators_staking_ledger(api, runtime, nominator_keys, tx);
+    spawn_fetch_nominators_payee(api, runtime, nominator_keys, tx);
+
+    spawn_fetch_nominators_proxy_status(
+        api,
+        runtime,
+        nominator_keys,
+        &runtime.signer_account_ids(),
+        tx,
     );
 }
 

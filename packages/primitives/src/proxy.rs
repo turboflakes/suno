@@ -145,17 +145,20 @@ impl std::fmt::Display for ProxyKey {
     }
 }
 
-/// What holds a proxy with an account: the validators and the collators, and the proxy types.
+/// What holds a proxy with an account: the validators, the collators and the nominators, and the
+/// proxy types.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProxyUsage {
     pub validators: usize,
     pub validator_types: BTreeSet<SupportedProxy>,
     pub collators: usize,
     pub collator_types: BTreeSet<SupportedProxy>,
+    pub nominators: usize,
+    pub nominator_types: BTreeSet<SupportedProxy>,
 }
 
 impl ProxyUsage {
-    /// The counts only, e.g. `3v 2c`, or `0` when nothing holds a proxy.
+    /// The counts only, e.g. `3 2c 1n`, or `0` when nothing holds a proxy.
     pub fn short(&self) -> String {
         let mut used = Vec::new();
         if self.validators > 0 {
@@ -163,6 +166,9 @@ impl ProxyUsage {
         }
         if self.collators > 0 {
             used.push(format!("{}c", self.collators));
+        }
+        if self.nominators > 0 {
+            used.push(format!("{}n", self.nominators));
         }
         if used.is_empty() {
             "0".to_string()
@@ -173,7 +179,8 @@ impl ProxyUsage {
 }
 
 impl std::fmt::Display for ProxyUsage {
-    /// E.g. `3 validators (S), 2 collators (C, NT)`, or `0` when nothing holds a proxy.
+    /// E.g. `3 validators (S), 2 collators (C, NT), 1 nominators (S)`, or `0` when nothing holds a
+    /// proxy.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let describe = |count: usize, name: &str, types: &BTreeSet<SupportedProxy>| {
             let types: Vec<_> = types.iter().map(|t| t.as_short()).collect();
@@ -189,6 +196,13 @@ impl std::fmt::Display for ProxyUsage {
         }
         if self.collators > 0 {
             used.push(describe(self.collators, "collators", &self.collator_types));
+        }
+        if self.nominators > 0 {
+            used.push(describe(
+                self.nominators,
+                "nominators",
+                &self.nominator_types,
+            ));
         }
         if used.is_empty() {
             write!(f, "0")
@@ -278,6 +292,15 @@ impl ProxyState {
         }
     }
 
+    /// Counts a nominator with these `proxies`, when it holds a proxy with the account.
+    pub fn track_nominator(&mut self, proxies: &HashSet<ProxyKey>) {
+        let types = self.held_by(proxies);
+        if !types.is_empty() {
+            self.usage.nominators += 1;
+            self.usage.nominator_types.extend(types);
+        }
+    }
+
     /// Counts a collator with these `proxies`, when it holds a proxy with the account.
     pub fn track_collator(&mut self, proxies: &HashSet<ProxyKey>) {
         let types = self.held_by(proxies);
@@ -286,6 +309,29 @@ impl ProxyState {
             self.usage.collator_types.extend(types);
         }
     }
+}
+
+/// The valid proxies as a list, e.g. `[Staking,NonTransfer]`, or nothing when there are none.
+pub fn proxies_to_string(proxies: &HashSet<ProxyKey>) -> String {
+    let mut proxies = proxies
+        .iter()
+        .filter(|p| p.is_valid())
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if proxies.is_empty() {
+        return String::new();
+    }
+
+    proxies.sort();
+    format!(
+        "[{}]",
+        proxies
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 /// The signer to make the `call` of a stash with the `proxies`, and its proxy type: the first
@@ -339,6 +385,7 @@ mod tests {
         let none = HashSet::from([key(runtime, SupportedProxy::None, [1; 32])]);
         proxy.track_validator(&none);
         proxy.track_collator(&none);
+        proxy.track_nominator(&none);
         assert_eq!(proxy.usage, ProxyUsage::default());
         assert_eq!(proxy.usage.short(), "0");
     }
@@ -369,11 +416,13 @@ mod tests {
         )]));
 
         assert_eq!(proxy.usage.validators, 2);
+        proxy.track_nominator(&staking);
         assert_eq!(proxy.usage.collators, 1);
-        assert_eq!(proxy.usage.short(), "2v 1c");
+        assert_eq!(proxy.usage.nominators, 1);
+        assert_eq!(proxy.usage.short(), "2V 1C 1N");
         assert_eq!(
             proxy.usage.to_string(),
-            "2 validators (S, SO), 1 collators (C)"
+            "2 validators (S, SO), 1 collators (C), 1 nominators (S, SO)"
         );
     }
 }

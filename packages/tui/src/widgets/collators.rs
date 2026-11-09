@@ -324,11 +324,10 @@ impl CollatorsList {
             .filter_map(move |key| self.collators.get(key))
     }
 
-    // Returns true if any validator has proxies available
+    /// Returns true if any of the tracked collators, has valid proxies to show.
     pub fn proxies_available(&self) -> bool {
-        self.collators_order
-            .iter()
-            .any(|key| self.collators.get(key).is_some_and(|c| c.has_proxies()))
+        self.collators_iter()
+            .any(|c| c.is_tracked() && c.has_proxies())
     }
 
     // Helper method to get collator by table index

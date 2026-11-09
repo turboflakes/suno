@@ -691,7 +691,7 @@ impl App {
         if self.chains.get_api_and_block_hash(runtime).is_none() {
             return;
         }
-        self.fetch_collators_chain_data(runtime, collator_keys.clone());
+        self.fetch_collators_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
             sync::spawn_fetch_nominators_on_connect(api_at, runtime, &nominator_keys, tx);
             sync::spawn_fetch_validators_on_connect(
@@ -714,7 +714,7 @@ impl App {
         if self.chains.get_api_and_block_hash(runtime).is_none() {
             return;
         }
-        self.fetch_collators_chain_data(runtime, collator_keys.clone());
+        self.fetch_collators_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
             sync::spawn_fetch_collators_on_connect(api_at, runtime, &collator_keys, tx);
         });
@@ -1221,12 +1221,17 @@ impl App {
         }
 
         for (runtime, keys) in self.collators.take_unrequested_visible() {
-            self.fetch_collators_chain_data(runtime, keys);
+            self.fetch_collators_data(runtime, keys);
         }
     }
 
-    /// Fetches the validators nominated by the nominators with the `keys` of the Asset Hub `runtime`.
-    fn fetch_nominations(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+    /// Fetches what the Asset Hub `runtime` holds about the nominators with the `keys`: the
+    /// validators nominated, the staking ledger, the payee and the proxy status.
+    fn fetch_nominators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if !runtime.is_asset_hub() || keys.is_empty() {
+            return;
+        }
+
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
             sync::spawn_fetch_nominators_on_connect(api_at, runtime, &keys, tx);
         });
@@ -1234,7 +1239,7 @@ impl App {
 
     /// Fetches the balance, the session keys and the last authored block of the `keys` collators,
     /// all of them held on the collator's own chain.
-    fn fetch_collators_chain_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+    fn fetch_collators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
         if keys.is_empty() {
             return;
         }
@@ -1313,6 +1318,16 @@ impl App {
                 self.nominators
                     .update_nominations(&nominator_key, nominations);
                 self.update_nominated_validators(nominator_key.runtime().relay_chain());
+            }
+            NominatorAction::UpdateStakeLedger(nominator_key, ledger) => {
+                self.nominators.update_stake_ledger(&nominator_key, ledger);
+            }
+            NominatorAction::UpdatePayee(nominator_key, payee) => {
+                self.nominators.update_payee(&nominator_key, payee);
+            }
+            NominatorAction::AddProxy(nominator_key, proxy) => {
+                self.nominators.add_proxy(&nominator_key, proxy);
+                self.refresh_proxies();
             }
         }
     }
@@ -1992,7 +2007,7 @@ impl App {
             Call::AddNominator { stash: Some(stash) } => {
                 if let Some(key) = self.nominators.add_pinned(runtime, stash) {
                     save_pinned_nominators(self.nominators.get_pinned());
-                    self.fetch_nominations(runtime, vec![key]);
+                    self.fetch_nominators_data(runtime, vec![key]);
                 }
             }
             Call::RemoveNominator { stash: Some(stash) } => {
@@ -2007,7 +2022,7 @@ impl App {
             Call::AddCollator { stash: Some(stash) } => {
                 if let Some(key) = self.collators.add_pinned(runtime, stash) {
                     save_pinned_collators(self.collators.get_pinned());
-                    self.fetch_collators_chain_data(runtime, vec![key.clone()]);
+                    self.fetch_collators_data(runtime, vec![key.clone()]);
                     self.fetch_collators_proxy_status(runtime, vec![key]);
                 }
             }
@@ -2079,6 +2094,9 @@ impl App {
             }
             for collator in self.collators.collators_iter() {
                 proxy.track_collator(&collator.proxies);
+            }
+            for nominator in self.nominators.nominators_iter() {
+                proxy.track_nominator(&nominator.proxies);
             }
         }
         self.proxies.load(proxies);
@@ -2168,8 +2186,24 @@ impl App {
             self.validators.clear_proxies(runtime.relay_chain());
         }
 
+        let nominator_keys = self.nominators.keys_by_runtime(runtime);
+        self.nominators.clear_proxies(runtime);
+
         self.fetch_validators_proxy_status(runtime, validator_keys);
         self.fetch_collators_proxy_status(runtime, collator_keys);
+        self.fetch_nominators_proxy_status(runtime, nominator_keys);
+    }
+
+    /// Fetches the proxy status of the `keys` nominators, held on the Asset Hub `runtime`, for
+    /// all the signers of the chain.
+    fn fetch_nominators_proxy_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        let proxies = runtime.signer_account_ids();
+        if keys.is_empty() || proxies.is_empty() {
+            return;
+        }
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_proxy_status(api_at, runtime, &keys, &proxies, tx);
+        });
     }
 
     /// Fetches the proxy status of the `keys` validators, held on the Asset Hub `runtime`, for

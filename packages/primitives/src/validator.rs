@@ -5,7 +5,7 @@ use crate::{
     identity::Identity,
     key::AccountKey,
     origin::{Origin, Origins},
-    proxy::{select_proxy, ProxyKey, SupportedProxy},
+    proxy::{proxies_to_string, select_proxy, ProxyKey, SupportedProxy},
     session::Keys,
     staking::{Payee, StakeLedger, StakeOverview, ValidatorPrefs},
 };
@@ -313,31 +313,13 @@ impl Validator {
         })
     }
 
+    /// Whether any of the proxies is valid, so there is something to show.
     pub fn has_proxies(&self) -> bool {
-        !self.proxies.is_empty()
+        self.proxies.iter().any(|p| p.is_valid())
     }
 
     pub fn proxies_as_str(&self) -> String {
-        let mut proxies = self
-            .proxies
-            .iter()
-            .filter(|p| p.is_valid())
-            .cloned()
-            .collect::<Vec<_>>();
-
-        if proxies.is_empty() {
-            return String::new();
-        }
-
-        proxies.sort();
-        format!(
-            "[{}]",
-            proxies
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        )
+        proxies_to_string(&self.proxies)
     }
 
     /// The signer to make the `call`, and its proxy type, see `select_proxy`.

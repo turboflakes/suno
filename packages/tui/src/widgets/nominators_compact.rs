@@ -49,6 +49,7 @@ impl StatefulWidget for NominatorsCompactWidget {
 
         // The targets column is only needed when there are nominators listed
         let has_nominators = !state.is_empty();
+        let proxies_available = state.proxies_available();
 
         // Interleave a non-selectable chain-name row before the nominators of each chain, named
         // after the relay chain since the nominators are listed under its asset hub.
@@ -62,12 +63,16 @@ impl StatefulWidget for NominatorsCompactWidget {
         for (i, nominator) in state.nominators_iter().enumerate() {
             let chain = nominator.runtime().relay_chain();
             if last_chain != Some(chain) {
-                rows.push(Row::new(vec![
+                let mut header_row = vec![
                     Text::from(""),
                     Text::from(chain.to_string()).style(theme.paragraph.label_italic),
                     Text::from(""),
-                    Text::from(""),
-                ]));
+                ];
+                if proxies_available {
+                    header_row.push(Text::from(""));
+                }
+                header_row.push(Text::from(""));
+                rows.push(Row::new(header_row));
                 last_chain = Some(chain);
             }
 
@@ -91,12 +96,16 @@ impl StatefulWidget for NominatorsCompactWidget {
                 None => "-".to_string(),
             };
 
-            rows.push(Row::new(vec![
+            let mut row = vec![
                 Text::from(""),
                 Text::from(Line::from(name)),
                 Text::from(targets).alignment(Alignment::Right),
-                Text::from(""),
-            ]));
+            ];
+            if proxies_available {
+                row.push(Text::from(nominator.proxies_as_str()).alignment(Alignment::Right));
+            }
+            row.push(Text::from(""));
+            rows.push(Row::new(row));
         }
 
         if rows.len().is_zero() {
@@ -112,12 +121,15 @@ impl StatefulWidget for NominatorsCompactWidget {
             ]));
         }
 
-        let widths = [
+        let mut widths = vec![
             Constraint::Length(1),
             Constraint::Fill(1),
             Constraint::Length(8),
-            Constraint::Length(1),
         ];
+        if proxies_available {
+            widths.push(Constraint::Length(7));
+        }
+        widths.push(Constraint::Length(1));
 
         let title = "nominators";
         let title_span = if is_active {
@@ -131,12 +143,17 @@ impl StatefulWidget for NominatorsCompactWidget {
             Span::raw(format!("{} ", title))
         };
         let targets_title = if has_nominators { "targets" } else { "" };
-        let header_cells = vec![
+        let mut header_cells = vec![
             Cell::from(""),
             Cell::from(Line::from(title_span)),
             Cell::from(Text::from(targets_title).alignment(Alignment::Right)),
-            Cell::from(""),
         ];
+        if proxies_available {
+            header_cells.push(Cell::from(
+                Text::from("proxies").alignment(Alignment::Right),
+            ));
+        }
+        header_cells.push(Cell::from(""));
 
         let table = Table::new(rows, widths)
             .block(block)
