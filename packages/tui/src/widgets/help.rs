@@ -151,6 +151,10 @@ const CUSTOM_COMMANDS: &[HelpEntry] = &[
 const KEYBINDINGS: &[HelpEntry] = &[
     ("ctrl+e or / ", "Show commands."),
     (
+        "left/right ",
+        "Switch the chain, validators, collators while its commands are shown.",
+    ),
+    (
         "tab ",
         "Input focus, Autocomplete or Navigate between pane sections and the main window.",
     ),

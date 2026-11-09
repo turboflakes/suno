@@ -156,6 +156,7 @@ Options:
 'tab' to input focus, to command autocomplete or just to navigate between pane sections
 'esc' to close popup or unfocus from input field
 'ctrl+e' to show list of enabled commands for the selected validator
+'left / right' to switch the chain while the commands of a chain are shown
 'ctrl+w' to switch window
 'ctrl+m' to mask or unmask hosts
 'ctrl+t' to show the list of available themes

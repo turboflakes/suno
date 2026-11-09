@@ -113,10 +113,13 @@ impl Widget for &InputCommandWidget {
                 .style(theme.input.base(state.is_active()))
                 .padding(Padding::new(0, 2, 1, 1));
 
-            let hotkey = Paragraph::new(Line::from(vec![
-                Span::raw("enter").style(theme.input.suffix(state.is_valid()))
-            ]))
-            .block(block);
+            let style = if state.is_active() {
+                theme.input.suffix(true)
+            } else {
+                theme.input.placeholder
+            };
+            let hotkey =
+                Paragraph::new(Line::from(vec![Span::raw("enter").style(style)])).block(block);
             hotkey.render(input_area[2], buf);
         }
 

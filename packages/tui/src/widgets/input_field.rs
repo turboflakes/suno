@@ -550,6 +550,26 @@ impl InputFieldWidget {
         state.reset_cursor_position();
     }
 
+    pub fn clear(&mut self) {
+        let mut state = self.state.write().unwrap();
+        state.reset();
+    }
+
+    pub fn is_locked(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_locked()
+    }
+
+    pub fn is_focused(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_active()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let state = self.state.read().unwrap();
+        state.is_empty()
+    }
+
     pub fn get_parsed_call(&self) -> Option<Call> {
         let state = self.state.read().unwrap();
         state.parsed_call()
@@ -590,11 +610,6 @@ impl InputFieldWidget {
     pub fn set_focus(&mut self) -> bool {
         let mut state = self.state.write().unwrap();
         state.set_focus()
-    }
-
-    pub fn clear_focus(&mut self) {
-        let mut state = self.state.write().unwrap();
-        state.clear_mode();
     }
 
     pub fn lock_input(&mut self) {

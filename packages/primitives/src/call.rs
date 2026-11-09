@@ -470,22 +470,22 @@ impl ToDescription for Call {
             Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
             Self::Custom(custom) => custom.to_string(),
             Self::ChainSpecs { chain_name } => {
-                format!("Display the chain-specs QR code for the {} network", chain_name)
+                format!("Display the chain-specs QR code for the {} chain", chain_name)
             }
             Self::Metadata { chain_name } => {
-                format!("Display the metadata QR code for the {} network", chain_name)
+                format!("Display the metadata QR code for the {} chain", chain_name)
             }
             Self::AddValidator { .. } => {
-                "Add a validator stash".to_string()
+                "Add a validator stash account".to_string()
             }
             Self::AddNominator { .. } => {
-                "Add a nominator stash".to_string()
+                "Add a nominator stash account".to_string()
             }
             Self::AddCollator { .. } => {
-                "Add a collator stash".to_string()
+                "Add a collator stash account".to_string()
             }
             Self::AddProxyAccount { .. } => {
-                "Add a proxy account".to_string()
+                "Add a proxy account to manage operations on behalf of the stash".to_string()
             }
             Self::RemoveProxyAccount { account: None } => {
                 "Remove a proxy account".to_string()

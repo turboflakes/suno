@@ -1,7 +1,7 @@
 use crate::layout::centered_area;
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Alignment, Rect},
     style::Style,
     widgets::{Block, Clear, Paragraph, StatefulWidget, Widget},
 };
@@ -15,6 +15,8 @@ pub struct ScannerWidget<'a> {
     block: Option<Block<'a>>,
     title: &'a str,
     title_style: Style,
+    helper: &'a str,
+    helper_style: Style,
     style: Style,
     filter: FilterType,
 }
@@ -26,6 +28,8 @@ impl<'a> ScannerWidget<'a> {
             block: None,
             title: "",
             title_style: Style::default(),
+            helper: "",
+            helper_style: Style::default(),
             style: Style::default(),
             filter: FilterType::Nearest,
         }
@@ -46,6 +50,18 @@ impl<'a> ScannerWidget<'a> {
     /// Title text style to display above the QR code scanner.
     pub fn set_title_style(mut self, style: Style) -> Self {
         self.title_style = style;
+        self
+    }
+
+    /// Helper text to display below the QR code scanner .
+    pub fn set_helper(mut self, helper: &'a str) -> Self {
+        self.helper = helper;
+        self
+    }
+
+    /// Helper text style to display below the QR code scanner.
+    pub fn set_helper_style(mut self, style: Style) -> Self {
+        self.helper_style = style;
         self
     }
 
@@ -74,10 +90,20 @@ impl Widget for ScannerWidget<'_> {
 
         buf.set_style(inner, self.style);
 
+        // Reserve a row below the image for the helper text.
+        let image_area = if self.helper.is_empty() {
+            inner
+        } else {
+            Rect {
+                height: inner.height.saturating_sub(1),
+                ..inner
+            }
+        };
+
         let fitted = self
             .protocol
-            .size_for(Resize::Fit(Some(self.filter)), inner.as_size());
-        let centered = centered_area(inner, fitted.width, fitted.height);
+            .size_for(Resize::Fit(Some(self.filter)), image_area.as_size());
+        let centered = centered_area(image_area, fitted.width, fitted.height);
 
         // Set the title if it's not empty. Just above the centered image.
         if !self.title.is_empty() {
@@ -91,6 +117,22 @@ impl Widget for ScannerWidget<'_> {
             Paragraph::new(self.title)
                 .style(self.title_style)
                 .render(title_area, buf);
+        }
+
+        // Set the helper text just below the centered image.
+        if !self.helper.is_empty() {
+            let helper_area = Rect {
+                x: centered.x,
+                y: centered.y + centered.height,
+                width: centered.width,
+                height: 1,
+            };
+            if helper_area.bottom() <= inner.bottom() {
+                Paragraph::new(self.helper)
+                    .alignment(Alignment::Right)
+                    .style(self.helper_style)
+                    .render(helper_area, buf);
+            }
         }
 
         Clear.render(centered, buf);

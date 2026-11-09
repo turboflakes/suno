@@ -136,7 +136,7 @@ pub enum InputAction {
     Delete,
     CursorLeft,
     CursorRight,
-    Editing,
+    Editing(Option<char>),
     Unfocus,
     Lock,
     Paste(String),

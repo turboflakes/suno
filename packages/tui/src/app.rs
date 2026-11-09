@@ -328,13 +328,17 @@ impl App {
             return;
         }
         match action {
-            InputAction::Editing => {
+            InputAction::Editing(start_char) => {
                 if self.popup.set_input_focus() {
                     self.focus = Focus::Input;
                 }
+                if let Some(new_char) = start_char {
+                    self.popup.insert_input_char(new_char);
+                }
             }
             InputAction::Unfocus => {
-                self.popup.clear_input_focus();
+                self.popup.leave_input();
+                self.preview_theme_selection();
                 self.focus = Focus::Popup;
             }
             InputAction::Lock => {
@@ -357,8 +361,16 @@ impl App {
                 self.popup.delete_input_char();
                 self.preview_theme_selection();
             }
-            InputAction::CursorLeft => self.popup.move_cursor_left(),
-            InputAction::CursorRight => self.popup.move_cursor_right(),
+            InputAction::CursorLeft => {
+                if !self.switch_popup_target(false) {
+                    self.popup.move_cursor_left();
+                }
+            }
+            InputAction::CursorRight => {
+                if !self.switch_popup_target(true) {
+                    self.popup.move_cursor_right();
+                }
+            }
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::PasteClipboard => {
@@ -372,6 +384,80 @@ impl App {
                     self.focus = Focus::Input;
                 }
             }
+        }
+    }
+
+    /// Shows the commands of the next or the previous chain, validator or collator while the
+    /// commands of one are displayed and nothing was typed yet.
+    fn switch_popup_target(&mut self, down: bool) -> bool {
+        if !self.popup.is_input_empty() {
+            return false;
+        }
+
+        let shown = if self.popup.is_chain_menu() && self.section == Section::Chains {
+            self.move_chain_selection(down);
+            self.show_chain_popup()
+        } else if self.popup.is_validator_menu()
+            && self.data_section() == Section::Validators
+            && self.validators.is_active()
+        {
+            self.move_validator_selection(down);
+            let shown = self.show_validator_popup();
+            if !shown {
+                // Keep the selection on the validator the commands belong to
+                // TODO: If there are other validators with proxy further down the list it should select
+                // the next one with proxy
+                self.move_validator_selection(!down);
+            }
+            shown
+        } else if self.popup.is_collator_menu()
+            && self.data_section() == Section::Collators
+            && self.collators.is_active()
+        {
+            self.move_collator_selection(down);
+            let shown = self.show_collator_popup();
+            if !shown {
+                self.move_collator_selection(!down);
+            }
+            shown
+        } else {
+            false
+        };
+
+        if !shown {
+            return false;
+        }
+        // Showing the commands resets the input, so the focus is set again as it was
+        let was_focused = self.focus == Focus::Input;
+        if was_focused && self.popup.set_input_focus() {
+            self.focus = Focus::Input;
+        } else {
+            self.focus = Focus::Popup;
+        }
+        true
+    }
+
+    fn move_chain_selection(&mut self, down: bool) {
+        if down {
+            self.chains.move_down();
+        } else {
+            self.chains.move_up();
+        }
+    }
+
+    fn move_validator_selection(&mut self, down: bool) {
+        if down {
+            self.validators.move_down();
+        } else {
+            self.validators.move_up();
+        }
+    }
+
+    fn move_collator_selection(&mut self, down: bool) {
+        if down {
+            self.collators.move_down();
+        } else {
+            self.collators.move_up();
         }
     }
 
@@ -393,7 +479,7 @@ impl App {
             FilterAction::CursorRight => self.edit_filter(|input| input.move_cursor_right()),
             FilterAction::Paste(data) => self.edit_filter(|input| input.paste_data(data)),
             FilterAction::Select => {
-                self.edit_filter(|input| input.clear_focus());
+                self.edit_filter(|input| input.unfocus());
                 self.focus = Focus::Main;
                 // The lists get the focus back, with the first row that matches highlighted
                 self.update_active_section();
@@ -1840,7 +1926,7 @@ impl App {
         self.popup.show_theme_menu(names, active_name);
 
         // Dispatch focus to the input field so typing filters and up/down/enter/esc navigate.
-        let _ = self.tx.send(Action::Input(InputAction::Editing));
+        let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
     }
 
     /// Enter on a popup that is not editing the input.
@@ -2179,76 +2265,86 @@ impl App {
         }
     }
 
-    /// Open menu popup
+    /// Shows the commands of the validator selected.
+    fn show_validator_popup(&mut self) -> bool {
+        if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
+            return false;
+        }
+        let Some(validator) = self.validators.get_selected() else {
+            return false;
+        };
+        let Some(chain) = self.chains.get_chain_by_runtime(
+            validator
+                .runtime()
+                .asset_hub_runtime()
+                .expect("every relay has an Asset Hub chain"),
+        ) else {
+            return false;
+        };
+        let Some(active_era) = chain.era() else {
+            return false;
+        };
+        self.popup
+            .show_validator_commands(&validator, active_era.index());
+        true
+    }
+
+    /// Shows the commands of the collator selected.
+    fn show_collator_popup(&mut self) -> bool {
+        if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
+            return false;
+        }
+        let Some(collator) = self.collators.get_selected() else {
+            return false;
+        };
+        self.popup.show_collator_commands(&collator);
+        true
+    }
+
+    /// Shows the commands of the chain selected.
+    fn show_chain_popup(&mut self) -> bool {
+        let Some(chain) = self.chains.get_selected() else {
+            return false;
+        };
+        self.popup.show_chain_commands(&chain);
+        true
+    }
+
+    /// Shows the commands of the proxy selected.
+    fn show_proxy_popup(&mut self) -> bool {
+        let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
+            return false;
+        };
+        self.popup.show_proxy_commands(&proxy);
+        true
+    }
+
+    /// Open popup depending on the selected pane section.
     pub fn open_popup(&mut self) {
         if self.popup.is_visible() {
             return;
         }
 
-        if self.data_section() == Section::Validators && self.validators.is_active() {
-            if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
-                return;
-            }
-
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
-
-            let Some(chain) = self.chains.get_chain_by_runtime(
-                validator
-                    .runtime()
-                    .asset_hub_runtime()
-                    .expect("every relay has an AssetHub chain"),
-            ) else {
-                return;
-            };
-
-            let Some(active_era) = chain.era() else {
-                return;
-            };
-
-            self.popup
-                .show_validator_commands(&validator, active_era.index());
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        if self.data_section() == Section::Validators
+            && self.validators.is_active()
+            && self.show_validator_popup()
+        {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
 
-        if self.data_section() == Section::Collators && self.collators.is_active() {
-            if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
-                return;
-            }
-
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            self.popup.show_collator_commands(&collator);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        if self.data_section() == Section::Collators
+            && self.collators.is_active()
+            && self.show_collator_popup()
+        {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
 
-        if self.section == Section::Chains && self.chains.is_active() {
-            let Some(chain) = self.chains.get_selected() else {
-                return;
-            };
-
-            self.popup.show_chain_commands(&chain);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        if self.section == Section::Chains && self.chains.is_active() && self.show_chain_popup() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
 
-        if self.section == Section::Proxies && self.proxies.is_active() {
-            let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
-                return;
-            };
-
-            self.popup.show_proxy_commands(&proxy);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+        if self.section == Section::Proxies && self.proxies.is_active() && self.show_proxy_popup() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
     }
 
@@ -2265,7 +2361,7 @@ impl App {
         if ctx.runtime.is_qrcode_enabled() {
             let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
         } else {
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         }
     }
 
@@ -3345,8 +3441,35 @@ impl App {
             }
         }
 
+        // The popups opened from a command menu go back to it
+        if matches!(
+            self.popup.get_mode(),
+            PopupMode::ScanAccount
+                | PopupMode::Confirmation
+                | PopupMode::ChainSpecs
+                | PopupMode::Metadata
+        ) && self.show_previous_popup()
+        {
+            self.focus = Focus::Popup;
+            return;
+        }
+
         if self.popup.can_close() {
             self.close_popup();
+        }
+    }
+
+    /// Shows again the commands popup of the selected section, the one the current popup was
+    /// opened from.
+    fn show_previous_popup(&mut self) -> bool {
+        match self.section {
+            Section::Chains => self.show_chain_popup(),
+            Section::Proxies => self.show_proxy_popup(),
+            _ => match self.data_section() {
+                Section::Validators => self.show_validator_popup(),
+                Section::Collators => self.show_collator_popup(),
+                _ => false,
+            },
         }
     }
 

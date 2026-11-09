@@ -259,10 +259,10 @@ mod tests {
         let mut list = list();
         let stash = AccountId32::from([9; 32]);
 
-        let key = list.add_pinned(SupportedRuntime::AssetHubKusama, stash.clone());
+        let key = list.add_pinned(SupportedRuntime::AssetHubKusama, stash);
         assert!(key.is_some());
         assert!(list
-            .add_pinned(SupportedRuntime::AssetHubKusama, stash.clone())
+            .add_pinned(SupportedRuntime::AssetHubKusama, stash)
             .is_none());
 
         // Only the pinned ones are persisted, not the ones of the config

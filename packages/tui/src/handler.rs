@@ -128,7 +128,19 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('f') => Action::Validator(ValidatorAction::SubmitChangeCommission),
         // KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
-        KeyCode::Tab => Action::Input(InputAction::Editing),
+        KeyCode::Tab => Action::Input(InputAction::Editing(None)),
+        // Typing letters or digits, focus and starts input editing
+        KeyCode::Char(c)
+            if c.is_alphanumeric()
+                && !key_event
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            Action::Input(InputAction::Editing(Some(c)))
+        }
+        // The chain of the commands shown is switched without focusing the input
+        KeyCode::Left => Action::Input(InputAction::CursorLeft),
+        KeyCode::Right => Action::Input(InputAction::CursorRight),
         // The features popup: select a feature, switch it on or off, or back to the config file
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
