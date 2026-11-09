@@ -408,6 +408,9 @@ impl Call {
 
 fn parse_address(address: &str) -> Result<AccountId32, CallError> {
     let address = address.trim();
+    if address.is_empty() {
+        return Err(CallError::MissingArgumentSilent);
+    }
     AccountId32::from_str(address).map_err(|_| CallError::InvalidAddress(address.to_string()))
 }
 
