@@ -21,7 +21,11 @@ use crate::{
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::str::{from_utf8, FromStr};
-use std::{collections::HashSet, io, thread, time::Duration};
+use std::{
+    collections::HashSet,
+    io, thread,
+    time::{Duration, Instant},
+};
 use subxt::{utils::AccountId32, OnlineClient, OnlineClientAtBlock};
 use suno_actions::{
     Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, FilterAction,
@@ -60,6 +64,9 @@ pub type AppResult<T> = std::result::Result<T, Error>;
 /// The tick rate at 100 ms represents 10 FPS
 const TICK_RATE: u64 = 100;
 
+/// How long the second key of a chord is awaited.
+const CHORD_TIMEOUT: Duration = Duration::from_secs(6);
+
 /// Application active focus.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Focus {
@@ -69,6 +76,7 @@ pub enum Focus {
     Filter,  // Typing filters the list of the window displayed
     Scanner, // Esc/Tab change mode state
     Popup,   // Esc/Tab change mode state
+    Chord,   // The key after `ctrl+x` is awaited
     None,    // Nothing is selected, after `esc` clears the selections
 }
 
@@ -83,6 +91,9 @@ pub struct App {
     pub running: bool,
     /// Application active focus, useful to determine how to handle keyboard events.
     pub focus: Focus,
+    /// The focus to get back to, and when the chord started, while the key that completes it
+    /// is awaited.
+    chord: Option<(Focus, Instant)>,
     /// The current selected window.
     pub window: Window,
     /// The current selected section.
@@ -150,6 +161,7 @@ impl App {
         Self {
             running: true,
             focus: Focus::default(),
+            chord: None,
             window: Window::first(CONFIG.features()),
             // Starts on the tabs of the main window, with the first window enabled displayed
             section: Section::None,
@@ -299,12 +311,15 @@ impl App {
             NavigationAction::ToggleMask => self.toggle_mask(),
             NavigationAction::ToggleView => self.toggle_view(),
             NavigationAction::TogglePin => self.toggle_pin(),
+            NavigationAction::StartChord => self.start_chord(),
+            NavigationAction::EndChord => self.end_chord(),
         }
     }
 
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
+            PopupAction::OpenCall(call) => self.open_call_popup(*call),
             PopupAction::OpenThemeMenu => self.open_theme_menu(),
             PopupAction::OpenFeatures => self.open_features(),
             PopupAction::ToggleFeature => self.toggle_feature(),
@@ -1641,6 +1656,8 @@ impl App {
 
     /// Handles the tick event of the terminal.
     pub fn tick(&mut self) {
+        self.expire_chord();
+
         if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
             self.popup.advance_metadata_frame();
         }
@@ -2375,6 +2392,67 @@ impl App {
         true
     }
 
+    /// Waits for the key that completes the chord, unless something else has the keys.
+    fn start_chord(&mut self) {
+        if self.popup.is_visible() || !matches!(self.focus, Focus::Main | Focus::None) {
+            return;
+        }
+        self.chord = Some((self.focus.clone(), Instant::now()));
+        self.focus = Focus::Chord;
+    }
+
+    /// Ends the chord when its second key doesn't come in time.
+    fn expire_chord(&mut self) {
+        if self
+            .chord
+            .as_ref()
+            .is_some_and(|(_, started)| started.elapsed() >= CHORD_TIMEOUT)
+        {
+            self.end_chord();
+        }
+    }
+
+    /// Gives the keys back to where they were when the chord started.
+    fn end_chord(&mut self) {
+        if let Some((focus, _)) = self.chord.take() {
+            self.focus = focus;
+        }
+    }
+
+    /// Opens the commands of the chain where the `call` runs, with its command typed.
+    fn open_call_popup(&mut self, call: Call) {
+        self.end_chord();
+        if self.popup.is_visible() {
+            return;
+        }
+        let features = CONFIG.features();
+        let filter: fn(SupportedRuntime) -> bool = match call {
+            Call::AddValidator { .. } if features.validators_enabled() => |r| r.is_asset_hub(),
+            Call::AddNominator { .. } if features.nominators_enabled() => |r| r.is_asset_hub(),
+            Call::AddCollator { .. } if features.collators_enabled() => |r| r.is_para_chain(),
+            Call::AddProxyAccount { .. } => |r| r.is_para_chain(),
+            _ => return,
+        };
+        self.set_section(Section::Chains);
+        if self.show_first_chain_popup(filter) {
+            self.type_command(&call);
+        }
+    }
+
+    /// Types the command of the `call` in the popup.
+    fn type_command(&self, call: &Call) {
+        let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        for c in call.to_string().chars() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(Some(c))));
+        }
+    }
+
+    /// Shows the commands of the first chain accepted by `filter`, e.g. to add the first account
+    /// of a section which is empty.
+    fn show_first_chain_popup(&mut self, filter: impl Fn(SupportedRuntime) -> bool) -> bool {
+        self.chains.select_first_where(filter).is_some() && self.show_chain_popup()
+    }
+
     /// Shows the commands of the proxy selected.
     fn show_proxy_popup(&mut self) -> bool {
         let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
@@ -2418,6 +2496,35 @@ impl App {
         if self.section == Section::Proxies && self.proxies.is_active() && self.show_proxy_popup() {
             let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
+
+        // An empty section has no node to show the commands of, so the ones of the chain where
+        // its nodes are added are shown, with the command to add the first one typed
+        if !self.popup.is_visible() {
+            let command = match self.data_section() {
+                Section::Validators
+                    if self.validators.is_active() && self.validators.get_selected().is_none() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_asset_hub())
+                        .then_some(Call::AddValidator { stash: None })
+                }
+                Section::Collators
+                    if self.collators.is_active() && self.collators.get_selected().is_none() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_para_chain())
+                        .then_some(Call::AddCollator { stash: None })
+                }
+                Section::Nominators
+                    if self.nominators.is_active() && self.nominators.is_empty() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_asset_hub())
+                        .then_some(Call::AddNominator { stash: None })
+                }
+                _ => None,
+            };
+            if let Some(command) = command {
+                self.type_command(&command);
+            }
+        }
 
         // Without anything focused, the commands of the first chain are the ones who become visible
         if self.focus == Focus::None

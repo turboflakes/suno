@@ -151,6 +151,10 @@ const CUSTOM_COMMANDS: &[HelpEntry] = &[
 const KEYBINDINGS: &[HelpEntry] = &[
     ("ctrl+e or / ", "Show commands."),
     (
+        "ctrl+x v/n/c/p ",
+        "Add a validator, nominator, collator or proxy account. Press ctrl+x, then the key within 6 seconds.",
+    ),
+    (
         "left/right ",
         "Switch the chain, validators, collators while its commands are shown.",
     ),

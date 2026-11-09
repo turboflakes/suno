@@ -58,6 +58,7 @@ impl Theme {
             paragraph: Paragraph {
                 base: Style::new().fg(p.color_01),
                 base_active: Style::new().fg(p.color_00),
+                base_italic: Style::new().fg(p.color_01).add_modifier(Modifier::ITALIC),
                 header: Style::new().fg(p.color_13),
                 header_active: Style::new().fg(p.color_14).add_modifier(Modifier::BOLD),
                 label: Style::new().fg(p.color_04),
@@ -187,6 +188,7 @@ impl Table {
 pub struct Paragraph {
     pub base: Style,
     pub base_active: Style,
+    pub base_italic: Style,
     pub header: Style,
     pub header_active: Style,
     pub label: Style,

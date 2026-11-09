@@ -305,6 +305,38 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let mut legend = vec![];
 
+    // The keys that complete the chord started with `ctrl+x`
+    if app.focus == Focus::Chord {
+        let features = CONFIG.features();
+        let mut keys = Vec::new();
+        if features.validators_enabled() {
+            keys.push(("v", "validator"));
+        }
+        if features.nominators_enabled() {
+            keys.push(("n", "nominator"));
+        }
+        if features.collators_enabled() {
+            keys.push(("c", "collator"));
+        }
+        keys.push(("p", "proxy"));
+        keys.push(("esc", "cancel"));
+        for (i, (key, label)) in keys.into_iter().enumerate() {
+            if i > 0 {
+                legend.push(Span::raw("   "));
+            }
+            legend.push(Span::styled(key.to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(label.to_string(), theme.paragraph.label));
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(legend))
+                .block(block)
+                .right_aligned(),
+            area,
+        );
+        return;
+    }
+
     // Esc clears the selection without changing the section, so ask the lists, not the section
     let has_selection = app.chains.is_active()
         || app.proxies.is_active()

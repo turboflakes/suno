@@ -91,7 +91,13 @@ impl StatefulWidget for ValidatorsCompactWidget {
         if rows.len().is_zero() {
             rows.push(Row::new(vec![
                 Text::from(""),
-                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+                Text::from(Line::from(vec![
+                    Span::styled("-- ", theme.paragraph.label_italic),
+                    Span::styled("ctrl+x v", theme.paragraph.base_italic),
+                    Span::raw(" "),
+                    Span::styled("add a validator", theme.paragraph.label_italic),
+                    Span::styled(" --", theme.paragraph.label_italic),
+                ])),
             ]));
         }
 

@@ -78,6 +78,8 @@ pub enum NavigationAction {
     ToggleMask,
     ToggleView,
     TogglePin,
+    StartChord,
+    EndChord,
 }
 
 type SpecVersion = u32;
@@ -118,6 +120,7 @@ pub enum PopupAction {
     Open,
     OpenThemeMenu,
     OpenFeatures,
+    OpenCall(Box<Call>),
     Confirm,
     ToggleFeature,
     ResetFeature,
