@@ -419,7 +419,7 @@ mod tests {
         proxy.track_nominator(&staking);
         assert_eq!(proxy.usage.collators, 1);
         assert_eq!(proxy.usage.nominators, 1);
-        assert_eq!(proxy.usage.short(), "2V 1C 1N");
+        assert_eq!(proxy.usage.short(), "2v 1c 1n");
         assert_eq!(
             proxy.usage.to_string(),
             "2 validators (S, SO), 1 collators (C), 1 nominators (S, SO)"
