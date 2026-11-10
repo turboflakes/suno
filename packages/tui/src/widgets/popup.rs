@@ -1166,6 +1166,9 @@ impl Popup {
         if let Some(state) = self.get_selected_feature() {
             items.push(("space", state.toggle_label()));
         }
+        if CONFIG.pending_restart() {
+            items.push(("enter", "restart"));
+        }
         items.push(("↑ ↓", "select"));
         items.push(("esc", "close"));
         items
@@ -1371,7 +1374,7 @@ impl Popup {
         };
 
         let rows = ctx.states.iter().map(|state| {
-            let mark = if state.pending_restart() {
+            let msg = if state.pending_restart() {
                 "restart required"
             } else if state.changed {
                 "overridden"
@@ -1384,7 +1387,10 @@ impl Popup {
                 Cell::from(state.feature.key()),
                 Cell::from(state.feature.scope().to_string()),
                 Cell::from(state.feature.description()),
-                Cell::from(Line::from(mark).alignment(Alignment::Right)),
+                Cell::from(
+                    Line::from(Span::styled(msg, theme.paragraph.base_italic))
+                        .alignment(Alignment::Right),
+                ),
                 Cell::from(""),
             ])
         });

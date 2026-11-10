@@ -517,6 +517,12 @@ impl Config {
             .collect()
     }
 
+    /// Whether any feature was saved with a value that only applies once the app is started
+    /// again, meaning it differs from the value in use right now.
+    pub fn pending_restart(&self) -> bool {
+        self.feature_states().iter().any(|s| s.pending_restart())
+    }
+
     /// Applies what was changed from the TUI, over what the config file sets: the last theme
     /// selected, if any, and the features.
     fn apply_prefs(&mut self) {

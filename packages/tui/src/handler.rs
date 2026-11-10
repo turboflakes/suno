@@ -167,7 +167,6 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // The chain of the commands shown is switched without focusing the input
         KeyCode::Left => Action::Input(InputAction::CursorLeft),
         KeyCode::Right => Action::Input(InputAction::CursorRight),
-        // The features popup: select a feature, switch it on or off, or back to the config file
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
         KeyCode::Char(' ') => Action::Popup(PopupAction::ToggleFeature),

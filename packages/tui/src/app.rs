@@ -20,10 +20,14 @@ use crate::{
 };
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::str::{from_utf8, FromStr};
 use std::{
     collections::HashSet,
-    io, thread,
+    env::{args_os, current_exe},
+    io,
+    path::PathBuf,
+    process::Command,
+    str::{from_utf8, FromStr},
+    thread,
     time::{Duration, Instant},
 };
 use subxt::{utils::AccountId32, OnlineClient, OnlineClientAtBlock};
@@ -89,6 +93,8 @@ pub enum ThreadControl {
 pub struct App {
     /// Is the application running?
     pub running: bool,
+    /// Should the application be relaunched once the terminal is restored?
+    pub restart: bool,
     /// Application active focus, useful to determine how to handle keyboard events.
     pub focus: Focus,
     /// The focus to get back to, and when the chord started, while the key that completes it
@@ -160,6 +166,7 @@ impl App {
 
         Self {
             running: true,
+            restart: false,
             focus: Focus::default(),
             chord: None,
             window: Window::first(CONFIG.features()),
@@ -219,6 +226,8 @@ impl App {
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
+        // Resolve the binary before it can be replaced by an upgrade
+        let binary = current_exe().ok();
         // Initialize async widgets
         self.init().await;
         // Initialize the terminal user interface.
@@ -243,6 +252,29 @@ impl App {
 
         // Exit the user interface.
         tui.exit()?;
+
+        // Check if restart is scheduled and relaunch the application.
+        if self.restart {
+            if let Some(binary) = binary {
+                Self::relaunch(binary)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Replaces the current process with a fresh instance of the (upgraded) binary.
+    #[cfg(unix)]
+    fn relaunch(exe: PathBuf) -> AppResult<()> {
+        use std::os::unix::process::CommandExt;
+        // `exec` only returns on failure
+        let err = Command::new(exe).args(args_os().skip(1)).exec();
+        Err(err.into())
+    }
+
+    /// Spawns a fresh instance of the (upgraded) binary and lets the current one exit.
+    #[cfg(not(unix))]
+    fn relaunch(exe: PathBuf) -> AppResult<()> {
+        Command::new(exe).args(args_os().skip(1)).spawn()?;
         Ok(())
     }
 
@@ -1667,7 +1699,8 @@ impl App {
             }
             UpdateAction::Complete => {
                 self.popup
-                    .show_upgrade_complete("upgrade complete, restart to apply");
+                    .show_upgrade_complete("upgrade complete, restarting");
+                self.restart();
             }
             UpdateAction::Error => {
                 self.popup.show_upgrade_error();
@@ -1720,6 +1753,12 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    /// Set restart to true to relaunch the application on quit.
+    pub fn restart(&mut self) {
+        self.restart = true;
+        self.quit();
     }
 
     /// Moves row selection up.
@@ -1978,8 +2017,8 @@ impl App {
 
     /// Enter on a popup that is not editing the input.
     fn confirm_popup(&mut self) {
-        if self.popup.get_mode() == PopupMode::Features {
-            self.toggle_feature();
+        if self.popup.get_mode() == PopupMode::Features && CONFIG.pending_restart() {
+            self.restart();
         }
     }
 
