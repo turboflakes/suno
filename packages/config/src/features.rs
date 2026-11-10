@@ -119,8 +119,8 @@ impl Feature {
             Self::ShowAllValidators
             | Self::ShowNominatorsCounter
             | Self::ShowNominatorsStake
-            | Self::ShowOwnStake
             | Self::ShowCommission => &[Validators],
+            Self::ShowOwnStake => &[Validators, Nominators],
             Self::ShowPayee => &[Validators, Nominators],
             Self::ShowKeys => &[Validators, Collators],
             Self::ShowAllCollators
@@ -155,7 +155,7 @@ impl Feature {
             Self::ShowAllValidators => "Display all on-chain validators, active or waiting",
             Self::ShowNominatorsCounter => "Display the number of nominators",
             Self::ShowNominatorsStake => "Display the nominator's total stake",
-            Self::ShowOwnStake => "Display the validator's own stake",
+            Self::ShowOwnStake => "Display the own stake, and the amount bonded when it differs",
             Self::ShowCommission => "Display the validator's commission",
             Self::ShowPayee => "Display the reward destination",
             Self::ShowKeys => "Display the session keys",
@@ -379,8 +379,8 @@ mod tests {
     #[test]
     fn the_short_scope_names_are_only_used_with_multiple_scopes() {
         assert_eq!(Feature::ShowCommission.scopes_label(), "validators");
-        assert_eq!(Feature::ShowPayee.scopes_label(), "val, nom");
-        assert_eq!(Feature::ShowKeys.scopes_label(), "val, col");
+        assert_eq!(Feature::ShowPayee.scopes_label(), "val,nom");
+        assert_eq!(Feature::ShowKeys.scopes_label(), "val,col");
     }
 
     #[test]

@@ -2,7 +2,7 @@ use crate::{
     account::{Account, AccountDisplay},
     identity::Identity,
     key::AccountKey,
-    origin::Origin,
+    origin::{Origin, Origins},
     proxy::{proxies_to_string, ProxyKey},
     staking::{Nominations, Payee, StakeLedger},
 };
@@ -15,8 +15,8 @@ use suno_config::SupportedRuntime;
 pub struct Nominator {
     /// Stash account that nominates validators.
     pub account: Account,
-    /// The origin of the nominator, e.g. whether it's listed in the config or pinned from the UI.
-    pub origin: Origin,
+    /// Every place the nominator is listed from, e.g. the config and also pinned from the UI.
+    pub origins: Origins,
     /// The nominations made by the nominator.
     pub nominations: Option<Nominations>,
     /// Stake ledger of the nominator.
@@ -31,7 +31,7 @@ impl Nominator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
             account: Account::new(runtime, stash),
-            origin: Origin::Config,
+            origins: Origins::new(Origin::Config),
             nominations: None,
             ledger: StakeLedger::default(),
             payee: Payee::None,
@@ -41,7 +41,7 @@ impl Nominator {
 
     pub fn with_origin(runtime: SupportedRuntime, stash: AccountId32, origin: Origin) -> Self {
         Self {
-            origin,
+            origins: Origins::new(origin),
             ..Self::new(runtime, stash)
         }
     }
@@ -59,7 +59,7 @@ impl Nominator {
     }
 
     pub fn is_tracked(&self) -> bool {
-        self.origin.is_tracked()
+        self.origins.is_tracked()
     }
 
     pub fn is_nominating(&self) -> bool {
@@ -75,6 +75,26 @@ impl Nominator {
 
     pub fn proxies_as_str(&self) -> String {
         proxies_to_string(&self.proxies)
+    }
+
+    /// The stake being unbonded, which can't be withdrawn yet at `era`.
+    pub fn unlocking(&self, era: u32) -> u128 {
+        self.ledger
+            .unlocking()
+            .iter()
+            .filter(|c| c.era > era)
+            .map(|c| c.value)
+            .sum()
+    }
+
+    /// The stake unbonded, which can be withdrawn at `era`.
+    pub fn unlocked(&self, era: u32) -> u128 {
+        self.ledger
+            .unlocking()
+            .iter()
+            .filter(|c| c.era <= era)
+            .map(|c| c.value)
+            .sum()
     }
 
     pub fn targets_count(&self) -> usize {
@@ -97,6 +117,7 @@ impl AccountDisplay for Nominator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::staking::Chunk;
 
     fn nominator() -> Nominator {
         Nominator::new(SupportedRuntime::AssetHubKusama, AccountId32::from([1; 32]))
@@ -105,7 +126,7 @@ mod tests {
     #[test]
     fn a_new_nominator_is_listed_from_the_config_and_nominates_nothing() {
         let nominator = nominator();
-        assert_eq!(nominator.origin, Origin::Config);
+        assert_eq!(nominator.origins, Origins::new(Origin::Config));
         assert!(nominator.is_tracked());
         assert!(!nominator.is_nominating());
         assert_eq!(nominator.targets_count(), 0);
@@ -124,12 +145,24 @@ mod tests {
     }
 
     #[test]
+    fn the_stake_is_unlocking_until_its_era_and_unlocked_after() {
+        let mut nominator = nominator();
+        nominator.ledger = StakeLedger::new(100, 160, vec![Chunk::new(10, 20), Chunk::new(12, 40)]);
+        assert_eq!(nominator.unlocking(9), 60);
+        assert_eq!(nominator.unlocked(9), 0);
+        assert_eq!(nominator.unlocking(10), 40);
+        assert_eq!(nominator.unlocked(10), 20);
+        assert_eq!(nominator.unlocking(12), 0);
+        assert_eq!(nominator.unlocked(12), 60);
+    }
+
+    #[test]
     fn the_origin_can_be_chosen() {
         let nominator = Nominator::with_origin(
             SupportedRuntime::AssetHubKusama,
             AccountId32::from([1; 32]),
             Origin::Pinned,
         );
-        assert_eq!(nominator.origin, Origin::Pinned);
+        assert_eq!(nominator.origins, Origins::new(Origin::Pinned));
     }
 }

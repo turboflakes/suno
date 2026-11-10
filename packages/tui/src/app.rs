@@ -1907,6 +1907,7 @@ impl App {
         match (&self.section, self.window) {
             (Section::None, Window::Validators) => Section::Validators,
             (Section::None, Window::Collators) => Section::Collators,
+            (Section::None, Window::Nominators) => Section::Nominators,
             (Section::None, _) => self.main_section.clone(),
             (section, _) => section.clone(),
         }
@@ -1934,8 +1935,10 @@ impl App {
             self.main_section = match self.section {
                 Section::Validators => Section::Validators,
                 Section::Collators => Section::Collators,
+                Section::Nominators => Section::Nominators,
                 _ if features.validators_enabled() => Section::Validators,
                 _ if features.collators_enabled() => Section::Collators,
+                _ if features.nominators_enabled() => Section::Nominators,
                 _ => Section::Chains,
             };
         }
@@ -1943,6 +1946,7 @@ impl App {
         match section {
             Section::Validators => self.window = Window::Validators,
             Section::Collators => self.window = Window::Collators,
+            Section::Nominators => self.window = Window::Nominators,
             _ => {}
         }
         if matches!(
@@ -1979,13 +1983,13 @@ impl App {
         };
         let validators_focus = focus_of(data_section == Section::Validators);
         let collators_focus = focus_of(data_section == Section::Collators);
+        let nominators_focus = focus_of(data_section == Section::Nominators);
 
         self.chains.set_active(self.section == Section::Chains);
         self.proxies.set_active(self.section == Section::Proxies);
-        self.nominators
-            .set_active(self.section == Section::Nominators);
         self.validators.set_focus(validators_focus);
         self.collators.set_focus(collators_focus);
+        self.nominators.set_focus(nominators_focus);
 
         // Selecting a section brings back the focus to the main
         if self.focus == Focus::None {
@@ -2015,6 +2019,7 @@ impl App {
             (Section::None, _) => self.update_active_section(),
             (_, Window::Validators) => self.set_section(Section::Validators),
             (_, Window::Collators) => self.set_section(Section::Collators),
+            (_, Window::Nominators) => self.set_section(Section::Nominators),
             _ => {}
         }
     }
@@ -2486,7 +2491,7 @@ impl App {
         let Some(nominator) = self
             .nominators
             .get_selected()
-            .filter(|n| n.origin.is_pinned())
+            .filter(|n| n.origins.is_pinned())
         else {
             return false;
         };
@@ -3811,7 +3816,7 @@ impl App {
 
         self.chains.set_active(false);
         self.proxies.set_active(false);
-        self.nominators.set_active(false);
+        self.nominators.set_focus(ListFocus::None);
         self.validators.set_focus(ListFocus::None);
         self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();

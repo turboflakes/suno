@@ -10,6 +10,7 @@ use crate::widgets::logs::LogsWidget;
 use crate::widgets::nominators_compact::{
     compact_height as nominators_compact_height, NominatorsCompactWidget,
 };
+use crate::widgets::nominators_detailed_group::NominatorsDetailedGroupWidget;
 use crate::widgets::proxies_compact::{
     compact_height as proxies_compact_height, ProxiesCompactWidget,
 };
@@ -170,7 +171,9 @@ fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
     }
     // Switch between main body window.
     match app.window {
-        Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
+        Window::Validators | Window::Collators | Window::Nominators => {
+            render_body_widget(app, frame, body_area)
+        }
         Window::Logs => render_logs_widget(app, frame, body_area),
         Window::Help => render_help_widget(app, frame, body_area),
     }
@@ -298,6 +301,10 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 frame.render_stateful_widget(widget, block_area, &mut app.collators);
             }
         },
+        Window::Nominators => {
+            let widget = NominatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.nominators);
+        }
         _ => {
             let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
             frame.render_stateful_widget(widget, block_area, &mut app.validators);
@@ -393,7 +400,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             && app
                 .nominators
                 .get_selected()
-                .is_some_and(|n| n.origin.is_pinned()))
+                .is_some_and(|n| n.origins.is_pinned()))
         || app.chains.is_active()
         || (app.proxies.is_active()
             && app.proxies.get_selected().is_some_and(|p| p.is_removable())))

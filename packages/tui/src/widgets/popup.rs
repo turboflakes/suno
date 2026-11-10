@@ -502,7 +502,7 @@ impl Popup {
     fn init_nominator_menu(&mut self, ctx: &NominatorContext) {
         self.input.reset_as_command(None);
 
-        if ctx.nominator.origin.is_pinned() {
+        if ctx.nominator.origins.is_pinned() {
             self.options.push(Entry::new(Command::Instruction {
                 call: Call::RemoveNominator {
                     stash: Some(ctx.nominator.stash()),
