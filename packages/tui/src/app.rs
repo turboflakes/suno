@@ -107,6 +107,8 @@ pub struct App {
     /// The section whose rows are shown and selected on the main window, while the main
     /// window itself is the selected section.
     main_section: Section,
+    /// The pane of the left menu which takes the most space, the last one selected.
+    expanded_section: Option<Section>,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
     pub proxies: ProxiesList,
@@ -173,6 +175,7 @@ impl App {
             // Starts on the tabs of the main window, with the first window enabled displayed
             section: Section::None,
             main_section: Section::default(),
+            expanded_section: None,
             chains,
             proxies,
             nominators,
@@ -1909,6 +1912,20 @@ impl App {
         }
     }
 
+    /// The pane of the left menu which takes the most space: the one selected, otherwise the
+    /// last one that was, otherwise the one of the main window.
+    pub fn expanded_section(&self) -> Section {
+        match &self.section {
+            Section::Validators | Section::Collators | Section::Nominators | Section::Proxies => {
+                self.section.clone()
+            }
+            _ => self
+                .expanded_section
+                .clone()
+                .unwrap_or_else(|| self.data_section()),
+        }
+    }
+
     fn set_section(&mut self, section: Section) {
         if section.is_none() {
             // Keep showing the rows of the section the main window was reached from, falling
@@ -1927,6 +1944,12 @@ impl App {
             Section::Validators => self.window = Window::Validators,
             Section::Collators => self.window = Window::Collators,
             _ => {}
+        }
+        if matches!(
+            section,
+            Section::Validators | Section::Collators | Section::Nominators | Section::Proxies
+        ) {
+            self.expanded_section = Some(section.clone());
         }
         self.section = section;
         self.update_visible_lists();

@@ -506,16 +506,6 @@ impl ValidatorsList {
         self.scroll_offset = 0;
     }
 
-    /// Height needed by [`ValidatorsCompactWidget`] to display every validator without scrolling.
-    /// One row per validator and one extra row per distinct runtime group, and at least one row
-    /// for the empty set message.
-    pub fn total_compact_height(&self) -> u16 {
-        let tracked: Vec<&Validator> = self.validators_iter().filter(|v| v.is_tracked()).collect();
-        let runtimes: HashSet<SupportedRuntime> = tracked.iter().map(|v| v.runtime()).collect();
-        let rows = (tracked.len() + runtimes.len()).max(1);
-        3 + rows as u16
-    }
-
     /// The selected validator, only while its row is highlighted.
     pub fn get_highlighted_ref(&self) -> Option<&Validator> {
         self.is_highlighted().then(|| self.get_selected_ref())?

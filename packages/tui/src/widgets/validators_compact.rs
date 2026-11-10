@@ -8,7 +8,22 @@ use ratatui::{
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
 use sp_arithmetic::traits::Zero;
+use std::collections::HashSet;
 use suno_theme::Theme;
+
+/// The most rows displayed at once, the list scrolls past them.
+const MAX_ROWS: usize = 8;
+
+/// The height the compact list needs: the header, the chain names, the tracked validators, and
+/// the padding. At least one row is kept for the message of the empty set.
+pub fn compact_height(validators: &ValidatorsList) -> u16 {
+    let tracked: Vec<_> = validators
+        .validators_iter()
+        .filter(|v| v.is_tracked())
+        .collect();
+    let runtimes: HashSet<_> = tracked.iter().map(|v| v.runtime()).collect();
+    (tracked.len() + runtimes.len()).clamp(1, MAX_ROWS) as u16 + 3
+}
 
 #[derive(Debug, Default)]
 pub struct ValidatorsCompactWidget {

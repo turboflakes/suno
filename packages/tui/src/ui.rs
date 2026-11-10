@@ -1,6 +1,9 @@
 use crate::app::{App, Focus};
+use crate::section::Section;
 use crate::widgets::collators::CollatorsView;
-use crate::widgets::collators_compact::CollatorsCompactWidget;
+use crate::widgets::collators_compact::{
+    compact_height as collators_compact_height, CollatorsCompactWidget,
+};
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
@@ -10,7 +13,9 @@ use crate::widgets::nominators_compact::{
 use crate::widgets::proxies_compact::{
     compact_height as proxies_compact_height, ProxiesCompactWidget,
 };
-use crate::widgets::validators_compact::ValidatorsCompactWidget;
+use crate::widgets::validators_compact::{
+    compact_height as validators_compact_height, ValidatorsCompactWidget,
+};
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{help::HelpWidget, logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
@@ -43,40 +48,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
-    let validators_enabled = config.features.validators_enabled();
-    let collators_enabled = config.features.collators_enabled();
-    let nominators_enabled = config.features.nominators_enabled();
-
-    let validators_constraint = match (validators_enabled, collators_enabled) {
-        (true, true) => Constraint::Length(app.validators.total_compact_height()),
-        (true, false) => Constraint::Fill(1),
-        (false, _) => Constraint::Length(0),
-    };
-    let collators_constraint = if collators_enabled {
-        Constraint::Fill(1)
-    } else {
-        Constraint::Length(0)
-    };
-
-    let nominators_constraint = if nominators_enabled {
-        Constraint::Length(nominators_compact_height(&app.nominators))
-    } else {
-        Constraint::Length(0)
-    };
-
-    let proxies_constraint = if config.features.proxies_enabled() {
-        Constraint::Length(proxies_compact_height(&app.proxies))
-    } else {
-        Constraint::Length(0)
-    };
-
-    let constraints = vec![
-        Constraint::Length(3 + config.chains.len() as u16),
-        validators_constraint,
-        collators_constraint,
-        nominators_constraint,
-        proxies_constraint,
-    ];
+    let constraints = left_menu_constraints(app);
 
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -119,6 +91,61 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if app.popup.is_visible() {
         render_popup(app, frame, container[0]);
     }
+}
+
+/// The heights of the left menu: the chains, then the panes from top to bottom, each with the
+/// height its rows need. The ones not enabled take no space, and the expanded one takes the
+/// space left.
+fn left_menu_constraints(app: &App) -> Vec<Constraint> {
+    let config = CONFIG.clone();
+    let features = &config.features;
+    let panes = [
+        (
+            Section::Validators,
+            features.validators_enabled(),
+            validators_compact_height(&app.validators),
+        ),
+        (
+            Section::Collators,
+            features.collators_enabled(),
+            collators_compact_height(&app.collators),
+        ),
+        (
+            Section::Nominators,
+            features.nominators_enabled(),
+            nominators_compact_height(&app.nominators),
+        ),
+        (
+            Section::Proxies,
+            features.proxies_enabled(),
+            proxies_compact_height(&app.proxies),
+        ),
+    ];
+
+    // The expanded pane falls back to the first enabled one
+    let expanded = app.expanded_section();
+    let expanded = if panes
+        .iter()
+        .any(|(section, enabled, _)| *enabled && *section == expanded)
+    {
+        expanded
+    } else {
+        panes
+            .iter()
+            .find(|(_, enabled, _)| *enabled)
+            .map(|(section, _, _)| section.clone())
+            .unwrap_or_default()
+    };
+
+    let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
+    constraints.extend(panes.iter().map(|(section, enabled, height)| {
+        match (enabled, *section == expanded) {
+            (false, _) => Constraint::Length(0),
+            (true, true) => Constraint::Fill(1),
+            (true, false) => Constraint::Length(*height),
+        }
+    }));
+    constraints
 }
 
 fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
