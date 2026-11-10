@@ -1,6 +1,6 @@
 use crate::palette::Palette;
 use crate::themes::suno::SUNO_DARK_PALETTE;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 
 /// A trait for objects that have an active style.
 pub trait Themed {
@@ -54,6 +54,7 @@ impl Theme {
                 row_highlight_active: Style::new()
                     .bg(p.selection_background)
                     .fg(p.selection_foreground),
+                row_highlight_shade: Style::new().bg(shade(p.background, 16)),
             },
             paragraph: Paragraph {
                 base: Style::new().fg(p.color_01),
@@ -156,6 +157,7 @@ pub struct Table {
     pub header_active: Style,
     pub row_highlight: Style,
     pub row_highlight_active: Style,
+    pub row_highlight_shade: Style,
 }
 
 impl Table {
@@ -284,4 +286,65 @@ pub struct Qrcode {
     pub scanner: Style,
     pub title: Style,
     pub label: Style,
+}
+
+/// The color with its brightness lowered by `percent`, keeping its hue.
+fn darken(color: Color, percent: u16) -> Color {
+    let scale = |channel: u8| (channel as u16 * (100 - percent.min(100)) / 100) as u8;
+    match color {
+        Color::Rgb(r, g, b) => Color::Rgb(scale(r), scale(g), scale(b)),
+        _ => color,
+    }
+}
+
+/// The color with its brightness raised by `percent`, keeping its hue.
+fn lighten(color: Color, percent: u16) -> Color {
+    let scale = |channel: u8| {
+        let channel = channel as u16;
+        (channel + (255 - channel) * percent.min(100) / 100) as u8
+    };
+    match color {
+        Color::Rgb(r, g, b) => Color::Rgb(scale(r), scale(g), scale(b)),
+        _ => color,
+    }
+}
+
+/// Whether the color is dark, by its perceived brightness.
+fn is_dark(color: Color) -> bool {
+    match color {
+        Color::Rgb(r, g, b) => (299 * r as u32 + 587 * g as u32 + 114 * b as u32) / 1000 < 128,
+        _ => false,
+    }
+}
+
+/// A shade of the color which stands out from it by `percent`: lighter if the color is dark,
+/// darker otherwise.
+fn shade(color: Color, percent: u16) -> Color {
+    if is_dark(color) {
+        lighten(color, percent)
+    } else {
+        darken(color, percent)
+    }
+}
+
+#[cfg(test)]
+mod brightness_tests {
+    use super::*;
+
+    #[test]
+    fn a_color_is_darkened_and_lightened_by_a_percentage() {
+        assert_eq!(darken(Color::Rgb(200, 100, 0), 10), Color::Rgb(180, 90, 0));
+        assert_eq!(
+            lighten(Color::Rgb(200, 100, 0), 10),
+            Color::Rgb(205, 115, 25)
+        );
+        assert_eq!(lighten(Color::Rgb(0, 0, 0), 100), Color::Rgb(255, 255, 255));
+        assert_eq!(shade(Color::Rgb(0, 0, 0), 10), Color::Rgb(25, 25, 25));
+        assert_eq!(
+            shade(Color::Rgb(255, 255, 255), 10),
+            Color::Rgb(229, 229, 229)
+        );
+        assert_eq!(darken(Color::Red, 10), Color::Red);
+        assert_eq!(lighten(Color::Red, 10), Color::Red);
+    }
 }

@@ -149,7 +149,7 @@ impl StatefulWidget for ValidatorsCompactWidget {
             .block(block)
             .header(Row::new(header_cells).set_style(theme.table.header(is_active)))
             .style(theme.table.base)
-            .row_highlight_style(theme.table.row_highlight(is_active))
+            .row_highlight_style(state.focus().compact_row_highlight(&theme.table))
             .highlight_symbol(theme.table.highlight_symbol(is_active));
 
         let mut display_table_state = state.table_state;

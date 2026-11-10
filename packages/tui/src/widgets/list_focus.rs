@@ -35,4 +35,22 @@ impl ListFocus {
     pub fn selects_every_row(&self) -> bool {
         matches!(self, Self::Main | Self::Filter)
     }
+
+    /// The style of the highlighted row of the main section, shaded when the selection is
+    /// driven from the compact list.
+    pub fn row_highlight(&self, table: &suno_theme::Table) -> ratatui::style::Style {
+        match self {
+            Self::Compact => table.row_highlight_shade,
+            _ => table.row_highlight(self.is_highlighted()),
+        }
+    }
+
+    /// The style of the highlighted row of the compact list, shaded while the selection is
+    /// driven from the main window.
+    pub fn compact_row_highlight(&self, table: &suno_theme::Table) -> ratatui::style::Style {
+        match self {
+            Self::Main => table.row_highlight_shade,
+            _ => table.row_highlight(self.is_compact()),
+        }
+    }
 }

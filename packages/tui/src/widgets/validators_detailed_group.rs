@@ -1,4 +1,5 @@
 use crate::widgets::chains::ChainsList;
+use crate::widgets::list_focus::ListFocus;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsList;
 use ratatui::{
@@ -48,7 +49,8 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
         };
 
         // Values needed further down to render the table
-        let is_active = state.is_highlighted();
+        let focus = state.focus();
+        let is_active = focus.is_highlighted();
         let is_masked = state.is_masked();
         let table_state = state.table_state;
 
@@ -83,7 +85,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 runtime,
                 &validators,
                 selected_validator,
-                is_active,
+                focus,
                 is_masked,
                 is_odd,
                 block,
@@ -149,7 +151,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        is_active: bool,
+        focus: ListFocus,
         is_masked: bool,
         is_odd: bool,
         block: Block,
@@ -177,7 +179,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             runtime,
             validators,
             selected_validator,
-            is_active,
+            focus,
             is_masked,
             is_odd,
             body_area,
@@ -362,7 +364,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        is_active: bool,
+        focus: ListFocus,
         is_masked: bool,
         is_odd: bool,
         area: Rect,
@@ -396,15 +398,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let header = columns.header();
 
-        let rows = self.build_validator_rows(
-            validators,
-            selected_validator,
-            &columns,
-            era.index(),
-            is_masked,
-            theme,
-            &symbol,
-        );
+        let rows =
+            self.build_validator_rows(validators, &columns, era.index(), is_masked, theme, &symbol);
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {
@@ -430,7 +425,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let table = Table::new(rows, widths)
             .block(block)
             .header(header.set_style(theme.table.header))
-            .row_highlight_style(theme.table.row_highlight(is_active));
+            .row_highlight_style(focus.row_highlight(&theme.table));
 
         StatefulWidget::render(table, area, buf, table_state);
     }
@@ -439,7 +434,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn build_validator_rows(
         &self,
         validators: &[&Validator],
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
@@ -448,7 +442,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) -> Vec<Row<'static>> {
         validators
             .iter()
-            .map(|v| self.validator_row(v, selected, columns, era, masked, theme, symbol))
+            .map(|v| self.validator_row(v, columns, era, masked, theme, symbol))
             .collect()
     }
 
@@ -456,16 +450,13 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn validator_row(
         &self,
         validator: &Validator,
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
         theme: Theme,
         symbol: &Span<'static>,
     ) -> Row<'static> {
-        let row = Row::new(
-            self.validator_cells(validator, selected, columns, era, masked, theme, symbol),
-        );
+        let row = Row::new(self.validator_cells(validator, columns, era, masked, theme, symbol));
         if validator.is_waiting() {
             row.style(Style::default().add_modifier(Modifier::DIM))
         } else {
@@ -477,7 +468,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn validator_cells(
         &self,
         validator: &Validator,
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
@@ -486,16 +476,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) -> Vec<Cell<'static>> {
         let decimals = validator.runtime().token_decimals();
 
-        let (cell_style, _highlight_symbol) = match selected {
-            Some(selected) if validator == selected => (theme.paragraph.cell_active, "❯"),
-            _ => (theme.paragraph.cell, ""),
-        };
-
         let mut cells = vec![
             Cell::from(Text::from(validator.origins.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
-            Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
-                .style(cell_style),
+            Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left)),
         ];
 
         if columns.host {
