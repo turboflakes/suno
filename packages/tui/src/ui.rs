@@ -64,11 +64,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         Constraint::Length(0)
     };
 
-    // The proxy accounts are only displayed when there are any
-    let proxies_constraint = if app.proxies.is_empty() {
-        Constraint::Length(0)
-    } else {
+    let proxies_constraint = if config.features.proxies_enabled() {
         Constraint::Length(proxies_compact_height(&app.proxies))
+    } else {
+        Constraint::Length(0)
     };
 
     let constraints = vec![
@@ -99,7 +98,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_nominators_widget(app, frame, left_layout[3]);
     }
 
-    if !app.proxies.is_empty() {
+    if config.features.proxies_enabled() {
         render_proxies_widget(app, frame, left_layout[4]);
     }
 

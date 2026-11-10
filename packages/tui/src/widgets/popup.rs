@@ -1385,7 +1385,7 @@ impl Popup {
                 Cell::from(""),
                 Cell::from(state.symbol()),
                 Cell::from(state.feature.key()),
-                Cell::from(state.feature.scope().to_string()),
+                Cell::from(state.feature.scopes_label()),
                 Cell::from(state.feature.description()),
                 Cell::from(
                     Line::from(Span::styled(msg, theme.paragraph.base_italic))

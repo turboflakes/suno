@@ -1883,7 +1883,9 @@ impl App {
     /// Moves the active section up.
     pub fn section_up(&mut self) {
         let config = CONFIG.clone();
-        let section = self.section.up(&config.features, !self.proxies.is_empty());
+        let section = self
+            .section
+            .up(&config.features, config.features.proxies_enabled());
         self.set_section(section);
     }
 
@@ -1892,7 +1894,7 @@ impl App {
         let config = CONFIG.clone();
         let section = self
             .section
-            .down(&config.features, !self.proxies.is_empty());
+            .down(&config.features, config.features.proxies_enabled());
         self.set_section(section);
     }
 
@@ -2139,11 +2141,6 @@ impl App {
             }
         }
         self.proxies.load(proxies);
-
-        // The proxies section can't stay selected once there are no proxy accounts
-        if self.section == Section::Proxies && self.proxies.is_empty() {
-            self.section_up();
-        }
     }
 
     /// Removes the proxy account selected
@@ -2601,6 +2598,9 @@ impl App {
                     self.show_first_chain_popup(|r| r.is_asset_hub())
                         .then_some(Call::AddNominator { stash: None })
                 }
+                Section::Proxies if self.proxies.is_active() && self.proxies.is_empty() => self
+                    .show_first_chain_popup(|r| r.is_para_chain())
+                    .then_some(Call::AddProxyAccount { account: None }),
                 _ => None,
             };
             if let Some(command) = command {

@@ -14,7 +14,7 @@ pub enum Section {
 
 impl Section {
     /// The sections that can be selected, from top to bottom.
-    fn selectable(features: &Features, has_proxies: bool) -> Vec<Self> {
+    fn selectable(features: &Features, proxies_enabled: bool) -> Vec<Self> {
         let mut sections = vec![Self::Chains];
         if features.validators_enabled() {
             sections.push(Self::Validators);
@@ -25,17 +25,17 @@ impl Section {
         if features.nominators_enabled() {
             sections.push(Self::Nominators);
         }
-        if has_proxies {
+        if proxies_enabled {
             sections.push(Self::Proxies);
         }
         sections
     }
 
-    pub fn up(&self, features: &Features, has_proxies: bool) -> Self {
-        let sections = Self::selectable(features, has_proxies);
+    pub fn up(&self, features: &Features, proxies_enabled: bool) -> Self {
+        let sections = Self::selectable(features, proxies_enabled);
         match self {
             Self::Chains => Self::None,
-            // A section that can't be selected anymore, e.g. the proxies once removed, goes
+            // A section that can't be selected anymore, e.g. the proxies once disabled, goes
             // back to the last one that can
             _ => match sections.iter().position(|s| s == self) {
                 Some(index) if index > 0 => sections[index - 1].clone(),
@@ -44,8 +44,8 @@ impl Section {
         }
     }
 
-    pub fn down(&self, features: &Features, has_proxies: bool) -> Self {
-        let sections = Self::selectable(features, has_proxies);
+    pub fn down(&self, features: &Features, proxies_enabled: bool) -> Self {
+        let sections = Self::selectable(features, proxies_enabled);
         match self {
             Self::None => Self::Chains,
             _ => match sections.iter().position(|s| s == self) {

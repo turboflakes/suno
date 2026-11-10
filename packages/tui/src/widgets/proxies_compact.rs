@@ -39,8 +39,9 @@ impl StatefulWidget for ProxiesCompactWidget {
             .set_style(theme.block.pane_body(is_active))
             .padding(Padding::symmetric(0, 1));
 
+        let proxies_available = !state.is_empty();
         let selected = state.table_state.selected();
-        let rows: Vec<Row> = state
+        let mut rows: Vec<Row> = state
             .proxies_iter()
             .enumerate()
             .map(|(i, proxy)| {
@@ -66,12 +67,28 @@ impl StatefulWidget for ProxiesCompactWidget {
             })
             .collect();
 
-        let widths = [
+        if rows.is_empty() {
+            rows.push(Row::new(vec![
+                Text::from(""),
+                Text::from(Line::from(vec![
+                    Span::styled("-- ", theme.paragraph.label_italic),
+                    Span::styled("ctrl+x p", theme.paragraph.base_italic),
+                    Span::raw(" "),
+                    Span::styled("add a proxy", theme.paragraph.label_italic),
+                    Span::styled(" --", theme.paragraph.label_italic),
+                ])),
+            ]));
+        }
+
+        let mut widths = vec![
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(10),
             Constraint::Length(1),
         ];
+        if proxies_available {
+            widths.push(Constraint::Length(10));
+        }
+        widths.push(Constraint::Length(1));
 
         let title = "proxies";
         let title_span = if is_active {
@@ -84,12 +101,14 @@ impl StatefulWidget for ProxiesCompactWidget {
         } else {
             Span::raw(format!("{} ", title))
         };
-        let header_cells = vec![
-            Cell::from(""),
-            Cell::from(Line::from(title_span)),
-            Cell::from(Text::from("used by").alignment(Alignment::Right)),
-            Cell::from(""),
-        ];
+
+        let mut header_cells = vec![Cell::from(""), Cell::from(Line::from(title_span))];
+        if proxies_available {
+            header_cells.push(Cell::from(
+                Text::from("used by").alignment(Alignment::Right),
+            ));
+        }
+        header_cells.push(Cell::from(""));
 
         let table = Table::new(rows, widths)
             .block(block)
