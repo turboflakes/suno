@@ -83,7 +83,6 @@ impl StatefulWidget for ProxiesCompactWidget {
         let mut widths = vec![
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(1),
         ];
         if proxies_available {
             widths.push(Constraint::Length(10));
