@@ -465,7 +465,7 @@ impl ToDescription for Call {
             )
             .to_string(),
             Self::Unbond { max, .. } => format!(
-                "Unbond up to {} of your staked balance.",
+                "Unbond up to {} of your staked balance",
                 max.as_ref()
                     .map(|(_, description)| description.to_string())
                     .unwrap_or_default()
@@ -488,7 +488,7 @@ impl ToDescription for Call {
             Self::Validate { .. } => {
                 "Validate or change commission settings, or enable/disable nominations".to_string()
             }
-            Self::Chill => "Declare no intention to validate".to_string(),
+            Self::Chill => "No intention to validate or nominate".to_string(),
             Self::SetKeys { .. } => {
                 "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
