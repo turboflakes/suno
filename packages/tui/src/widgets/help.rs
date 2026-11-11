@@ -69,6 +69,10 @@ const VALIDATOR_PROXIES: &[HelpEntry] = &[
         "[SO] ",
         "StakingOperator. Must be configured on Asset Hub Chain.",
     ),
+    (
+        "[NT] ",
+        "NonTransfer. Must be configured on Asset Hub Chain.",
+    ),
 ];
 
 const COLLATOR_STATUS: &[HelpEntry] = &[
@@ -91,34 +95,52 @@ const COLLATOR_PROXIES: &[HelpEntry] = &[
 ];
 
 const STAKING_EXTRINSICS: &[HelpEntry] = &[
-    ("/bond ", "Bond requires `Staking` proxy."),
-    ("/bond_extra ", "BondExtra requires `Staking` proxy."),
-    ("/unbond ", "Unbond requires `Staking` proxy."),
-    ("/rebond ", "Rebond requires `Staking` proxy."),
+    (
+        "/bond ",
+        "Bond requires one of `Staking` or `NonTransfer` proxy.",
+    ),
+    (
+        "/bond_extra ",
+        "BondExtra requires one of `Staking` or `NonTransfer` proxy.",
+    ),
+    (
+        "/unbond ",
+        "Unbond requires one of `Staking` or `NonTransfer` proxy.",
+    ),
+    (
+        "/rebond ",
+        "Rebond requires one of `Staking` or `NonTransfer` proxy.",
+    ),
     (
         "/withdraw_unbonded ",
-        "Withdraw unbonded requires `Staking` proxy.",
+        "Withdraw unbonded requires one of `Staking` or `NonTransfer` proxy.",
     ),
     (
         "/validate ",
-        "Validate requires one of `Staking` or `StakingOperator` proxy.",
+        "Validate requires one of `Staking`, `StakingOperator` or `NonTransfer` proxy.",
     ),
     (
         "/chill ",
-        "Chill requires one of `Staking` or `StakingOperator` proxy.",
+        "Chill requires one of `Staking`, `StakingOperator` or `NonTransfer` proxy.",
     ),
 ];
 
 const COLLATOR_EXTRINSICS: &[HelpEntry] = &[
     (
         "/register_as_candidate ",
-        "Register requires `Collator` proxy.",
+        "Register requires one of `Collator` or `NonTransfer` proxy.",
     ),
-    ("/leave_intent ", "Leave intent requires `Collator` proxy."),
-    ("/update_bond ", "Update bond requires `Collator` proxy."),
+    (
+        "/leave_intent ",
+        "Leave intent requires one of `Collator` or `NonTransfer` proxy.",
+    ),
+    (
+        "/update_bond ",
+        "Update bond requires one of `Collator` or `NonTransfer` proxy.",
+    ),
     (
         "/take_candidate_slot ",
-        "Take slot requires `Collator` proxy.",
+        "Take slot requires one of `Collator` or `NonTransfer` proxy.",
     ),
 ];
 
