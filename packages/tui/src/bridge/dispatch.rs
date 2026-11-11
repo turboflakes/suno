@@ -297,6 +297,14 @@ pub fn dispatch_response_action(
             )))
             .boxed()?;
         }
+        Response::NominatorBalance(data) => {
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::UpdateBalance(
+                nominator_key,
+                data.value.balance,
+            )))
+            .boxed()?;
+        }
         Response::CollatorBalance(data) => {
             let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateBalance(

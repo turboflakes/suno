@@ -1,9 +1,11 @@
 use crate::{
     account::{Account, AccountDisplay},
+    call::Call,
+    display::format_planks,
     identity::Identity,
     key::AccountKey,
     origin::{Origin, Origins},
-    proxy::{proxies_to_string, ProxyKey},
+    proxy::{proxies_to_string, select_proxy, ProxyKey, SupportedProxy},
     staking::{Nominations, Payee, StakeLedger},
 };
 use std::collections::HashSet;
@@ -95,6 +97,67 @@ impl Nominator {
             .filter(|c| c.era <= era)
             .map(|c| c.value)
             .sum()
+    }
+
+    pub fn free_balance(&self) -> u128 {
+        self.account.free_balance()
+    }
+
+    pub fn free_balance_extended(&self, decimal_places: usize) -> (u128, String) {
+        (
+            self.account.free_balance(),
+            self.account.free_balance_as_str(decimal_places),
+        )
+    }
+
+    /// The stake bonded and not being unbonded.
+    pub fn bounded(&self) -> u128 {
+        self.ledger.active()
+    }
+
+    pub fn bounded_extended(&self, decimal_places: usize) -> (u128, String) {
+        self.amount_extended(self.bounded(), decimal_places)
+    }
+
+    pub fn unlocking_extended(&self, era: u32, decimal_places: usize) -> (u128, String) {
+        self.amount_extended(self.unlocking(era), decimal_places)
+    }
+
+    pub fn unlocked_extended(&self, era: u32, decimal_places: usize) -> (u128, String) {
+        self.amount_extended(self.unlocked(era), decimal_places)
+    }
+
+    fn amount_extended(&self, amount: u128, decimal_places: usize) -> (u128, String) {
+        let value = format_planks(amount, self.account.token_decimals(), decimal_places);
+        (amount, format!("{}{}", value, self.account.token_symbol()))
+    }
+
+    /// Whether there is stake in the ledger, bonded or being unbonded.
+    pub fn is_bonded(&self) -> bool {
+        self.ledger.total() > 0
+    }
+
+    /// Whether any of the proxies is able to make the staking calls.
+    pub fn is_proxy_valid(&self) -> bool {
+        self.proxies.iter().any(|p| {
+            p.is_non_transfer_valid() || p.is_staking_valid() || p.is_staking_operator_valid()
+        })
+    }
+
+    /// The signer to make the `call`, and its proxy type, see `select_proxy`.
+    pub fn get_proxy_for(&self, call: &Call) -> Option<(AccountId32, SupportedProxy)> {
+        select_proxy(&self.proxies, self.runtime(), call)
+    }
+
+    pub fn display_name(&self, size: usize) -> String {
+        match self.identity() {
+            Some(identity) => format!(
+                "{} ({})",
+                identity.truncate(6 * size),
+                self.to_compact_string(size)
+            ),
+            None => self.to_compact_string(size),
+        }
     }
 
     pub fn targets_count(&self) -> usize {

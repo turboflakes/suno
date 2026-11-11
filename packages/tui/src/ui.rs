@@ -400,7 +400,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             && app
                 .nominators
                 .get_selected()
-                .is_some_and(|n| n.origins.is_pinned()))
+                .is_some_and(|n| n.origins.is_pinned() || n.is_proxy_valid()))
         || app.chains.is_active()
         || (app.proxies.is_active()
             && app.proxies.get_selected().is_some_and(|p| p.is_removable())))
@@ -435,9 +435,12 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
             legend.push(Span::raw("   "));
         }
-        let has_items = (app.validators.is_active() || app.collators.is_active())
+        let has_items = ((app.validators.is_active() || app.collators.is_active())
             && (app.window.is_validators_selected() || app.window.is_collators_selected())
-            && app.can_filter();
+            && app.can_filter())
+            || (app.nominators.is_active()
+                && app.window.is_nominators_selected()
+                && !app.nominators.is_empty());
         if has_items {
             legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));

@@ -197,6 +197,7 @@ pub enum Response {
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
     CollatorBalance(Data<BalanceData>),
+    NominatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     AllValidators(Data<Vec<AccountBytes>>),

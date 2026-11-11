@@ -41,7 +41,7 @@ impl StatefulWidget for NominatorsCompactWidget {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = self.theme;
-        let is_active = state.is_active();
+        let is_active = state.focus().is_compact();
 
         let block = Block::new()
             .set_style(theme.block.pane_body(is_active))

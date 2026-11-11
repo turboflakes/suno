@@ -1360,6 +1360,9 @@ impl App {
             NominatorAction::UpdatePayee(nominator_key, payee) => {
                 self.nominators.update_payee(&nominator_key, payee);
             }
+            NominatorAction::UpdateBalance(nominator_key, balance) => {
+                self.nominators.update_balance(&nominator_key, balance);
+            }
             NominatorAction::AddProxy(nominator_key, proxy) => {
                 self.nominators.add_proxy(&nominator_key, proxy);
                 self.refresh_proxies();
@@ -2408,6 +2411,23 @@ impl App {
                 }
                 save_pinned_collators(self.collators.get_pinned());
             }
+            Window::Nominators => {
+                // Toggle pin only from the main window, not from the compact list
+                if self.nominators.focus() != ListFocus::Main {
+                    return;
+                }
+                let Some(key) = self.nominators.get_selected().map(|n| n.key().clone()) else {
+                    return;
+                };
+                let Some(origins) = self.nominators.toggle_pinned(&key) else {
+                    return;
+                };
+                // The nominators only found on-chain are never listed
+                if origins.is_onchain() {
+                    self.nominators.remove(&key);
+                }
+                save_pinned_nominators(self.nominators.get_pinned());
+            }
             _ => {}
         }
     }
@@ -2423,6 +2443,9 @@ impl App {
                 .toggle_label(),
             Window::Collators if self.collators.focus() == ListFocus::Main => {
                 self.collators.get_highlighted_ref()?.origin.toggle_label()
+            }
+            Window::Nominators if self.nominators.focus() == ListFocus::Main => {
+                self.nominators.get_selected()?.origins.toggle_label()
             }
             _ => None,
         }
@@ -2491,11 +2514,18 @@ impl App {
         let Some(nominator) = self
             .nominators
             .get_selected()
-            .filter(|n| n.origins.is_pinned())
+            .filter(|n| n.origins.is_pinned() || n.is_proxy_valid())
         else {
             return false;
         };
-        self.popup.show_nominator_commands(nominator);
+        let Some(active_era) = self
+            .chains
+            .get_chain_by_runtime(nominator.runtime())
+            .and_then(|chain| chain.era().as_ref().map(|e| e.index()))
+        else {
+            return false;
+        };
+        self.popup.show_nominator_commands(nominator, active_era);
         true
     }
 
@@ -2593,7 +2623,7 @@ impl App {
             let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         };
 
-        if self.section == Section::Nominators
+        if self.data_section() == Section::Nominators
             && self.nominators.is_active()
             && self.show_nominator_popup()
         {
@@ -2845,18 +2875,8 @@ impl App {
         }
 
         if mode == PopupMode::Confirmation {
-            match self.data_section() {
-                Section::Validators => {
-                    if let Some(validator) = self.validators.get_selected() {
-                        self.on_validator_confirm_enter(validator);
-                    }
-                }
-                Section::Collators => {
-                    if let Some(collator) = self.collators.get_selected() {
-                        self.on_collator_confirm_enter(collator);
-                    }
-                }
-                _ => {}
+            if let Some(runtime) = self.selected_runtime() {
+                self.on_confirm_enter(runtime);
             }
         }
     }
@@ -2864,17 +2884,36 @@ impl App {
     /// Handle enter when a nominator is selected and popup is in menu mode, showing the commands
     /// available for it.
     fn on_nominator_menu_enter(&mut self) {
-        let Some(Call::RemoveNominator { .. }) = self.popup.get_input_parsed_call() else {
+        let Some(call) = self.popup.get_input_parsed_call() else {
             return;
         };
-        let Some(nominator) = self.nominators.get_selected() else {
+        let Some(nominator) = self.nominators.get_selected().cloned() else {
             return;
-        };
-        let call = Call::RemoveNominator {
-            stash: Some(nominator.stash()),
         };
         let runtime = nominator.runtime();
-        self.add_account(call, runtime);
+        match call {
+            Call::RemoveNominator { .. } => {
+                let call = Call::RemoveNominator {
+                    stash: Some(nominator.stash()),
+                };
+                self.add_account(call, runtime);
+            }
+            call => {
+                let Some((proxy_account_id, supported_proxy)) = nominator.get_proxy_for(&call)
+                else {
+                    error!("No signer is defined for {}", runtime);
+                    return;
+                };
+                self.request_confirmation(
+                    runtime,
+                    call,
+                    nominator.stash(),
+                    nominator.display_name(6),
+                    proxy_account_id,
+                    supported_proxy,
+                );
+            }
+        }
     }
 
     /// Handle enter when a proxy account is selected and popup is in menu mode, showing the
@@ -2952,19 +2991,40 @@ impl App {
             .asset_hub_runtime()
             .expect("every relay has an AssetHub chain");
 
-        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            return;
-        };
-        let api = chain.client().clone();
-        let tx = self.tx.clone();
         let stash = validator.key().stash();
         let Some((proxy_account_id, supported_proxy)) = validator.get_proxy_for(runtime, &call)
         else {
             error!("No signer is defined for {}", runtime);
             return;
         };
+        let stash_identity = validator.display_name(6);
+        self.request_confirmation(
+            runtime,
+            call,
+            stash,
+            stash_identity,
+            proxy_account_id,
+            supported_proxy,
+        );
+    }
+
+    /// Builds the call data and the QR code of the `call` made by the proxy, to be confirmed and
+    /// signed in the popup.
+    fn request_confirmation(
+        &self,
+        runtime: SupportedRuntime,
+        call: Call,
+        stash: AccountId32,
+        stash_identity: String,
+        proxy_account_id: AccountId32,
+        supported_proxy: suno_primitives::proxy::SupportedProxy,
+    ) {
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
-        let stash_identity = validator.display_name(3);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -3063,7 +3123,7 @@ impl App {
             return;
         };
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
-        let stash_identity = collator.display_name(3);
+        let stash_identity = collator.display_name(6);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -3176,7 +3236,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = collator.key().stash();
-                    let stash_identity = collator.display_name(3);
+                    let stash_identity = collator.display_name(6);
 
                     tokio::spawn(async move {
                         let (aura_key, proof) = match custom::rotate_keys(&collator).await {
@@ -3381,7 +3441,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
-                    let stash_identity = validator.display_name(3);
+                    let stash_identity = validator.display_name(6);
 
                     tokio::spawn(async move {
                         let result = custom::rotate_keys(&validator).await;
@@ -3539,149 +3599,51 @@ impl App {
         }
     }
 
+    /// The chain a call is submitted to, by the section whose item is selected.
+    fn selected_runtime(&self) -> Option<SupportedRuntime> {
+        match self.data_section() {
+            Section::Validators => self
+                .validators
+                .get_selected()
+                .and_then(|v| v.runtime().asset_hub_runtime()),
+            Section::Collators => self.collators.get_selected().map(|c| c.runtime()),
+            Section::Nominators => self.nominators.get_selected().map(|n| n.runtime()),
+            _ => None,
+        }
+    }
+
     /// Handle decoded bytes from qr code when popup is in confirmation mode
     pub fn on_qr_decoded_signature(&mut self, signature_bytes: &[u8]) {
-        if !self.popup.is_visible() {
+        if !self.popup.is_visible() || !self.popup.is_confirmation_mode() {
             return;
         }
 
-        if self.data_section() == Section::Validators {
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
-
-            if self.popup.is_confirmation_mode() {
-                let runtime = validator
-                    .runtime()
-                    .asset_hub_runtime()
-                    .expect("every relay has an AssetHub chain");
-                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                    return;
-                };
-                let Some(bytes) = self.popup.get_call_data_bytes() else {
-                    return;
-                };
-                let api = chain.client().clone();
-                let tx = self.tx.clone();
-
-                if let Some(signer) = self.popup.get_proxy_account() {
-                    sync::spawn_submit_call_data_with_signature(
-                        &api,
-                        runtime,
-                        &signer,
-                        &bytes,
-                        signature_bytes,
-                        &tx,
-                    );
-                }
-            }
+        let Some(runtime) = self.selected_runtime() else {
+            return;
         };
-
-        if self.data_section() == Section::Collators {
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            if self.popup.is_confirmation_mode() {
-                let runtime = collator.runtime();
-                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                    return;
-                };
-                let Some(bytes) = self.popup.get_call_data_bytes() else {
-                    return;
-                };
-                let api = chain.client().clone();
-                let tx = self.tx.clone();
-
-                if let Some(signer) = self.popup.get_proxy_account() {
-                    sync::spawn_submit_call_data_with_signature(
-                        &api,
-                        runtime,
-                        &signer,
-                        &bytes,
-                        signature_bytes,
-                        &tx,
-                    );
-                }
-            }
-        };
-    }
-
-    /// Handle enter when a validator is selected and popup is in confirmation mode
-    /// showing the call details and input field as password
-    pub fn on_validator_confirm_enter(&mut self, validator: Validator) {
-        let runtime = validator
-            .runtime()
-            .asset_hub_runtime()
-            .expect("every relay has an AssetHub chain");
-
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
         };
-
         let Some(bytes) = self.popup.get_call_data_bytes() else {
             return;
         };
-        let api = chain.client().clone();
-        let tx = self.tx.clone();
+        let Some(signer) = self.popup.get_proxy_account() else {
+            return;
+        };
 
-        let result = self
-            .popup
-            .execute_with_password(|password| -> AppResult<()> {
-                let password = Zeroizing::new(password.to_string());
-
-                tokio::spawn(async move {
-                    // Use spawn_blocking for CPU-intensive decrypt_json operation
-                    let signer_result =
-                        tokio::task::spawn_blocking(move || suno_signer::load_keypair(&password))
-                            .await;
-
-                    match signer_result {
-                        Ok(Ok(signer)) => {
-                            sync::spawn_sign_and_submit_call_data(
-                                &api, runtime, &signer, &bytes, &tx,
-                            );
-                        }
-                        Ok(Err(e)) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Failed to load keypair: {}",
-                                e
-                            ))));
-                            let _ = tx.send(Action::Input(InputAction::Error(
-                                "Invalid password".to_string(),
-                            )));
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Task failed: {}",
-                                e
-                            ))));
-                            let _ = tx.send(Action::Input(InputAction::Error(
-                                "Something went wrong, check errors and try again".to_string(),
-                            )));
-                        }
-                    }
-                });
-
-                // Lock input so it can't be changed unless there's an error
-                // and remove focus from the input field and start verification password spinner
-                let _ = self.tx.send(Action::Input(InputAction::Lock));
-
-                Ok(())
-            });
-        if let Err(e) = result {
-            let _ = self
-                .tx
-                .send(Action::System(SystemAction::Error(e.to_string())));
-            let _ = self.tx.send(Action::Input(InputAction::Error(
-                "Something went wrong, check errors and try again".to_string(),
-            )));
-        }
+        sync::spawn_submit_call_data_with_signature(
+            chain.client(),
+            runtime,
+            &signer,
+            &bytes,
+            signature_bytes,
+            &self.tx,
+        );
     }
 
-    pub fn on_collator_confirm_enter(&mut self, collator: Collator) {
-        let runtime = collator.runtime();
-
+    /// Handle enter when the popup is in confirmation mode, to sign the call data with the
+    /// password given and submit it to the chain `runtime`.
+    fn on_confirm_enter(&mut self, runtime: SupportedRuntime) {
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
         };
@@ -3797,10 +3759,10 @@ impl App {
         match self.section {
             Section::Chains => self.show_chain_popup(),
             Section::Proxies => self.show_proxy_popup(),
-            Section::Nominators => self.show_nominator_popup(),
             _ => match self.data_section() {
                 Section::Validators => self.show_validator_popup(),
                 Section::Collators => self.show_collator_popup(),
+                Section::Nominators => self.show_nominator_popup(),
                 _ => false,
             },
         }

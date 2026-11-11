@@ -817,6 +817,18 @@ pub fn spawn_fetch_nominators_payee(
     );
 }
 
+pub fn spawn_fetch_nominators_account_balance(
+    api: &OnlineClientAtBlock<CustomConfig>,
+    runtime: SupportedRuntime,
+    nominator_keys: &[AccountKey],
+    tx: &UnboundedSender<Action>,
+) {
+    ValidatorSpawner::new(api, runtime, nominator_keys, tx).spawn_unordered(
+        move |api, stash| async move { runtime.fetch_nominators_account_balance(&api, &stash).await },
+        DEFAULT_CONCURRENCY,
+    );
+}
+
 pub fn spawn_fetch_nominators_proxy_status(
     api: &OnlineClientAtBlock<CustomConfig>,
     runtime: SupportedRuntime,
@@ -848,6 +860,7 @@ pub fn spawn_fetch_nominators_on_connect(
     spawn_fetch_nominators_nominations(api, runtime, nominator_keys, tx);
     spawn_fetch_nominators_staking_ledger(api, runtime, nominator_keys, tx);
     spawn_fetch_nominators_payee(api, runtime, nominator_keys, tx);
+    spawn_fetch_nominators_account_balance(api, runtime, nominator_keys, tx);
 
     spawn_fetch_nominators_proxy_status(
         api,

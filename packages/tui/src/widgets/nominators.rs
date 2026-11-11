@@ -5,8 +5,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use subxt::utils::AccountId32;
 use suno_config::{PinnedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
+    balance::Balance,
     key::AccountBytes,
-    origin::Origin,
+    origin::{Origin, Origins},
     proxy::ProxyKey,
     staking::{Nominations, Payee, StakeLedger},
     AccountKey, Nominator,
@@ -51,7 +52,7 @@ impl NominatorsList {
     }
 
     pub fn is_active(&self) -> bool {
-        self.focus.is_compact()
+        self.focus.is_active()
     }
 
     pub fn focus(&self) -> ListFocus {
@@ -99,6 +100,15 @@ impl NominatorsList {
         }
         self.table_state
             .select((!self.nominators.is_empty()).then_some(0));
+    }
+
+    /// Pins the nominator, or unpins it when it was pinned. The nominators listed by the config
+    /// can't be toggled. Returns the new origins of the nominator, if they changed.
+    pub fn toggle_pinned(&mut self, key: &AccountKey) -> Option<Origins> {
+        let nominator = self.nominators.get_mut(key)?;
+        let origins = nominator.origins.toggle()?;
+        nominator.origins = origins;
+        Some(origins)
     }
 
     /// Adds a nominator pinned from the TUI. Returns its key, or none when it is already listed.
@@ -160,6 +170,12 @@ impl NominatorsList {
     pub fn update_stake_ledger(&mut self, key: &AccountKey, ledger: StakeLedger) {
         if let Some(nominator) = self.nominators.get_mut(key) {
             nominator.ledger = ledger;
+        }
+    }
+
+    pub fn update_balance(&mut self, key: &AccountKey, balance: Balance) {
+        if let Some(nominator) = self.nominators.get_mut(key) {
+            nominator.account.set_balance(balance);
         }
     }
 

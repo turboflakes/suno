@@ -45,6 +45,7 @@ struct CollatorContext {
 
 #[derive(Clone, PartialEq, Eq)]
 struct NominatorContext {
+    era: ActiveEra,
     nominator: Nominator,
 }
 
@@ -262,10 +263,7 @@ impl Popup {
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
             if p.proxy_type().can_call(&bond) && ctx.validator.is_unknown() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: bond,
-                    bytes: None,
-                }));
+                self.push_instruction(bond);
             }
 
             let bond_extra = Call::BondExtra {
@@ -276,10 +274,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.free_balance() > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: bond_extra,
-                    bytes: None,
-                }));
+                self.push_instruction(bond_extra);
             }
 
             let unbond = Call::Unbond {
@@ -290,10 +285,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.bounded() > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: unbond,
-                    bytes: None,
-                }));
+                self.push_instruction(unbond);
             }
 
             let rebond = Call::Rebond {
@@ -304,10 +296,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocking(ctx.era) > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: rebond,
-                    bytes: None,
-                }));
+                self.push_instruction(rebond);
             }
 
             let withdraw = Call::WithdrawUnbonded {
@@ -317,20 +306,14 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocked(ctx.era) > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: withdraw,
-                    bytes: None,
-                }));
+                self.push_instruction(withdraw);
             }
 
             let set_payee = Call::SetPayee {
                 payee: Payee::default(),
             };
             if p.proxy_type().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_payee,
-                    bytes: None,
-                }));
+                self.push_instruction(set_payee);
             }
 
             let validate = Call::Validate {
@@ -338,18 +321,12 @@ impl Popup {
                 blocked: false,
             };
             if p.proxy_type().can_call(&validate) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: validate,
-                    bytes: None,
-                }));
+                self.push_instruction(validate);
             }
 
             let chill = Call::Chill;
             if p.proxy_type().can_call(&chill) && ctx.validator.is_active_or_waiting() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: chill,
-                    bytes: None,
-                }));
+                self.push_instruction(chill);
             }
 
             let set_keys = Call::SetKeys {
@@ -357,10 +334,7 @@ impl Popup {
                 proof: Proof::default(),
             };
             if p.proxy_type().can_call(&set_keys) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(set_keys);
             }
 
             let purge_keys = Call::PurgeKeys;
@@ -368,27 +342,18 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.has_keys()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: purge_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(purge_keys);
             }
         });
 
         ctx.validator.commands.iter().for_each(|c| {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::Custom(c.clone()),
-                bytes: None,
-            }));
+            self.push_instruction(Call::Custom(c.clone()));
         });
 
         if is_pinned {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::RemoveValidator {
-                    stash: Some(ctx.validator.account.stash()),
-                },
-                bytes: None,
-            }));
+            self.push_instruction(Call::RemoveValidator {
+                stash: Some(ctx.validator.account.stash()),
+            });
         }
 
         if !self.options.is_empty() {
@@ -417,20 +382,14 @@ impl Popup {
             if p.proxy_type().can_call(&register_as_candidate)
                 && ctx.collator.is_exiting_or_unknown()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: register_as_candidate,
-                    bytes: None,
-                }));
+                self.push_instruction(register_as_candidate);
             }
 
             let leave_intent = Call::LeaveIntent;
             if p.proxy_type().can_call(&leave_intent)
                 && ctx.collator.is_permissionless_or_candidate()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: leave_intent,
-                    bytes: None,
-                }));
+                self.push_instruction(leave_intent);
             }
 
             let update_bond = Call::UpdateBond {
@@ -441,10 +400,7 @@ impl Popup {
             if p.proxy_type().can_call(&update_bond)
                 && ctx.collator.is_permissionless_or_candidate()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: update_bond,
-                    bytes: None,
-                }));
+                self.push_instruction(update_bond);
             }
 
             let take_candidate_slot = Call::TakeCandidateSlot {
@@ -452,10 +408,7 @@ impl Popup {
                 target: ctx.collator.stash(),
             };
             if p.proxy_type().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: take_candidate_slot,
-                    bytes: None,
-                }));
+                self.push_instruction(take_candidate_slot);
             }
 
             let set_session_keys = Call::SetSessionKeys {
@@ -463,35 +416,23 @@ impl Popup {
                 proof: Proof::default(),
             };
             if p.proxy_type().can_call(&set_session_keys) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_session_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(set_session_keys);
             }
 
             let purge_session_keys = Call::PurgeSessionKeys;
             if p.proxy_type().can_call(&purge_session_keys) && ctx.collator.has_keys() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: purge_session_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(purge_session_keys);
             }
         });
 
         ctx.collator.commands.iter().for_each(|c| {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::Custom(c.clone()),
-                bytes: None,
-            }));
+            self.push_instruction(Call::Custom(c.clone()));
         });
 
         if is_pinned {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::RemoveCollator {
-                    stash: Some(ctx.collator.account.stash()),
-                },
-                bytes: None,
-            }));
+            self.push_instruction(Call::RemoveCollator {
+                stash: Some(ctx.collator.account.stash()),
+            });
         }
 
         if !self.options.is_empty() {
@@ -500,15 +441,80 @@ impl Popup {
     }
 
     fn init_nominator_menu(&mut self, ctx: &NominatorContext) {
-        self.input.reset_as_command(None);
+        let nominator = &ctx.nominator;
+        let is_pinned = nominator.origins.is_pinned();
+        if nominator.is_proxy_valid() {
+            let runtime = nominator.runtime();
+            let metadata = InputFieldMetadata::new()
+                .with_unit(runtime.token_symbol())
+                .with_decimals(runtime.token_decimals())
+                .with_call_context(CallContext::Validator);
+            self.input.reset_as_command(Some(metadata));
+        } else {
+            self.input.reset_as_command(None);
+        }
 
-        if ctx.nominator.origins.is_pinned() {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::RemoveNominator {
-                    stash: Some(ctx.nominator.stash()),
-                },
-                bytes: None,
-            }));
+        nominator.proxies.iter().for_each(|p| {
+            let bond = Call::Bond {
+                amount: 0,
+                payee: Payee::default(),
+                max: Some(nominator.free_balance_extended(4)),
+            };
+            if p.proxy_type().can_call(&bond) && !nominator.is_bonded() {
+                self.push_instruction(bond);
+            }
+
+            let bond_extra = Call::BondExtra {
+                amount: 0,
+                max: Some(nominator.free_balance_extended(4)),
+            };
+            if p.proxy_type().can_call(&bond_extra)
+                && nominator.is_bonded()
+                && nominator.free_balance() > 0
+            {
+                self.push_instruction(bond_extra);
+            }
+
+            let unbond = Call::Unbond {
+                amount: 0,
+                max: Some(nominator.bounded_extended(4)),
+            };
+            if p.proxy_type().can_call(&unbond) && nominator.bounded() > 0 {
+                self.push_instruction(unbond);
+            }
+
+            let rebond = Call::Rebond {
+                amount: 0,
+                max: Some(nominator.unlocking_extended(ctx.era, 4)),
+            };
+            if p.proxy_type().can_call(&rebond) && nominator.unlocking(ctx.era) > 0 {
+                self.push_instruction(rebond);
+            }
+
+            let withdraw = Call::WithdrawUnbonded {
+                max: Some(nominator.unlocked_extended(ctx.era, 4)),
+            };
+            if p.proxy_type().can_call(&withdraw) && nominator.unlocked(ctx.era) > 0 {
+                self.push_instruction(withdraw);
+            }
+
+            let set_payee = Call::SetPayee {
+                payee: Payee::default(),
+            };
+            if p.proxy_type().can_call(&set_payee) && nominator.is_bonded() {
+                self.push_instruction(set_payee);
+            }
+
+            let chill = Call::Chill;
+            if p.proxy_type().can_call(&chill) && nominator.is_nominating() {
+                self.push_instruction(chill);
+            }
+        });
+
+        if is_pinned {
+            self.push_instruction(Call::RemoveNominator {
+                stash: Some(ctx.nominator.stash()),
+            });
         }
 
         if !self.options.is_empty() {
@@ -516,16 +522,18 @@ impl Popup {
         }
     }
 
+    fn push_instruction(&mut self, call: Call) {
+        self.options
+            .push(Entry::new(Command::Instruction { call, bytes: None }));
+    }
+
     fn init_proxy_menu(&mut self, ctx: &ProxyContext) {
         self.input.reset_as_command(None);
 
         if ctx.proxy.is_removable() {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::RemoveProxyAccount {
-                    account: Some(ctx.proxy.account),
-                },
-                bytes: None,
-            }));
+            self.push_instruction(Call::RemoveProxyAccount {
+                account: Some(ctx.proxy.account),
+            });
         }
 
         if !self.options.is_empty() {
@@ -536,19 +544,13 @@ impl Popup {
     fn init_chain_menu(&mut self, ctx: &ChainContext) {
         self.input.reset_as_command(None);
 
-        self.options.push(Entry::new(Command::Instruction {
-            call: Call::ChainSpecs {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
+        self.push_instruction(Call::ChainSpecs {
+            chain_name: ctx.runtime.to_string(),
+        });
 
-        self.options.push(Entry::new(Command::Instruction {
-            call: Call::Metadata {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
+        self.push_instruction(Call::Metadata {
+            chain_name: ctx.runtime.to_string(),
+        });
 
         if ctx.runtime.is_para_chain() {
             let mut calls = Vec::new();
@@ -594,8 +596,9 @@ impl Popup {
         self.on_init(Context::CollatorMenu(Box::new(ctx)));
     }
 
-    pub fn show_nominator_commands(&mut self, nominator: &Nominator) {
+    pub fn show_nominator_commands(&mut self, nominator: &Nominator, active_era: ActiveEra) {
         let ctx = NominatorContext {
+            era: active_era,
             nominator: nominator.clone(),
         };
         self.on_init(Context::NominatorMenu(Box::new(ctx)));

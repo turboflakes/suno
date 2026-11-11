@@ -192,6 +192,12 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_nominators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_aura_authorities(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -859,6 +865,19 @@ impl RuntimeFetcher for Runtime {
 
         Ok(match response {
             Response::Balance(data) => Response::CollatorBalance(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_nominators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        let response = self.fetch_account_balance(api, stash).await?;
+
+        Ok(match response {
+            Response::Balance(data) => Response::NominatorBalance(data),
             other => other,
         })
     }
