@@ -1098,72 +1098,51 @@ impl App {
                 // In case of 'Rebond' funds should be added to staking_ledger and also
                 // subtracted from unlocking vec.
                 // To keep things in sync, a fetch for this respective stash is being called here.
-                // And also a fetch to the account balance is being called here.
+                // And also a fetch to the account balance is being called here. The events are
+                // about every account, so only the validators listed are fetched.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_staking_ledger(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                        sync::spawn_fetch_validators_account_balance(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                    sync::spawn_fetch_validators_account_balance(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
             ValidatorAction::SubChunkFromStakeLedger(validator_key, chunk) => {
                 self.validators
                     .sub_chunk_from_stake_ledger(&validator_key, chunk);
                 // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_account_balance(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_account_balance(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
             ValidatorAction::AddProxy(validator_key, proxy) => {
                 self.validators.add_proxy(&validator_key, proxy);
@@ -1179,33 +1158,22 @@ impl App {
                 // 'Withdrawn' event. The witdrawn amount is expected to be available as free in balance
                 // and also unlocked from `staking.ledger`. Rather than unlocking manually is easier just
                 // to fetch storage for staking ledger.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_staking_ledger(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
         }
     }
@@ -1365,6 +1333,68 @@ impl App {
             }
             NominatorAction::UpdateBalance(nominator_key, balance) => {
                 self.nominators.update_balance(&nominator_key, balance);
+            }
+            NominatorAction::AddAmountToStakeLedger(nominator_key, amount) => {
+                self.nominators
+                    .add_amount_to_stake_ledger(&nominator_key, amount);
+                // NOTE: As for the validators, the 'Bonded' event is also raised by 'Rebond', so
+                // the ledger and the balance are fetched to keep them in sync. The events are
+                // about every account, so only the nominators listed are fetched.
+                if !self.nominators.is_listed(&nominator_key) {
+                    return;
+                }
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                    sync::spawn_fetch_nominators_account_balance(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
+            }
+            NominatorAction::SubChunkFromStakeLedger(nominator_key, chunk) => {
+                self.nominators
+                    .sub_chunk_from_stake_ledger(&nominator_key, chunk);
+                // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
+                if !self.nominators.is_listed(&nominator_key) {
+                    return;
+                }
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_account_balance(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
+            }
+            NominatorAction::AddAmountToBalance(nominator_key, amount) => {
+                self.nominators
+                    .add_amount_to_balance(&nominator_key, amount);
+                // NOTE: The amount withdrawn is also unlocked from `staking.ledger`.
+                if !self.nominators.is_listed(&nominator_key) {
+                    return;
+                }
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
             }
             NominatorAction::AddProxy(nominator_key, proxy) => {
                 self.nominators.add_proxy(&nominator_key, proxy);

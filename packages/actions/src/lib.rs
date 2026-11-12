@@ -190,6 +190,9 @@ pub enum NominatorAction {
     UpdatePayee(NominatorKey, Payee),
     AddProxy(NominatorKey, ProxyKey),
     UpdateBalance(NominatorKey, Balance),
+    AddAmountToStakeLedger(NominatorKey, Amount),
+    SubChunkFromStakeLedger(NominatorKey, Chunk),
+    AddAmountToBalance(NominatorKey, Amount),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -135,6 +135,12 @@ pub fn dispatch_response_action(
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::UpdatePayee(
                 account_key,
+                data.value.payee.clone(),
+            )))
+            .boxed()?;
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::UpdatePayee(
+                nominator_key,
                 data.value.payee,
             )))
             .boxed()?;
@@ -248,12 +254,24 @@ pub fn dispatch_response_action(
                 data.value.amount,
             )))
             .boxed()?;
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::AddAmountToStakeLedger(
+                nominator_key,
+                data.value.amount,
+            )))
+            .boxed()?;
         }
         Response::EventUnbonded(data) => {
             let rc_runtime = runtime.relay_chain();
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::SubChunkFromStakeLedger(
                 account_key,
+                data.value.chunk.clone(),
+            )))
+            .boxed()?;
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::SubChunkFromStakeLedger(
+                nominator_key,
                 data.value.chunk,
             )))
             .boxed()?;
@@ -263,6 +281,12 @@ pub fn dispatch_response_action(
             let account_key = AccountKey::from_bytes(rc_runtime, data.value.account);
             tx.send(Action::Validator(ValidatorAction::AddAmountToBalance(
                 account_key,
+                data.value.amount,
+            )))
+            .boxed()?;
+            let nominator_key = AccountKey::from_bytes(runtime, data.value.account);
+            tx.send(Action::Nominator(NominatorAction::AddAmountToBalance(
+                nominator_key,
                 data.value.amount,
             )))
             .boxed()?;

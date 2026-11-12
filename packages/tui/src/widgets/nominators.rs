@@ -9,7 +9,7 @@ use suno_primitives::{
     key::AccountBytes,
     origin::{Origin, Origins},
     proxy::ProxyKey,
-    staking::{Nominations, Payee, StakeLedger},
+    staking::{Chunk, Nominations, Payee, StakeLedger},
     AccountKey, Nominator,
 };
 use suno_theme::Theme;
@@ -179,6 +179,24 @@ impl NominatorsList {
         }
     }
 
+    pub fn add_amount_to_stake_ledger(&mut self, key: &AccountKey, amount: u128) {
+        if let Some(nominator) = self.nominators.get_mut(key) {
+            nominator.set_ledger(nominator.ledger.with_amount_added(amount));
+        }
+    }
+
+    pub fn sub_chunk_from_stake_ledger(&mut self, key: &AccountKey, chunk: Chunk) {
+        if let Some(nominator) = self.nominators.get_mut(key) {
+            nominator.set_ledger(nominator.ledger.with_chunk_unbonded(chunk));
+        }
+    }
+
+    pub fn add_amount_to_balance(&mut self, key: &AccountKey, amount: u128) {
+        if let Some(nominator) = self.nominators.get_mut(key) {
+            nominator.account.add_free_amount(amount);
+        }
+    }
+
     pub fn update_payee(&mut self, key: &AccountKey, payee: Payee) {
         if let Some(nominator) = self.nominators.get_mut(key) {
             nominator.payee = payee;
@@ -227,6 +245,10 @@ impl NominatorsList {
         } else {
             self.scroll_offset = 0;
         }
+    }
+
+    pub fn is_listed(&self, nominator_key: &AccountKey) -> bool {
+        self.nominators.contains_key(nominator_key)
     }
 
     pub fn nominators_iter(&self) -> impl Iterator<Item = &Nominator> {
@@ -380,6 +402,26 @@ mod tests {
         assert_eq!(list.table_state.selected(), Some(2));
         list.move_down();
         assert_eq!(list.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn the_events_update_the_ledger_and_the_balance_of_the_nominator_by_key() {
+        let mut list = list();
+        let key = nominator(2).key().clone();
+        let other = nominator(3).key().clone();
+        list.update_stake_ledger(&key, StakeLedger::new(100, 100, vec![]));
+
+        list.add_amount_to_stake_ledger(&key, 50);
+        list.sub_chunk_from_stake_ledger(&key, Chunk::new(7, 30));
+        list.add_amount_to_balance(&key, 20);
+
+        let updated = list.nominators_iter().find(|n| n.key() == &key).unwrap();
+        assert_eq!(updated.ledger.active(), 120);
+        assert_eq!(updated.ledger.unlocking(), &[Chunk::new(7, 30)]);
+        assert_eq!(updated.free_balance(), 20);
+        let untouched = list.nominators_iter().find(|n| n.key() == &other).unwrap();
+        assert_eq!(untouched.ledger, StakeLedger::default());
+        assert_eq!(untouched.free_balance(), 0);
     }
 
     #[test]

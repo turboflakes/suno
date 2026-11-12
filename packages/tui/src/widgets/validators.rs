@@ -292,41 +292,13 @@ impl ValidatorsList {
 
     pub fn add_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            validator.ledger = StakeLedger {
-                active: validator.ledger.active().saturating_add(amount),
-                total: validator.ledger.total().saturating_add(amount),
-                unlocking: validator.ledger.unlocking().to_vec(),
-            };
+            validator.ledger = validator.ledger.with_amount_added(amount);
         }
     }
 
     pub fn sub_chunk_from_stake_ledger(&mut self, validator_key: &AccountKey, chunk: Chunk) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let unlocking: Vec<Chunk> = if validator.ledger.unlocking().is_empty() {
-                vec![chunk.clone()]
-            } else {
-                validator
-                    .ledger
-                    .unlocking()
-                    .iter()
-                    .map(|c| {
-                        if c.era == chunk.era {
-                            Chunk {
-                                era: c.era,
-                                value: c.value.saturating_add(chunk.value),
-                            }
-                        } else {
-                            c.clone()
-                        }
-                    })
-                    .collect()
-            };
-
-            validator.ledger = StakeLedger {
-                active: validator.ledger.active().saturating_sub(chunk.value),
-                total: validator.ledger.total().saturating_sub(chunk.value),
-                unlocking,
-            };
+            validator.ledger = validator.ledger.with_chunk_unbonded(chunk);
         }
     }
 
@@ -391,6 +363,10 @@ impl ValidatorsList {
 
     pub fn get_validator_by_key(&self, validator_key: &ValidatorKey) -> Option<&Validator> {
         self.validators.get(validator_key)
+    }
+
+    pub fn is_listed(&self, validator_key: &ValidatorKey) -> bool {
+        self.validators.contains_key(validator_key)
     }
 
     pub fn get_validator_by_key_cloned(&self, validator_key: &ValidatorKey) -> Option<Validator> {
