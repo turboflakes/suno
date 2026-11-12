@@ -342,7 +342,10 @@ impl App {
             NavigationAction::NextWindow => self.next_window(),
             NavigationAction::PrevWindow => self.prev_window(),
             NavigationAction::Reset => self.reset_selection(),
-            NavigationAction::Copy => self.copy_to_clipboard(),
+            NavigationAction::Copy => {
+                self.end_chord();
+                self.copy_to_clipboard()
+            }
             NavigationAction::ToggleMask => self.toggle_mask(),
             NavigationAction::ToggleView => self.toggle_view(),
             NavigationAction::TogglePin => self.toggle_pin(),
@@ -3796,18 +3799,27 @@ impl App {
             return;
         }
 
-        // The stash of the selected validator or collator
+        // The address of the selected row, following the section like the selection does
         if !self.popup.is_visible() {
-            let address = match self.window {
-                Window::Validators => self
-                    .validators
-                    .get_selected_ref()
-                    .map(|v| v.to_address_string()),
-                Window::Collators => self
-                    .collators
-                    .get_selected_ref()
-                    .map(|c| c.to_address_string()),
-                _ => None,
+            let address = if self.section.is_none() && self.window.is_help_selected() {
+                None
+            } else {
+                match self.data_section() {
+                    Section::Validators => self
+                        .validators
+                        .get_selected_ref()
+                        .map(|v| v.to_address_string()),
+                    Section::Collators => self
+                        .collators
+                        .get_selected_ref()
+                        .map(|c| c.to_address_string()),
+                    Section::Nominators => self
+                        .nominators
+                        .get_selected()
+                        .map(|n| n.to_address_string()),
+                    Section::Proxies => self.proxies.get_selected().map(|p| p.address()),
+                    _ => None,
+                }
             };
             if let Some(address) = address {
                 self.set_clipboard_text(address);
