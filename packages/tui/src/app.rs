@@ -1318,6 +1318,18 @@ impl App {
         true
     }
 
+    /// Fetches the identity of the `keys` nominators of the relay chain `runtime`, held on its
+    /// People chain. Returns false when it is not connected yet, and nothing was requested.
+    fn fetch_nominators_identity(&self, runtime: SupportedRuntime, keys: &[AccountKey]) -> bool {
+        let Some(people_runtime) = runtime.people_runtime() else {
+            return false;
+        };
+        let keys = keys.to_vec();
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_identity(api_at, people_runtime, &keys, tx);
+        })
+    }
+
     fn handle_nominator_actions(&mut self, action: NominatorAction) {
         match action {
             NominatorAction::UpdateNominations(nominator_key, nominations) => {
@@ -1333,6 +1345,9 @@ impl App {
             }
             NominatorAction::UpdateBalance(nominator_key, balance) => {
                 self.nominators.update_balance(&nominator_key, balance);
+            }
+            NominatorAction::UpdateIdentity(nominator_key, identity) => {
+                self.nominators.update_identity(&nominator_key, identity);
             }
             NominatorAction::AddAmountToStakeLedger(nominator_key, amount) => {
                 self.nominators
@@ -1763,7 +1778,7 @@ impl App {
         self.fetch_missing_identities();
     }
 
-    /// Fetches the identity of every validator, or collator, listed in the window displayed, once
+    /// Fetches the identity of every validator, collator, or nominator, listed in the window displayed, once
     /// the People chain is connected. The identity is critical to tell them apart, so unlike the
     /// rest of the data, which is only fetched for the tracked and the visible ones, it is
     /// fetched for all of them. The other window is fetched when it is displayed.
@@ -1782,6 +1797,13 @@ impl App {
                 for (runtime, keys) in self.collators.get_keys_without_identity_requested() {
                     if self.fetch_collators_identity(runtime, &keys) {
                         self.collators.mark_identity_requested(&keys);
+                    }
+                }
+            }
+            Window::Nominators => {
+                for (runtime, keys) in self.nominators.get_keys_without_identity_requested() {
+                    if self.fetch_nominators_identity(runtime, &keys) {
+                        self.nominators.mark_identity_requested(&keys);
                     }
                 }
             }

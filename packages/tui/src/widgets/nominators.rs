@@ -6,6 +6,7 @@ use subxt::utils::AccountId32;
 use suno_config::{PinnedNode, SupportedRuntime, CONFIG};
 use suno_primitives::{
     balance::Balance,
+    identity::Identity,
     key::AccountBytes,
     origin::{Origin, Origins},
     proxy::ProxyKey,
@@ -19,6 +20,8 @@ use suno_theme::Theme;
 pub struct NominatorsList {
     nominators: HashMap<AccountKey, Nominator>,
     nominators_order: Vec<AccountKey>,
+    /// Nominators whose identity was requested already
+    identity_requested: HashSet<AccountKey>,
     pub table_state: TableState,
     focus: ListFocus,
     pub scroll_offset: u16,
@@ -163,6 +166,7 @@ impl NominatorsList {
     pub fn remove(&mut self, key: &AccountKey) {
         let selected = self.selected_key().filter(|selected| selected != key);
         self.nominators.remove(key);
+        self.identity_requested.remove(key);
         self.nominators_order.retain(|k| k != key);
         self.restore_selection(selected);
     }
@@ -195,6 +199,34 @@ impl NominatorsList {
         if let Some(nominator) = self.nominators.get_mut(key) {
             nominator.account.add_free_amount(amount);
         }
+    }
+
+    pub fn update_identity(&mut self, key: &AccountKey, identity: Identity) {
+        if let Some(nominator) = self.nominators.get_mut(key) {
+            nominator.account.set_identity(Some(identity));
+        }
+    }
+
+    /// The nominators whose identity wasn't requested yet, by relay chain. The identity is held
+    /// on the People chain of the relay chain.
+    pub fn get_keys_without_identity_requested(
+        &self,
+    ) -> HashMap<SupportedRuntime, Vec<AccountKey>> {
+        let mut by_relay_chain: HashMap<SupportedRuntime, Vec<AccountKey>> = HashMap::new();
+        for nominator in self.nominators_iter() {
+            if nominator.identity().is_none() && !self.identity_requested.contains(nominator.key())
+            {
+                by_relay_chain
+                    .entry(nominator.runtime().relay_chain())
+                    .or_default()
+                    .push(nominator.key().clone());
+            }
+        }
+        by_relay_chain
+    }
+
+    pub fn mark_identity_requested(&mut self, keys: &[AccountKey]) {
+        self.identity_requested.extend(keys.iter().cloned());
     }
 
     pub fn update_payee(&mut self, key: &AccountKey, payee: Payee) {

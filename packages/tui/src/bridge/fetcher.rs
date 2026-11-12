@@ -134,6 +134,12 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_nominator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -650,6 +656,30 @@ impl RuntimeFetcher for Runtime {
 
         match response {
             Response::Identity(data) => Ok(Response::collator_identity(
+                data.value.account,
+                data.value.identity,
+            )),
+            other => Ok(other),
+        }
+    }
+
+    async fn fetch_nominator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // The identity is keyed by stash, so reuse the per-chain fetch and relabel the response
+        // so dispatch routes it into the nominators state.
+        let response = match self {
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_identity(api, stash).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_identity(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, stash).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_identity(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }?;
+
+        match response {
+            Response::Identity(data) => Ok(Response::nominator_identity(
                 data.value.account,
                 data.value.identity,
             )),

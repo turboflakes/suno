@@ -205,6 +205,7 @@ pub enum Response {
     Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
+    NominatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
     CollatorSupportedProxy(Data<SupportedProxyData>),
@@ -383,6 +384,10 @@ impl Response {
 
     pub fn collator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
         Response::CollatorIdentity(Data::new(IdentityData { account, identity }))
+    }
+
+    pub fn nominator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
+        Response::NominatorIdentity(Data::new(IdentityData { account, identity }))
     }
 
     pub fn collator_next_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {

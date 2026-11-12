@@ -7,7 +7,6 @@ use ratatui::{
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
 use sp_arithmetic::traits::Zero;
-use suno_primitives::AccountDisplay;
 use suno_theme::Theme;
 
 /// The most rows displayed at once, the list scrolls past them.
@@ -88,7 +87,7 @@ impl StatefulWidget for NominatorsCompactWidget {
                     theme.paragraph.label(is_active),
                 ));
             }
-            name.push(Span::raw(nominator.to_compact_string(4)));
+            name.push(Span::raw(nominator.display_name(4)));
 
             // The validators nominated, unknown until read from the chain
             let targets = match &nominator.nominations {

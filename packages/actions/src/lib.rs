@@ -193,6 +193,7 @@ pub enum NominatorAction {
     AddAmountToStakeLedger(NominatorKey, Amount),
     SubChunkFromStakeLedger(NominatorKey, Chunk),
     AddAmountToBalance(NominatorKey, Amount),
+    UpdateIdentity(NominatorKey, Identity),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

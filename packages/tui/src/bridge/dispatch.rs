@@ -387,6 +387,24 @@ pub fn dispatch_response_action(
                 );
             }
         }
+        Response::NominatorIdentity(data) => {
+            let account_key = AccountKey::from_bytes(
+                runtime
+                    .relay_chain()
+                    .asset_hub_runtime()
+                    .expect("every relay has an AssetHub chain"),
+                data.value.account,
+            );
+            if let Some(identity) = data.value.identity {
+                tx.send(Action::Nominator(NominatorAction::UpdateIdentity(
+                    account_key,
+                    identity,
+                )))
+                .boxed()?;
+            } else {
+                debug!("No identity data found for nominator {}", account_key);
+            }
+        }
         Response::CollatorNextKeys(data) => {
             let collator_key = AccountKey::from_bytes(runtime, data.value.account);
             tx.send(Action::Collator(CollatorAction::UpdateNextKeys(
