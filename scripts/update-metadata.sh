@@ -61,31 +61,32 @@ fetch_metadata() {
 }
 
 # Relay Chains
-fetch_metadata "westend"  "westend.rpc.turboflakes.io"  "$RC_PALLETS"
+fetch_metadata "westend"  "westend-rpc.polkadot.io"  "$RC_PALLETS"
 fetch_metadata "paseo"    "paseo.rpc.turboflakes.io"    "$RC_PALLETS"
 fetch_metadata "kusama"   "kusama.rpc.turboflakes.io"   "$RC_PALLETS"
 fetch_metadata "polkadot" "polkadot.rpc.turboflakes.io" "$RC_PALLETS"
 
 # AssetHub Chains
-fetch_metadata "asset-hub-westend"  "asset-hub-westend.rpc.turboflakes.io"  "$AH_PALLETS"
+fetch_metadata "asset-hub-westend"  "westend-asset-hub-rpc.polkadot.io"  "$AH_PALLETS"
 fetch_metadata "asset-hub-paseo"    "asset-hub-paseo.rpc.turboflakes.io"    "$AH_PALLETS"
 fetch_metadata "asset-hub-kusama"   "asset-hub-kusama.rpc.turboflakes.io"   "$AH_PALLETS"
 fetch_metadata "asset-hub-polkadot" "asset-hub-polkadot.rpc.turboflakes.io" "$AH_PALLETS"
 
 # People Chains
-fetch_metadata "people-westend"  "people-westend.rpc.turboflakes.io"    "$PEOPLE_PALLETS"
+fetch_metadata "people-westend"  "westend-people-rpc.polkadot.io"    "$PEOPLE_PALLETS"
 fetch_metadata "people-paseo"    "people-paseo.rpc.turboflakes.io"      "$PEOPLE_PALLETS"
 fetch_metadata "people-kusama"   "people-kusama.rpc.turboflakes.io"     "$PEOPLE_PALLETS"
 fetch_metadata "people-polkadot" "people-polkadot.rpc.turboflakes.io"   "$PEOPLE_PALLETS"
 
 # BridgeHub Chains
+fetch_metadata "bridge-hub-westend"   "westend-bridge-hub-rpc.polkadot.io"     "$BH_PALLETS"
 fetch_metadata "bridge-hub-kusama"   "kusama-bridge-hub-rpc.polkadot.io"     "$BH_PALLETS"
 fetch_metadata "bridge-hub-polkadot" "polkadot-bridge-hub-rpc.polkadot.io"   "$BH_PALLETS"
 
 # Coretime Chains
+fetch_metadata "coretime-westend"  "westend-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
 fetch_metadata "coretime-kusama"   "kusama-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
 fetch_metadata "coretime-polkadot" "polkadot-coretime-rpc.polkadot.io"   "$CORETIME_PALLETS"
-fetch_metadata "coretime-westend"  "westend-coretime-rpc.polkadot.io"     "$CORETIME_PALLETS"
 
 # Collectives Chains
 fetch_metadata "collectives-westend"  "westend-collectives-rpc.polkadot.io"    "$COLLECTIVES_PALLETS"
