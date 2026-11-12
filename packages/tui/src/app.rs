@@ -3717,11 +3717,9 @@ impl App {
             return;
         }
 
-        // The chain commands take an address, e.g. `add_validator <address>`
-        let is_menu_section = matches!(self.data_section(), Section::Validators | Section::Chains);
-        if is_menu_section && self.popup.get_mode() == PopupMode::Menu {
+        if self.popup.get_mode() == PopupMode::Menu {
             self.popup.insert_input_paste_data(data);
-        };
+        }
     }
 
     /// Cancel instruction.
