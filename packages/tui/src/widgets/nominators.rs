@@ -169,7 +169,7 @@ impl NominatorsList {
 
     pub fn update_stake_ledger(&mut self, key: &AccountKey, ledger: StakeLedger) {
         if let Some(nominator) = self.nominators.get_mut(key) {
-            nominator.ledger = ledger;
+            nominator.set_ledger(ledger);
         }
     }
 
@@ -187,7 +187,7 @@ impl NominatorsList {
 
     pub fn update_nominations(&mut self, key: &AccountKey, nominations: Option<Nominations>) {
         if let Some(nominator) = self.nominators.get_mut(key) {
-            nominator.nominations = nominations;
+            nominator.set_nominations(nominations);
         }
     }
 

@@ -12,6 +12,31 @@ use std::collections::HashSet;
 use subxt::utils::AccountId32;
 use suno_config::SupportedRuntime;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum NominatorStatus {
+    /// Nominator has nominated validators backed by its active stake, displayed as [A]
+    Active,
+    /// Nominator has nominated validators but it's stake is not active,
+    /// or it is only backing validators that aren’t authorities, displayed as [I]
+    Inactive,
+    /// Nominator has nominations that were suppressed, displayed as [S]
+    Suppressed,
+    /// Nominator has no nominations set or they are not yet known, displayed as [U]
+    #[default]
+    Unknown,
+}
+
+impl std::fmt::Display for NominatorStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Active => write!(f, "[A]"),
+            Self::Inactive => write!(f, "[I]"),
+            Self::Suppressed => write!(f, "[S]"),
+            Self::Unknown => write!(f, "[U]"),
+        }
+    }
+}
+
 /// An account that nominates validators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nominator {
@@ -27,6 +52,8 @@ pub struct Nominator {
     pub payee: Payee,
     /// Proxies of the nominator.
     pub proxies: HashSet<ProxyKey>,
+    /// Status of the nominator.
+    pub status: NominatorStatus,
 }
 
 impl Nominator {
@@ -38,6 +65,7 @@ impl Nominator {
             ledger: StakeLedger::default(),
             payee: Payee::None,
             proxies: HashSet::new(),
+            status: NominatorStatus::default(),
         }
     }
 
@@ -58,6 +86,39 @@ impl Nominator {
 
     pub fn identity(&self) -> &Option<Identity> {
         self.account.identity()
+    }
+
+    pub fn status(&self) -> &NominatorStatus {
+        &self.status
+    }
+
+    pub fn set_status(&mut self, status: NominatorStatus) {
+        self.status = status;
+    }
+
+    /// Sets the nominations read from the chain, none when the nominator has made none, and the
+    /// status that follows from them.
+    pub fn set_nominations(&mut self, nominations: Option<Nominations>) {
+        self.nominations = nominations;
+        self.status = self.nominations_status();
+    }
+
+    /// Sets the staking ledger read from the chain. The status depends on the active stake.
+    pub fn set_ledger(&mut self, ledger: StakeLedger) {
+        self.ledger = ledger;
+        self.status = self.nominations_status();
+    }
+
+    /// The status that follows from the nominations and the active stake backing them.
+    fn nominations_status(&self) -> NominatorStatus {
+        match &self.nominations {
+            Some(n) if n.suppressed => NominatorStatus::Suppressed,
+            Some(n) if !n.targets.is_empty() && self.ledger.active() == 0 => {
+                NominatorStatus::Inactive
+            }
+            Some(n) if !n.targets.is_empty() => NominatorStatus::Active,
+            _ => NominatorStatus::Unknown,
+        }
     }
 
     pub fn is_tracked(&self) -> bool {
@@ -193,6 +254,36 @@ mod tests {
         assert!(nominator.is_tracked());
         assert!(!nominator.is_nominating());
         assert_eq!(nominator.targets_count(), 0);
+    }
+
+    #[test]
+    fn the_status_follows_the_nominations() {
+        let mut nominator = nominator();
+        assert_eq!(nominator.status(), &NominatorStatus::Unknown);
+
+        nominator.set_nominations(None);
+        assert_eq!(nominator.status(), &NominatorStatus::Unknown);
+
+        let nominations = Nominations {
+            targets: vec![[2; 32]],
+            submitted_in: 10,
+            suppressed: false,
+        };
+        nominator.set_nominations(Some(nominations.clone()));
+        assert_eq!(nominator.status(), &NominatorStatus::Inactive);
+
+        nominator.set_ledger(StakeLedger::new(100, 100, vec![]));
+        assert_eq!(nominator.status(), &NominatorStatus::Active);
+
+        nominator.set_ledger(StakeLedger::new(0, 100, vec![Chunk::new(10, 100)]));
+        assert_eq!(nominator.status(), &NominatorStatus::Inactive);
+        nominator.set_ledger(StakeLedger::new(100, 100, vec![]));
+
+        nominator.set_nominations(Some(Nominations {
+            suppressed: true,
+            ..nominations
+        }));
+        assert_eq!(nominator.status(), &NominatorStatus::Suppressed);
     }
 
     #[test]

@@ -83,6 +83,24 @@ const COLLATOR_STATUS: &[HelpEntry] = &[
     ("[U] ", "Undefined. No Collator intention set."),
 ];
 
+const NOMINATOR_STATUS: &[HelpEntry] = &[
+    ("[A] ", "Active. Nominating with active stake."),
+    (
+        "[I] ",
+        "Inactive. Nominations set, but no active stake backing validators.",
+    ),
+    ("[S] ", "Suppressed. Its nominations were suppressed."),
+    ("[U] ", "Undefined. No Nominator intention set."),
+];
+
+const NOMINATOR_PROXIES: &[HelpEntry] = &[
+    ("[S] ", "Staking. Must be configured on Asset Hub Chain."),
+    (
+        "[NT] ",
+        "NonTransfer. Must be configured on Asset Hub Chain.",
+    ),
+];
+
 const COLLATOR_PROXIES: &[HelpEntry] = &[
     (
         "[C] ",
@@ -224,6 +242,8 @@ const HELP_SECTIONS: &[(&str, &[HelpEntry])] = &[
     ("VALIDATOR SUPPORTED PROXIES", VALIDATOR_PROXIES),
     ("COLLATOR STATUS (◈)", COLLATOR_STATUS),
     ("COLLATOR SUPPORTED PROXIES", COLLATOR_PROXIES),
+    ("NOMINATOR STATUS (◈)", NOMINATOR_STATUS),
+    ("NOMINATOR SUPPORTED PROXIES", NOMINATOR_PROXIES),
     ("STAKING SUPPORTED EXTRINSICS", STAKING_EXTRINSICS),
     ("COLLATOR SUPPORTED EXTRINSICS", COLLATOR_EXTRINSICS),
     ("KEYS SUPPORTED EXTRINSICS", KEYS_EXTRINSICS),

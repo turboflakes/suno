@@ -25,7 +25,7 @@ pub use babe::Epoch;
 pub use chain::{BlockHash, BlockNumber, Chain, RecentBlocks};
 pub use collator::Collator;
 pub use key::AccountKey;
-pub use nominator::Nominator;
+pub use nominator::{Nominator, NominatorStatus};
 pub use origin::Origins;
 pub use staking::Era;
 pub use storage::Response;

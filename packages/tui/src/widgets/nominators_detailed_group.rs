@@ -306,11 +306,7 @@ impl<'a> NominatorsDetailedGroupWidget<'a> {
     ) -> Vec<Cell<'static>> {
         let decimals = nominator.runtime().token_decimals();
 
-        let status = match &nominator.nominations {
-            Some(n) if n.suppressed => "[S]",
-            Some(n) if !n.targets.is_empty() => "[N]",
-            _ => "[I]",
-        };
+        let status = nominator.status().to_string();
         let identity = match nominator.identity() {
             Some(identity) => identity.to_string(),
             None => nominator.to_compact_string(6),
