@@ -23,7 +23,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
         return match key_event.code {
             // Select previous main window/tab
             KeyCode::Char('w') => Action::Navigation(NavigationAction::PrevWindow),
-            KeyCode::Char('c') => Action::Navigation(NavigationAction::Copy),
+            KeyCode::Char('c' | 'C') => Action::Navigation(NavigationAction::Copy),
             _ => Action::System(SystemAction::Noop),
         };
     }
@@ -81,6 +81,8 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
 /// The keys that complete the chord started with `ctrl+x`
 fn handle_chord_key_events(key_event: KeyEvent) -> Action {
     let call = match key_event.code {
+        // Copy the selected address, same as ctrl+shift+c
+        KeyCode::Char('a') => return Action::Navigation(NavigationAction::Copy),
         KeyCode::Char('v') => Call::AddValidator { stash: None },
         KeyCode::Char('n') => Call::AddNominator { stash: None },
         KeyCode::Char('c') => Call::AddCollator { stash: None },

@@ -343,15 +343,16 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         let features = CONFIG.features();
         let mut keys = Vec::new();
         if features.validators_enabled() {
-            keys.push(("v", "validator"));
+            keys.push(("v", "add validator"));
         }
         if features.nominators_enabled() {
-            keys.push(("n", "nominator"));
+            keys.push(("n", "add nominator"));
         }
         if features.collators_enabled() {
-            keys.push(("c", "collator"));
+            keys.push(("c", "add collator"));
         }
-        keys.push(("p", "proxy"));
+        keys.push(("p", "add proxy"));
+        keys.push(("a", "copy account"));
         keys.push(("esc", "cancel"));
         for (i, (key, label)) in keys.into_iter().enumerate() {
             if i > 0 {

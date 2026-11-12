@@ -177,6 +177,10 @@ const KEYBINDINGS: &[HelpEntry] = &[
         "Add a validator, nominator, collator or proxy account. Press ctrl+x, then the key within 6 seconds.",
     ),
     (
+        "ctrl+x a ",
+        "Copy the selected account address to the clipboard.",
+    ),
+    (
         "left/right ",
         "Switch the chain, validators, collators while its commands are shown.",
     ),
