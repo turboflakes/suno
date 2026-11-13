@@ -939,28 +939,10 @@ impl App {
         let Some(people_runtime) = runtime.people_runtime() else {
             return false;
         };
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
-            return false;
-        };
-
         let keys = keys.to_vec();
-
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
-                    return;
-                }
-            };
-
-            sync::spawn_fetch_validators_identity(&api_at, people_runtime, &keys, &tx);
-        });
-        true
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_validators_identity(api_at, people_runtime, &keys, tx);
+        })
     }
 
     /// Fetches the data of the `keys` validators of the relay chain `runtime` that takes a fetch
@@ -973,25 +955,11 @@ impl App {
         }
 
         // The authority status and the session keys are held on the relay chain
-        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-            let keys = keys.clone();
-            let tx = self.tx.clone();
-            tokio::spawn(async move {
-                let api_at = match api.at_block(block_hash).await.boxed() {
-                    Ok(api_at) => api_at,
-                    Err(e) => {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Failed to client at_block: {}",
-                            e
-                        ))));
-                        return;
-                    }
-                };
-
-                sync::spawn_fetch_validators_authority_status(&api_at, runtime, &keys, &tx);
-                sync::spawn_fetch_validators_session_keys(&api_at, runtime, &keys, &tx);
-            });
-        }
+        let relay_keys = keys.clone();
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_validators_authority_status(api_at, runtime, &relay_keys, tx);
+            sync::spawn_fetch_validators_session_keys(api_at, runtime, &relay_keys, tx);
+        });
 
         // The staking data is held on the Asset Hub chain: the bonded stake (the ledger) and the
         // payee, and, for the active era, the stake overview and the era points. If the era is
@@ -1002,46 +970,27 @@ impl App {
                 .as_ref()
                 .and_then(|c| c.era().as_ref())
                 .map(|e| e.index());
-            if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(asset_hub_runtime) {
-                let tx = self.tx.clone();
-                tokio::spawn(async move {
-                    let api_at = match api.at_block(block_hash).await.boxed() {
-                        Ok(api_at) => api_at,
-                        Err(e) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Failed to client at_block: {}",
-                                e
-                            ))));
-                            return;
-                        }
-                    };
+            self.spawn_at_latest_block(asset_hub_runtime, move |api_at, tx| {
+                sync::spawn_fetch_validators_staking_ledger(api_at, asset_hub_runtime, &keys, tx);
+                sync::spawn_fetch_validators_payee(api_at, asset_hub_runtime, &keys, tx);
 
-                    sync::spawn_fetch_validators_staking_ledger(
-                        &api_at,
+                if let Some(era_index) = era_index {
+                    sync::spawn_fetch_validators_stake_overview(
+                        api_at,
                         asset_hub_runtime,
+                        era_index,
                         &keys,
-                        &tx,
+                        tx,
                     );
-                    sync::spawn_fetch_validators_payee(&api_at, asset_hub_runtime, &keys, &tx);
-
-                    if let Some(era_index) = era_index {
-                        sync::spawn_fetch_validators_stake_overview(
-                            &api_at,
-                            asset_hub_runtime,
-                            era_index,
-                            &keys,
-                            &tx,
-                        );
-                        sync::spawn_fetch_validators_era_points(
-                            &api_at,
-                            asset_hub_runtime,
-                            era_index,
-                            &keys,
-                            &tx,
-                        );
-                    }
-                });
-            }
+                    sync::spawn_fetch_validators_era_points(
+                        api_at,
+                        asset_hub_runtime,
+                        era_index,
+                        &keys,
+                        tx,
+                    );
+                }
+            });
         }
     }
 
@@ -1250,32 +1199,16 @@ impl App {
             return;
         }
 
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) else {
-            return;
-        };
-
         // Aura's expected block time is derived from the relay chain epoch data
         let is_epoch_known = self
             .chains
             .get_chain_by_runtime(runtime.relay_chain())
             .is_some_and(|chain| chain.epoch().is_some());
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
-                    return;
-                }
-            };
-
-            sync::spawn_fetch_collators_account_balance(&api_at, runtime, &keys, &tx);
-            sync::spawn_fetch_collators_session_keys(&api_at, runtime, &keys, &tx);
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_collators_account_balance(api_at, runtime, &keys, tx);
+            sync::spawn_fetch_collators_session_keys(api_at, runtime, &keys, tx);
             if is_epoch_known {
-                sync::spawn_fetch_collators_last_authored_block(&api_at, runtime, &keys, &tx);
+                sync::spawn_fetch_collators_last_authored_block(api_at, runtime, &keys, tx);
             }
         });
     }
@@ -1287,10 +1220,6 @@ impl App {
         let Some(people_runtime) = runtime.relay_chain().people_runtime() else {
             return false;
         };
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
-            return false;
-        };
-
         // The same stash can be a collator of several chains, and the identity is the same, so
         // it is only fetched once
         let mut seen = HashSet::new();
@@ -1300,22 +1229,9 @@ impl App {
             .cloned()
             .collect();
 
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
-                    return;
-                }
-            };
-
-            sync::spawn_fetch_collators_identity(&api_at, people_runtime, &keys, &tx);
-        });
-        true
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_collators_identity(api_at, people_runtime, &keys, tx);
+        })
     }
 
     /// Fetches the identity of the `keys` nominators of the relay chain `runtime`, held on its
