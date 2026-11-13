@@ -9,7 +9,7 @@ use suno_config::{fetch_validators_from_source, NodeConfig, PinnedNode, Supporte
 use suno_primitives::{
     balance::Balance,
     identity::Identity,
-    origin::Origin,
+    origin::{Origin, Origins},
     proxy::ProxyKey,
     session::Keys,
     staking::{Chunk, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
@@ -77,6 +77,13 @@ impl Default for ValidatorsList {
 impl ValidatorsList {
     pub fn add_validator(&mut self, validator: Validator) {
         let key = validator.key();
+        // A validator listed from more than one place is listed once, with every origin
+        if let Some(listed) = self.validators.get_mut(key) {
+            for origin in validator.origins.iter() {
+                listed.origins.add(origin);
+            }
+            return;
+        }
         if !self.validators.contains_key(key) {
             // Keep the order sorted by runtime (insertion order within a runtime), so the
             // validators of a runtime are listed together and the selection order matches the
@@ -126,6 +133,58 @@ impl ValidatorsList {
             })
             .map(|(key, _)| key.clone())
             .collect();
+        for key in &stale {
+            self.validators.remove(key);
+            self.requested.remove(key);
+            self.identity_requested.remove(key);
+        }
+        self.validators_order.retain(|key| !stale.contains(key));
+
+        // New validators are inserted in order and others removed, which shifts the selected index
+        let selected = selected.filter(|key| !stale.contains(key));
+        if !added.is_empty() || !stale.is_empty() {
+            self.restore_selection(selected);
+        }
+        added
+    }
+
+    /// Lists the validators nominated by the nominators of `runtime`, the relay chain, with the
+    /// nominated origin on top of the ones they already have. The validators no longer nominated
+    /// lose it, and the ones left with no other origin are removed, unless `keep_onchain`, when
+    /// every validator on-chain is listed. Returns the keys of the validators added.
+    pub fn update_nominated(
+        &mut self,
+        runtime: SupportedRuntime,
+        targets: &HashSet<AccountBytes>,
+        keep_onchain: bool,
+    ) -> Vec<ValidatorKey> {
+        let selected = self.selected_key();
+
+        let mut added = Vec::new();
+        for bytes in targets {
+            let key = ValidatorKey::from_bytes(runtime, *bytes);
+            if !self.validators.contains_key(&key) {
+                added.push(key);
+            }
+            self.add_validator(Validator::with_origin(
+                runtime,
+                AccountId32::from(*bytes),
+                Origin::Nominated,
+            ));
+        }
+
+        let mut stale = Vec::new();
+        for (key, validator) in self.validators.iter_mut() {
+            if key.runtime == runtime
+                && validator.origins.is_nominated()
+                && !targets.contains(&key.bytes)
+            {
+                validator.origins.remove(Origin::Nominated);
+                if validator.origins.is_onchain() && !keep_onchain {
+                    stale.push(key.clone());
+                }
+            }
+        }
         for key in &stale {
             self.validators.remove(key);
             self.requested.remove(key);
@@ -233,41 +292,13 @@ impl ValidatorsList {
 
     pub fn add_amount_to_stake_ledger(&mut self, validator_key: &AccountKey, amount: Amount) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            validator.ledger = StakeLedger {
-                active: validator.ledger.active().saturating_add(amount),
-                total: validator.ledger.total().saturating_add(amount),
-                unlocking: validator.ledger.unlocking().to_vec(),
-            };
+            validator.ledger = validator.ledger.with_amount_added(amount);
         }
     }
 
     pub fn sub_chunk_from_stake_ledger(&mut self, validator_key: &AccountKey, chunk: Chunk) {
         if let Some(validator) = self.validators.get_mut(validator_key) {
-            let unlocking: Vec<Chunk> = if validator.ledger.unlocking().is_empty() {
-                vec![chunk.clone()]
-            } else {
-                validator
-                    .ledger
-                    .unlocking()
-                    .iter()
-                    .map(|c| {
-                        if c.era == chunk.era {
-                            Chunk {
-                                era: c.era,
-                                value: c.value.saturating_add(chunk.value),
-                            }
-                        } else {
-                            c.clone()
-                        }
-                    })
-                    .collect()
-            };
-
-            validator.ledger = StakeLedger {
-                active: validator.ledger.active().saturating_sub(chunk.value),
-                total: validator.ledger.total().saturating_sub(chunk.value),
-                unlocking,
-            };
+            validator.ledger = validator.ledger.with_chunk_unbonded(chunk);
         }
     }
 
@@ -334,6 +365,10 @@ impl ValidatorsList {
         self.validators.get(validator_key)
     }
 
+    pub fn is_listed(&self, validator_key: &ValidatorKey) -> bool {
+        self.validators.contains_key(validator_key)
+    }
+
     pub fn get_validator_by_key_cloned(&self, validator_key: &ValidatorKey) -> Option<Validator> {
         self.validators.get(validator_key).cloned()
     }
@@ -349,6 +384,10 @@ impl ValidatorsList {
         self.get_validator_by_index(index).cloned()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.validators.is_empty()
+    }
+
     /// Returns an iterator of validators in display order
     pub fn validators_iter(&self) -> impl Iterator<Item = &Validator> {
         self.validators_order
@@ -356,11 +395,10 @@ impl ValidatorsList {
             .filter_map(move |key| self.validators.get(key))
     }
 
-    /// Returns true if any validator has proxies available
+    /// Returns true if any of the tracked validators, has valid proxies to show.
     pub fn proxies_available(&self) -> bool {
-        self.validators_order
-            .iter()
-            .any(|key| self.validators.get(key).is_some_and(|v| v.has_proxies()))
+        self.validators_iter()
+            .any(|v| v.is_tracked() && v.has_proxies())
     }
 
     /// Get all AccountKeys for a specific runtime
@@ -442,16 +480,6 @@ impl ValidatorsList {
         });
         self.table_state.select(first);
         self.scroll_offset = 0;
-    }
-
-    /// Height needed by [`ValidatorsCompactWidget`] to display every validator without scrolling.
-    /// One row per validator and one extra row per distinct runtime group, and at least one row
-    /// for the empty set message.
-    pub fn total_compact_height(&self) -> u16 {
-        let tracked: Vec<&Validator> = self.validators_iter().filter(|v| v.is_tracked()).collect();
-        let runtimes: HashSet<SupportedRuntime> = tracked.iter().map(|v| v.runtime()).collect();
-        let rows = (tracked.len() + runtimes.len()).max(1);
-        3 + rows as u16
     }
 
     /// The selected validator, only while its row is highlighted.
@@ -589,16 +617,16 @@ impl ValidatorsList {
     /// Pins the validator when it was only found on-chain, and the other way
     /// around. The validators listed by the config are always tracked, so they stay as they are.
     /// Returns the new origin of the validator, if it changed.
-    pub fn toggle_pinned(&mut self, key: &ValidatorKey) -> Option<Origin> {
+    pub fn toggle_pinned(&mut self, key: &ValidatorKey) -> Option<Origins> {
         let validator = self.validators.get_mut(key)?;
-        let origin = validator.origin.toggle()?;
-        validator.origin = origin;
+        let origins = validator.origins.toggle()?;
+        validator.origins = origins;
 
         // The selection can only be on a tracked validator, outside of the main window
         if !self.focus.selects_every_row() {
             self.select_nearest_tracked();
         }
-        Some(origin)
+        Some(origins)
     }
 
     /// Adds a validator pinned from the TUI, or pins the one found on-chain. Returns its key,
@@ -610,7 +638,10 @@ impl ValidatorsList {
     ) -> Option<ValidatorKey> {
         let key = AccountKey::new(runtime, stash);
         match self.validators.get(&key) {
-            Some(validator) if validator.is_tracked() => return None,
+            // Already listed by the config, or pinned before
+            Some(validator) if validator.origins.is_config() || validator.origins.is_pinned() => {
+                return None
+            }
             Some(_) => {
                 self.toggle_pinned(&key)?;
             }
@@ -623,10 +654,30 @@ impl ValidatorsList {
         Some(key)
     }
 
+    /// Unpins the validator pinned from the TUI, which is no longer listed when it is only found
+    /// on-chain and those are not listed. Returns whether it was pinned.
+    pub fn remove_pinned(&mut self, runtime: SupportedRuntime, stash: AccountId32) -> bool {
+        let key = AccountKey::new(runtime, stash);
+        if !self
+            .validators
+            .get(&key)
+            .is_some_and(|v| v.origins.is_pinned())
+        {
+            return false;
+        }
+        let Some(origins) = self.toggle_pinned(&key) else {
+            return false;
+        };
+        if origins.is_onchain() && !CONFIG.features().all_validators_visible() {
+            self.remove(&key);
+        }
+        true
+    }
+
     /// The validators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.validators_iter()
-            .filter(|v| v.origin.is_pinned())
+            .filter(|v| v.origins.is_pinned())
             .map(|v| PinnedNode {
                 chain: v.runtime(),
                 stash: v.account.stash(),
@@ -659,7 +710,7 @@ impl ValidatorsList {
     pub fn remove_on_chain(&mut self) {
         let keys: Vec<_> = self
             .validators_iter()
-            .filter(|v| v.origin.is_onchain())
+            .filter(|v| v.origins.is_onchain())
             .map(|v| v.key().clone())
             .collect();
         for key in keys {
@@ -975,5 +1026,109 @@ impl ValidatorsList {
 
     pub fn update_balance(&mut self, validator_key: &AccountKey, balance: Balance) {
         self.set_balance(validator_key, balance);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RUNTIME: SupportedRuntime = SupportedRuntime::Kusama;
+
+    fn key(byte: u8) -> ValidatorKey {
+        ValidatorKey::from_bytes(RUNTIME, [byte; 32])
+    }
+
+    fn validator(byte: u8, origin: Origin) -> Validator {
+        Validator::with_origin(RUNTIME, AccountId32::from([byte; 32]), origin)
+    }
+
+    fn origins(list: &ValidatorsList, byte: u8) -> Option<Origins> {
+        list.validators.get(&key(byte)).map(|v| v.origins)
+    }
+
+    #[test]
+    fn a_validator_listed_twice_keeps_every_origin() {
+        let mut list = ValidatorsList::default();
+        list.add_validator(validator(1, Origin::Config));
+        list.add_validator(validator(1, Origin::Nominated));
+
+        assert_eq!(list.validators_order.len(), 1);
+        let origins = origins(&list, 1).unwrap();
+        assert!(origins.is_config());
+        assert!(origins.is_nominated());
+    }
+
+    #[test]
+    fn the_nominated_validators_are_listed_with_their_origin() {
+        let mut list = ValidatorsList::default();
+        list.add_validator(validator(1, Origin::Config));
+        list.add_validator(validator(2, Origin::OnChain));
+
+        // 1 is in the config, 2 is only found on-chain, 3 is not known
+        let targets = HashSet::from([[1; 32], [2; 32], [3; 32]]);
+        let added = list.update_nominated(RUNTIME, &targets, true);
+
+        assert_eq!(added, vec![key(3)]);
+        assert_eq!(list.validators_order.len(), 3);
+        let one = origins(&list, 1).unwrap();
+        assert!(one.is_config() && one.is_nominated());
+        // The ones nominated are followed, not only found on-chain
+        let two = origins(&list, 2).unwrap();
+        assert!(two.is_nominated() && !two.is_onchain());
+        assert_eq!(origins(&list, 3), Some(Origins::new(Origin::Nominated)));
+    }
+
+    #[test]
+    fn a_validator_no_longer_nominated_loses_the_origin() {
+        let mut list = ValidatorsList::default();
+        list.add_validator(validator(1, Origin::Config));
+        list.update_nominated(RUNTIME, &HashSet::from([[1; 32], [2; 32]]), false);
+
+        list.update_nominated(RUNTIME, &HashSet::from([[2; 32]]), false);
+
+        // The one of the config stays, without the nominated origin
+        let one = origins(&list, 1).unwrap();
+        assert!(one.is_config() && !one.is_nominated());
+        assert!(origins(&list, 2).unwrap().is_nominated());
+    }
+
+    #[test]
+    fn a_validator_only_listed_for_being_nominated_is_removed_when_it_is_not() {
+        let mut list = ValidatorsList::default();
+        list.update_nominated(RUNTIME, &HashSet::from([[3; 32]]), false);
+        assert!(origins(&list, 3).is_some());
+
+        list.update_nominated(RUNTIME, &HashSet::new(), false);
+
+        assert!(origins(&list, 3).is_none());
+        assert!(list.validators_order.is_empty());
+    }
+
+    #[test]
+    fn the_validators_found_on_chain_stay_when_all_of_them_are_listed() {
+        let mut list = ValidatorsList::default();
+        list.add_validator(validator(4, Origin::OnChain));
+        list.update_nominated(RUNTIME, &HashSet::from([[4; 32]]), true);
+
+        list.update_nominated(RUNTIME, &HashSet::new(), true);
+
+        // Back to only found on-chain
+        assert_eq!(origins(&list, 4), Some(Origins::new(Origin::OnChain)));
+    }
+
+    #[test]
+    fn a_nominated_validator_can_be_pinned_and_unpinned() {
+        let mut list = ValidatorsList::default();
+        list.update_nominated(RUNTIME, &HashSet::from([[5; 32]]), false);
+
+        list.toggle_pinned(&key(5)).unwrap();
+        assert!(origins(&list, 5).unwrap().is_pinned());
+        assert_eq!(list.get_pinned().len(), 1);
+
+        list.toggle_pinned(&key(5)).unwrap();
+        let unpinned = origins(&list, 5).unwrap();
+        assert!(!unpinned.is_pinned() && unpinned.is_nominated());
+        assert!(list.get_pinned().is_empty());
     }
 }

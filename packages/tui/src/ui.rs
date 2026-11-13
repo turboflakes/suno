@@ -1,11 +1,22 @@
 use crate::app::{App, Focus};
+use crate::section::Section;
 use crate::widgets::collators::CollatorsView;
-use crate::widgets::collators_compact::CollatorsCompactWidget;
+use crate::widgets::collators_compact::{
+    compact_height as collators_compact_height, CollatorsCompactWidget,
+};
 use crate::widgets::collators_detailed_group::CollatorsDetailedGroupWidget;
 use crate::widgets::collators_detailed_list::CollatorsDetailedListWidget;
 use crate::widgets::logs::LogsWidget;
-use crate::widgets::proxies_compact::{compact_height, ProxiesCompactWidget};
-use crate::widgets::validators_compact::ValidatorsCompactWidget;
+use crate::widgets::nominators_compact::{
+    compact_height as nominators_compact_height, NominatorsCompactWidget,
+};
+use crate::widgets::nominators_detailed_group::NominatorsDetailedGroupWidget;
+use crate::widgets::proxies_compact::{
+    compact_height as proxies_compact_height, ProxiesCompactWidget,
+};
+use crate::widgets::validators_compact::{
+    compact_height as validators_compact_height, ValidatorsCompactWidget,
+};
 use crate::widgets::validators_detailed_group::ValidatorsDetailedGroupWidget;
 use crate::widgets::{help::HelpWidget, logo::Logo, popup::Mode as PopupMode, window::Window};
 use ratatui::{
@@ -38,33 +49,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints(vec![Constraint::Max(56), Constraint::Fill(1)])
         .split(container[0]);
 
-    let validators_enabled = config.features.validators_enabled();
-    let collators_enabled = config.features.collators_enabled();
-
-    let validators_constraint = match (validators_enabled, collators_enabled) {
-        (true, true) => Constraint::Length(app.validators.total_compact_height()),
-        (true, false) => Constraint::Fill(1),
-        (false, _) => Constraint::Length(0),
-    };
-    let collators_constraint = if collators_enabled {
-        Constraint::Fill(1)
-    } else {
-        Constraint::Length(0)
-    };
-
-    // The proxy accounts are only displayed when there are any
-    let proxies_constraint = if app.proxies.is_empty() {
-        Constraint::Length(0)
-    } else {
-        Constraint::Length(compact_height(&app.proxies))
-    };
-
-    let constraints = vec![
-        Constraint::Length(3 + config.chains.len() as u16),
-        validators_constraint,
-        collators_constraint,
-        proxies_constraint,
-    ];
+    let constraints = left_menu_constraints(app);
 
     let left_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -82,8 +67,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         render_collators_widget(app, frame, left_layout[2]);
     }
 
-    if !app.proxies.is_empty() {
-        render_proxies_widget(app, frame, left_layout[3]);
+    if config.features.nominators_enabled() {
+        render_nominators_widget(app, frame, left_layout[3]);
+    }
+
+    if config.features.proxies_enabled() {
+        render_proxies_widget(app, frame, left_layout[4]);
     }
 
     render_window(app, frame, outer_layout[1]);
@@ -103,6 +92,61 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if app.popup.is_visible() {
         render_popup(app, frame, container[0]);
     }
+}
+
+/// The heights of the left menu: the chains, then the panes from top to bottom, each with the
+/// height its rows need. The ones not enabled take no space, and the expanded one takes the
+/// space left.
+fn left_menu_constraints(app: &App) -> Vec<Constraint> {
+    let config = CONFIG.clone();
+    let features = &config.features;
+    let panes = [
+        (
+            Section::Validators,
+            features.validators_enabled(),
+            validators_compact_height(&app.validators),
+        ),
+        (
+            Section::Collators,
+            features.collators_enabled(),
+            collators_compact_height(&app.collators),
+        ),
+        (
+            Section::Nominators,
+            features.nominators_enabled(),
+            nominators_compact_height(&app.nominators),
+        ),
+        (
+            Section::Proxies,
+            features.proxies_enabled(),
+            proxies_compact_height(&app.proxies),
+        ),
+    ];
+
+    // The expanded pane falls back to the first enabled one
+    let expanded = app.expanded_section();
+    let expanded = if panes
+        .iter()
+        .any(|(section, enabled, _)| *enabled && *section == expanded)
+    {
+        expanded
+    } else {
+        panes
+            .iter()
+            .find(|(_, enabled, _)| *enabled)
+            .map(|(section, _, _)| section.clone())
+            .unwrap_or_default()
+    };
+
+    let mut constraints = vec![Constraint::Length(3 + config.chains.len() as u16)];
+    constraints.extend(panes.iter().map(|(section, enabled, height)| {
+        match (enabled, *section == expanded) {
+            (false, _) => Constraint::Length(0),
+            (true, true) => Constraint::Fill(1),
+            (true, false) => Constraint::Length(*height),
+        }
+    }));
+    constraints
 }
 
 fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
@@ -127,7 +171,9 @@ fn render_window(app: &mut App, frame: &mut Frame, area: Rect) {
     }
     // Switch between main body window.
     match app.window {
-        Window::Validators | Window::Collators => render_body_widget(app, frame, body_area),
+        Window::Validators | Window::Collators | Window::Nominators => {
+            render_body_widget(app, frame, body_area)
+        }
         Window::Logs => render_logs_widget(app, frame, body_area),
         Window::Help => render_help_widget(app, frame, body_area),
     }
@@ -222,6 +268,14 @@ fn render_collators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     );
 }
 
+fn render_nominators_widget(app: &mut App, frame: &mut Frame, area: Rect) {
+    frame.render_stateful_widget(
+        NominatorsCompactWidget::new(app.theme),
+        area,
+        &mut app.nominators,
+    );
+}
+
 fn render_proxies_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_stateful_widget(ProxiesCompactWidget::new(app.theme), area, &mut app.proxies);
 }
@@ -247,6 +301,10 @@ fn render_body_widget(app: &mut App, frame: &mut Frame, area: Rect) {
                 frame.render_stateful_widget(widget, block_area, &mut app.collators);
             }
         },
+        Window::Nominators => {
+            let widget = NominatorsDetailedGroupWidget::new(&app.chains, theme);
+            frame.render_stateful_widget(widget, block_area, &mut app.nominators);
+        }
         _ => {
             let widget = ValidatorsDetailedGroupWidget::new(&app.chains, theme);
             frame.render_stateful_widget(widget, block_area, &mut app.validators);
@@ -280,19 +338,70 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
 
     let mut legend = vec![];
 
+    // The keys that complete the chord started with `ctrl+x`
+    if app.focus == Focus::Chord {
+        let features = CONFIG.features();
+        let mut keys = Vec::new();
+        if features.validators_enabled() {
+            keys.push(("v", "add validator"));
+        }
+        if features.nominators_enabled() {
+            keys.push(("n", "add nominator"));
+        }
+        if features.collators_enabled() {
+            keys.push(("c", "add collator"));
+        }
+        keys.push(("p", "add proxy"));
+        keys.push(("a", "copy account"));
+        keys.push(("esc", "cancel"));
+        for (i, (key, label)) in keys.into_iter().enumerate() {
+            if i > 0 {
+                legend.push(Span::raw("   "));
+            }
+            legend.push(Span::styled(key.to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(label.to_string(), theme.paragraph.label));
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(legend))
+                .block(block)
+                .right_aligned(),
+            area,
+        );
+        return;
+    }
+
     // Esc clears the selection without changing the section, so ask the lists, not the section
     let has_selection = app.chains.is_active()
         || app.proxies.is_active()
+        || app.nominators.is_active()
         || app.validators.is_active()
         || app.collators.is_active()
         || (app.section.is_none()
             && (app.window.is_logs_selected() || app.window.is_help_selected()));
 
-    // show how to open popup with available commands depending on the active section
-    if ((app.validators.is_active()
-        && (app.validators.is_proxy_valid() || app.validators.has_commands_available()))
+    // show how to open popup with available commands depending on the active section, or the
+    // ones of the first chain when nothing is selected
+    if (app.focus == Focus::None
+        || (app.validators.is_active()
+            && (app.validators.is_proxy_valid()
+                || app.validators.has_commands_available()
+                || app
+                    .validators
+                    .get_selected_ref()
+                    .is_some_and(|v| v.origins.is_pinned())))
         || (app.collators.is_active()
-            && (app.collators.is_proxy_valid() || app.collators.has_commands_available()))
+            && (app.collators.is_proxy_valid()
+                || app.collators.has_commands_available()
+                || app
+                    .collators
+                    .get_selected_ref()
+                    .is_some_and(|c| c.origin.is_pinned())))
+        || (app.nominators.is_active()
+            && app
+                .nominators
+                .get_selected()
+                .is_some_and(|n| n.origins.is_pinned() || n.is_proxy_valid()))
         || app.chains.is_active()
         || (app.proxies.is_active()
             && app.proxies.get_selected().is_some_and(|p| p.is_removable())))
@@ -306,93 +415,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
     };
 
     if app.popup.is_visible() {
-        legend.push(Span::raw("   "));
-        match app.popup.get_mode() {
-            PopupMode::Menu => {
-                legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled(
-                    "autocomplete".to_string(),
-                    theme.paragraph.label,
-                ));
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("confirm".to_string(), theme.paragraph.label));
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            PopupMode::ThemeMenu => {
-                legend.push(Span::styled("tab".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled(
-                    "autocomplete".to_string(),
-                    theme.paragraph.label,
-                ));
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
-                if app.popup.get_confirmed_theme().is_some() {
-                    legend.push(Span::raw("   "));
-                    legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
-                    legend.push(Span::raw(" "));
-                    legend.push(Span::styled("confirm".to_string(), theme.paragraph.label));
-                }
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            PopupMode::ScanAccount => {
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            PopupMode::Features => {
-                legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("select".to_string(), theme.paragraph.label));
-                if let Some(state) = app.popup.get_selected_feature() {
-                    legend.push(Span::raw("   "));
-                    legend.push(Span::styled("space".to_string(), theme.paragraph.base));
-                    legend.push(Span::raw(" "));
-                    legend.push(Span::styled(
-                        state.toggle_label().to_string(),
-                        theme.paragraph.label,
-                    ));
-                }
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            PopupMode::Confirmation => {
-                legend.push(Span::styled("enter".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled(
-                    "sign and submit".to_string(),
-                    theme.paragraph.label,
-                ));
-                legend.push(Span::raw("   "));
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            PopupMode::ChainSpecs | PopupMode::Metadata => {
-                legend.push(Span::styled("esc".to_string(), theme.paragraph.base));
-                legend.push(Span::raw(" "));
-                legend.push(Span::styled("go back".to_string(), theme.paragraph.label));
-            }
-            _ => {}
-        }
+        // The popups show their keybindings in the popup header
     } else if app.focus == Focus::Filter {
         legend.push(Span::raw("   "));
         legend.push(Span::styled(
@@ -413,15 +436,32 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             legend.push(Span::styled(hint.to_string(), theme.paragraph.label));
             legend.push(Span::raw("   "));
         }
-        legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
-        legend.push(Span::raw(" "));
-        let up_down = if app.window.is_help_selected() {
-            "scroll"
-        } else {
-            "select"
-        };
-        legend.push(Span::styled(up_down.to_string(), theme.paragraph.label));
-        legend.push(Span::raw("   "));
+        let has_items = ((app.validators.is_active() || app.collators.is_active())
+            && (app.window.is_validators_selected() || app.window.is_collators_selected())
+            && app.can_filter())
+            || (app.nominators.is_active()
+                && app.window.is_nominators_selected()
+                && !app.nominators.is_empty());
+        if has_items {
+            legend.push(Span::styled("↑ ↓".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            let up_down = if app.window.is_help_selected() {
+                "scroll"
+            } else {
+                "select"
+            };
+            legend.push(Span::styled(up_down.to_string(), theme.paragraph.label));
+            legend.push(Span::raw("   "));
+        }
+        if has_items && app.collators.is_active() && app.window.is_collators_selected() {
+            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
+            legend.push(Span::raw(" "));
+            legend.push(Span::styled(
+                "switch view".to_string(),
+                theme.paragraph.label,
+            ));
+            legend.push(Span::raw("   "));
+        }
         if app.section.is_none() && app.window.is_logs_selected() {
             legend.push(Span::styled("shift+↑/↓".to_string(), theme.paragraph.base));
             legend.push(Span::raw(" "));
@@ -441,15 +481,6 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
             ));
             legend.push(Span::raw("   "));
         }
-        if app.collators.is_active() && app.window.is_collators_selected() {
-            legend.push(Span::styled("ctrl+v".to_string(), theme.paragraph.base));
-            legend.push(Span::raw(" "));
-            legend.push(Span::styled(
-                "switch view".to_string(),
-                theme.paragraph.label,
-            ));
-            legend.push(Span::raw("   "));
-        }
     }
 
     // The hints above are followed by their separator, so drop the last one
@@ -457,7 +488,7 @@ fn render_legend_widget(app: &mut App, frame: &mut Frame, area: Rect) {
         legend.pop();
     }
 
-    let can_filter = app.window.is_validators_selected() || app.window.is_collators_selected();
+    let can_filter = app.can_filter();
     if app.popup.is_hidden() && app.focus != Focus::Filter && can_filter {
         legend.push(Span::raw("   "));
         legend.push(Span::styled("ctrl+f".to_string(), theme.paragraph.base));

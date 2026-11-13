@@ -7,7 +7,7 @@ use crate::{
     key::AccountBytes,
     proxy::SupportedProxy,
     session::Keys,
-    staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Chunk, Era, Nominations, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
 };
 use sp_arithmetic::Permill;
@@ -92,6 +92,14 @@ pub struct ValidatorPayeeData {
     pub payee: Payee,
 }
 
+/// Nominator nominations combining account and the validators nominated, none if the stash
+/// is not a nominator
+#[derive(Debug)]
+pub struct NominationsData {
+    pub account: AccountBytes,
+    pub nominations: Option<Nominations>,
+}
+
 /// Validator keys combining account and session keys
 #[derive(Debug)]
 pub struct ValidatorKeysData {
@@ -164,6 +172,10 @@ pub enum Response {
     ValidatorPrefs(Data<ValidatorPrefsData>),
     ValidatorPrefsNext(Data<ValidatorPrefsData>),
     ValidatorPayee(Data<ValidatorPayeeData>),
+    Nominations(Data<NominationsData>),
+    NominatorStakeLedger(Data<StakeLedgerData>),
+    NominatorPayee(Data<ValidatorPayeeData>),
+    NominatorSupportedProxy(Data<SupportedProxyData>),
     ValidatorNextKeys(Data<ValidatorKeysData>),
     ValidatorQueuedKeys(Data<ValidatorKeysData>),
     Identity(Data<IdentityData>),
@@ -185,6 +197,7 @@ pub enum Response {
     SupportedProxy(Data<SupportedProxyData>),
     Balance(Data<BalanceData>),
     CollatorBalance(Data<BalanceData>),
+    NominatorBalance(Data<BalanceData>),
     AuraAuthorities(Data<Vec<AccountBytes>>),
     SessionValidators(Data<Vec<AccountBytes>>),
     AllValidators(Data<Vec<AccountBytes>>),
@@ -192,6 +205,7 @@ pub enum Response {
     Candidates(Data<Vec<(AccountBytes, Deposit)>>),
     LastAuthoredBlock(Data<LastAuthoredBlockData>),
     CollatorIdentity(Data<IdentityData>),
+    NominatorIdentity(Data<IdentityData>),
     CollatorNextKeys(Data<CollatorKeysData>),
     CollatorQueuedKeys(Data<CollatorKeysData>),
     CollatorSupportedProxy(Data<SupportedProxyData>),
@@ -264,6 +278,13 @@ impl Response {
         Response::ValidatorPayee(Data::new(ValidatorPayeeData { account, payee }))
     }
 
+    pub fn nominations(account: AccountBytes, nominations: Option<Nominations>) -> Self {
+        Response::Nominations(Data::new(NominationsData {
+            account,
+            nominations,
+        }))
+    }
+
     pub fn validator_next_keys(account: AccountBytes, keys: Option<Keys>) -> Self {
         Response::ValidatorNextKeys(Data::new(ValidatorKeysData { account, keys }))
     }
@@ -321,6 +342,10 @@ impl Response {
                 data.value.proxy_account = Some(proxy_account);
                 Response::CollatorSupportedProxy(data)
             }
+            Response::NominatorSupportedProxy(mut data) => {
+                data.value.proxy_account = Some(proxy_account);
+                Response::NominatorSupportedProxy(data)
+            }
             other => other,
         }
     }
@@ -359,6 +384,10 @@ impl Response {
 
     pub fn collator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
         Response::CollatorIdentity(Data::new(IdentityData { account, identity }))
+    }
+
+    pub fn nominator_identity(account: AccountBytes, identity: Option<Identity>) -> Self {
+        Response::NominatorIdentity(Data::new(IdentityData { account, identity }))
     }
 
     pub fn collator_next_keys(account: AccountBytes, keys: Option<[u8; 32]>) -> Self {

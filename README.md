@@ -154,8 +154,10 @@ Options:
 
 ```bash
 'tab' to input focus, to command autocomplete or just to navigate between pane sections
-'esc' to close popup or unfocus from input field
+'esc' to close popup, go back, or unfocus from input field
 'ctrl+e' to show list of enabled commands for the selected validator
+'ctrl+x' followed by 'v', 'n', 'c' or 'p' to add a validator, nominator, collator or proxy account
+'left / right' to switch the chain while the commands of a chain are shown
 'ctrl+w' to switch window
 'ctrl+m' to mask or unmask hosts
 'ctrl+t' to show the list of available themes
@@ -243,6 +245,9 @@ chains:
 
 features:
   enable_validators: true
+  enable_collators: true
+  enable_nominators: true
+  enable_proxies: true
   enable_check_update: true
   enable_lightclient_db: true
   show_all_validators: true

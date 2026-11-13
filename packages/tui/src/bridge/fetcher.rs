@@ -116,6 +116,12 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_nominations(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_validator_identity(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -128,7 +134,32 @@ pub trait RuntimeFetcher {
         stash: &AccountId32,
     ) -> Result<Response, Error>;
 
+    async fn fetch_nominator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
     async fn fetch_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error>;
+
+    async fn fetch_nominator_stake_ledger(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_nominator_payee(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_and_validate_nominators_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
         stash: &AccountId32,
@@ -162,6 +193,12 @@ pub trait RuntimeFetcher {
     ) -> Result<Response, Error>;
 
     async fn fetch_collators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error>;
+
+    async fn fetch_nominators_account_balance(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
         stash: &AccountId32,
@@ -571,6 +608,22 @@ impl RuntimeFetcher for Runtime {
         }
     }
 
+    async fn fetch_nominations(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        match self {
+            Runtime::AssetHubKusama => suno_asset_hub_kusama::fetch_nominations(api, stash).await,
+            Runtime::AssetHubPolkadot => {
+                suno_asset_hub_polkadot::fetch_nominations(api, stash).await
+            }
+            Runtime::AssetHubPaseo => suno_asset_hub_paseo::fetch_nominations(api, stash).await,
+            Runtime::AssetHubWestend => suno_asset_hub_westend::fetch_nominations(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }
+    }
+
     async fn fetch_validator_identity(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -603,6 +656,30 @@ impl RuntimeFetcher for Runtime {
 
         match response {
             Response::Identity(data) => Ok(Response::collator_identity(
+                data.value.account,
+                data.value.identity,
+            )),
+            other => Ok(other),
+        }
+    }
+
+    async fn fetch_nominator_identity(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // The identity is keyed by stash, so reuse the per-chain fetch and relabel the response
+        // so dispatch routes it into the nominators state.
+        let response = match self {
+            Runtime::PeoplePolkadot => suno_people_polkadot::fetch_identity(api, stash).await,
+            Runtime::PeopleKusama => suno_people_kusama::fetch_identity(api, stash).await,
+            Runtime::PeoplePaseo => suno_people_paseo::fetch_identity(api, stash).await,
+            Runtime::PeopleWestend => suno_people_westend::fetch_identity(api, stash).await,
+            _ => Err(Error::UnsupportedRuntime(*self)),
+        }?;
+
+        match response {
+            Response::Identity(data) => Ok(Response::nominator_identity(
                 data.value.account,
                 data.value.identity,
             )),
@@ -693,6 +770,56 @@ impl RuntimeFetcher for Runtime {
             .collect())
     }
 
+    async fn fetch_nominator_stake_ledger(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        // The ledger is read the same way for every stash, it's the response that tells whom
+        // it belongs to
+        Ok(match self.fetch_stake_ledger(api, stash).await? {
+            Response::StakeLedger(data) => Response::NominatorStakeLedger(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_nominator_payee(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        Ok(match self.fetch_validator_payee(api, stash).await? {
+            Response::ValidatorPayee(data) => Response::NominatorPayee(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_and_validate_nominators_proxy_account(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+        proxy: &AccountId32,
+    ) -> Result<Vec<Response>, Error> {
+        let responses = self.fetch_proxy_account(api, stash, proxy).await?;
+
+        let runtime = *self;
+        Ok(responses
+            .into_iter()
+            .filter_map(|response| match response {
+                Response::SupportedProxy(data) => {
+                    let proxy_key = ProxyKey::new(runtime, data.value.proxy_type);
+                    (proxy_key.is_staking_valid()
+                        || proxy_key.is_staking_operator_valid()
+                        || proxy_key.is_non_transfer_valid()
+                        || !proxy_key.is_valid())
+                    .then(|| Response::NominatorSupportedProxy(data))
+                }
+                other => Some(other),
+            })
+            .map(|response| response.with_proxy_account(*proxy.as_ref()))
+            .collect())
+    }
+
     async fn fetch_and_validate_collators_proxy_account(
         &self,
         api: &OnlineClientAtBlock<CustomConfig>,
@@ -768,6 +895,19 @@ impl RuntimeFetcher for Runtime {
 
         Ok(match response {
             Response::Balance(data) => Response::CollatorBalance(data),
+            other => other,
+        })
+    }
+
+    async fn fetch_nominators_account_balance(
+        &self,
+        api: &OnlineClientAtBlock<CustomConfig>,
+        stash: &AccountId32,
+    ) -> Result<Response, Error> {
+        let response = self.fetch_account_balance(api, stash).await?;
+
+        Ok(match response {
+            Response::Balance(data) => Response::NominatorBalance(data),
             other => other,
         })
     }

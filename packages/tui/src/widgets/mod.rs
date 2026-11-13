@@ -1,3 +1,4 @@
+pub mod chain_header;
 pub mod chains;
 pub mod collators;
 pub mod collators_compact;
@@ -11,6 +12,9 @@ pub mod input_password;
 pub mod list_focus;
 pub mod logo;
 pub mod logs;
+pub mod nominators;
+pub mod nominators_compact;
+pub mod nominators_detailed_group;
 pub mod popup;
 pub mod proxies;
 pub mod proxies_compact;

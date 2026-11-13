@@ -8,7 +8,31 @@ use ratatui::{
     widgets::{Block, Cell, Padding, Row, StatefulWidget, Table},
 };
 use sp_arithmetic::traits::Zero;
+use std::collections::HashSet;
 use suno_theme::Theme;
+
+/// The most rows displayed at once, the list scrolls past them.
+const MAX_ROWS: usize = 8;
+
+/// The height the compact list needs: the header, the group names, the tracked collators, and
+/// the padding. At least one row is kept for the message of the empty set.
+pub fn compact_height(collators: &CollatorsList) -> u16 {
+    let tracked: Vec<_> = collators
+        .collators_iter()
+        .filter(|c| c.is_tracked())
+        .collect();
+    let groups: HashSet<_> = tracked
+        .iter()
+        .map(|c| {
+            if collators.is_list_view() {
+                c.runtime().relay_chain().to_string()
+            } else {
+                c.runtime().to_string()
+            }
+        })
+        .collect();
+    (tracked.len() + groups.len()).clamp(1, MAX_ROWS) as u16 + 3
+}
 
 #[derive(Debug, Default)]
 pub struct CollatorsCompactWidget {
@@ -112,7 +136,13 @@ impl StatefulWidget for CollatorsCompactWidget {
         if rows.len().is_zero() {
             rows.push(Row::new(vec![
                 Text::from(""),
-                Text::from("-- empty set --").style(theme.paragraph.label_italic),
+                Text::from(Line::from(vec![
+                    Span::styled("-- ", theme.paragraph.label_italic),
+                    Span::styled("ctrl+x c", theme.paragraph.base_italic),
+                    Span::raw(" "),
+                    Span::styled("add a collator", theme.paragraph.label_italic),
+                    Span::styled(" --", theme.paragraph.label_italic),
+                ])),
             ]));
         }
 
@@ -152,7 +182,7 @@ impl StatefulWidget for CollatorsCompactWidget {
             .block(block)
             .header(Row::new(header_cells).set_style(theme.table.header(is_active)))
             .style(theme.table.base)
-            .row_highlight_style(theme.table.row_highlight(is_active))
+            .row_highlight_style(state.focus().compact_row_highlight(&theme.table))
             .highlight_symbol(theme.table.highlight_symbol(is_active));
 
         let mut display_table_state = state.table_state;

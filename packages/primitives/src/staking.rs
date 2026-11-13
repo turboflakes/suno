@@ -1,4 +1,5 @@
 use crate::display::{format_millis, to_compact_string};
+use crate::key::AccountBytes;
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::Perbill;
 use std::{
@@ -167,6 +168,41 @@ impl StakeLedger {
     pub fn unlocking(&self) -> &[Chunk] {
         &self.unlocking
     }
+
+    /// The ledger with `amount` more bonded.
+    pub fn with_amount_added(&self, amount: u128) -> Self {
+        Self {
+            active: self.active.saturating_add(amount),
+            total: self.total.saturating_add(amount),
+            unlocking: self.unlocking.clone(),
+        }
+    }
+
+    /// The ledger with the `chunk` moved from the bonded stake to unlocking.
+    pub fn with_chunk_unbonded(&self, chunk: Chunk) -> Self {
+        let unlocking = if self.unlocking.is_empty() {
+            vec![chunk.clone()]
+        } else {
+            self.unlocking
+                .iter()
+                .map(|c| {
+                    if c.era == chunk.era {
+                        Chunk {
+                            era: c.era,
+                            value: c.value.saturating_add(chunk.value),
+                        }
+                    } else {
+                        c.clone()
+                    }
+                })
+                .collect()
+        };
+        Self {
+            active: self.active.saturating_sub(chunk.value),
+            total: self.total.saturating_sub(chunk.value),
+            unlocking,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -233,5 +269,36 @@ impl FromStr for Payee {
                 )),
             },
         }
+    }
+}
+
+/// The targets a nominator has chosen
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Nominations {
+    /// The validators nominated
+    pub targets: Vec<AccountBytes>,
+    /// The era in which the nominations were submitted
+    pub submitted_in: u32,
+    /// Whether the nominations were suppressed, e.g. after a slash
+    pub suppressed: bool,
+}
+
+#[cfg(test)]
+mod ledger_tests {
+    use super::*;
+
+    #[test]
+    fn bonding_more_adds_to_the_active_and_the_total_stake() {
+        let ledger = StakeLedger::new(100, 150, vec![Chunk::new(10, 50)]);
+        let bonded = ledger.with_amount_added(40);
+        assert_eq!(bonded, StakeLedger::new(140, 190, vec![Chunk::new(10, 50)]));
+    }
+
+    #[test]
+    fn unbonding_moves_the_chunk_out_of_the_active_stake() {
+        let ledger = StakeLedger::new(100, 100, vec![]);
+        let unbonded = ledger.with_chunk_unbonded(Chunk::new(12, 30));
+        assert_eq!(unbonded.active(), 70);
+        assert_eq!(unbonded.unlocking(), &[Chunk::new(12, 30)]);
     }
 }

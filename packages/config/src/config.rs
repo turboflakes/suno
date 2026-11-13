@@ -165,9 +165,11 @@ pub struct ChainConfig {
     #[serde(default)]
     pub validators_source: Option<Source>,
     /// Collators for the system chains.
-    /// TODO: To be supported in the future.
     #[serde(default)]
     pub collators: Vec<NodeConfig>,
+    /// Nominators stashes, only available on asset hub chains.
+    #[serde(default)]
+    pub nominators: Vec<NodeConfig>,
 }
 
 impl Default for ChainConfig {
@@ -185,6 +187,7 @@ impl ChainConfig {
             validators: Vec::new(),
             validators_source: None,
             collators: Vec::new(),
+            nominators: Vec::new(),
         }
     }
 
@@ -196,6 +199,7 @@ impl ChainConfig {
             validators,
             validators_source,
             collators: Vec::new(),
+            nominators: Vec::new(),
         }
     }
 
@@ -342,6 +346,14 @@ pub enum NodeConfig {
     },
 }
 
+impl NodeConfig {
+    pub fn stash(&self) -> Stash {
+        match self {
+            Self::Address(stash) | Self::Detailed { stash, .. } => *stash,
+        }
+    }
+}
+
 impl FromStr for NodeConfig {
     type Err = Error;
 
@@ -469,6 +481,11 @@ impl Config {
         self.read_prefs().pinned_collators()
     }
 
+    /// The nominators pinned from the TUI, as saved in the prefs file.
+    pub fn pinned_nominators(&self) -> Vec<PinnedNode> {
+        self.read_prefs().pinned_nominators()
+    }
+
     /// The features as set in the config file, before any change from the TUI. The file is read
     /// again, defaults apply if it is missing or malformed.
     fn file_features(&self) -> Features {
@@ -498,6 +515,12 @@ impl Config {
                 }
             })
             .collect()
+    }
+
+    /// Whether any feature was saved with a value that only applies once the app is started
+    /// again, meaning it differs from the value in use right now.
+    pub fn pending_restart(&self) -> bool {
+        self.feature_states().iter().any(|s| s.pending_restart())
     }
 
     /// Applies what was changed from the TUI, over what the config file sets: the last theme
@@ -535,6 +558,18 @@ impl Config {
         write_private_atomic(&self.prefs_path(), content.as_bytes())
     }
 
+    /// The nominators are only available on the Asset Hub.
+    fn validate_nominators(&self) -> Result<(), Error> {
+        for chain in &self.chains {
+            for (runtime, chain_config) in chain {
+                if !chain_config.nominators.is_empty() && !runtime.is_asset_hub() {
+                    return Err(Error::NominatorsNotSupported(runtime.to_string()));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), Error> {
         // Validate that at least one chain is configured
         if self.chains.is_empty() {
@@ -543,6 +578,9 @@ impl Config {
 
         // Validate themes
         self.themes.validate()?;
+
+        // Validate nominators
+        self.validate_nominators()?;
 
         // Validate custom commands don't clash with built-in call names
         for chain in &self.chains {
@@ -972,18 +1010,20 @@ pub fn save_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
     }
 }
 
-/// Removes the proxy account from the signers of the chain `runtime`, and from the prefs. It only
-/// removes the accounts added from the TUI or listed under `signers`. Failures are logged and
-/// otherwise ignored.
-pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) {
+/// Removes the proxy account pinned from the TUI, from the signers of the chain `runtime` and from
+/// the prefs. Returns whether it was pinned. Failures to persist are logged and otherwise ignored.
+pub fn remove_proxy_account(runtime: SupportedRuntime, account: AccountId32) -> bool {
+    let mut prefs = CONFIG.read_prefs();
+    if !prefs.remove_proxy_account(runtime, account) {
+        return false;
+    }
     if let Some(chain_config) = CONFIG.chain_config(runtime) {
         chain_config.remove_signer(&account);
     }
-    let mut prefs = CONFIG.read_prefs();
-    prefs.remove_proxy_account(runtime, account);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist the removed proxy account: {}", e);
     }
+    true
 }
 
 /// Persists the active theme so it's restored on the next launch.
@@ -1013,6 +1053,16 @@ pub fn save_pinned_collators(pinned: Vec<PinnedNode>) {
     prefs.set_pinned_collators(pinned);
     if let Err(e) = CONFIG.write_prefs(&prefs) {
         warn!("Failed to persist the pinned collators: {}", e);
+    }
+}
+
+/// Persists the nominators pinned from the TUI so they are restored on the next launch.
+/// Failures are logged and otherwise ignored, this is a nice-to-have.
+pub fn save_pinned_nominators(pinned: Vec<PinnedNode>) {
+    let mut prefs = CONFIG.read_prefs();
+    prefs.set_pinned_nominators(pinned);
+    if let Err(e) = CONFIG.write_prefs(&prefs) {
+        warn!("Failed to persist the pinned nominators: {}", e);
     }
 }
 
@@ -1224,6 +1274,68 @@ explorer:
     }
 
     #[test]
+    fn test_config_nominators_on_asset_hub() {
+        let yaml = r#"
+chains:
+  - asset_hub_kusama:
+      rpc_url: "wss://rpc.asset.hub"
+      nominators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        - stash: "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+        let chain = config.chains[0].values().next().unwrap();
+
+        assert_eq!(chain.nominators.len(), 2);
+        assert!(chain.validators.is_empty());
+        assert!(config.validate_nominators().is_ok());
+    }
+
+    #[test]
+    fn test_config_nominators_default_to_none() {
+        let yaml = r#"
+chains:
+  - asset_hub_kusama:
+      rpc_url: "wss://rpc.asset.hub"
+"#;
+        let file = create_temp_file(yaml);
+        let config = Config::from_file(file.path()).unwrap();
+
+        assert!(config.chains[0]
+            .values()
+            .next()
+            .unwrap()
+            .nominators
+            .is_empty());
+    }
+
+    #[test]
+    fn test_config_nominators_are_not_supported_outside_asset_hub() {
+        for chain in ["polkadot", "kusama", "people_kusama"] {
+            let yaml = format!(
+                r#"
+chains:
+  - {chain}:
+      rpc_url: "wss://rpc.example.io"
+      nominators:
+        - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+"#
+            );
+            let file = create_temp_file(&yaml);
+            let config = Config::from_file(file.path()).unwrap();
+
+            assert!(
+                matches!(
+                    config.validate_nominators(),
+                    Err(Error::NominatorsNotSupported(_))
+                ),
+                "nominators should be rejected on {chain}"
+            );
+        }
+    }
+
+    #[test]
     fn test_config_global_proxy_account_enables_qrcode() {
         let yaml = r#"
 chains:
@@ -1373,11 +1485,13 @@ explorer:
         let mut prefs = config.read_prefs();
         prefs.set_pinned_validators(validators.clone());
         prefs.set_pinned_collators(collators.clone());
+        prefs.set_pinned_nominators(collators.clone());
         config.write_prefs(&prefs).unwrap();
 
         let reloaded = Config::from_file(&config_path).unwrap();
         assert_eq!(reloaded.pinned_validators(), validators);
         assert_eq!(reloaded.pinned_collators(), collators);
+        assert_eq!(reloaded.pinned_nominators(), collators);
 
         // Same shape as the chains of the config file, with the addresses of the network
         let content = std::fs::read_to_string(dir.path().join(".config.local.yaml")).unwrap();

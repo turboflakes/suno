@@ -31,6 +31,8 @@ struct ChainPrefs {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     collators: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    nominators: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     signers: Vec<SignerPrefs>,
     #[serde(default, skip_serializing)]
     signer: Option<SignerPrefs>,
@@ -38,7 +40,10 @@ struct ChainPrefs {
 
 impl ChainPrefs {
     fn is_empty(&self) -> bool {
-        self.validators.is_empty() && self.collators.is_empty() && self.signers.is_empty()
+        self.validators.is_empty()
+            && self.collators.is_empty()
+            && self.nominators.is_empty()
+            && self.signers.is_empty()
     }
 }
 
@@ -54,8 +59,8 @@ fn to_address(chain: SupportedRuntime, account: &AccountId32) -> String {
     account.to_ss58check_with_version(Ss58AddressFormat::custom(chain.account_format()))
 }
 
-/// A validator or a collator pinned from the TUI, since it is not listed in the
-/// config file. The `chain` is the relay chain of a validator, and the chain of a collator.
+/// A validator, a collator or a nominator pinned from the TUI, since it is not listed in the
+/// config file. The `chain` is the relay chain of a validator, and the chain of a collator or a nominator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PinnedNode {
     pub chain: SupportedRuntime,
@@ -100,13 +105,22 @@ impl Prefs {
         self.store_chains(chains);
     }
 
-    pub(crate) fn remove_proxy_account(&mut self, chain: SupportedRuntime, account: AccountId32) {
+    /// Removes the proxy account of the chain. Returns whether it was pinned.
+    pub(crate) fn remove_proxy_account(
+        &mut self,
+        chain: SupportedRuntime,
+        account: AccountId32,
+    ) -> bool {
         let mut chains = self.take_chains();
+        let mut removed = false;
         if let Some(prefs) = chains.get_mut(&chain) {
             let proxy_account = to_address(chain, &account);
+            let count = prefs.signers.len();
             prefs.signers.retain(|s| s.proxy_account != proxy_account);
+            removed = prefs.signers.len() != count;
         }
         self.store_chains(chains);
+        removed
     }
 
     /// The prefs of the chains, merged by chain.
@@ -116,6 +130,7 @@ impl Prefs {
             let entry = chains.entry(chain).or_default();
             entry.validators.extend(prefs.validators);
             entry.collators.extend(prefs.collators);
+            entry.nominators.extend(prefs.nominators);
             for signer in prefs.signer.into_iter().chain(prefs.signers) {
                 if !entry
                     .signers
@@ -146,6 +161,10 @@ impl Prefs {
         self.pinned(|chain| &chain.collators)
     }
 
+    pub(crate) fn pinned_nominators(&self) -> Vec<PinnedNode> {
+        self.pinned(|chain| &chain.nominators)
+    }
+
     fn pinned(&self, list: impl Fn(&ChainPrefs) -> &Vec<String>) -> Vec<PinnedNode> {
         self.chains
             .iter()
@@ -173,6 +192,10 @@ impl Prefs {
 
     pub(crate) fn set_pinned_collators(&mut self, nodes: Vec<PinnedNode>) {
         self.set_pinned(nodes, |chain| &mut chain.collators);
+    }
+
+    pub(crate) fn set_pinned_nominators(&mut self, nodes: Vec<PinnedNode>) {
+        self.set_pinned(nodes, |chain| &mut chain.nominators);
     }
 
     /// Replaces the list of the pinned `nodes`, validators or collators, and keeps the other.

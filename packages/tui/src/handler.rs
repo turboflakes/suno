@@ -3,9 +3,18 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use suno_actions::{
     Action, FilterAction, InputAction, NavigationAction, PopupAction, SystemAction,
 };
+use suno_primitives::call::Call;
 
 /// Handles the key events and triggers respective action.
 pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
+    // The key after `ctrl+x` completes the chord, anything else ends it
+    if app_focus == Focus::Chord
+        && !key_event
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+    {
+        return handle_chord_key_events(key_event);
+    }
     // Check for pressed ctrl + shift + key combination first
     if key_event
         .modifiers
@@ -14,7 +23,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
         return match key_event.code {
             // Select previous main window/tab
             KeyCode::Char('w') => Action::Navigation(NavigationAction::PrevWindow),
-            KeyCode::Char('c') => Action::Navigation(NavigationAction::Copy),
+            KeyCode::Char('c' | 'C') => Action::Navigation(NavigationAction::Copy),
             _ => Action::System(SystemAction::Noop),
         };
     }
@@ -26,6 +35,10 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 KeyCode::Char('c') => Action::System(SystemAction::Quit),
                 // Update application on ctrl-u`
                 KeyCode::Char('u') => Action::System(SystemAction::Update),
+                // Start the chord to add an account, completed by the next key
+                KeyCode::Char('x') if matches!(app_focus, Focus::Main | Focus::None) => {
+                    Action::Navigation(NavigationAction::StartChord)
+                }
                 // Open popup on `ctrl-e` within the active section
                 KeyCode::Char('e') => Action::Popup(PopupAction::Open),
                 // Open the theme selection popup
@@ -45,7 +58,7 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
                 // Toggle between grouped and listed detailed views
                 KeyCode::Char('v') => Action::Navigation(NavigationAction::ToggleView),
                 _ => match app_focus {
-                    Focus::Main => match key_event.code {
+                    Focus::Main | Focus::None => match key_event.code {
                         KeyCode::Char('h') => Action::Navigation(NavigationAction::PrevTab),
                         KeyCode::Char('j') => Action::Navigation(NavigationAction::MoveUp),
                         KeyCode::Char('k') => Action::Navigation(NavigationAction::MoveDown),
@@ -65,12 +78,27 @@ pub fn handle_key_events(key_event: KeyEvent, app_focus: Focus) -> Action {
     }
 }
 
+/// The keys that complete the chord started with `ctrl+x`
+fn handle_chord_key_events(key_event: KeyEvent) -> Action {
+    let call = match key_event.code {
+        // Copy the selected address, same as ctrl+shift+c
+        KeyCode::Char('a') => return Action::Navigation(NavigationAction::Copy),
+        KeyCode::Char('v') => Call::AddValidator { stash: None },
+        KeyCode::Char('n') => Call::AddNominator { stash: None },
+        KeyCode::Char('c') => Call::AddCollator { stash: None },
+        KeyCode::Char('p') => Call::AddProxyAccount { account: None },
+        _ => return Action::Navigation(NavigationAction::EndChord),
+    };
+    Action::Popup(PopupAction::OpenCall(Box::new(call)))
+}
+
 fn handle_key_events_without_modifiers(key_event: KeyEvent, app_focus: Focus) -> Action {
     match app_focus {
-        Focus::Main => handle_main_key_events(key_event),
+        Focus::Main | Focus::None => handle_main_key_events(key_event),
         Focus::Popup | Focus::Scanner => handle_popup_key_events(key_event),
         Focus::Input => handle_editing_key_events(key_event),
         Focus::Filter => handle_filter_key_events(key_event),
+        Focus::Chord => Action::System(SystemAction::Noop),
         // _ => Action::System(SystemAction::Noop),
     }
 }
@@ -128,8 +156,19 @@ fn handle_popup_key_events(key_event: KeyEvent) -> Action {
         // KeyCode::Char('f') => Action::Validator(ValidatorAction::SubmitChangeCommission),
         // KeyCode::Char('k') => Action::Validator(ValidatorAction::SubmitKickNominators),
         // KeyCode::Char('s') => Action::Validator(ValidatorAction::SubmitSetSessionKey),
-        KeyCode::Tab => Action::Input(InputAction::Editing),
-        // The features popup: select a feature, switch it on or off, or back to the config file
+        KeyCode::Tab => Action::Input(InputAction::Editing(None)),
+        // Typing letters or digits, focus and starts input editing
+        KeyCode::Char(c)
+            if c.is_alphanumeric()
+                && !key_event
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            Action::Input(InputAction::Editing(Some(c)))
+        }
+        // The chain of the commands shown is switched without focusing the input
+        KeyCode::Left => Action::Input(InputAction::CursorLeft),
+        KeyCode::Right => Action::Input(InputAction::CursorRight),
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
         KeyCode::Char(' ') => Action::Popup(PopupAction::ToggleFeature),
@@ -165,5 +204,48 @@ fn handle_editing_key_events(key_event: KeyEvent) -> Action {
         KeyCode::Up => Action::Navigation(NavigationAction::MoveUp),
         KeyCode::Down => Action::Navigation(NavigationAction::MoveDown),
         _ => Action::System(SystemAction::Noop),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        KeyEvent::new(code, modifiers)
+    }
+
+    #[test]
+    fn ctrl_x_starts_the_chord_only_when_nothing_has_the_keys() {
+        let ctrl_x = key(KeyCode::Char('x'), KeyModifiers::CONTROL);
+        for focus in [Focus::Main, Focus::None] {
+            assert_eq!(
+                handle_key_events(ctrl_x, focus),
+                Action::Navigation(NavigationAction::StartChord)
+            );
+        }
+        assert_eq!(
+            handle_key_events(ctrl_x, Focus::Input),
+            Action::System(SystemAction::Noop)
+        );
+    }
+
+    #[test]
+    fn the_key_after_the_chord_adds_an_account_or_ends_it() {
+        let plain = |c| key(KeyCode::Char(c), KeyModifiers::NONE);
+        assert_eq!(
+            handle_key_events(plain('n'), Focus::Chord),
+            Action::Popup(PopupAction::OpenCall(Box::new(Call::AddNominator {
+                stash: None
+            })))
+        );
+        assert_eq!(
+            handle_key_events(plain('z'), Focus::Chord),
+            Action::Navigation(NavigationAction::EndChord)
+        );
+        assert_eq!(
+            handle_key_events(key(KeyCode::Esc, KeyModifiers::NONE), Focus::Chord),
+            Action::Navigation(NavigationAction::EndChord)
+        );
     }
 }

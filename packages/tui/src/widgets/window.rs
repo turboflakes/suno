@@ -7,6 +7,7 @@ pub enum Window {
     #[default]
     Validators,
     Collators,
+    Nominators,
     Logs,
     Help,
 }
@@ -17,6 +18,7 @@ impl Window {
         match self {
             Self::Validators => features.validators_enabled(),
             Self::Collators => features.collators_enabled(),
+            Self::Nominators => features.nominators_enabled(),
             Self::Logs | Self::Help => true,
         }
     }
@@ -27,6 +29,10 @@ impl Window {
 
     pub fn is_validators_selected(self) -> bool {
         matches!(self, Self::Validators)
+    }
+
+    pub fn is_nominators_selected(self) -> bool {
+        matches!(self, Self::Nominators)
     }
 
     pub fn is_logs_selected(self) -> bool {

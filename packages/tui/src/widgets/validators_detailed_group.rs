@@ -1,4 +1,6 @@
+use crate::widgets::chain_header::render_network_header;
 use crate::widgets::chains::ChainsList;
+use crate::widgets::list_focus::ListFocus;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::validators::ValidatorsList;
 use ratatui::{
@@ -6,14 +8,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Styled},
     text::{Line, Span, Text},
-    widgets::{Block, Cell, Padding, Paragraph, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Cell, Padding, Row, StatefulWidget, Table, TableState, Widget},
 };
 use suno_config::{Features, SupportedRuntime, CONFIG};
-use suno_primitives::{
-    display::{create_progress_bar_by_blocks, format_millis, format_planks},
-    validator::Validator,
-    NodeHost,
-};
+use suno_primitives::{display::format_planks, validator::Validator, NodeHost};
 use suno_theme::Theme;
 
 pub const GROUP_HEADER_HEIGHT: u16 = 7;
@@ -48,7 +46,8 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
         };
 
         // Values needed further down to render the table
-        let is_active = state.is_highlighted();
+        let focus = state.focus();
+        let is_active = focus.is_highlighted();
         let is_masked = state.is_masked();
         let table_state = state.table_state;
 
@@ -83,7 +82,7 @@ impl<'a> StatefulWidget for ValidatorsDetailedGroupWidget<'a> {
                 runtime,
                 &validators,
                 selected_validator,
-                is_active,
+                focus,
                 is_masked,
                 is_odd,
                 block,
@@ -149,7 +148,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        is_active: bool,
+        focus: ListFocus,
         is_masked: bool,
         is_odd: bool,
         block: Block,
@@ -177,7 +176,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
             runtime,
             validators,
             selected_validator,
-            is_active,
+            focus,
             is_masked,
             is_odd,
             body_area,
@@ -194,166 +193,23 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         buf: &mut Buffer,
         is_odd: bool,
     ) {
-        let theme = self.theme;
-        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            let block = Block::new().set_style(theme.block.alt(is_odd));
-            block.render(area, buf);
-            return;
-        };
-
-        let Some(ah_chain) = self.chains.get_chain_by_runtime(
-            runtime
-                .asset_hub_runtime()
-                .expect("every relay has an AssetHub chain"),
-        ) else {
-            let block = Block::new().set_style(theme.block.alt(is_odd));
-            block.render(area, buf);
-            return;
-        };
-
-        let [network_area, progress_area, progress_bar_area, countdown_area] = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),    // Network info
-                Constraint::Length(16), // Era / Session info bar
-                Constraint::Length(24), // Era / Session progress bar
-                Constraint::Length(20), // Countdown
-            ])
-            .areas(area);
-
-        // Draw and render general network stats
-
-        let network_lines = vec![
-            Line::from(
-                Span::raw(format!("{} NETWORK", runtime.to_string().to_uppercase()))
-                    .style(theme.paragraph.header_active),
-            ),
-            Line::from(vec![
-                Span::raw("Avg. block time ").style(theme.paragraph.label),
-                Span::raw(
-                    chain
-                        .epoch()
-                        .as_ref()
-                        .and_then(|e| chain.average_block_time_ms(e.block_time_ms()))
-                        .map(|ms| format_millis(ms, true, true))
-                        .unwrap_or_else(|| "-".to_string()),
-                ),
-            ]),
-            Line::from(vec![
-                Span::raw("Total validators ").style(theme.paragraph.label),
-                Span::raw(format!(
-                    "{} active, {} waiting",
-                    ah_chain.active_validators_count(),
-                    ah_chain.waiting_validators_count()
-                )),
-            ]),
-            Line::from(vec![
-                Span::raw("Total nominators ").style(theme.paragraph.label),
-                Span::raw(format!(
-                    "{} active, {} waiting",
-                    ah_chain.active_nominators_count(),
-                    ah_chain.waiting_nominators_count()
-                )),
-            ]),
-            Line::from(vec![
-                Span::raw("Total staked ").style(theme.paragraph.label),
-                Span::raw(ah_chain.total_staked_percentage()),
-            ]),
-            Line::from(vec![
-                Span::raw("Displayed ").style(theme.paragraph.label),
-                Span::raw(format!(
-                    "{} active, {} waiting",
-                    validators.iter().filter(|v| v.is_active()).count(),
-                    validators.iter().filter(|v| v.is_waiting()).count(),
-                )),
-            ]),
-        ];
-
-        let block = Block::new().set_style(theme.block.alt(is_odd));
-        let network_info = Paragraph::new(network_lines)
-            .block(block)
-            .style(theme.paragraph.base);
-
-        network_info.render(network_area, buf);
-
-        // Draw and render Progress Info
-
-        let Some(epoch) = chain.epoch() else {
-            // TODO: Handle epoch not available, maybe render loading indicator
-            let block = Block::new().set_style(theme.block.alt(is_odd));
-            let area = progress_area.union(progress_bar_area).union(countdown_area);
-            block.render(area, buf);
-            return;
-        };
-
-        let Some(era) = ah_chain.era() else {
-            // TODO: Handle era not available, maybe render loading indicator
-            let block = Block::new().set_style(theme.block.alt(is_odd));
-            let area = progress_area.union(progress_bar_area).union(countdown_area);
-            block.render(area, buf);
-            return;
-        };
-
-        let epoch_progress = epoch.progress(chain.finalized_block());
-        let era_progress = era.progress(epoch.duration(), epoch.block_time_ms());
-
-        let progress_lines = vec![
-            Line::from(""),
-            Line::from(format!(
-                "era {} {:.0}% ",
-                era.index(),
-                era_progress * 100_f64,
-            ))
-            .alignment(Alignment::Right),
-            Line::from(format!(
-                "epoch {} {:.0}% ",
-                epoch.index(),
-                epoch_progress * 100_f64,
-            ))
-            .alignment(Alignment::Right),
-        ];
-
-        let block = Block::new().set_style(theme.block.alt(is_odd));
-        let progress_info = Paragraph::new(progress_lines)
-            .block(block)
-            .style(theme.paragraph.base);
-
-        progress_info.render(progress_area, buf);
-
-        // Draw and render Progress Bars
-        let epoch_progress_bar = create_progress_bar_by_blocks(epoch_progress, 24);
-        let era_progress_bar = create_progress_bar_by_blocks(era_progress, 24);
-
-        let progress_bar_lines = vec![
-            Line::from(""),
-            Line::from(era_progress_bar).alignment(Alignment::Right),
-            Line::from(epoch_progress_bar).alignment(Alignment::Right),
-        ];
-
-        let block = Block::new().set_style(theme.block.alt(is_odd));
-        let progress_bar = Paragraph::new(progress_bar_lines)
-            .block(block)
-            .style(theme.paragraph.base);
-
-        progress_bar.render(progress_bar_area, buf);
-
-        // Draw and render Countdowns
-
-        let epoch_countdown_time = epoch.countdown_time(chain.finalized_block());
-        let era_countdown_time = era.countdown_time(epoch.duration(), epoch.block_time_ms());
-
-        let countdown_lines = vec![
-            Line::from(""),
-            Line::from(format!(" {} left", era_countdown_time,)).alignment(Alignment::Left),
-            Line::from(format!(" {} left", epoch_countdown_time,)).alignment(Alignment::Left),
-        ];
-
-        let block = Block::new().set_style(theme.block.alt(is_odd));
-        let countdown_info = Paragraph::new(countdown_lines)
-            .block(block)
-            .style(theme.paragraph.base);
-
-        countdown_info.render(countdown_area, buf);
+        let displayed = Line::from(vec![
+            Span::raw("Displayed ").style(self.theme.paragraph.label),
+            Span::raw(format!(
+                "{} active, {} waiting",
+                validators.iter().filter(|v| v.is_active()).count(),
+                validators.iter().filter(|v| v.is_waiting()).count(),
+            )),
+        ]);
+        render_network_header(
+            self.chains,
+            self.theme,
+            runtime,
+            displayed,
+            area,
+            buf,
+            is_odd,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -362,7 +218,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         validators: &[&Validator],
         selected_validator: Option<&Validator>,
-        is_active: bool,
+        focus: ListFocus,
         is_masked: bool,
         is_odd: bool,
         area: Rect,
@@ -396,15 +252,8 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
 
         let header = columns.header();
 
-        let rows = self.build_validator_rows(
-            validators,
-            selected_validator,
-            &columns,
-            era.index(),
-            is_masked,
-            theme,
-            &symbol,
-        );
+        let rows =
+            self.build_validator_rows(validators, &columns, era.index(), is_masked, theme, &symbol);
 
         // Note: If selected validator is in this group, add a column for the highlight symbol
         // if selected_validator.is_some() {
@@ -430,7 +279,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
         let table = Table::new(rows, widths)
             .block(block)
             .header(header.set_style(theme.table.header))
-            .row_highlight_style(theme.table.row_highlight(is_active));
+            .row_highlight_style(focus.row_highlight(&theme.table));
 
         StatefulWidget::render(table, area, buf, table_state);
     }
@@ -439,7 +288,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn build_validator_rows(
         &self,
         validators: &[&Validator],
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
@@ -448,7 +296,7 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) -> Vec<Row<'static>> {
         validators
             .iter()
-            .map(|v| self.validator_row(v, selected, columns, era, masked, theme, symbol))
+            .map(|v| self.validator_row(v, columns, era, masked, theme, symbol))
             .collect()
     }
 
@@ -456,16 +304,13 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn validator_row(
         &self,
         validator: &Validator,
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
         theme: Theme,
         symbol: &Span<'static>,
     ) -> Row<'static> {
-        let row = Row::new(
-            self.validator_cells(validator, selected, columns, era, masked, theme, symbol),
-        );
+        let row = Row::new(self.validator_cells(validator, columns, era, masked, theme, symbol));
         if validator.is_waiting() {
             row.style(Style::default().add_modifier(Modifier::DIM))
         } else {
@@ -477,7 +322,6 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     fn validator_cells(
         &self,
         validator: &Validator,
-        selected: Option<&Validator>,
         columns: &Columns,
         era: u32,
         masked: bool,
@@ -486,16 +330,10 @@ impl<'a> ValidatorsDetailedGroupWidget<'a> {
     ) -> Vec<Cell<'static>> {
         let decimals = validator.runtime().token_decimals();
 
-        let (cell_style, _highlight_symbol) = match selected {
-            Some(selected) if validator == selected => (theme.paragraph.cell_active, "❯"),
-            _ => (theme.paragraph.cell, ""),
-        };
-
         let mut cells = vec![
-            Cell::from(Text::from(validator.origin.symbol()).style(theme.paragraph.label(false))),
+            Cell::from(Text::from(validator.origins.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(validator.status().to_string()).alignment(Alignment::Left)),
-            Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left))
-                .style(cell_style),
+            Cell::from(Text::from(validator.display_identity()).alignment(Alignment::Left)),
         ];
 
         if columns.host {

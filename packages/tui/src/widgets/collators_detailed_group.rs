@@ -1,5 +1,6 @@
 use crate::widgets::chains::ChainsList;
 use crate::widgets::collators::CollatorsList;
+use crate::widgets::list_focus::ListFocus;
 use crate::widgets::scrollbar::render_scrollbar;
 use crate::widgets::spinner::current_frame;
 use ratatui::{
@@ -59,7 +60,8 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
         };
 
         // Values needed further down to render the table
-        let is_active = state.is_highlighted();
+        let focus = state.focus();
+        let is_active = focus.is_highlighted();
         let table_state = state.table_state;
 
         // Create a new area to fit all the content as total_height, but as wide as the screen.
@@ -93,7 +95,7 @@ impl<'a> StatefulWidget for CollatorsDetailedGroupWidget<'a> {
                 runtime,
                 &collators,
                 selected_collator,
-                is_active,
+                focus,
                 is_odd,
                 block,
                 group_area,
@@ -154,7 +156,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
-        is_active: bool,
+        focus: ListFocus,
         is_odd: bool,
         block: Block,
         area: Rect,
@@ -174,7 +176,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
             runtime,
             collators,
             selected_collator,
-            is_active,
+            focus,
             is_odd,
             body_area,
             buf,
@@ -350,7 +352,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         runtime: SupportedRuntime,
         collators: &[&Collator],
         selected_collator: Option<&Collator>,
-        is_active: bool,
+        focus: ListFocus,
         is_odd: bool,
         area: Rect,
         buf: &mut Buffer,
@@ -381,17 +383,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
 
         let rows = collators
             .iter()
-            .map(|c| {
-                self.collator_row(
-                    c,
-                    selected_collator,
-                    &columns,
-                    aura,
-                    current_slot,
-                    current_slot_ts,
-                    theme,
-                )
-            })
+            .map(|c| self.collator_row(c, &columns, aura, current_slot, current_slot_ts, theme))
             .collect::<Vec<_>>();
 
         // Note: Since table_state is being shared with other widgets, it is important to guarantee
@@ -410,7 +402,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let block = Block::new().set_style(theme.block.alt(is_odd));
         let table = Table::new(rows, widths)
             .block(block)
-            .row_highlight_style(theme.table.row_highlight(is_active))
+            .row_highlight_style(focus.row_highlight(&theme.table))
             .header(header.set_style(theme.table.header));
 
         StatefulWidget::render(table, area, buf, table_state);
@@ -420,18 +412,12 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
     fn collator_row(
         &self,
         collator: &Collator,
-        selected: Option<&Collator>,
         columns: &Columns,
         aura: &Aura,
         current_slot: u64,
         current_slot_ts: u128,
         theme: Theme,
     ) -> Row<'static> {
-        let (cell_style, _highlight_symbol) = match selected {
-            Some(selected) if collator == selected => (theme.paragraph.cell_active, "❯"),
-            _ => (theme.paragraph.cell, ""),
-        };
-
         let authorities = aura.authorities();
 
         let is_current_author = collator.is_current_slot_author(authorities, current_slot);
@@ -439,8 +425,7 @@ impl<'a> CollatorsDetailedGroupWidget<'a> {
         let mut cells = vec![
             Cell::from(Text::from(collator.origin.symbol()).style(theme.paragraph.label(false))),
             Cell::from(Text::from(collator.status().to_string()).alignment(Alignment::Left)),
-            Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left))
-                .style(cell_style),
+            Cell::from(Text::from(collator.display_identity()).alignment(Alignment::Left)),
         ];
 
         if columns.host {
