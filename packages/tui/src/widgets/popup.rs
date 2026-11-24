@@ -16,14 +16,14 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use sp_arithmetic::Perbill;
 use subxt::utils::AccountId32;
 use suno_actions::{ChainSpecsContext, ConfirmationContext, MetadataContext, ThreadAction};
-use suno_config::{FeatureState, SupportedRuntime};
+use suno_config::{FeatureState, SupportedRuntime, CONFIG};
 use suno_primitives::{
     call::{Call, CallContext},
     entry::{Command, Entry, ToDescription, ToMethod},
     proxy::ProxyState,
     session::{AuraKey, Keys, Proof},
     staking::Payee,
-    AccountDisplay, Chain, Collator, NodeHost, Validator,
+    AccountDisplay, Chain, Collator, NodeHost, Nominator, Validator,
 };
 use suno_qrcode::{MetadataState, MetadataWidget, QrCodeWidget, ScannerWidget};
 use suno_theme::Theme;
@@ -41,6 +41,12 @@ struct ValidatorContext {
 #[derive(Clone, PartialEq, Eq)]
 struct CollatorContext {
     collator: Collator,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct NominatorContext {
+    era: ActiveEra,
+    nominator: Nominator,
 }
 
 struct ProxyContext {
@@ -85,6 +91,7 @@ enum Context {
     ValidatorMenu(Box<ValidatorContext>),
     CollatorMenu(Box<CollatorContext>),
     ChainMenu(Box<ChainContext>),
+    NominatorMenu(Box<NominatorContext>),
     ProxyMenu(Box<ProxyContext>),
     ThemeMenu(Box<ThemeMenuContext>),
     Features(Box<FeaturesContext>),
@@ -102,6 +109,7 @@ impl Context {
             Context::ValidatorMenu(_) => Mode::Menu,
             Context::CollatorMenu(_) => Mode::Menu,
             Context::ChainMenu(_) => Mode::Menu,
+            Context::NominatorMenu(_) => Mode::Menu,
             Context::ProxyMenu(_) => Mode::Menu,
             Context::ThemeMenu(_) => Mode::ThemeMenu,
             Context::Features(_) => Mode::Features,
@@ -184,6 +192,7 @@ impl Popup {
             Context::ValidatorMenu(ctx) => self.init_validator_menu(ctx),
             Context::CollatorMenu(ctx) => self.init_collator_menu(ctx),
             Context::ChainMenu(ctx) => self.init_chain_menu(ctx),
+            Context::NominatorMenu(ctx) => self.init_nominator_menu(ctx),
             Context::ProxyMenu(ctx) => self.init_proxy_menu(ctx),
             Context::ThemeMenu(ctx) => {
                 self.input.reset_as_filter();
@@ -216,6 +225,7 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
                 | Context::ProxyMenu(_)
         ) {
             let commands = self.options.iter().map(|e| e.command()).collect();
@@ -226,7 +236,9 @@ impl Popup {
     }
 
     fn init_validator_menu(&mut self, ctx: &ValidatorContext) {
-        if !ctx.validator.is_proxy_valid() && !ctx.validator.has_commands_available() {
+        let is_pinned = ctx.validator.origins.is_pinned();
+        if !ctx.validator.is_proxy_valid() && !ctx.validator.has_commands_available() && !is_pinned
+        {
             return;
         }
 
@@ -251,10 +263,7 @@ impl Popup {
                 max: Some(ctx.validator.free_balance_extended(4)),
             };
             if p.proxy_type().can_call(&bond) && ctx.validator.is_unknown() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: bond,
-                    bytes: None,
-                }));
+                self.push_instruction(bond);
             }
 
             let bond_extra = Call::BondExtra {
@@ -265,10 +274,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.free_balance() > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: bond_extra,
-                    bytes: None,
-                }));
+                self.push_instruction(bond_extra);
             }
 
             let unbond = Call::Unbond {
@@ -279,10 +285,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.bounded() > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: unbond,
-                    bytes: None,
-                }));
+                self.push_instruction(unbond);
             }
 
             let rebond = Call::Rebond {
@@ -293,10 +296,7 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocking(ctx.era) > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: rebond,
-                    bytes: None,
-                }));
+                self.push_instruction(rebond);
             }
 
             let withdraw = Call::WithdrawUnbonded {
@@ -306,20 +306,14 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.unlocked(ctx.era) > 0
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: withdraw,
-                    bytes: None,
-                }));
+                self.push_instruction(withdraw);
             }
 
             let set_payee = Call::SetPayee {
                 payee: Payee::default(),
             };
             if p.proxy_type().can_call(&set_payee) && ctx.validator.is_active_or_waiting() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_payee,
-                    bytes: None,
-                }));
+                self.push_instruction(set_payee);
             }
 
             let validate = Call::Validate {
@@ -327,18 +321,12 @@ impl Popup {
                 blocked: false,
             };
             if p.proxy_type().can_call(&validate) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: validate,
-                    bytes: None,
-                }));
+                self.push_instruction(validate);
             }
 
             let chill = Call::Chill;
             if p.proxy_type().can_call(&chill) && ctx.validator.is_active_or_waiting() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: chill,
-                    bytes: None,
-                }));
+                self.push_instruction(chill);
             }
 
             let set_keys = Call::SetKeys {
@@ -346,10 +334,7 @@ impl Popup {
                 proof: Proof::default(),
             };
             if p.proxy_type().can_call(&set_keys) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(set_keys);
             }
 
             let purge_keys = Call::PurgeKeys;
@@ -357,19 +342,19 @@ impl Popup {
                 && ctx.validator.is_active_or_waiting()
                 && ctx.validator.has_keys()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: purge_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(purge_keys);
             }
         });
 
         ctx.validator.commands.iter().for_each(|c| {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::Custom(c.clone()),
-                bytes: None,
-            }));
+            self.push_instruction(Call::Custom(c.clone()));
         });
+
+        if is_pinned {
+            self.push_instruction(Call::RemoveValidator {
+                stash: Some(ctx.validator.account.stash()),
+            });
+        }
 
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
@@ -377,7 +362,8 @@ impl Popup {
     }
 
     fn init_collator_menu(&mut self, ctx: &CollatorContext) {
-        if !ctx.collator.is_proxy_valid() && !ctx.collator.has_commands_available() {
+        let is_pinned = ctx.collator.origin.is_pinned();
+        if !ctx.collator.is_proxy_valid() && !ctx.collator.has_commands_available() && !is_pinned {
             return;
         }
 
@@ -396,20 +382,14 @@ impl Popup {
             if p.proxy_type().can_call(&register_as_candidate)
                 && ctx.collator.is_exiting_or_unknown()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: register_as_candidate,
-                    bytes: None,
-                }));
+                self.push_instruction(register_as_candidate);
             }
 
             let leave_intent = Call::LeaveIntent;
             if p.proxy_type().can_call(&leave_intent)
                 && ctx.collator.is_permissionless_or_candidate()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: leave_intent,
-                    bytes: None,
-                }));
+                self.push_instruction(leave_intent);
             }
 
             let update_bond = Call::UpdateBond {
@@ -420,10 +400,7 @@ impl Popup {
             if p.proxy_type().can_call(&update_bond)
                 && ctx.collator.is_permissionless_or_candidate()
             {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: update_bond,
-                    bytes: None,
-                }));
+                self.push_instruction(update_bond);
             }
 
             let take_candidate_slot = Call::TakeCandidateSlot {
@@ -431,10 +408,7 @@ impl Popup {
                 target: ctx.collator.stash(),
             };
             if p.proxy_type().can_call(&take_candidate_slot) && !ctx.collator.is_invulnerable() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: take_candidate_slot,
-                    bytes: None,
-                }));
+                self.push_instruction(take_candidate_slot);
             }
 
             let set_session_keys = Call::SetSessionKeys {
@@ -442,43 +416,124 @@ impl Popup {
                 proof: Proof::default(),
             };
             if p.proxy_type().can_call(&set_session_keys) {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: set_session_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(set_session_keys);
             }
 
             let purge_session_keys = Call::PurgeSessionKeys;
             if p.proxy_type().can_call(&purge_session_keys) && ctx.collator.has_keys() {
-                self.options.push(Entry::new(Command::Instruction {
-                    call: purge_session_keys,
-                    bytes: None,
-                }));
+                self.push_instruction(purge_session_keys);
             }
         });
 
         ctx.collator.commands.iter().for_each(|c| {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::Custom(c.clone()),
-                bytes: None,
-            }));
+            self.push_instruction(Call::Custom(c.clone()));
         });
+
+        if is_pinned {
+            self.push_instruction(Call::RemoveCollator {
+                stash: Some(ctx.collator.account.stash()),
+            });
+        }
 
         if !self.options.is_empty() {
             self.table_state.select(Some(0));
         }
     }
 
+    fn init_nominator_menu(&mut self, ctx: &NominatorContext) {
+        let nominator = &ctx.nominator;
+        let is_pinned = nominator.origins.is_pinned();
+        if nominator.is_proxy_valid() {
+            let runtime = nominator.runtime();
+            let metadata = InputFieldMetadata::new()
+                .with_unit(runtime.token_symbol())
+                .with_decimals(runtime.token_decimals())
+                .with_call_context(CallContext::Validator);
+            self.input.reset_as_command(Some(metadata));
+        } else {
+            self.input.reset_as_command(None);
+        }
+
+        nominator.proxies.iter().for_each(|p| {
+            let bond = Call::Bond {
+                amount: 0,
+                payee: Payee::default(),
+                max: Some(nominator.free_balance_extended(4)),
+            };
+            if p.proxy_type().can_call(&bond) && !nominator.is_bonded() {
+                self.push_instruction(bond);
+            }
+
+            let bond_extra = Call::BondExtra {
+                amount: 0,
+                max: Some(nominator.free_balance_extended(4)),
+            };
+            if p.proxy_type().can_call(&bond_extra)
+                && nominator.is_bonded()
+                && nominator.free_balance() > 0
+            {
+                self.push_instruction(bond_extra);
+            }
+
+            let unbond = Call::Unbond {
+                amount: 0,
+                max: Some(nominator.bounded_extended(4)),
+            };
+            if p.proxy_type().can_call(&unbond) && nominator.bounded() > 0 {
+                self.push_instruction(unbond);
+            }
+
+            let rebond = Call::Rebond {
+                amount: 0,
+                max: Some(nominator.unlocking_extended(ctx.era, 4)),
+            };
+            if p.proxy_type().can_call(&rebond) && nominator.unlocking(ctx.era) > 0 {
+                self.push_instruction(rebond);
+            }
+
+            let withdraw = Call::WithdrawUnbonded {
+                max: Some(nominator.unlocked_extended(ctx.era, 4)),
+            };
+            if p.proxy_type().can_call(&withdraw) && nominator.unlocked(ctx.era) > 0 {
+                self.push_instruction(withdraw);
+            }
+
+            let set_payee = Call::SetPayee {
+                payee: Payee::default(),
+            };
+            if p.proxy_type().can_call(&set_payee) && nominator.is_bonded() {
+                self.push_instruction(set_payee);
+            }
+
+            let chill = Call::Chill;
+            if p.proxy_type().can_call(&chill) && nominator.is_nominating() {
+                self.push_instruction(chill);
+            }
+        });
+
+        if is_pinned {
+            self.push_instruction(Call::RemoveNominator {
+                stash: Some(ctx.nominator.stash()),
+            });
+        }
+
+        if !self.options.is_empty() {
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn push_instruction(&mut self, call: Call) {
+        self.options
+            .push(Entry::new(Command::Instruction { call, bytes: None }));
+    }
+
     fn init_proxy_menu(&mut self, ctx: &ProxyContext) {
         self.input.reset_as_command(None);
 
         if ctx.proxy.is_removable() {
-            self.options.push(Entry::new(Command::Instruction {
-                call: Call::RemoveProxyAccount {
-                    account: Some(ctx.proxy.account),
-                },
-                bytes: None,
-            }));
+            self.push_instruction(Call::RemoveProxyAccount {
+                account: Some(ctx.proxy.account),
+            });
         }
 
         if !self.options.is_empty() {
@@ -489,26 +544,30 @@ impl Popup {
     fn init_chain_menu(&mut self, ctx: &ChainContext) {
         self.input.reset_as_command(None);
 
-        self.options.push(Entry::new(Command::Instruction {
-            call: Call::ChainSpecs {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
+        self.push_instruction(Call::ChainSpecs {
+            chain_name: ctx.runtime.to_string(),
+        });
 
-        self.options.push(Entry::new(Command::Instruction {
-            call: Call::Metadata {
-                chain_name: ctx.runtime.to_string(),
-            },
-            bytes: None,
-        }));
+        self.push_instruction(Call::Metadata {
+            chain_name: ctx.runtime.to_string(),
+        });
 
         if ctx.runtime.is_para_chain() {
             let mut calls = Vec::new();
             if ctx.runtime.is_asset_hub() {
-                calls.push(Call::AddValidator { stash: None });
+                if CONFIG.features().validators_enabled() {
+                    calls.push(Call::AddValidator { stash: None });
+                    calls.push(Call::RemoveValidator { stash: None });
+                }
+                if CONFIG.features().nominators_enabled() {
+                    calls.push(Call::AddNominator { stash: None });
+                    calls.push(Call::RemoveNominator { stash: None });
+                }
             }
-            calls.push(Call::AddCollator { stash: None });
+            if CONFIG.features().collators_enabled() {
+                calls.push(Call::AddCollator { stash: None });
+                calls.push(Call::RemoveCollator { stash: None });
+            }
             calls.push(Call::AddProxyAccount { account: None });
             calls.push(Call::RemoveProxyAccount { account: None });
             for call in calls {
@@ -535,6 +594,14 @@ impl Popup {
             collator: collator.clone(),
         };
         self.on_init(Context::CollatorMenu(Box::new(ctx)));
+    }
+
+    pub fn show_nominator_commands(&mut self, nominator: &Nominator, active_era: ActiveEra) {
+        let ctx = NominatorContext {
+            era: active_era,
+            nominator: nominator.clone(),
+        };
+        self.on_init(Context::NominatorMenu(Box::new(ctx)));
     }
 
     pub fn show_chain_commands(&mut self, chain: &Chain) {
@@ -763,7 +830,8 @@ impl Popup {
         self.scanner = None;
         self.metadata = None;
         self.table_state.select(None);
-        self.input.clear_focus();
+        self.input.clear();
+        self.input.unfocus();
     }
 
     pub fn start_scanner(&mut self, ctrl: UnboundedSender<ThreadAction>) {
@@ -828,6 +896,26 @@ impl Popup {
         self.context.mode()
     }
 
+    pub fn is_input_empty(&self) -> bool {
+        self.input.is_empty()
+    }
+
+    pub fn is_validator_menu(&self) -> bool {
+        matches!(self.context, Context::ValidatorMenu(_))
+    }
+
+    pub fn is_collator_menu(&self) -> bool {
+        matches!(self.context, Context::CollatorMenu(_))
+    }
+
+    pub fn is_nominator_menu(&self) -> bool {
+        matches!(self.context, Context::NominatorMenu(_))
+    }
+
+    pub fn is_chain_menu(&self) -> bool {
+        matches!(self.context, Context::ChainMenu(_))
+    }
+
     pub fn is_scan_account_mode(&self) -> bool {
         matches!(self.context, Context::ScanAccount(_))
     }
@@ -839,7 +927,10 @@ impl Popup {
     pub fn is_menu_mode(&self) -> bool {
         matches!(
             self.context,
-            Context::ValidatorMenu(_) | Context::ChainMenu(_) | Context::ProxyMenu(_)
+            Context::ValidatorMenu(_)
+                | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
+                | Context::ProxyMenu(_)
         )
     }
 
@@ -849,6 +940,7 @@ impl Popup {
             Context::ValidatorMenu(_)
                 | Context::CollatorMenu(_)
                 | Context::ChainMenu(_)
+                | Context::NominatorMenu(_)
                 | Context::ProxyMenu(_)
                 | Context::ThemeMenu(_)
                 | Context::Features(_)
@@ -897,8 +989,17 @@ impl Popup {
         self.input.set_focus()
     }
 
+    pub fn leave_input(&mut self) {
+        if matches!(self.get_mode(), Mode::Menu | Mode::ThemeMenu) {
+            self.input.clear();
+            self.reset_theme_selection_after_filter();
+        } else {
+            self.input.unfocus();
+        }
+    }
+
     pub fn clear_input_focus(&mut self) {
-        self.input.clear_focus();
+        self.input.unfocus();
     }
 
     pub fn lock_input(&mut self) {
@@ -1004,6 +1105,153 @@ impl Widget for &mut Popup {
 }
 
 impl Popup {
+    /// The keys available on the commands menu, as `(key, action)`.
+    fn keybindings_items(&self) -> Vec<(&'static str, &'static str)> {
+        if let Context::ThemeMenu(_) = self.context {
+            return self.theme_keybindings();
+        }
+        if let Context::Features(_) = self.context {
+            return self.features_keybindings();
+        }
+        if let Context::ScanAccount(_) = self.context {
+            return vec![("show", "account qr code"), ("esc", "back")];
+        }
+        if let Context::ChainSpecs(_) = self.context {
+            return vec![("scan", "to update chain specs"), ("esc", "back")];
+        }
+        if let Context::Metadata(_) = self.context {
+            return vec![("scan", "to update metadata"), ("esc", "back")];
+        }
+        if let Context::Confirmation(ctx) = &self.context {
+            let authorize = if ctx.runtime.is_qrcode_enabled() {
+                ("scan", "to authorize transaction")
+            } else {
+                ("enter", "sign and submit")
+            };
+            return vec![authorize, ("esc", "back")];
+        }
+
+        if self.input.is_locked() {
+            return vec![("esc", "close")];
+        }
+
+        let mut items = Vec::new();
+        if self.is_input_empty() {
+            match self.context {
+                Context::ChainMenu(_) => items.push(("← →", "switch chain")),
+                Context::ValidatorMenu(_) => items.push(("← →", "switch validator")),
+                Context::CollatorMenu(_) => items.push(("← →", "switch collator")),
+                _ => {}
+            }
+        }
+
+        if !self.input.is_focused() {
+            items.push(("tab", "edit"));
+            items.push(("↑ ↓", "select"));
+            items.push(("esc", "close"));
+            return items;
+        }
+
+        // A command that can run has nothing left to autocomplete nor to select
+        if self.get_input_parsed_call().is_some() {
+            items.push(("enter", "confirm"));
+        } else {
+            items.push(("tab", "autocomplete"));
+            items.push(("↑ ↓", "select"));
+        }
+        items.push(("esc", "clear"));
+        items
+    }
+
+    /// The keys available on the features popup.
+    fn features_keybindings(&self) -> Vec<(&'static str, &'static str)> {
+        let mut items = Vec::new();
+        if let Some(state) = self.get_selected_feature() {
+            items.push(("space", state.toggle_label()));
+        }
+        if CONFIG.pending_restart() {
+            items.push(("enter", "restart"));
+        }
+        items.push(("↑ ↓", "select"));
+        items.push(("esc", "close"));
+        items
+    }
+
+    /// The keys available on the themes menu.
+    fn theme_keybindings(&self) -> Vec<(&'static str, &'static str)> {
+        if !self.input.is_focused() {
+            return vec![("tab", "edit"), ("↑ ↓", "select"), ("esc", "close")];
+        }
+        let mut items = Vec::new();
+        if self.get_confirmed_theme().is_some() {
+            items.push(("enter", "confirm"));
+        } else {
+            items.push(("tab", "autocomplete"));
+            items.push(("↑ ↓", "select"));
+        }
+        items.push(("esc", "clear"));
+        items
+    }
+
+    /// The keybindings of the popup header, the key in the base style and its action as a label.
+    fn keybindings(&self) -> Vec<Span<'static>> {
+        let theme = self.theme;
+        let mut spans = Vec::new();
+        for (i, (key, action)) in self.keybindings_items().into_iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::raw("   "));
+            }
+            spans.push(Span::styled(key, theme.paragraph.base));
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled(action, theme.paragraph.label));
+        }
+        spans
+    }
+
+    fn render_header(
+        &self,
+        title: Option<String>,
+        label: Option<String>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        let theme = self.theme;
+        let block = Block::new()
+            .style(theme.block.popup_header)
+            .padding(Padding::new(2, 2, 1, 1));
+
+        let mut header_line = vec![];
+
+        if let Some(title) = title {
+            header_line.push(Span::styled(
+                format!("{} ", title),
+                theme.paragraph.header(true),
+            ));
+        }
+
+        if let Some(label) = label {
+            header_line.push(Span::styled(label, theme.paragraph.label(true)));
+        }
+
+        let keybindings = self.keybindings();
+        let inner = block.inner(area);
+        let title_width: usize = header_line.iter().map(|s| s.width()).sum();
+        let keybindings_width: usize = keybindings.iter().map(|s| s.width()).sum();
+        let keybindings_visible = title_width + 3 + keybindings_width <= inner.width as usize;
+
+        let header = Line::from(header_line).alignment(Alignment::Left);
+        let top = Paragraph::new(header)
+            .block(block)
+            .wrap(Wrap { trim: false });
+
+        Clear.render(area, buf);
+        top.render(area, buf);
+
+        if keybindings_visible {
+            Paragraph::new(Line::from(keybindings).alignment(Alignment::Right)).render(inner, buf);
+        }
+    }
+
     fn render_menu(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
         let options = self.get_options_filtered();
@@ -1013,29 +1261,18 @@ impl Popup {
 
         let (title, label) = match &self.context {
             Context::ValidatorMenu(ctx) => {
-                let label = if !ctx.validator.commands.is_empty() {
-                    format!("Commands ({})", ctx.validator.host(self.masked))
-                } else {
-                    "Commands".to_string()
-                };
-                (Some(ctx.validator.display_identity()), Some(label))
+                let label = (!ctx.validator.commands.is_empty())
+                    .then(|| format!("({})", ctx.validator.host(self.masked)));
+                (Some(ctx.validator.display_identity()), label)
             }
             Context::CollatorMenu(ctx) => {
-                let label = if !ctx.collator.commands.is_empty() {
-                    format!("Commands ({})", ctx.collator.host(self.masked))
-                } else {
-                    "Commands".to_string()
-                };
-                (Some(ctx.collator.display_identity()), Some(label))
+                let label = (!ctx.collator.commands.is_empty())
+                    .then(|| format!("({})", ctx.collator.host(self.masked)));
+                (Some(ctx.collator.display_identity()), label)
             }
-            Context::ChainMenu(ctx) => (
-                Some(ctx.runtime.as_str_long().to_uppercase()),
-                Some("Commands".to_string()),
-            ),
-            Context::ProxyMenu(ctx) => (
-                Some(ctx.proxy.compact_address(6)),
-                Some("Commands".to_string()),
-            ),
+            Context::ChainMenu(ctx) => (Some(ctx.runtime.as_str_long().to_uppercase()), None),
+            Context::NominatorMenu(ctx) => (Some(ctx.nominator.to_compact_string(6)), None),
+            Context::ProxyMenu(ctx) => (Some(ctx.proxy.compact_address(6)), None),
             _ => (None, None),
         };
 
@@ -1043,40 +1280,17 @@ impl Popup {
         let [top_area, details_area, input_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),
+                Constraint::Length(3),
                 Constraint::Max(details_len),
                 Constraint::Length(5),
             ])
             .flex(Flex::End)
             .areas(area);
 
-        let block = Block::new()
-            .style(theme.block.popup_header)
-            .padding(Padding::new(1, 1, 1, 0));
-
-        let mut header_line = vec![];
-
-        if let Some(label) = label {
-            header_line.push(Span::styled(
-                format!("{} ", label),
-                theme.paragraph.label(true),
-            ));
-        }
-
-        if let Some(title) = title {
-            header_line.push(Span::styled(title, theme.paragraph.header(true)));
-        }
-
-        let header = Line::from(header_line).alignment(Alignment::Right);
-        let top = Paragraph::new(header)
-            .block(block)
-            .wrap(Wrap { trim: false });
-
-        Clear.render(top_area, buf);
-        top.render(top_area, buf);
+        self.render_header(title, label, top_area, buf);
 
         let widths = [
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Length(22),
             Constraint::Fill(2),
             Constraint::Length(2),
@@ -1113,33 +1327,27 @@ impl Popup {
 
         let rows = names
             .iter()
-            .map(|name| Row::new([Cell::from(""), Cell::from(to_slug(name))]));
+            .map(|name| Row::new([Cell::from(""), Cell::from(to_slug(name)), Cell::from("")]));
 
         let details_len = (names.len() as u16 + 5).clamp(4, 10);
         let [top_area, details_area, hint_area] = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),
+                Constraint::Length(3),
                 Constraint::Max(details_len),
                 Constraint::Length(5),
             ])
             .flex(Flex::End)
             .areas(area);
 
-        let block = Block::new()
-            .style(theme.block.popup_header)
-            .padding(Padding::new(1, 1, 1, 0));
+        self.render_header(Some("THEMES".to_string()), None, top_area, buf);
 
-        let header = Line::from(vec![Span::styled("Themes", theme.paragraph.label(true))])
-            .alignment(Alignment::Right);
-        let top = Paragraph::new(header)
-            .block(block)
-            .wrap(Wrap { trim: false });
-
-        Clear.render(top_area, buf);
-        top.render(top_area, buf);
-
-        let widths = [Constraint::Length(2), Constraint::Fill(1)];
+        // The column spacing adds one to the gutter, so the themes line up with the title
+        let widths = [
+            Constraint::Length(1),
+            Constraint::Fill(1),
+            Constraint::Length(2),
+        ];
 
         let block = Block::new()
             .style(theme.block.popup_header)
@@ -1147,7 +1355,7 @@ impl Popup {
 
         let table = Table::new(rows, widths)
             .block(block)
-            .header(Row::new(["", "theme"]).style(theme.table.header))
+            .header(Row::new(["", "command", ""]).style(theme.table.header))
             .style(theme.table.base)
             .row_highlight_style(theme.table.row_highlight(true));
 
@@ -1169,7 +1377,7 @@ impl Popup {
         };
 
         let rows = ctx.states.iter().map(|state| {
-            let mark = if state.pending_restart() {
+            let msg = if state.pending_restart() {
                 "restart required"
             } else if state.changed {
                 "overridden"
@@ -1180,9 +1388,12 @@ impl Popup {
                 Cell::from(""),
                 Cell::from(state.symbol()),
                 Cell::from(state.feature.key()),
-                Cell::from(state.feature.scope().to_string()),
+                Cell::from(state.feature.scopes_label()),
                 Cell::from(state.feature.description()),
-                Cell::from(Line::from(mark).alignment(Alignment::Right)),
+                Cell::from(
+                    Line::from(Span::styled(msg, theme.paragraph.base_italic))
+                        .alignment(Alignment::Right),
+                ),
                 Cell::from(""),
             ])
         });
@@ -1190,31 +1401,20 @@ impl Popup {
         let details_len = (ctx.states.len() as u16 + 3).clamp(4, 20);
         let [top_area, details_area] = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Max(details_len)])
+            .constraints([Constraint::Length(3), Constraint::Max(details_len)])
             .flex(Flex::End)
             .areas(area);
 
-        let block = Block::new()
-            .style(theme.block.popup_header)
-            .padding(Padding::new(1, 1, 1, 0));
-
-        let header = Line::from(vec![Span::styled("Options", theme.paragraph.label(true))])
-            .alignment(Alignment::Right);
-        let top = Paragraph::new(header)
-            .block(block)
-            .wrap(Wrap { trim: false });
-
-        Clear.render(top_area, buf);
-        top.render(top_area, buf);
+        self.render_header(Some("OPTIONS".to_string()), None, top_area, buf);
 
         let widths = [
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(24),
             Constraint::Length(12),
             Constraint::Fill(1),
             Constraint::Length(16),
-            Constraint::Length(1),
+            Constraint::Length(2),
         ];
 
         let block = Block::new()
@@ -1236,20 +1436,12 @@ impl Popup {
     fn render_scan_account(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
 
-        let Context::ScanAccount(_) = &self.context else {
+        let Context::ScanAccount(ctx) = &self.context else {
             return;
         };
 
-        let title = "SCAN TO ADD ADDRESS";
-        let header = Line::from(vec![Span::styled(title, theme.paragraph.header(true))])
-            .alignment(Alignment::Right);
-        let top = Paragraph::new(header)
-            .block(
-                Block::new()
-                    .style(theme.block.popup_header)
-                    .padding(Padding::proportional(1)),
-            )
-            .wrap(Wrap { trim: false });
+        let title = ctx.runtime.as_str_long().to_uppercase();
+        let label = format!("/{}", ctx.call.to_method());
 
         let [top_area, scanner_area] = Layout::default()
             .direction(Direction::Vertical)
@@ -1257,19 +1449,20 @@ impl Popup {
             .flex(Flex::End)
             .areas(area);
 
-        Clear.render(top_area, buf);
-        top.render(top_area, buf);
+        self.render_header(Some(title), Some(label), top_area, buf);
 
         Clear.render(scanner_area, buf);
         Block::new()
-            .style(theme.qrcode.base)
+            .style(theme.qrcode.scanner)
             .padding(Padding::proportional(1))
             .render(scanner_area, buf);
         if let Some(scanner) = self.scanner.as_mut() {
             if let Some(frame) = scanner.frame_protocol.as_mut() {
                 ScannerWidget::new(frame)
-                    .set_title("Scan QR code")
+                    .set_title("Show the account's QR code")
                     .set_title_style(theme.qrcode.title)
+                    .set_helper("Position the QR code inside the frame")
+                    .set_helper_style(theme.qrcode.label)
                     .set_style(theme.qrcode.scanner)
                     .render(scanner_area, buf);
             }
@@ -1283,11 +1476,6 @@ impl Popup {
             return;
         };
 
-        let title = if ctx.runtime.is_qrcode_enabled() {
-            "SCAN TO AUTHORIZE TRANSACTION"
-        } else {
-            "AUTHORIZE TRANSACTION"
-        };
         let runtime_version_value = format!("{}/{}", ctx.runtime.legacy_name(), ctx.spec_version);
         let stash = ctx.stash_identity.clone();
         let proxy = ctx.proxy_identity.clone();
@@ -1299,8 +1487,8 @@ impl Popup {
             None
         };
 
-        let header = Line::from(vec![Span::styled(title, theme.paragraph.header(true))])
-            .alignment(Alignment::Right);
+        // The way to authorize the transaction is the first of the keybindings
+        let header = Line::from(self.keybindings()).alignment(Alignment::Right);
         let runtime_version = Line::from(vec![
             Span::styled("runtime version ", theme.paragraph.label_inverse),
             Span::raw(runtime_version_value),
@@ -1389,8 +1577,10 @@ impl Popup {
         if let Some(scanner) = self.scanner.as_mut() {
             if let Some(frame) = scanner.frame_protocol.as_mut() {
                 ScannerWidget::new(frame)
-                    .set_title("Scan QR code")
+                    .set_title("Show the signed transaction QR code")
                     .set_title_style(theme.qrcode.title)
+                    .set_helper("Position the QR code inside the frame")
+                    .set_helper_style(theme.qrcode.label)
                     .set_style(theme.qrcode.scanner)
                     .render(scanner_area, buf);
             }
@@ -1448,11 +1638,7 @@ impl Popup {
         let unit_value = ctx.runtime.token_symbol().to_string();
         let qr_bytes = ctx.qr_bytes.clone();
 
-        let header = Line::from(vec![Span::styled(
-            "SCAN TO ADD CHAIN SPECS",
-            theme.paragraph.header(true),
-        )])
-        .alignment(Alignment::Right);
+        let header = Line::from(self.keybindings()).alignment(Alignment::Right);
         let runtime_version = Line::from(vec![
             Span::styled("runtime version ", theme.paragraph.label_inverse),
             Span::raw(runtime_version_value),
@@ -1518,17 +1704,13 @@ impl Popup {
             return;
         };
 
-        let header = Line::from(vec![Span::styled(
-            "SCAN TO UPDATE METADATA",
-            theme.paragraph.header(true),
-        )])
-        .alignment(Alignment::Right);
+        let header = Line::from(self.keybindings()).alignment(Alignment::Right);
         let runtime_version = Line::from(vec![
             Span::styled("runtime version ", theme.paragraph.label_inverse),
             Span::raw(runtime_version_value),
         ]);
         let genesis_hash = Line::from(vec![
-            Span::styled("genesis_hash ", theme.paragraph.label_inverse),
+            Span::styled("genesis hash ", theme.paragraph.label_inverse),
             Span::raw(genesis_hash_value),
         ]);
 
@@ -1605,5 +1787,80 @@ fn truncate_hex(bytes: &[u8], max_length: usize) -> String {
         )
     } else {
         format!("0x{encoded}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A chain menu with the add validator command, set up without reading the config.
+    fn chain_menu() -> Popup {
+        let mut popup = Popup::default();
+        popup.input.reset_as_command(None);
+        popup
+            .input
+            .set_valid_commands(vec![Call::AddValidator { stash: None }.to_string()]);
+        popup.context = Context::ChainMenu(Box::new(ChainContext {
+            runtime: SupportedRuntime::AssetHubKusama,
+        }));
+        popup.set_input_focus();
+        popup
+    }
+
+    fn keys(popup: &Popup) -> Vec<&'static str> {
+        popup
+            .keybindings_items()
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect()
+    }
+
+    #[test]
+    fn test_legend_changes_chain_only_while_nothing_is_typed() {
+        let mut popup = chain_menu();
+        assert_eq!(keys(&popup), vec!["← →", "tab", "↑ ↓", "esc"]);
+
+        popup.insert_input_char('a');
+        assert_eq!(keys(&popup), vec!["tab", "↑ ↓", "esc"]);
+    }
+
+    #[test]
+    fn test_legend_closes_the_popup_once_the_input_is_unfocused() {
+        let mut popup = chain_menu();
+        assert_eq!(popup.keybindings_items().last(), Some(&("esc", "clear")));
+
+        popup.clear_input_focus();
+        assert_eq!(
+            popup.keybindings_items(),
+            vec![
+                ("← →", "switch chain"),
+                ("tab", "edit"),
+                ("↑ ↓", "select"),
+                ("esc", "close")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_leaving_the_input_clears_what_was_typed() {
+        let mut popup = chain_menu();
+        for c in "add_val".chars() {
+            popup.insert_input_char(c);
+        }
+        assert!(!popup.is_input_empty());
+
+        popup.leave_input();
+        assert!(popup.is_input_empty());
+        assert!(!popup.input.is_focused());
+    }
+
+    #[test]
+    fn test_legend_confirms_only_a_valid_command() {
+        let mut popup = chain_menu();
+        for c in "add_validator".chars() {
+            popup.insert_input_char(c);
+        }
+        assert_eq!(keys(&popup), vec!["enter", "esc"]);
     }
 }

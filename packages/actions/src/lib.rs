@@ -13,7 +13,7 @@ use suno_primitives::{
     network::ConnectionState,
     proxy::ProxyKey,
     session::Keys,
-    staking::{Chunk, Era, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
+    staking::{Chunk, Era, Nominations, Payee, StakeLedger, StakeOverview, ValidatorPrefs},
     validator::ValidatorStatus,
     AccountKey,
 };
@@ -21,6 +21,7 @@ use suno_update::{AssetName, Checksum, Release};
 
 type ValidatorKey = AccountKey;
 type CollatorKey = AccountKey;
+type NominatorKey = AccountKey;
 type ChainKey = SupportedRuntime;
 type AccountBytes = [u8; 32];
 type BlockNumber = u64;
@@ -49,6 +50,8 @@ pub enum Action {
     Transaction(TxAction),
     /// Collator actions
     Collator(CollatorAction),
+    /// Nominator actions
+    Nominator(NominatorAction),
     ///
     /// QrScanner actions
     Scanner(ScannerAction),
@@ -75,6 +78,8 @@ pub enum NavigationAction {
     ToggleMask,
     ToggleView,
     TogglePin,
+    StartChord,
+    EndChord,
 }
 
 type SpecVersion = u32;
@@ -115,6 +120,7 @@ pub enum PopupAction {
     Open,
     OpenThemeMenu,
     OpenFeatures,
+    OpenCall(Box<Call>),
     Confirm,
     ToggleFeature,
     ResetFeature,
@@ -133,7 +139,7 @@ pub enum InputAction {
     Delete,
     CursorLeft,
     CursorRight,
-    Editing,
+    Editing(Option<char>),
     Unfocus,
     Lock,
     Paste(String),
@@ -175,6 +181,19 @@ pub enum ChainAction {
     UpdateCurrentSlot(ChainKey, BlockNumber, u64),
     UpdateSlotDuration(ChainKey, u64),
     UpdateSessionIndex(ChainKey, u32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NominatorAction {
+    UpdateNominations(NominatorKey, Option<Nominations>),
+    UpdateStakeLedger(NominatorKey, StakeLedger),
+    UpdatePayee(NominatorKey, Payee),
+    AddProxy(NominatorKey, ProxyKey),
+    UpdateBalance(NominatorKey, Balance),
+    AddAmountToStakeLedger(NominatorKey, Amount),
+    SubChunkFromStakeLedger(NominatorKey, Chunk),
+    AddAmountToBalance(NominatorKey, Amount),
+    UpdateIdentity(NominatorKey, Identity),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -687,12 +687,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-take"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8ab6b55fe97976e46f91ddbed8d147d966475dc29b2032757ba47e02376fbc3"
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1580,15 +1574,6 @@ name = "crossbeam-epoch"
 version = "0.9.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc74980687109a3b14c72fd458107bf0baa1da1a1a805e178d15501ba9b86d9d"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03e8bd762f7479489c70ed6c768ddca99d7296857de437a68dcb2a94365b3fae"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -5841,9 +5826,9 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "ruzstd"
-version = "0.8.3"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
+checksum = "69e4ce4a039f42bf25920b95667e4d789e98749ab11bbb8d2c2936f788421bb5"
 
 [[package]]
 name = "rxing"
@@ -6608,9 +6593,9 @@ dependencies = [
 
 [[package]]
 name = "smoldot"
-version = "5.0.0"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b780906b3a7480f18c148366bf223d76258ce73c4a45685bc131fff24b1d7b1c"
+checksum = "5132f7a54063e1ca8b5fa64c17f01e7add28c1c2b127dcd07c0abfe6eb9c531c"
 dependencies = [
  "ark-bls12-381 0.6.0",
  "ark-ec 0.6.0",
@@ -6618,26 +6603,19 @@ dependencies = [
  "ark-ff 0.6.0",
  "ark-serialize 0.6.0",
  "arrayvec 0.7.8",
- "async-lock",
- "atomic-take",
  "base32",
  "base64 0.22.1",
- "bip39",
  "blake2-rfc",
  "bs58",
  "chacha20",
- "crossbeam-queue",
  "derive_more 2.1.1",
  "ed25519-zebra",
  "either",
- "event-listener",
  "fastbloom",
  "fnv",
- "futures-lite",
  "futures-util",
  "hashbrown 0.16.1",
  "hex",
- "hmac 0.12.1",
  "itertools 0.14.0",
  "libm",
  "libsecp256k1",
@@ -6646,7 +6624,6 @@ dependencies = [
  "num-bigint",
  "num-rational",
  "num-traits",
- "pbkdf2",
  "pin-project",
  "poly1305",
  "rand 0.8.8",
@@ -6670,9 +6647,9 @@ dependencies = [
 
 [[package]]
 name = "smoldot-light"
-version = "3.0.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea708747ec694c138492e4b244795b556be7e98f4f1eb683db8dd68b25cfac72"
+checksum = "318a7945d3557ed282195da6ffdff004d6d6bc0cf99ea541f9544210efebdd8c"
 dependencies = [
  "async-channel",
  "async-lock",
@@ -7006,7 +6983,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "subxt"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "async-trait",
  "derive-where",
@@ -7046,7 +7023,7 @@ dependencies = [
 [[package]]
 name = "subxt-codegen"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "heck",
  "parity-scale-codec",
@@ -7062,7 +7039,7 @@ dependencies = [
 [[package]]
 name = "subxt-lightclient"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "futures",
  "futures-util",
@@ -7078,7 +7055,7 @@ dependencies = [
 [[package]]
 name = "subxt-macro"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "darling 0.20.11",
  "parity-scale-codec",
@@ -7094,7 +7071,7 @@ dependencies = [
 [[package]]
 name = "subxt-metadata"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "frame-decode",
  "frame-metadata",
@@ -7110,7 +7087,7 @@ dependencies = [
 [[package]]
 name = "subxt-rpcs"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "derive-where",
  "finito",
@@ -7134,7 +7111,7 @@ dependencies = [
 [[package]]
 name = "subxt-signer"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "base64 0.22.1",
  "bip39",
@@ -7162,7 +7139,7 @@ dependencies = [
 [[package]]
 name = "subxt-utils-accountid32"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "base58",
  "blake2",
@@ -7177,7 +7154,7 @@ dependencies = [
 [[package]]
 name = "subxt-utils-fetchmetadata"
 version = "0.51.1"
-source = "git+https://github.com/turboflakes/subxt?rev=2593159#25931599578953532d83b7dd868092457fe05be8"
+source = "git+https://github.com/turboflakes/subxt?rev=4b54813#4b54813221b21a6f569c32cac2b6764ea304245d"
 dependencies = [
  "hex",
  "parity-scale-codec",

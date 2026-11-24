@@ -75,9 +75,13 @@ chains:
   #     rpc_url: "ws://192.0.2.2:9944"
   #     # collators:
   #     #   - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
+  #     # nominators, only available on asset hub chains
+  #     # nominators:
+  #     #   - "5GTD7ZeD823BjpmZBCSzBQp7cvHR1Gunq7oDkurZr9zUev2n"
 
 features:
   enable_validators: true # default true
+  enable_nominators: true # default true, only available on asset hub chains with `nominators` configured
   enable_check_update: true # default true
   enable_lightclient_db: true # default true, saves the light client database to speed up the next start
   show_nominators_counter: true # default true

@@ -69,6 +69,8 @@ pub async fn process_runtime_events(
             let prefs = ValidatorPrefs::new(Perbill::zero(), false);
             let response = Response::validator_prefs_next(account_bytes, Some(prefs));
             processed_events.push(response);
+            let response = Response::nominations(account_bytes, None);
+            processed_events.push(response);
         } else if let Some(ev) = event.decode_fields_as::<ValidatorPrefsSet>() {
             let ev = ev.boxed()?;
             let account_bytes = *(ev.stash).as_ref();

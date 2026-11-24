@@ -7,6 +7,7 @@ use crate::widgets::{
     input_field::InputFieldWidget,
     list_focus::ListFocus,
     logs::LogsState,
+    nominators::NominatorsList,
     popup::{Mode as PopupMode, Popup},
     proxies::ProxiesList,
     validators::ValidatorsList,
@@ -19,18 +20,26 @@ use crate::{
 };
 use arboard::Clipboard;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::str::{from_utf8, FromStr};
-use std::{collections::HashSet, io, thread, time::Duration};
+use std::{
+    collections::HashSet,
+    env::{args_os, current_exe},
+    io,
+    path::PathBuf,
+    process::Command,
+    str::{from_utf8, FromStr},
+    thread,
+    time::{Duration, Instant},
+};
 use subxt::{utils::AccountId32, OnlineClient, OnlineClientAtBlock};
 use suno_actions::{
     Action, ChainAction, ChainSpecsContext, CollatorAction, ConfirmationContext, FilterAction,
-    InputAction, MetadataContext, NavigationAction, PopupAction, ScannerAction, SystemAction,
-    ThreadAction, TxAction, UpdateAction, ValidatorAction,
+    InputAction, MetadataContext, NavigationAction, NominatorAction, PopupAction, ScannerAction,
+    SystemAction, ThreadAction, TxAction, UpdateAction, ValidatorAction,
 };
 use suno_config::{
     remove_proxy_account, save_active_theme, save_feature, save_pinned_collators,
-    save_pinned_validators, save_proxy_account, CommandKind, CustomCalls, CustomCommand,
-    CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
+    save_pinned_nominators, save_pinned_validators, save_proxy_account, CommandKind, CustomCalls,
+    CustomCommand, CustomConfig, Feature, NodeAccess, SupportedRuntime, CONFIG,
 };
 use suno_error::{Error, ResultExt};
 use suno_primitives::{
@@ -59,6 +68,9 @@ pub type AppResult<T> = std::result::Result<T, Error>;
 /// The tick rate at 100 ms represents 10 FPS
 const TICK_RATE: u64 = 100;
 
+/// How long the second key of a chord is awaited.
+const CHORD_TIMEOUT: Duration = Duration::from_secs(6);
+
 /// Application active focus.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Focus {
@@ -68,6 +80,8 @@ pub enum Focus {
     Filter,  // Typing filters the list of the window displayed
     Scanner, // Esc/Tab change mode state
     Popup,   // Esc/Tab change mode state
+    Chord,   // The key after `ctrl+x` is awaited
+    None,    // Nothing is selected, after `esc` clears the selections
 }
 
 /// Thread control messages, useful for controlling threads from the app, eg. stopping a scanner thread.
@@ -79,8 +93,13 @@ pub enum ThreadControl {
 pub struct App {
     /// Is the application running?
     pub running: bool,
+    /// Should the application be relaunched once the terminal is restored?
+    pub restart: bool,
     /// Application active focus, useful to determine how to handle keyboard events.
     pub focus: Focus,
+    /// The focus to get back to, and when the chord started, while the key that completes it
+    /// is awaited.
+    chord: Option<(Focus, Instant)>,
     /// The current selected window.
     pub window: Window,
     /// The current selected section.
@@ -88,9 +107,13 @@ pub struct App {
     /// The section whose rows are shown and selected on the main window, while the main
     /// window itself is the selected section.
     main_section: Section,
+    /// The pane of the left menu which takes the most space, the last one selected.
+    expanded_section: Option<Section>,
     /// Holds the API clients for each supported runtime.
     pub chains: ChainsList,
     pub proxies: ProxiesList,
+    /// Holds the nominators listed in the config.
+    pub nominators: NominatorsList,
     /// Holds the validators list for the selected relay-chain.
     pub validators: ValidatorsList,
     /// Holds the collators list for the selected relay-chain.
@@ -134,6 +157,8 @@ impl App {
         chains.set_theme(theme);
         let mut proxies = ProxiesList::default();
         proxies.set_theme(theme);
+        let mut nominators = NominatorsList::default();
+        nominators.set_theme(theme);
         let mut popup = Popup::default();
         popup.set_theme(theme);
         let mut logs = LogsState::new(rx_logs);
@@ -143,13 +168,17 @@ impl App {
 
         Self {
             running: true,
+            restart: false,
             focus: Focus::default(),
+            chord: None,
             window: Window::first(CONFIG.features()),
             // Starts on the tabs of the main window, with the first window enabled displayed
             section: Section::None,
             main_section: Section::default(),
+            expanded_section: None,
             chains,
             proxies,
+            nominators,
             validators: ValidatorsList::default(),
             collators: CollatorsList::default(),
             popup,
@@ -170,6 +199,7 @@ impl App {
         self.update_active_section();
         self.validators.on_init().await;
         self.collators.on_init();
+        self.nominators.on_init();
         self.refresh_proxies();
         self.chains.on_init(self.tx.clone()).await;
         self.check_for_update();
@@ -199,6 +229,8 @@ impl App {
     }
 
     pub async fn run(&mut self) -> AppResult<()> {
+        // Resolve the binary before it can be replaced by an upgrade
+        let binary = current_exe().ok();
         // Initialize async widgets
         self.init().await;
         // Initialize the terminal user interface.
@@ -223,6 +255,29 @@ impl App {
 
         // Exit the user interface.
         tui.exit()?;
+
+        // Check if restart is scheduled and relaunch the application.
+        if self.restart {
+            if let Some(binary) = binary {
+                Self::relaunch(binary)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Replaces the current process with a fresh instance of the (upgraded) binary.
+    #[cfg(unix)]
+    fn relaunch(exe: PathBuf) -> AppResult<()> {
+        use std::os::unix::process::CommandExt;
+        // `exec` only returns on failure
+        let err = Command::new(exe).args(args_os().skip(1)).exec();
+        Err(err.into())
+    }
+
+    /// Spawns a fresh instance of the (upgraded) binary and lets the current one exit.
+    #[cfg(not(unix))]
+    fn relaunch(exe: PathBuf) -> AppResult<()> {
+        Command::new(exe).args(args_os().skip(1)).spawn()?;
         Ok(())
     }
 
@@ -254,6 +309,7 @@ impl App {
                 Action::Chain(act) => self.handle_chain_actions(act),
                 Action::Validator(act) => self.handle_validator_actions(act),
                 Action::Collator(act) => self.handle_collator_actions(act),
+                Action::Nominator(act) => self.handle_nominator_actions(act),
                 Action::Transaction(act) => self.handle_transaction_actions(act),
                 Action::Scanner(act) => self.handle_scanner_actions(act),
                 Action::Update(act) => self.handle_update_actions(act),
@@ -286,16 +342,22 @@ impl App {
             NavigationAction::NextWindow => self.next_window(),
             NavigationAction::PrevWindow => self.prev_window(),
             NavigationAction::Reset => self.reset_selection(),
-            NavigationAction::Copy => self.copy_to_clipboard(),
+            NavigationAction::Copy => {
+                self.end_chord();
+                self.copy_to_clipboard()
+            }
             NavigationAction::ToggleMask => self.toggle_mask(),
             NavigationAction::ToggleView => self.toggle_view(),
             NavigationAction::TogglePin => self.toggle_pin(),
+            NavigationAction::StartChord => self.start_chord(),
+            NavigationAction::EndChord => self.end_chord(),
         }
     }
 
     fn handle_popup_actions(&mut self, action: PopupAction) {
         match action {
             PopupAction::Open => self.open_popup(),
+            PopupAction::OpenCall(call) => self.open_call_popup(*call),
             PopupAction::OpenThemeMenu => self.open_theme_menu(),
             PopupAction::OpenFeatures => self.open_features(),
             PopupAction::ToggleFeature => self.toggle_feature(),
@@ -320,13 +382,17 @@ impl App {
             return;
         }
         match action {
-            InputAction::Editing => {
+            InputAction::Editing(start_char) => {
                 if self.popup.set_input_focus() {
                     self.focus = Focus::Input;
                 }
+                if let Some(new_char) = start_char {
+                    self.popup.insert_input_char(new_char);
+                }
             }
             InputAction::Unfocus => {
-                self.popup.clear_input_focus();
+                self.popup.leave_input();
+                self.preview_theme_selection();
                 self.focus = Focus::Popup;
             }
             InputAction::Lock => {
@@ -349,8 +415,16 @@ impl App {
                 self.popup.delete_input_char();
                 self.preview_theme_selection();
             }
-            InputAction::CursorLeft => self.popup.move_cursor_left(),
-            InputAction::CursorRight => self.popup.move_cursor_right(),
+            InputAction::CursorLeft => {
+                if !self.switch_popup_target(false) {
+                    self.popup.move_cursor_left();
+                }
+            }
+            InputAction::CursorRight => {
+                if !self.switch_popup_target(true) {
+                    self.popup.move_cursor_right();
+                }
+            }
             InputAction::Enter => self.on_input_enter(),
             InputAction::Paste(data) => self.on_input_paste(data),
             InputAction::PasteClipboard => {
@@ -364,6 +438,80 @@ impl App {
                     self.focus = Focus::Input;
                 }
             }
+        }
+    }
+
+    /// Shows the commands of the next or the previous chain, validator or collator while the
+    /// commands of one are displayed and nothing was typed yet.
+    fn switch_popup_target(&mut self, down: bool) -> bool {
+        if !self.popup.is_input_empty() {
+            return false;
+        }
+
+        let shown = if self.popup.is_chain_menu() && self.section == Section::Chains {
+            self.move_chain_selection(down);
+            self.show_chain_popup()
+        } else if self.popup.is_validator_menu()
+            && self.data_section() == Section::Validators
+            && self.validators.is_active()
+        {
+            self.move_validator_selection(down);
+            let shown = self.show_validator_popup();
+            if !shown {
+                // Keep the selection on the validator the commands belong to
+                // TODO: If there are other validators with proxy further down the list it should select
+                // the next one with proxy
+                self.move_validator_selection(!down);
+            }
+            shown
+        } else if self.popup.is_collator_menu()
+            && self.data_section() == Section::Collators
+            && self.collators.is_active()
+        {
+            self.move_collator_selection(down);
+            let shown = self.show_collator_popup();
+            if !shown {
+                self.move_collator_selection(!down);
+            }
+            shown
+        } else {
+            false
+        };
+
+        if !shown {
+            return false;
+        }
+        // Showing the commands resets the input, so the focus is set again as it was
+        let was_focused = self.focus == Focus::Input;
+        if was_focused && self.popup.set_input_focus() {
+            self.focus = Focus::Input;
+        } else {
+            self.focus = Focus::Popup;
+        }
+        true
+    }
+
+    fn move_chain_selection(&mut self, down: bool) {
+        if down {
+            self.chains.move_down();
+        } else {
+            self.chains.move_up();
+        }
+    }
+
+    fn move_validator_selection(&mut self, down: bool) {
+        if down {
+            self.validators.move_down();
+        } else {
+            self.validators.move_up();
+        }
+    }
+
+    fn move_collator_selection(&mut self, down: bool) {
+        if down {
+            self.collators.move_down();
+        } else {
+            self.collators.move_up();
         }
     }
 
@@ -385,7 +533,7 @@ impl App {
             FilterAction::CursorRight => self.edit_filter(|input| input.move_cursor_right()),
             FilterAction::Paste(data) => self.edit_filter(|input| input.paste_data(data)),
             FilterAction::Select => {
-                self.edit_filter(|input| input.clear_focus());
+                self.edit_filter(|input| input.unfocus());
                 self.focus = Focus::Main;
                 // The lists get the focus back, with the first row that matches highlighted
                 self.update_active_section();
@@ -409,7 +557,7 @@ impl App {
         if self.popup.is_visible() {
             return;
         }
-        if !self.window.is_validators_selected() && !self.window.is_collators_selected() {
+        if !self.can_filter() {
             return;
         }
         self.set_section(Section::None);
@@ -432,6 +580,15 @@ impl App {
             Window::Validators => self.validators.edit_filter(edit),
             Window::Collators => self.collators.edit_filter(edit),
             _ => {}
+        }
+    }
+
+    /// Wheter the validators or the collators can be filtered.
+    pub fn can_filter(&self) -> bool {
+        match self.window {
+            Window::Validators => !self.validators.is_empty(),
+            Window::Collators => !self.collators.is_empty(),
+            _ => false,
         }
     }
 
@@ -566,13 +723,15 @@ impl App {
         let collator_keys = self
             .collators
             .get_tracked_and_visible_keys_by_runtime(runtime);
+        let nominator_keys = self.nominators.keys_by_runtime(runtime);
         let is_all_validators_visible = CONFIG.features().all_validators_visible();
 
         if self.chains.get_api_and_block_hash(runtime).is_none() {
             return;
         }
-        self.fetch_collators_chain_data(runtime, collator_keys.clone());
+        self.fetch_collators_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_on_connect(api_at, runtime, &nominator_keys, tx);
             sync::spawn_fetch_validators_on_connect(
                 api_at,
                 runtime,
@@ -593,7 +752,7 @@ impl App {
         if self.chains.get_api_and_block_hash(runtime).is_none() {
             return;
         }
-        self.fetch_collators_chain_data(runtime, collator_keys.clone());
+        self.fetch_collators_data(runtime, collator_keys.clone());
         self.spawn_at_latest_block(runtime, move |api_at, tx| {
             sync::spawn_fetch_collators_on_connect(api_at, runtime, &collator_keys, tx);
         });
@@ -780,28 +939,10 @@ impl App {
         let Some(people_runtime) = runtime.people_runtime() else {
             return false;
         };
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
-            return false;
-        };
-
         let keys = keys.to_vec();
-
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
-                    return;
-                }
-            };
-
-            sync::spawn_fetch_validators_identity(&api_at, people_runtime, &keys, &tx);
-        });
-        true
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_validators_identity(api_at, people_runtime, &keys, tx);
+        })
     }
 
     /// Fetches the data of the `keys` validators of the relay chain `runtime` that takes a fetch
@@ -814,25 +955,11 @@ impl App {
         }
 
         // The authority status and the session keys are held on the relay chain
-        if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-            let keys = keys.clone();
-            let tx = self.tx.clone();
-            tokio::spawn(async move {
-                let api_at = match api.at_block(block_hash).await.boxed() {
-                    Ok(api_at) => api_at,
-                    Err(e) => {
-                        let _ = tx.send(Action::System(SystemAction::Error(format!(
-                            "Failed to client at_block: {}",
-                            e
-                        ))));
-                        return;
-                    }
-                };
-
-                sync::spawn_fetch_validators_authority_status(&api_at, runtime, &keys, &tx);
-                sync::spawn_fetch_validators_session_keys(&api_at, runtime, &keys, &tx);
-            });
-        }
+        let relay_keys = keys.clone();
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_validators_authority_status(api_at, runtime, &relay_keys, tx);
+            sync::spawn_fetch_validators_session_keys(api_at, runtime, &relay_keys, tx);
+        });
 
         // The staking data is held on the Asset Hub chain: the bonded stake (the ledger) and the
         // payee, and, for the active era, the stake overview and the era points. If the era is
@@ -843,46 +970,27 @@ impl App {
                 .as_ref()
                 .and_then(|c| c.era().as_ref())
                 .map(|e| e.index());
-            if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(asset_hub_runtime) {
-                let tx = self.tx.clone();
-                tokio::spawn(async move {
-                    let api_at = match api.at_block(block_hash).await.boxed() {
-                        Ok(api_at) => api_at,
-                        Err(e) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Failed to client at_block: {}",
-                                e
-                            ))));
-                            return;
-                        }
-                    };
+            self.spawn_at_latest_block(asset_hub_runtime, move |api_at, tx| {
+                sync::spawn_fetch_validators_staking_ledger(api_at, asset_hub_runtime, &keys, tx);
+                sync::spawn_fetch_validators_payee(api_at, asset_hub_runtime, &keys, tx);
 
-                    sync::spawn_fetch_validators_staking_ledger(
-                        &api_at,
+                if let Some(era_index) = era_index {
+                    sync::spawn_fetch_validators_stake_overview(
+                        api_at,
                         asset_hub_runtime,
+                        era_index,
                         &keys,
-                        &tx,
+                        tx,
                     );
-                    sync::spawn_fetch_validators_payee(&api_at, asset_hub_runtime, &keys, &tx);
-
-                    if let Some(era_index) = era_index {
-                        sync::spawn_fetch_validators_stake_overview(
-                            &api_at,
-                            asset_hub_runtime,
-                            era_index,
-                            &keys,
-                            &tx,
-                        );
-                        sync::spawn_fetch_validators_era_points(
-                            &api_at,
-                            asset_hub_runtime,
-                            era_index,
-                            &keys,
-                            &tx,
-                        );
-                    }
-                });
-            }
+                    sync::spawn_fetch_validators_era_points(
+                        api_at,
+                        asset_hub_runtime,
+                        era_index,
+                        &keys,
+                        tx,
+                    );
+                }
+            });
         }
     }
 
@@ -939,72 +1047,51 @@ impl App {
                 // In case of 'Rebond' funds should be added to staking_ledger and also
                 // subtracted from unlocking vec.
                 // To keep things in sync, a fetch for this respective stash is being called here.
-                // And also a fetch to the account balance is being called here.
+                // And also a fetch to the account balance is being called here. The events are
+                // about every account, so only the validators listed are fetched.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_staking_ledger(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                        sync::spawn_fetch_validators_account_balance(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                    sync::spawn_fetch_validators_account_balance(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
             ValidatorAction::SubChunkFromStakeLedger(validator_key, chunk) => {
                 self.validators
                     .sub_chunk_from_stake_ledger(&validator_key, chunk);
                 // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_account_balance(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_account_balance(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
             ValidatorAction::AddProxy(validator_key, proxy) => {
                 self.validators.add_proxy(&validator_key, proxy);
@@ -1020,33 +1107,22 @@ impl App {
                 // 'Withdrawn' event. The witdrawn amount is expected to be available as free in balance
                 // and also unlocked from `staking.ledger`. Rather than unlocking manually is easier just
                 // to fetch storage for staking ledger.
+                if !self.validators.is_listed(&validator_key) {
+                    return;
+                }
                 let runtime = validator_key
                     .runtime()
                     .asset_hub_runtime()
                     .expect("every relay has an AssetHub chain");
-                if let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) {
-                    let validator_keys = vec![validator_key];
-                    let tx = self.tx.clone();
-                    tokio::spawn(async move {
-                        let api_at = match api.at_block(block_hash).await.boxed() {
-                            Ok(api_at) => api_at,
-                            Err(e) => {
-                                let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                    "Failed to client at_block: {}",
-                                    e
-                                ))));
-                                return;
-                            }
-                        };
-
-                        sync::spawn_fetch_validators_staking_ledger(
-                            &api_at,
-                            runtime,
-                            &validator_keys,
-                            &tx,
-                        );
-                    });
-                }
+                let validator_keys = vec![validator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_validators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &validator_keys,
+                        tx,
+                    );
+                });
             }
         }
     }
@@ -1100,43 +1176,39 @@ impl App {
         }
 
         for (runtime, keys) in self.collators.take_unrequested_visible() {
-            self.fetch_collators_chain_data(runtime, keys);
+            self.fetch_collators_data(runtime, keys);
         }
+    }
+
+    /// Fetches what the Asset Hub `runtime` holds about the nominators with the `keys`: the
+    /// validators nominated, the staking ledger, the payee and the proxy status.
+    fn fetch_nominators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        if !runtime.is_asset_hub() || keys.is_empty() {
+            return;
+        }
+
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_on_connect(api_at, runtime, &keys, tx);
+        });
     }
 
     /// Fetches the balance, the session keys and the last authored block of the `keys` collators,
     /// all of them held on the collator's own chain.
-    fn fetch_collators_chain_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+    fn fetch_collators_data(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
         if keys.is_empty() {
             return;
         }
-
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(runtime) else {
-            return;
-        };
 
         // Aura's expected block time is derived from the relay chain epoch data
         let is_epoch_known = self
             .chains
             .get_chain_by_runtime(runtime.relay_chain())
             .is_some_and(|chain| chain.epoch().is_some());
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
-                    return;
-                }
-            };
-
-            sync::spawn_fetch_collators_account_balance(&api_at, runtime, &keys, &tx);
-            sync::spawn_fetch_collators_session_keys(&api_at, runtime, &keys, &tx);
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_collators_account_balance(api_at, runtime, &keys, tx);
+            sync::spawn_fetch_collators_session_keys(api_at, runtime, &keys, tx);
             if is_epoch_known {
-                sync::spawn_fetch_collators_last_authored_block(&api_at, runtime, &keys, &tx);
+                sync::spawn_fetch_collators_last_authored_block(api_at, runtime, &keys, tx);
             }
         });
     }
@@ -1148,10 +1220,6 @@ impl App {
         let Some(people_runtime) = runtime.relay_chain().people_runtime() else {
             return false;
         };
-        let Some((api, block_hash)) = self.chains.get_api_and_block_hash(people_runtime) else {
-            return false;
-        };
-
         // The same stash can be a collator of several chains, and the identity is the same, so
         // it is only fetched once
         let mut seen = HashSet::new();
@@ -1161,22 +1229,140 @@ impl App {
             .cloned()
             .collect();
 
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let api_at = match api.at_block(block_hash).await.boxed() {
-                Ok(api_at) => api_at,
-                Err(e) => {
-                    let _ = tx.send(Action::System(SystemAction::Error(format!(
-                        "Failed to client at_block: {}",
-                        e
-                    ))));
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_collators_identity(api_at, people_runtime, &keys, tx);
+        })
+    }
+
+    /// Fetches the identity of the `keys` nominators of the relay chain `runtime`, held on its
+    /// People chain. Returns false when it is not connected yet, and nothing was requested.
+    fn fetch_nominators_identity(&self, runtime: SupportedRuntime, keys: &[AccountKey]) -> bool {
+        let Some(people_runtime) = runtime.people_runtime() else {
+            return false;
+        };
+        let keys = keys.to_vec();
+        self.spawn_at_latest_block(people_runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_identity(api_at, people_runtime, &keys, tx);
+        })
+    }
+
+    fn handle_nominator_actions(&mut self, action: NominatorAction) {
+        match action {
+            NominatorAction::UpdateNominations(nominator_key, nominations) => {
+                self.nominators
+                    .update_nominations(&nominator_key, nominations);
+                self.update_nominated_validators(nominator_key.runtime().relay_chain());
+            }
+            NominatorAction::UpdateStakeLedger(nominator_key, ledger) => {
+                self.nominators.update_stake_ledger(&nominator_key, ledger);
+            }
+            NominatorAction::UpdatePayee(nominator_key, payee) => {
+                self.nominators.update_payee(&nominator_key, payee);
+            }
+            NominatorAction::UpdateBalance(nominator_key, balance) => {
+                self.nominators.update_balance(&nominator_key, balance);
+            }
+            NominatorAction::UpdateIdentity(nominator_key, identity) => {
+                self.nominators.update_identity(&nominator_key, identity);
+            }
+            NominatorAction::AddAmountToStakeLedger(nominator_key, amount) => {
+                self.nominators
+                    .add_amount_to_stake_ledger(&nominator_key, amount);
+                // NOTE: As for the validators, the 'Bonded' event is also raised by 'Rebond', so
+                // the ledger and the balance are fetched to keep them in sync. The events are
+                // about every account, so only the nominators listed are fetched.
+                if !self.nominators.is_listed(&nominator_key) {
                     return;
                 }
-            };
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                    sync::spawn_fetch_nominators_account_balance(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
+            }
+            NominatorAction::SubChunkFromStakeLedger(nominator_key, chunk) => {
+                self.nominators
+                    .sub_chunk_from_stake_ledger(&nominator_key, chunk);
+                // NOTE: Fetch account balance after sub-chunk to keep balance in sync.
+                if !self.nominators.is_listed(&nominator_key) {
+                    return;
+                }
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_account_balance(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
+            }
+            NominatorAction::AddAmountToBalance(nominator_key, amount) => {
+                self.nominators
+                    .add_amount_to_balance(&nominator_key, amount);
+                // NOTE: The amount withdrawn is also unlocked from `staking.ledger`.
+                if !self.nominators.is_listed(&nominator_key) {
+                    return;
+                }
+                let runtime = nominator_key.runtime();
+                let nominator_keys = vec![nominator_key];
+                self.spawn_at_latest_block(runtime, move |api_at, tx| {
+                    sync::spawn_fetch_nominators_staking_ledger(
+                        api_at,
+                        runtime,
+                        &nominator_keys,
+                        tx,
+                    );
+                });
+            }
+            NominatorAction::AddProxy(nominator_key, proxy) => {
+                self.nominators.add_proxy(&nominator_key, proxy);
+                self.refresh_proxies();
+            }
+        }
+    }
 
-            sync::spawn_fetch_collators_identity(&api_at, people_runtime, &keys, &tx);
-        });
-        true
+    /// Lists the validators nominated by the nominators on the validators list,
+    /// and fetches the data of the ones not listed before.
+    fn update_nominated_validators(&mut self, runtime: SupportedRuntime) {
+        if !CONFIG.features().validators_enabled() {
+            return;
+        }
+
+        let targets = self.nominators.targets_by_relay_chain(runtime);
+        let keep_onchain = CONFIG.features().all_validators_visible();
+        let added = self
+            .validators
+            .update_nominated(runtime, &targets, keep_onchain);
+        if added.is_empty() {
+            return;
+        }
+
+        // The data of a validator listed after the start, the same as the one pinned
+        self.fetch_validators_data(runtime, added.clone());
+        if let Some(asset_hub_runtime) = runtime.asset_hub_runtime() {
+            self.spawn_at_latest_block(asset_hub_runtime, move |api_at, tx| {
+                sync::spawn_fetch_validators_on_connect(
+                    api_at,
+                    asset_hub_runtime,
+                    &added,
+                    false,
+                    tx,
+                );
+            });
+        }
     }
 
     fn handle_collator_actions(&mut self, action: CollatorAction) {
@@ -1483,7 +1669,8 @@ impl App {
             }
             UpdateAction::Complete => {
                 self.popup
-                    .show_upgrade_complete("upgrade complete, restart to apply");
+                    .show_upgrade_complete("upgrade complete, restarting");
+                self.restart();
             }
             UpdateAction::Error => {
                 self.popup.show_upgrade_error();
@@ -1496,6 +1683,8 @@ impl App {
 
     /// Handles the tick event of the terminal.
     pub fn tick(&mut self) {
+        self.expire_chord();
+
         if self.section == Section::Chains && self.popup.get_mode() == PopupMode::Metadata {
             self.popup.advance_metadata_frame();
         }
@@ -1505,7 +1694,7 @@ impl App {
         self.fetch_missing_identities();
     }
 
-    /// Fetches the identity of every validator, or collator, listed in the window displayed, once
+    /// Fetches the identity of every validator, collator, or nominator, listed in the window displayed, once
     /// the People chain is connected. The identity is critical to tell them apart, so unlike the
     /// rest of the data, which is only fetched for the tracked and the visible ones, it is
     /// fetched for all of them. The other window is fetched when it is displayed.
@@ -1527,6 +1716,13 @@ impl App {
                     }
                 }
             }
+            Window::Nominators => {
+                for (runtime, keys) in self.nominators.get_keys_without_identity_requested() {
+                    if self.fetch_nominators_identity(runtime, &keys) {
+                        self.nominators.mark_identity_requested(&keys);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -1534,6 +1730,12 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    /// Set restart to true to relaunch the application on quit.
+    pub fn restart(&mut self) {
+        self.restart = true;
+        self.quit();
     }
 
     /// Moves row selection up.
@@ -1565,6 +1767,9 @@ impl App {
             }
             Section::Collators => {
                 self.collators.move_up();
+            }
+            Section::Nominators => {
+                self.nominators.move_up();
             }
             Section::Proxies => {
                 self.proxies.move_up();
@@ -1602,6 +1807,9 @@ impl App {
             }
             Section::Collators => {
                 self.collators.move_down();
+            }
+            Section::Nominators => {
+                self.nominators.move_down();
             }
             Section::Proxies => {
                 self.proxies.move_down();
@@ -1652,7 +1860,9 @@ impl App {
     /// Moves the active section up.
     pub fn section_up(&mut self) {
         let config = CONFIG.clone();
-        let section = self.section.up(&config.features, !self.proxies.is_empty());
+        let section = self
+            .section
+            .up(&config.features, config.features.proxies_enabled());
         self.set_section(section);
     }
 
@@ -1661,7 +1871,7 @@ impl App {
         let config = CONFIG.clone();
         let section = self
             .section
-            .down(&config.features, !self.proxies.is_empty());
+            .down(&config.features, config.features.proxies_enabled());
         self.set_section(section);
     }
 
@@ -1671,8 +1881,23 @@ impl App {
         match (&self.section, self.window) {
             (Section::None, Window::Validators) => Section::Validators,
             (Section::None, Window::Collators) => Section::Collators,
+            (Section::None, Window::Nominators) => Section::Nominators,
             (Section::None, _) => self.main_section.clone(),
             (section, _) => section.clone(),
+        }
+    }
+
+    /// The pane of the left menu which takes the most space: the one selected, otherwise the
+    /// last one that was, otherwise the one of the main window.
+    pub fn expanded_section(&self) -> Section {
+        match &self.section {
+            Section::Validators | Section::Collators | Section::Nominators | Section::Proxies => {
+                self.section.clone()
+            }
+            _ => self
+                .expanded_section
+                .clone()
+                .unwrap_or_else(|| self.data_section()),
         }
     }
 
@@ -1684,8 +1909,10 @@ impl App {
             self.main_section = match self.section {
                 Section::Validators => Section::Validators,
                 Section::Collators => Section::Collators,
+                Section::Nominators => Section::Nominators,
                 _ if features.validators_enabled() => Section::Validators,
                 _ if features.collators_enabled() => Section::Collators,
+                _ if features.nominators_enabled() => Section::Nominators,
                 _ => Section::Chains,
             };
         }
@@ -1693,7 +1920,14 @@ impl App {
         match section {
             Section::Validators => self.window = Window::Validators,
             Section::Collators => self.window = Window::Collators,
+            Section::Nominators => self.window = Window::Nominators,
             _ => {}
+        }
+        if matches!(
+            section,
+            Section::Validators | Section::Collators | Section::Nominators | Section::Proxies
+        ) {
+            self.expanded_section = Some(section.clone());
         }
         self.section = section;
         self.update_visible_lists();
@@ -1723,11 +1957,18 @@ impl App {
         };
         let validators_focus = focus_of(data_section == Section::Validators);
         let collators_focus = focus_of(data_section == Section::Collators);
+        let nominators_focus = focus_of(data_section == Section::Nominators);
 
         self.chains.set_active(self.section == Section::Chains);
         self.proxies.set_active(self.section == Section::Proxies);
         self.validators.set_focus(validators_focus);
         self.collators.set_focus(collators_focus);
+        self.nominators.set_focus(nominators_focus);
+
+        // Selecting a section brings back the focus to the main
+        if self.focus == Focus::None {
+            self.focus = Focus::Main;
+        }
     }
 
     /// Selects the previous window.
@@ -1752,6 +1993,7 @@ impl App {
             (Section::None, _) => self.update_active_section(),
             (_, Window::Validators) => self.set_section(Section::Validators),
             (_, Window::Collators) => self.set_section(Section::Collators),
+            (_, Window::Nominators) => self.set_section(Section::Nominators),
             _ => {}
         }
     }
@@ -1774,13 +2016,13 @@ impl App {
         self.popup.show_theme_menu(names, active_name);
 
         // Dispatch focus to the input field so typing filters and up/down/enter/esc navigate.
-        let _ = self.tx.send(Action::Input(InputAction::Editing));
+        let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
     }
 
     /// Enter on a popup that is not editing the input.
     fn confirm_popup(&mut self) {
-        if self.popup.get_mode() == PopupMode::Features {
-            self.toggle_feature();
+        if self.popup.get_mode() == PopupMode::Features && CONFIG.pending_restart() {
+            self.restart();
         }
     }
 
@@ -1796,12 +2038,45 @@ impl App {
                     self.fetch_validators_proxy_status(runtime, vec![key]);
                 }
             }
+            Call::RemoveValidator { stash: Some(stash) } => {
+                if !self.validators.remove_pinned(runtime.relay_chain(), stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a validator account",
+                    );
+                    return;
+                }
+                save_pinned_validators(self.validators.get_pinned());
+            }
+            Call::AddNominator { stash: Some(stash) } => {
+                if let Some(key) = self.nominators.add_pinned(runtime, stash) {
+                    save_pinned_nominators(self.nominators.get_pinned());
+                    self.fetch_nominators_data(runtime, vec![key]);
+                }
+            }
+            Call::RemoveNominator { stash: Some(stash) } => {
+                if !self.nominators.remove_pinned(runtime, stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a nominator account",
+                    );
+                    return;
+                }
+                save_pinned_nominators(self.nominators.get_pinned());
+            }
             Call::AddCollator { stash: Some(stash) } => {
                 if let Some(key) = self.collators.add_pinned(runtime, stash) {
                     save_pinned_collators(self.collators.get_pinned());
-                    self.fetch_collators_chain_data(runtime, vec![key.clone()]);
+                    self.fetch_collators_data(runtime, vec![key.clone()]);
                     self.fetch_collators_proxy_status(runtime, vec![key]);
                 }
+            }
+            Call::RemoveCollator { stash: Some(stash) } => {
+                if !self.collators.remove_pinned(runtime, stash) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a collator account",
+                    );
+                    return;
+                }
+                save_pinned_collators(self.collators.get_pinned());
             }
             Call::AddProxyAccount {
                 account: Some(account),
@@ -1813,13 +2088,29 @@ impl App {
             Call::RemoveProxyAccount {
                 account: Some(account),
             } => {
-                remove_proxy_account(runtime, account);
+                if !remove_proxy_account(runtime, account) {
+                    self.on_account_error(
+                        "That account is not currently pinned as a proxy account",
+                    );
+                    return;
+                }
                 self.fetch_proxy_status(runtime);
                 self.refresh_proxies();
             }
             _ => return,
         }
         self.close_popup();
+    }
+
+    /// Shows why the account of a command could not be added or removed. The popup of the commands
+    /// shows it below the input, and the scanner starts again when an address was being scanned.
+    fn on_account_error(&mut self, msg: &str) {
+        error!("{}", msg);
+        if self.popup.is_scan_account_mode() {
+            let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
+        } else if self.popup.invalidate_input(msg) {
+            self.focus = Focus::Input;
+        }
     }
 
     /// Handle decoded bytes from qr code when popup is in scan account mode
@@ -1832,10 +2123,7 @@ impl App {
             .and_then(|text| AccountId32::from_str(extract_address_from_qr(text)).ok());
         match account {
             Some(account) => self.add_account(call.with_address(account), runtime),
-            None => {
-                error!("The QR code is not an address");
-                let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
-            }
+            None => self.on_account_error("The QR code is not an address"),
         }
     }
 
@@ -1850,13 +2138,11 @@ impl App {
             for collator in self.collators.collators_iter() {
                 proxy.track_collator(&collator.proxies);
             }
+            for nominator in self.nominators.nominators_iter() {
+                proxy.track_nominator(&nominator.proxies);
+            }
         }
         self.proxies.load(proxies);
-
-        // The proxies section can't stay selected once there are no proxy accounts
-        if self.section == Section::Proxies && self.proxies.is_empty() {
-            self.section_up();
-        }
     }
 
     /// Removes the proxy account selected
@@ -1938,8 +2224,24 @@ impl App {
             self.validators.clear_proxies(runtime.relay_chain());
         }
 
+        let nominator_keys = self.nominators.keys_by_runtime(runtime);
+        self.nominators.clear_proxies(runtime);
+
         self.fetch_validators_proxy_status(runtime, validator_keys);
         self.fetch_collators_proxy_status(runtime, collator_keys);
+        self.fetch_nominators_proxy_status(runtime, nominator_keys);
+    }
+
+    /// Fetches the proxy status of the `keys` nominators, held on the Asset Hub `runtime`, for
+    /// all the signers of the chain.
+    fn fetch_nominators_proxy_status(&self, runtime: SupportedRuntime, keys: Vec<AccountKey>) {
+        let proxies = runtime.signer_account_ids();
+        if keys.is_empty() || proxies.is_empty() {
+            return;
+        }
+        self.spawn_at_latest_block(runtime, move |api_at, tx| {
+            sync::spawn_fetch_nominators_proxy_status(api_at, runtime, &keys, &proxies, tx);
+        });
     }
 
     /// Fetches the proxy status of the `keys` validators, held on the Asset Hub `runtime`, for
@@ -2003,6 +2305,7 @@ impl App {
         self.theme = catalog[index].1;
         self.chains.set_theme(self.theme);
         self.proxies.set_theme(self.theme);
+        self.nominators.set_theme(self.theme);
         self.popup.set_theme(self.theme);
         self.logs.set_theme(self.theme);
         self.help.set_theme(self.theme);
@@ -2079,6 +2382,23 @@ impl App {
                 }
                 save_pinned_collators(self.collators.get_pinned());
             }
+            Window::Nominators => {
+                // Toggle pin only from the main window, not from the compact list
+                if self.nominators.focus() != ListFocus::Main {
+                    return;
+                }
+                let Some(key) = self.nominators.get_selected().map(|n| n.key().clone()) else {
+                    return;
+                };
+                let Some(origins) = self.nominators.toggle_pinned(&key) else {
+                    return;
+                };
+                // The nominators only found on-chain are never listed
+                if origins.is_onchain() {
+                    self.nominators.remove(&key);
+                }
+                save_pinned_nominators(self.nominators.get_pinned());
+            }
             _ => {}
         }
     }
@@ -2086,16 +2406,20 @@ impl App {
     /// Returns the hint to show in the legend when the highlighted validator or collator is toggled,
     /// which only happens from the main window.
     pub fn toggle_hint(&self) -> Option<&'static str> {
-        let origin = match self.window {
-            Window::Validators if self.validators.focus() == ListFocus::Main => {
-                self.validators.get_highlighted_ref()?.origin
-            }
+        match self.window {
+            Window::Validators if self.validators.focus() == ListFocus::Main => self
+                .validators
+                .get_highlighted_ref()?
+                .origins
+                .toggle_label(),
             Window::Collators if self.collators.focus() == ListFocus::Main => {
-                self.collators.get_highlighted_ref()?.origin
+                self.collators.get_highlighted_ref()?.origin.toggle_label()
             }
-            _ => return None,
-        };
-        origin.toggle_label()
+            Window::Nominators if self.nominators.focus() == ListFocus::Main => {
+                self.nominators.get_selected()?.origins.toggle_label()
+            }
+            _ => None,
+        }
     }
 
     /// Toggles between grouped and listed view.
@@ -2105,77 +2429,228 @@ impl App {
         }
     }
 
-    /// Open menu popup
+    /// Shows the commands of the validator selected.
+    fn show_validator_popup(&mut self) -> bool {
+        let Some(validator) = self.validators.get_selected() else {
+            return false;
+        };
+        if !validator.origins.is_pinned()
+            && !self.validators.is_proxy_valid()
+            && !self.validators.has_commands_available()
+        {
+            return false;
+        }
+        let Some(chain) = self.chains.get_chain_by_runtime(
+            validator
+                .runtime()
+                .asset_hub_runtime()
+                .expect("every relay has an Asset Hub chain"),
+        ) else {
+            return false;
+        };
+        let Some(active_era) = chain.era() else {
+            return false;
+        };
+        self.popup
+            .show_validator_commands(&validator, active_era.index());
+        true
+    }
+
+    /// Shows the commands of the collator selected.
+    fn show_collator_popup(&mut self) -> bool {
+        let Some(collator) = self.collators.get_selected() else {
+            return false;
+        };
+        if !collator.origin.is_pinned()
+            && !self.collators.is_proxy_valid()
+            && !self.collators.has_commands_available()
+        {
+            return false;
+        }
+        self.popup.show_collator_commands(&collator);
+        true
+    }
+
+    /// Shows the commands of the chain selected.
+    fn show_chain_popup(&mut self) -> bool {
+        let Some(chain) = self.chains.get_selected() else {
+            return false;
+        };
+        self.popup.show_chain_commands(&chain);
+        true
+    }
+
+    /// Shows the commands of the nominator selected.
+    fn show_nominator_popup(&mut self) -> bool {
+        let Some(nominator) = self
+            .nominators
+            .get_selected()
+            .filter(|n| n.origins.is_pinned() || n.is_proxy_valid())
+        else {
+            return false;
+        };
+        let Some(active_era) = self
+            .chains
+            .get_chain_by_runtime(nominator.runtime())
+            .and_then(|chain| chain.era().as_ref().map(|e| e.index()))
+        else {
+            return false;
+        };
+        self.popup.show_nominator_commands(nominator, active_era);
+        true
+    }
+
+    /// Waits for the key that completes the chord, unless something else has the keys.
+    fn start_chord(&mut self) {
+        if self.popup.is_visible() || !matches!(self.focus, Focus::Main | Focus::None) {
+            return;
+        }
+        self.chord = Some((self.focus.clone(), Instant::now()));
+        self.focus = Focus::Chord;
+    }
+
+    /// Ends the chord when its second key doesn't come in time.
+    fn expire_chord(&mut self) {
+        if self
+            .chord
+            .as_ref()
+            .is_some_and(|(_, started)| started.elapsed() >= CHORD_TIMEOUT)
+        {
+            self.end_chord();
+        }
+    }
+
+    /// Gives the keys back to where they were when the chord started.
+    fn end_chord(&mut self) {
+        if let Some((focus, _)) = self.chord.take() {
+            self.focus = focus;
+        }
+    }
+
+    /// Opens the commands of the chain where the `call` runs, with its command typed.
+    fn open_call_popup(&mut self, call: Call) {
+        self.end_chord();
+        if self.popup.is_visible() {
+            return;
+        }
+        let features = CONFIG.features();
+        let filter: fn(SupportedRuntime) -> bool = match call {
+            Call::AddValidator { .. } if features.validators_enabled() => |r| r.is_asset_hub(),
+            Call::AddNominator { .. } if features.nominators_enabled() => |r| r.is_asset_hub(),
+            Call::AddCollator { .. } if features.collators_enabled() => |r| r.is_para_chain(),
+            Call::AddProxyAccount { .. } => |r| r.is_para_chain(),
+            _ => return,
+        };
+        self.set_section(Section::Chains);
+        if self.show_first_chain_popup(filter) {
+            self.type_command(&call);
+        }
+    }
+
+    /// Types the command of the `call` in the popup.
+    fn type_command(&self, call: &Call) {
+        let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        for c in call.to_string().chars() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(Some(c))));
+        }
+    }
+
+    /// Shows the commands of the first chain accepted by `filter`, e.g. to add the first account
+    /// of a section which is empty.
+    fn show_first_chain_popup(&mut self, filter: impl Fn(SupportedRuntime) -> bool) -> bool {
+        self.chains.select_first_where(filter).is_some() && self.show_chain_popup()
+    }
+
+    /// Shows the commands of the proxy selected.
+    fn show_proxy_popup(&mut self) -> bool {
+        let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
+            return false;
+        };
+        self.popup.show_proxy_commands(&proxy);
+        true
+    }
+
+    /// Open popup depending on the selected pane section.
     pub fn open_popup(&mut self) {
         if self.popup.is_visible() {
             return;
         }
 
-        if self.data_section() == Section::Validators && self.validators.is_active() {
-            if !self.validators.is_proxy_valid() && !self.validators.has_commands_available() {
-                return;
+        if self.data_section() == Section::Validators
+            && self.validators.is_active()
+            && self.show_validator_popup()
+        {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        if self.data_section() == Section::Collators
+            && self.collators.is_active()
+            && self.show_collator_popup()
+        {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        if self.section == Section::Chains && self.chains.is_active() && self.show_chain_popup() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        if self.data_section() == Section::Nominators
+            && self.nominators.is_active()
+            && self.show_nominator_popup()
+        {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        if self.section == Section::Proxies && self.proxies.is_active() && self.show_proxy_popup() {
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+        };
+
+        // An empty section has no node to show the commands of, so the ones of the chain where
+        // its nodes are added are shown, with the command to add the first one typed
+        if !self.popup.is_visible() {
+            let command = match self.data_section() {
+                Section::Validators
+                    if self.validators.is_active() && self.validators.get_selected().is_none() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_asset_hub())
+                        .then_some(Call::AddValidator { stash: None })
+                }
+                Section::Collators
+                    if self.collators.is_active() && self.collators.get_selected().is_none() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_para_chain())
+                        .then_some(Call::AddCollator { stash: None })
+                }
+                Section::Nominators
+                    if self.nominators.is_active() && self.nominators.is_empty() =>
+                {
+                    self.show_first_chain_popup(|r| r.is_asset_hub())
+                        .then_some(Call::AddNominator { stash: None })
+                }
+                Section::Proxies if self.proxies.is_active() && self.proxies.is_empty() => self
+                    .show_first_chain_popup(|r| r.is_para_chain())
+                    .then_some(Call::AddProxyAccount { account: None }),
+                _ => None,
+            };
+            if let Some(command) = command {
+                self.type_command(&command);
             }
+        }
 
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
-
-            let Some(chain) = self.chains.get_chain_by_runtime(
-                validator
-                    .runtime()
-                    .asset_hub_runtime()
-                    .expect("every relay has an AssetHub chain"),
-            ) else {
-                return;
-            };
-
-            let Some(active_era) = chain.era() else {
-                return;
-            };
-
-            self.popup
-                .show_validator_commands(&validator, active_era.index());
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
-        };
-
-        if self.data_section() == Section::Collators && self.collators.is_active() {
-            if !self.collators.is_proxy_valid() && !self.collators.has_commands_available() {
-                return;
+        // Without anything focused, the commands of the first chain are the ones who become visible
+        if self.focus == Focus::None
+            && !self.popup.is_visible()
+            && !self.window.is_logs_selected()
+            && !self.window.is_help_selected()
+        {
+            self.set_section(Section::Chains);
+            if self.chains.get_selected().is_none() {
+                self.chains.init_table();
             }
-
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            self.popup.show_collator_commands(&collator);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
-        };
-
-        if self.section == Section::Chains && self.chains.is_active() {
-            let Some(chain) = self.chains.get_selected() else {
-                return;
-            };
-
-            self.popup.show_chain_commands(&chain);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
-        };
-
-        if self.section == Section::Proxies && self.proxies.is_active() {
-            let Some(proxy) = self.proxies.get_selected().filter(|p| p.is_removable()) else {
-                return;
-            };
-
-            self.popup.show_proxy_commands(&proxy);
-
-            // Dispatch focus to the input field
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
-        };
+            if self.show_chain_popup() {
+                let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
+            }
+        }
     }
 
     /// Open confirm and sign popup
@@ -2191,7 +2666,7 @@ impl App {
         if ctx.runtime.is_qrcode_enabled() {
             let _ = self.tx.send(Action::Scanner(ScannerAction::Init));
         } else {
-            let _ = self.tx.send(Action::Input(InputAction::Editing));
+            let _ = self.tx.send(Action::Input(InputAction::Editing(None)));
         }
     }
 
@@ -2346,50 +2821,69 @@ impl App {
             return;
         }
 
-        if self.data_section() == Section::Validators {
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
+        let mode = self.popup.get_mode();
 
-            match self.popup.get_mode() {
-                PopupMode::Menu => {
+        // The commands of a menu are the ones of the popup displayed, not of the section selected
+        if mode == PopupMode::Menu {
+            if self.popup.is_validator_menu() {
+                if let Some(validator) = self.validators.get_selected() {
                     self.on_validator_menu_enter(validator);
                 }
-                PopupMode::Confirmation => {
-                    self.on_validator_confirm_enter(validator);
-                }
-                _ => {}
-            }
-        };
-
-        if self.data_section() == Section::Collators {
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            match self.popup.get_mode() {
-                PopupMode::Menu => {
+            } else if self.popup.is_collator_menu() {
+                if let Some(collator) = self.collators.get_selected() {
                     self.on_collator_menu_enter(collator);
                 }
-                PopupMode::Confirmation => {
-                    self.on_collator_confirm_enter(collator);
+            } else if self.popup.is_chain_menu() {
+                if let Some(chain) = self.chains.get_selected() {
+                    self.on_chain_menu_enter(&chain);
                 }
-                _ => {}
+            } else if self.popup.is_nominator_menu() {
+                self.on_nominator_menu_enter();
+            } else if self.section == Section::Proxies {
+                self.on_proxy_menu_enter();
             }
-        };
-
-        if self.section == Section::Chains {
-            let Some(chain) = self.chains.get_selected() else {
-                return;
-            };
-
-            if self.popup.get_mode() == PopupMode::Menu {
-                self.on_chain_menu_enter(&chain);
-            }
+            return;
         }
 
-        if self.section == Section::Proxies && self.popup.get_mode() == PopupMode::Menu {
-            self.on_proxy_menu_enter();
+        if mode == PopupMode::Confirmation {
+            if let Some(runtime) = self.selected_runtime() {
+                self.on_confirm_enter(runtime);
+            }
+        }
+    }
+
+    /// Handle enter when a nominator is selected and popup is in menu mode, showing the commands
+    /// available for it.
+    fn on_nominator_menu_enter(&mut self) {
+        let Some(call) = self.popup.get_input_parsed_call() else {
+            return;
+        };
+        let Some(nominator) = self.nominators.get_selected().cloned() else {
+            return;
+        };
+        let runtime = nominator.runtime();
+        match call {
+            Call::RemoveNominator { .. } => {
+                let call = Call::RemoveNominator {
+                    stash: Some(nominator.stash()),
+                };
+                self.add_account(call, runtime);
+            }
+            call => {
+                let Some((proxy_account_id, supported_proxy)) = nominator.get_proxy_for(&call)
+                else {
+                    error!("No signer is defined for {}", runtime);
+                    return;
+                };
+                self.request_confirmation(
+                    runtime,
+                    call,
+                    nominator.stash(),
+                    nominator.display_name(6),
+                    proxy_account_id,
+                    supported_proxy,
+                );
+            }
         }
     }
 
@@ -2418,7 +2912,11 @@ impl App {
                 self.build_metadata_qrcode_popup(chain);
             }
             Call::AddValidator { .. }
+            | Call::RemoveValidator { .. }
+            | Call::AddNominator { .. }
+            | Call::RemoveNominator { .. }
             | Call::AddCollator { .. }
+            | Call::RemoveCollator { .. }
             | Call::AddProxyAccount { .. }
             | Call::RemoveProxyAccount { .. } => self.add_or_scan_account(call, chain.runtime()),
             _ => {}
@@ -2445,6 +2943,15 @@ impl App {
 
         match call {
             Call::Custom(custom) => self.handle_custom_command(custom, validator),
+            Call::RemoveValidator { .. } => {
+                let Some(runtime) = validator.runtime().asset_hub_runtime() else {
+                    return;
+                };
+                let call = Call::RemoveValidator {
+                    stash: Some(validator.key().stash()),
+                };
+                self.add_account(call, runtime);
+            }
             _ => self.handle_extrinsic_calls(call, validator),
         }
     }
@@ -2455,19 +2962,40 @@ impl App {
             .asset_hub_runtime()
             .expect("every relay has an AssetHub chain");
 
-        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-            return;
-        };
-        let api = chain.client().clone();
-        let tx = self.tx.clone();
         let stash = validator.key().stash();
         let Some((proxy_account_id, supported_proxy)) = validator.get_proxy_for(runtime, &call)
         else {
             error!("No signer is defined for {}", runtime);
             return;
         };
+        let stash_identity = validator.display_name(6);
+        self.request_confirmation(
+            runtime,
+            call,
+            stash,
+            stash_identity,
+            proxy_account_id,
+            supported_proxy,
+        );
+    }
+
+    /// Builds the call data and the QR code of the `call` made by the proxy, to be confirmed and
+    /// signed in the popup.
+    fn request_confirmation(
+        &self,
+        runtime: SupportedRuntime,
+        call: Call,
+        stash: AccountId32,
+        stash_identity: String,
+        proxy_account_id: AccountId32,
+        supported_proxy: suno_primitives::proxy::SupportedProxy,
+    ) {
+        let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
+            return;
+        };
+        let api = chain.client().clone();
+        let tx = self.tx.clone();
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
-        let stash_identity = validator.display_name(3);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -2541,6 +3069,12 @@ impl App {
 
         match call {
             Call::Custom(custom) => self.handle_collator_custom_command(custom, collator),
+            Call::RemoveCollator { .. } => {
+                let call = Call::RemoveCollator {
+                    stash: Some(collator.key().stash()),
+                };
+                self.add_account(call, collator.runtime());
+            }
             _ => self.handle_collator_extrinsic_calls(call, collator),
         }
     }
@@ -2560,7 +3094,7 @@ impl App {
             return;
         };
         let proxy_identity = to_compact_string(&proxy_account_id, runtime.account_format(), 6);
-        let stash_identity = collator.display_name(3);
+        let stash_identity = collator.display_name(6);
 
         // Lock the input focus to prevent user interaction while the QR code is being built.
         let _ = self.tx.send(Action::Input(InputAction::Lock));
@@ -2673,7 +3207,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = collator.key().stash();
-                    let stash_identity = collator.display_name(3);
+                    let stash_identity = collator.display_name(6);
 
                     tokio::spawn(async move {
                         let (aura_key, proof) = match custom::rotate_keys(&collator).await {
@@ -2878,7 +3412,7 @@ impl App {
                     };
                     let api = chain.client().clone();
                     let stash = validator.key().stash();
-                    let stash_identity = validator.display_name(3);
+                    let stash_identity = validator.display_name(6);
 
                     tokio::spawn(async move {
                         let result = custom::rotate_keys(&validator).await;
@@ -3036,149 +3570,51 @@ impl App {
         }
     }
 
+    /// The chain a call is submitted to, by the section whose item is selected.
+    fn selected_runtime(&self) -> Option<SupportedRuntime> {
+        match self.data_section() {
+            Section::Validators => self
+                .validators
+                .get_selected()
+                .and_then(|v| v.runtime().asset_hub_runtime()),
+            Section::Collators => self.collators.get_selected().map(|c| c.runtime()),
+            Section::Nominators => self.nominators.get_selected().map(|n| n.runtime()),
+            _ => None,
+        }
+    }
+
     /// Handle decoded bytes from qr code when popup is in confirmation mode
     pub fn on_qr_decoded_signature(&mut self, signature_bytes: &[u8]) {
-        if !self.popup.is_visible() {
+        if !self.popup.is_visible() || !self.popup.is_confirmation_mode() {
             return;
         }
 
-        if self.data_section() == Section::Validators {
-            let Some(validator) = self.validators.get_selected() else {
-                return;
-            };
-
-            if self.popup.is_confirmation_mode() {
-                let runtime = validator
-                    .runtime()
-                    .asset_hub_runtime()
-                    .expect("every relay has an AssetHub chain");
-                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                    return;
-                };
-                let Some(bytes) = self.popup.get_call_data_bytes() else {
-                    return;
-                };
-                let api = chain.client().clone();
-                let tx = self.tx.clone();
-
-                if let Some(signer) = self.popup.get_proxy_account() {
-                    sync::spawn_submit_call_data_with_signature(
-                        &api,
-                        runtime,
-                        &signer,
-                        &bytes,
-                        signature_bytes,
-                        &tx,
-                    );
-                }
-            }
+        let Some(runtime) = self.selected_runtime() else {
+            return;
         };
-
-        if self.data_section() == Section::Collators {
-            let Some(collator) = self.collators.get_selected() else {
-                return;
-            };
-
-            if self.popup.is_confirmation_mode() {
-                let runtime = collator.runtime();
-                let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
-                    return;
-                };
-                let Some(bytes) = self.popup.get_call_data_bytes() else {
-                    return;
-                };
-                let api = chain.client().clone();
-                let tx = self.tx.clone();
-
-                if let Some(signer) = self.popup.get_proxy_account() {
-                    sync::spawn_submit_call_data_with_signature(
-                        &api,
-                        runtime,
-                        &signer,
-                        &bytes,
-                        signature_bytes,
-                        &tx,
-                    );
-                }
-            }
-        };
-    }
-
-    /// Handle enter when a validator is selected and popup is in confirmation mode
-    /// showing the call details and input field as password
-    pub fn on_validator_confirm_enter(&mut self, validator: Validator) {
-        let runtime = validator
-            .runtime()
-            .asset_hub_runtime()
-            .expect("every relay has an AssetHub chain");
-
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
         };
-
         let Some(bytes) = self.popup.get_call_data_bytes() else {
             return;
         };
-        let api = chain.client().clone();
-        let tx = self.tx.clone();
+        let Some(signer) = self.popup.get_proxy_account() else {
+            return;
+        };
 
-        let result = self
-            .popup
-            .execute_with_password(|password| -> AppResult<()> {
-                let password = Zeroizing::new(password.to_string());
-
-                tokio::spawn(async move {
-                    // Use spawn_blocking for CPU-intensive decrypt_json operation
-                    let signer_result =
-                        tokio::task::spawn_blocking(move || suno_signer::load_keypair(&password))
-                            .await;
-
-                    match signer_result {
-                        Ok(Ok(signer)) => {
-                            sync::spawn_sign_and_submit_call_data(
-                                &api, runtime, &signer, &bytes, &tx,
-                            );
-                        }
-                        Ok(Err(e)) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Failed to load keypair: {}",
-                                e
-                            ))));
-                            let _ = tx.send(Action::Input(InputAction::Error(
-                                "Invalid password".to_string(),
-                            )));
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Action::System(SystemAction::Error(format!(
-                                "Task failed: {}",
-                                e
-                            ))));
-                            let _ = tx.send(Action::Input(InputAction::Error(
-                                "Something went wrong, check errors and try again".to_string(),
-                            )));
-                        }
-                    }
-                });
-
-                // Lock input so it can't be changed unless there's an error
-                // and remove focus from the input field and start verification password spinner
-                let _ = self.tx.send(Action::Input(InputAction::Lock));
-
-                Ok(())
-            });
-        if let Err(e) = result {
-            let _ = self
-                .tx
-                .send(Action::System(SystemAction::Error(e.to_string())));
-            let _ = self.tx.send(Action::Input(InputAction::Error(
-                "Something went wrong, check errors and try again".to_string(),
-            )));
-        }
+        sync::spawn_submit_call_data_with_signature(
+            chain.client(),
+            runtime,
+            &signer,
+            &bytes,
+            signature_bytes,
+            &self.tx,
+        );
     }
 
-    pub fn on_collator_confirm_enter(&mut self, collator: Collator) {
-        let runtime = collator.runtime();
-
+    /// Handle enter when the popup is in confirmation mode, to sign the call data with the
+    /// password given and submit it to the chain `runtime`.
+    fn on_confirm_enter(&mut self, runtime: SupportedRuntime) {
         let Some(chain) = self.chains.get_chain_by_runtime(runtime) else {
             return;
         };
@@ -3249,11 +3685,9 @@ impl App {
             return;
         }
 
-        // The chain commands take an address, e.g. `add_validator <address>`
-        let is_menu_section = matches!(self.data_section(), Section::Validators | Section::Chains);
-        if is_menu_section && self.popup.get_mode() == PopupMode::Menu {
+        if self.popup.get_mode() == PopupMode::Menu {
             self.popup.insert_input_paste_data(data);
-        };
+        }
     }
 
     /// Cancel instruction.
@@ -3270,8 +3704,36 @@ impl App {
             }
         }
 
+        // The popups opened from a command menu go back to it
+        if matches!(
+            self.popup.get_mode(),
+            PopupMode::ScanAccount
+                | PopupMode::Confirmation
+                | PopupMode::ChainSpecs
+                | PopupMode::Metadata
+        ) && self.show_previous_popup()
+        {
+            self.focus = Focus::Popup;
+            return;
+        }
+
         if self.popup.can_close() {
             self.close_popup();
+        }
+    }
+
+    /// Shows again the commands popup of the selected section, the one the current popup was
+    /// opened from.
+    fn show_previous_popup(&mut self) -> bool {
+        match self.section {
+            Section::Chains => self.show_chain_popup(),
+            Section::Proxies => self.show_proxy_popup(),
+            _ => match self.data_section() {
+                Section::Validators => self.show_validator_popup(),
+                Section::Collators => self.show_collator_popup(),
+                Section::Nominators => self.show_nominator_popup(),
+                _ => false,
+            },
         }
     }
 
@@ -3285,9 +3747,13 @@ impl App {
 
         self.chains.set_active(false);
         self.proxies.set_active(false);
+        self.nominators.set_focus(ListFocus::None);
         self.validators.set_focus(ListFocus::None);
         self.collators.set_focus(ListFocus::None);
         self.logs.clear_selection();
+        if self.focus == Focus::Main {
+            self.focus = Focus::None;
+        }
     }
 
     /// Copy to clipboard
@@ -3299,18 +3765,27 @@ impl App {
             return;
         }
 
-        // The stash of the selected validator or collator
+        // The address of the selected row, following the section like the selection does
         if !self.popup.is_visible() {
-            let address = match self.window {
-                Window::Validators => self
-                    .validators
-                    .get_selected_ref()
-                    .map(|v| v.to_address_string()),
-                Window::Collators => self
-                    .collators
-                    .get_selected_ref()
-                    .map(|c| c.to_address_string()),
-                _ => None,
+            let address = if self.section.is_none() && self.window.is_help_selected() {
+                None
+            } else {
+                match self.data_section() {
+                    Section::Validators => self
+                        .validators
+                        .get_selected_ref()
+                        .map(|v| v.to_address_string()),
+                    Section::Collators => self
+                        .collators
+                        .get_selected_ref()
+                        .map(|c| c.to_address_string()),
+                    Section::Nominators => self
+                        .nominators
+                        .get_selected()
+                        .map(|n| n.to_address_string()),
+                    Section::Proxies => self.proxies.get_selected().map(|p| p.address()),
+                    _ => None,
+                }
             };
             if let Some(address) = address {
                 self.set_clipboard_text(address);

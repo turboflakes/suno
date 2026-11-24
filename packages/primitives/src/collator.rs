@@ -1,11 +1,11 @@
 use crate::{
+    account::{Account, AccountDisplay, NodeHost},
     call::Call,
     display::{format_millis, format_planks, get_elapsed_millis},
     identity::Identity,
     key::AccountKey,
-    node_account::{AccountDisplay, NodeAccount, NodeHost},
     origin::Origin,
-    proxy::{select_proxy, ProxyKey, SupportedProxy},
+    proxy::{proxies_to_string, select_proxy, ProxyKey, SupportedProxy},
     session::AuraKey,
 };
 use std::collections::HashSet;
@@ -45,7 +45,7 @@ type Amount = u128;
 /// Specific types using composition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collator {
-    pub account: NodeAccount,
+    pub account: Account,
     /// Where the collator was listed from.
     pub origin: Origin,
     pub deposit: Amount,
@@ -70,7 +70,7 @@ pub struct Collator {
 impl Collator {
     pub fn new(runtime: SupportedRuntime, stash: AccountId32) -> Self {
         Self {
-            account: NodeAccount::new(runtime, stash),
+            account: Account::new(runtime, stash),
             origin: Origin::Config,
             deposit: 0,
             last_block_authored: None,
@@ -347,31 +347,13 @@ impl Collator {
             .any(|p| p.is_non_transfer_valid() || p.is_collator_valid())
     }
 
+    /// Whether any of the proxies is valid, so there is something to show.
     pub fn has_proxies(&self) -> bool {
-        !self.proxies.is_empty()
+        self.proxies.iter().any(|p| p.is_valid())
     }
 
     pub fn proxies_as_str(&self) -> String {
-        let mut proxies = self
-            .proxies
-            .iter()
-            .filter(|p| p.is_valid())
-            .cloned()
-            .collect::<Vec<_>>();
-
-        if proxies.is_empty() {
-            return String::new();
-        }
-
-        proxies.sort();
-        format!(
-            "[{}]",
-            proxies
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        )
+        proxies_to_string(&self.proxies)
     }
 
     /// The signer to make the `call`, and its proxy type, see `select_proxy`.
@@ -405,7 +387,7 @@ impl AccountDisplay for Collator {
 impl NodeHost for Collator {
     type SessionKeys = AuraKey;
 
-    fn node_account(&self) -> &NodeAccount {
+    fn account(&self) -> &Account {
         &self.account
     }
 

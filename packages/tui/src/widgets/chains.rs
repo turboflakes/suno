@@ -380,6 +380,23 @@ impl ChainsList {
             .and_then(|i| self.get_chain_by_index_cloned(i))
     }
 
+    /// Selects the chain selected, or else the first one, whose runtime is accepted by `filter`.
+    /// Returns its runtime.
+    pub fn select_first_where(
+        &mut self,
+        filter: impl Fn(SupportedRuntime) -> bool,
+    ) -> Option<SupportedRuntime> {
+        let accepts = |key: &ChainKey| filter(self.chains.get(key).map_or(*key, |c| c.runtime()));
+        // The chain selected is kept when it is accepted
+        let selected = self
+            .table_state
+            .selected()
+            .filter(|i| self.chains_order.get(*i).is_some_and(accepts));
+        let index = selected.or_else(|| self.chains_order.iter().position(accepts))?;
+        self.table_state.select(Some(index));
+        self.chains_order.get(index).copied()
+    }
+
     pub fn get_chain_by_runtime(&self, runtime: SupportedRuntime) -> Option<Chain> {
         self.get_chain_by_key_cloned(runtime)
     }

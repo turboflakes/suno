@@ -88,8 +88,26 @@ pub enum Call {
     AddValidator {
         stash: Option<AccountId32>,
     },
+    /// Removes a validator stash pinned from the TUI, scanning its address from the Vault when
+    /// not given
+    RemoveValidator {
+        stash: Option<AccountId32>,
+    },
     /// Adds a collator to the list, scanning its address from the Vault when not given
     AddCollator {
+        stash: Option<AccountId32>,
+    },
+    /// Removes a collator pinned from the TUI, scanning its address from the Vault when not given
+    RemoveCollator {
+        stash: Option<AccountId32>,
+    },
+    /// Adds a nominator stash to the list, scanning its address from the Vault when not given
+    AddNominator {
+        stash: Option<AccountId32>,
+    },
+    /// Removes a nominator stash pinned from the TUI, scanning its address from the Vault when
+    /// not given
+    RemoveNominator {
         stash: Option<AccountId32>,
     },
     /// Sets the proxy account, scanning its address from the Vault when not given
@@ -157,7 +175,11 @@ impl Call {
                     chain_name: "".to_string(),
                 }),
                 "add_validator" => Ok(Self::AddValidator { stash: None }),
+                "remove_validator" => Ok(Self::RemoveValidator { stash: None }),
+                "add_nominator" => Ok(Self::AddNominator { stash: None }),
+                "remove_nominator" => Ok(Self::RemoveNominator { stash: None }),
                 "add_collator" => Ok(Self::AddCollator { stash: None }),
+                "remove_collator" => Ok(Self::RemoveCollator { stash: None }),
                 "add_proxy_account" => Ok(Self::AddProxyAccount { account: None }),
                 "remove_proxy_account" => Ok(Self::RemoveProxyAccount { account: None }),
                 _ => {
@@ -290,7 +312,19 @@ impl Call {
                 "add_validator" => Ok(Self::AddValidator {
                     stash: Some(parse_address(args)?),
                 }),
+                "remove_validator" => Ok(Self::RemoveValidator {
+                    stash: Some(parse_address(args)?),
+                }),
+                "add_nominator" => Ok(Self::AddNominator {
+                    stash: Some(parse_address(args)?),
+                }),
+                "remove_nominator" => Ok(Self::RemoveNominator {
+                    stash: Some(parse_address(args)?),
+                }),
                 "add_collator" => Ok(Self::AddCollator {
+                    stash: Some(parse_address(args)?),
+                }),
+                "remove_collator" => Ok(Self::RemoveCollator {
                     stash: Some(parse_address(args)?),
                 }),
                 "add_proxy_account" => Ok(Self::AddProxyAccount {
@@ -329,7 +363,12 @@ impl Call {
     /// The address of the account to add, for the commands that add one.
     pub fn address(&self) -> Option<AccountId32> {
         match self {
-            Self::AddValidator { stash } | Self::AddCollator { stash } => *stash,
+            Self::AddValidator { stash }
+            | Self::RemoveValidator { stash }
+            | Self::AddNominator { stash }
+            | Self::RemoveNominator { stash }
+            | Self::AddCollator { stash }
+            | Self::RemoveCollator { stash } => *stash,
             Self::AddProxyAccount { account } | Self::RemoveProxyAccount { account } => *account,
             _ => None,
         }
@@ -341,7 +380,19 @@ impl Call {
             Self::AddValidator { .. } => Self::AddValidator {
                 stash: Some(address),
             },
+            Self::RemoveValidator { .. } => Self::RemoveValidator {
+                stash: Some(address),
+            },
+            Self::AddNominator { .. } => Self::AddNominator {
+                stash: Some(address),
+            },
+            Self::RemoveNominator { .. } => Self::RemoveNominator {
+                stash: Some(address),
+            },
             Self::AddCollator { .. } => Self::AddCollator {
+                stash: Some(address),
+            },
+            Self::RemoveCollator { .. } => Self::RemoveCollator {
                 stash: Some(address),
             },
             Self::AddProxyAccount { .. } => Self::AddProxyAccount {
@@ -357,6 +408,9 @@ impl Call {
 
 fn parse_address(address: &str) -> Result<AccountId32, CallError> {
     let address = address.trim();
+    if address.is_empty() {
+        return Err(CallError::MissingArgumentSilent);
+    }
     AccountId32::from_str(address).map_err(|_| CallError::InvalidAddress(address.to_string()))
 }
 
@@ -383,7 +437,11 @@ impl std::fmt::Display for Call {
             Self::ChainSpecs { .. } => write!(f, "chain_specs"),
             Self::Metadata { .. } => write!(f, "metadata"),
             Self::AddValidator { .. } => write!(f, "add_validator"),
+            Self::RemoveValidator { .. } => write!(f, "remove_validator"),
+            Self::AddNominator { .. } => write!(f, "add_nominator"),
+            Self::RemoveNominator { .. } => write!(f, "remove_nominator"),
             Self::AddCollator { .. } => write!(f, "add_collator"),
+            Self::RemoveCollator { .. } => write!(f, "remove_collator"),
             Self::AddProxyAccount { .. } => write!(f, "add_proxy_account"),
             Self::RemoveProxyAccount { .. } => write!(f, "remove_proxy_account"),
         }
@@ -407,7 +465,7 @@ impl ToDescription for Call {
             )
             .to_string(),
             Self::Unbond { max, .. } => format!(
-                "Unbond up to {} of your staked balance.",
+                "Unbond up to {} of your staked balance",
                 max.as_ref()
                     .map(|(_, description)| description.to_string())
                     .unwrap_or_default()
@@ -430,7 +488,7 @@ impl ToDescription for Call {
             Self::Validate { .. } => {
                 "Validate or change commission settings, or enable/disable nominations".to_string()
             }
-            Self::Chill => "Declare no intention to validate".to_string(),
+            Self::Chill => "No intention to validate or nominate".to_string(),
             Self::SetKeys { .. } => {
                 "Set session keys using the output of the `author_rotateKeysWithOwner` RPC call"
                     .to_string()
@@ -456,25 +514,46 @@ impl ToDescription for Call {
             Self::TakeCandidateSlot { .. } => "Bid for a candidate slot with a deposit".to_string(),
             Self::Custom(custom) => custom.to_string(),
             Self::ChainSpecs { chain_name } => {
-                format!("Display the chain-specs QR code for the {} network", chain_name)
+                format!("Display the chain-specs QR code for the {} chain", chain_name)
             }
             Self::Metadata { chain_name } => {
-                format!("Display the metadata QR code for the {} network", chain_name)
+                format!("Display the metadata QR code for the {} chain", chain_name)
             }
             Self::AddValidator { .. } => {
-                "Add a validator stash".to_string()
+                "Add a validator stash account".to_string()
+            }
+            Self::RemoveValidator { stash: None } => {
+                "Unpin a validator stash account".to_string()
+            }
+            Self::RemoveValidator { .. } => {
+                "Unpin the selected validator stash account".to_string()
+            }
+            Self::AddNominator { .. } => {
+                "Add a nominator stash account".to_string()
+            }
+            Self::RemoveNominator { stash: None } => {
+                "Unpin a nominator stash account".to_string()
+            }
+            Self::RemoveNominator { .. } => {
+                "Unpin the selected nominator stash account".to_string()
             }
             Self::AddCollator { .. } => {
-                "Add a collator stash".to_string()
+                "Add a collator stash account".to_string()
+            }
+            Self::RemoveCollator { stash: None } => {
+                "Unpin a collator stash account".to_string()
+            }
+            Self::RemoveCollator { .. } => {
+                "Unpin the selected collator stash account".to_string()
             }
             Self::AddProxyAccount { .. } => {
-                "Add a proxy account".to_string()
+                "Add a proxy account to manage operations on behalf of the stash".to_string()
             }
             Self::RemoveProxyAccount { account: None } => {
-                "Remove a proxy account".to_string()
+                "Unpin a proxy account".to_string()
             }
             Self::RemoveProxyAccount { .. } => {
-                "Remove the proxy account".to_string()
+                "Unpin the selected proxy account".to_string()
             }
         }
     }
@@ -510,7 +589,14 @@ impl ToPlaceholder for Call {
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
             Self::AddValidator { .. } => "add_validator [<address>]".to_string(),
+            Self::RemoveValidator { stash: None } => "remove_validator [<address>]".to_string(),
+            Self::RemoveValidator { .. } => "remove_validator".to_string(),
+            Self::AddNominator { .. } => "add_nominator [<address>]".to_string(),
+            Self::RemoveNominator { stash: None } => "remove_nominator [<address>]".to_string(),
+            Self::RemoveNominator { .. } => "remove_nominator".to_string(),
             Self::AddCollator { .. } => "add_collator [<address>]".to_string(),
+            Self::RemoveCollator { stash: None } => "remove_collator [<address>]".to_string(),
+            Self::RemoveCollator { .. } => "remove_collator".to_string(),
             Self::AddProxyAccount { .. } => "add_proxy_account [<address>]".to_string(),
             Self::RemoveProxyAccount { account: None } => {
                 "remove_proxy_account [<address>]".to_string()
@@ -557,7 +643,11 @@ impl ToMethod for Call {
             Self::ChainSpecs { .. } => "chain_specs".to_string(),
             Self::Metadata { .. } => "metadata".to_string(),
             Self::AddValidator { .. } => "add_validator".to_string(),
+            Self::RemoveValidator { .. } => "remove_validator".to_string(),
+            Self::AddNominator { .. } => "add_nominator".to_string(),
+            Self::RemoveNominator { .. } => "remove_nominator".to_string(),
             Self::AddCollator { .. } => "add_collator".to_string(),
+            Self::RemoveCollator { .. } => "remove_collator".to_string(),
             Self::AddProxyAccount { .. } => "add_proxy_account".to_string(),
             Self::RemoveProxyAccount { .. } => "remove_proxy_account".to_string(),
         }

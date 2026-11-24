@@ -234,6 +234,26 @@ impl CollatorsList {
         Some(key)
     }
 
+    /// Unpins the collator pinned from the TUI, which is no longer listed when it is only found
+    /// on-chain and those are not listed. Returns whether it was pinned.
+    pub fn remove_pinned(&mut self, runtime: SupportedRuntime, stash: AccountId32) -> bool {
+        let key = CollatorKey::new(runtime, stash);
+        if !self
+            .collators
+            .get(&key)
+            .is_some_and(|c| c.origin.is_pinned())
+        {
+            return false;
+        }
+        let Some(origin) = self.toggle_pinned(&key) else {
+            return false;
+        };
+        if origin.is_onchain() && !CONFIG.features().all_collators_visible() {
+            self.remove(&key);
+        }
+        true
+    }
+
     /// The collators pinned from the TUI, to be persisted.
     pub fn get_pinned(&self) -> Vec<PinnedNode> {
         self.collators_iter()
@@ -293,6 +313,10 @@ impl CollatorsList {
         self.ensure_selection_in_view();
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.collators.is_empty()
+    }
+
     /// Returns an iterator of collators in display order
     pub fn collators_iter(&self) -> impl Iterator<Item = &Collator> {
         self.collators_order
@@ -300,11 +324,10 @@ impl CollatorsList {
             .filter_map(move |key| self.collators.get(key))
     }
 
-    // Returns true if any validator has proxies available
+    /// Returns true if any of the tracked collators, has valid proxies to show.
     pub fn proxies_available(&self) -> bool {
-        self.collators_order
-            .iter()
-            .any(|key| self.collators.get(key).is_some_and(|c| c.has_proxies()))
+        self.collators_iter()
+            .any(|c| c.is_tracked() && c.has_proxies())
     }
 
     // Helper method to get collator by table index

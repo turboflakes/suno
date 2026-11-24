@@ -17,6 +17,8 @@ pub enum Error {
     KeypairError(#[from] subxt_signer::sr25519::Error),
     #[error("At least one chain has to be configured [Polkadot, Kusama, Paseo, Westend]")]
     ChainNotAvailable,
+    #[error("Nominators are only supported on Asset Hub, found on {0}")]
+    NominatorsNotSupported(String),
     #[error("Unsupported chain: {0}")]
     UnsupportedChain(String),
     #[error("Unsupported provider: {0}")]
