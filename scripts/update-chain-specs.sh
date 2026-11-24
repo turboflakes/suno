@@ -73,7 +73,7 @@ fetch_chain_specs() {
 }
 
 # Relay Chains
-fetch_chain_specs "westend"  "westend.rpc.turboflakes.io"
+fetch_chain_specs "westend"  "westend-rpc.polkadot.io"
 fetch_chain_specs "paseo"    "paseo.rpc.turboflakes.io"
 fetch_chain_specs "kusama"   "kusama.rpc.turboflakes.io"
 fetch_chain_specs "polkadot" "polkadot.rpc.turboflakes.io"
